@@ -124,6 +124,10 @@ as Administrator.
   CREATE USER [VGSOT\svc-pncapi] FOR LOGIN [VGSOT\svc-pncapi];
   ALTER ROLE [app_execute] ADD MEMBER [VGSOT\svc-pncapi];
   ```
+- **Card round 2 answered 2026-09-11 20:09Z** (#91): the grant above run by the owner and verified by query;
+  the owner installs the second site by hand from `docs/runbook/VM02-SECOND-SITE.md`; `VGS01@vgsot.internal`
+  (Administrator, Global) and `VGS99@vgsot.internal` (ReadOnly, Global) seeded on `_V2_DEV` as gate fixtures.
+  **Still owed:** the site on VM02 and the VM07 run; W1 closes when that result is observed here.
 
 ### W2 — Identity, roles, scopes
 

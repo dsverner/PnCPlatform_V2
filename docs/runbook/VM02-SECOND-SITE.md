@@ -1,6 +1,6 @@
 # VGS-VM02 — the V2 API as a second IIS site (decision #89)
 
-**Planned, not yet done. 2026-09-11.** What installing the V2 API next to the predecessor's site
+**2026-09-11. Steps 1 and the identities of step 7 are done; steps 2–7 are the owner's, by hand (decision #91).** What installing the V2 API next to the predecessor's site
 involves, with what the predecessor's record does and does not say. Every "recorded" fact below was
 read this session in `C:\Projects\PnCPlatform`; every **not recorded** is a gap the install has to
 close by looking at the VM itself.
@@ -24,7 +24,7 @@ VM07.
 
 ## The install, step by step
 
-1. **Database (VM01)** — run by the owner; `dev_pnc` may not grant it from this session:
+1. **Database (VM01)** — **done** by the owner 2026-09-11 (card round 2 G1) and verified by query: `app_execute` on `_V2_DEV` holds `VGSOT\svc-pncapi`.
    ```sql
    USE PnCPlatform_V2_DEV;
    CREATE USER [VGSOT\svc-pncapi] FOR LOGIN [VGSOT\svc-pncapi];
@@ -62,15 +62,16 @@ VM07.
    PnC.Api.Smoke.exe https://vgs-vm02.vgsot.internal:8443 - --windows=Administrator
    PnC.Api.Smoke.exe https://vgs-vm02.vgsot.internal:8443 - --windows=ReadOnly
    ```
-   `security.User` rows for `VGS01@vgsot.internal` and `VGS99@vgsot.internal` with their grants
-   must exist on `_V2_DEV` first — W2's identity work, or two rows seeded by hand for the gate and
-   recorded as such.
+   `security.User` rows for `VGS01@vgsot.internal` (Administrator, Global) and `VGS99@vgsot.internal`
+   (ReadOnly, Global) **exist on `_V2_DEV`** — seeded through the procedures as the SYSTEM actor on
+   2026-09-11 (G3, #91), each person noted as a W1 gate fixture. W2 replaces them with the real model.
 8. **Record** — `platform.Deployment` for the V2 database (deploy.py does this on the schema side);
    the W1 gate record in `PHASE-1-WORKFLOW.md` gets the observed result.
 
-## What is still a decision
+## Decided
 
-Who runs steps 2–7, and how. Two honest options: the owner by hand on the VM (the predecessor's
-installs were done that way, with the Proxmox path for file transfer), or this session through the
-Proxmox guest agent with the credentials in `dev.local` — a first for this project, on the OT
-application server, and therefore not started without a ruling.
+The owner runs steps 2–7 by hand on the VM (#91), the way the predecessor's installs were done. When
+the site answers, this session verifies from the laptop: `/health` over the Tailscale path is **not**
+expected to answer (Business → OT allows SQL only); the observation is the VM07 smoke output the owner
+pastes into the next card, and the `AccessRefused` and `SignIn`-shaped rows in `audit.vActionLog` on
+`_V2_DEV`, which this session can read.
