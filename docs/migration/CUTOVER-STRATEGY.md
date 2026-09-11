@@ -99,11 +99,13 @@ How legacy rows become platform facts. The rules, not the code.
 | `M` rows | **Open work in flight** — 357, one per device | Each becomes a running `SETTINGS_CHANGE` instance **landed at the `COMPLETION` block**, with its two branch states set from the legacy documentation and database tracks (Complete → Completed · NA → NotApplicable · Change In Progress → Running) and steps 1–12 recorded as *migrated — not performed in this platform*, using the migration list's own mechanism (design §6). Owner's ruling #56. Nothing about the earlier steps is invented |
 | The three track tables — **software** column | Notes on the migrated request | The software track is not in the new procedure (owner's ruling #58). Its 1 906 non-NA rows — 1 572 Complete, 334 In Progress — are carried as dated notes with their text, never dropped |
 | `D` rows | **Dropped** — 2 361 rows | Work request deleted before completion; no significance (owner). Dropped with a **counted, recorded reason**, never silently |
-| The 2 rows prefixed `2` | **Reconciled explicitly** | Never dropped silently |
-| The 17 bases where an archived CR exceeds the active CR | **Reconciled explicitly** | Genuine ordering violations. A ruling is needed — see `docs/OPEN-QUESTIONS.md` |
-| The 617 A/M/P rows with a CR below 1000 | Pre-numbering legacy | Ordering within these chains needs a rule |
+| The 2 rows keyed `2440` | **Dropped, with a counted reason** | A model number typed into the key; one SEL-2440 at Belledune, 2018. Owner's ruling #60 |
+| The 17 bases where an archived CR exceeds the active CR | **Migrated as the letters say; each becomes a finding on day one** | `A` active, `P` history, no automatic correction. A person rules on each afterwards. Owner's ruling #59 |
+| The 617 A/M/P rows with a CR below 1000 | Ordinary rows | No rule needed: CRs below 1 000 sort first, correctly; 334 are single-row chains (#72) |
+| `SET1` (13 771 populated) | **The revision's settings file, text format** | The legacy name=value text *is* the text settings-file format of decision #61. Each populated `SET1` becomes a `ConfigurationFile` of kind `SettingsText` on its revision, parsed later against the device's template |
+| `IDATE` | Dropped | NULL in all 14 211 rows (#72) |
 | Document filenames `A9999` / `M9999_12345` / `P9999_12345` | State decoded and discarded; the file attaches to its revision | State must **not** survive into filenames |
-| `CDATE` | Calculated date on the revision | 1 188 null, 54 sentinel — null, never sentinel, in the platform |
+| `CDATE` | Calculated date on the revision | 1 188 null, 54 sentinel — **sentinel means unknown** (#62): null in the platform |
 | `VDATE` | Verified / in-service date on the revision | 1 273 null, 75 sentinel — likewise |
 | `Settings Management` row | The Work Request | `SAP Work Order Numer` (50 populated) → the Cascade/SAP link |
 | The three track tables | Three **parallel branches** of one procedure instance | Complete / NA / Change In Progress map to branch outcomes |

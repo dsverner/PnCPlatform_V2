@@ -93,16 +93,12 @@
                 "else": {
                   "block": "step",
                   "id": "RECORD_SETTINGS",
-                  "title": "[4] Record the relay's settings",
-                  "instruction": "Electromechanical or static relay: record the settings directly. They become a revision in the package like a file would. The fields here are placeholders until the per-device-type definitions are agreed (OQ-19).",
+                  "title": "[4] Record the relay's settings as a text file",
+                  "instruction": "Electromechanical or static relay: no vendor file exists, so the settings are written as a text file in name=value form — WDG1=2.9, WDG2=2.9, SLOPE=25 % — and attached. The device's template says which settings it has; the text reader parses the file against it; every setting is then readable as device.settings.<key>, exactly like a microprocessor relay's (decision #61).",
                   "role": "engineer",
-                  "capture": {
-                    "tap":           { "type": "num", "unit": "A", "base": "Secondary", "required": true, "validate": "value > 0" },
-                    "timeDial":      { "type": "num", "required": true, "validate": "value > 0" },
-                    "instantaneous": { "type": "num", "unit": "A", "base": "Secondary" }
-                  },
+                  "evidence": { "required": true, "kinds": ["SettingsText"], "min": 1 },
                   "signoff": { "action": "Calculate" },
-                  "record": { "kind": "DeviceSettings" }
+                  "record": { "kind": "ConfigurationFileRevision" }
                 }
               }
             },

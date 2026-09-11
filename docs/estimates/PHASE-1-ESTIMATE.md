@@ -34,7 +34,7 @@ central requirement, which is why it is not a multiplier.
 
 | # | Package | Low | High | What drives the spread |
 |---|---|---:|---:|---|
-| A | **Repository bring-up** — import the carried schema DDL, deploy pipeline (`deploy.py`, sqlpackage, `Roles.sql`, the 252-check smoke), API and PWA into V2; subsystem-map lines; build green; deployed to DEV | 12 | 24 | *Assumes the predecessor's code is carried subsystem-by-subsystem, not rewritten. Decision #27 says the stack; it does not say the code. If the code is rewritten, add 60–100.* |
+| A | **Repository bring-up and application rewrite** — import the carried schema DDL and deploy pipeline (`deploy.py`, sqlpackage, `Roles.sql`, the 252-check smoke) and `PnC.Formula`; **rewrite the API and PWA** on the same stack; subsystem-map lines; build green; deployed to DEV | 72 | 124 | **Owner's ruling #64 (v0.3): the application is rewritten, against the recommendation to carry it.** Was 12–24 on the carry assumption; the rewrite adds 60–100. The generic dispatcher, forms, definitions editor, expression checker and Windows auth are all rebuilt |
 | B1 | **`process` schema DDL** — 12 tables with the four conventions, temporal classes, generated views and accessors | 16 | 24 | *UNVERIFIED whether the predecessor's 510 procedures and 365 views come from a generator or were hand-written. If a generator exists, the low end; if not, the high.* |
 | B2 | **Document validation and projection** — schema enforcement, structural checks (§8 of the design), canonical AST on approval, projection into `ProcedureStep`, `ProcedureStepRole`, `ProcedureFactUse`, `ProcedureCall` | 12 | 20 | The schema exists; the structural checks are enumerated. Spread is the document-aware typing hook (OQ-14) |
 | B3 | **The interpreter** — block-tree execution for all eight kinds; step lifecycle; the ten-action commit through `record.*`, segregation and acceptance | 40 | 60 | The largest single package. `foreach` with parallel members, `repeat` passes, and `parallel` joins are where the hours go. The commit pipeline reuses existing machinery |
@@ -48,7 +48,7 @@ central requirement, which is why it is not a multiplier.
 | D2 | **Navigation by the tree** — the Location / Protected Asset / Protection Function view as a projection of `location.Node` → `asset.Placement` → `scheme.CommissionedFunction`, plus browse by station, panel, scheme and device type (FR-7.2, binding; decision #57) | 12 | 20 | Added after the specification review (H5). The `location` and `scheme` schemas are carried; this is screens, not schema. Spread is the projection query's complexity against 208k location rows |
 | F | **Authentication and the seven account types** — Windows/Kerberos auth exists (`Auth.Mode: Windows`, app-pool SPN registered); map the seven types to `security.Role` grants with functional-location and device-type scope; read-scope enforcement | 8 | 14 | Role codes undecided (OQ-18). Auth itself is carried |
 | H | **Testing, UAT support, defect fixing, cutover rehearsal** | 24 | 40 | The predecessor's relocation rehearsal found five defects DEV structurally could not show. Expect the same shape |
-| | **Build subtotal (A–F, H)** | **224** | **370** | *v0.2: +12–20 for D2, added after the specification review* |
+| | **Build subtotal (A–F, H)** | **284** | **470** | *v0.2: +12–20 for D2 (specification review). v0.3: +60–100 for the application rewrite (#64)* |
 
 ### Documentation packages in the fixed price
 
@@ -81,20 +81,23 @@ credited.
 
 | | Low | High |
 |---|---:|---:|
-| Build (A–F, H) | 224 | 370 |
+| Build (A–F, H) | 284 | 470 |
 | Documentation remaining | 63 | 100 |
-| **Phase 1 as scoped in `REQUIREMENTS.md` §10** | **287** | **470** |
+| **Phase 1 as scoped in `REQUIREMENTS.md` §10** | **347** | **570** |
 | Contracted effort basis | 180 | 240 |
 | Four weeks at 40 h/week | 160 | 160 |
 
-**The scope as proposed is roughly 1.5× the contract's high end at the low estimate, and nearly
-2× at the high.** Against the four-week calendar it is 1.7–2.8×. The judgement stated in
+**The scope as proposed is roughly 1.4× the contract's high end at the low estimate, and 2.4× at
+the high.** Against the four-week calendar at forty hours it is 2.2–3.6×. The judgement stated in
 `REQUIREMENTS.md` §10 and `OPEN-QUESTIONS.md` OQ-11 — that the full scope does not fit — is now a
-number.
+number, and the owner has ruled on it (#63): the engine is built inside Phase 1 anyway, the excess
+is investment in phases 2–5, the documentation packages are delivered at acceptance, and the owner
+works more than forty hours a week for this phase (#71).
 
-Where the excess comes from, in order: the engine (B1–B7, 100–158 h) is the whole of it. Without
-the engine, A + C + D + E + F + H is 112–192 h — inside the contract's band and consistent with the
-proposal's own 80-hour Phase 1a baseline plus documentation.
+Where the excess comes from: the engine (B1–B7, 100–158 h) and, from v0.3, the application rewrite
+(60–100 h, #64). Without either, C + D + D2 + E + F + H plus a 12–24 h bring-up is 124–216 h —
+inside the contract's band and consistent with the proposal's own 80-hour Phase 1a baseline plus
+documentation. Both additions are the owner's deliberate choices, recorded with their cost.
 
 ---
 
@@ -112,10 +115,14 @@ These are the owner's choices. Each is stated with what it costs.
 | **6. Recognise the engine as investment.** Build it as designed inside Phase 1; treat ~100–160 h of it as unfunded, recovered in phases 2–5 where every phase reuses it | 0 | Commercial, not technical. The engine is what makes phases 2–5 cheap; the SOW's Phase 2 (*settings automation, logic exports*) and Phase 4 (*compliance*) are procedures |
 | **7. Re-baseline with the client.** Present the measured scope and this estimate; propose Phase 1 at its real size or split it | 0 | The proposal's own §8 lists *Phase 1 scope expansion* as its first risk and prescribes change control for it |
 
-Options 1–4 together: **34–56 h saved**, bringing the build to roughly 190–314 and the whole to
-253–414. Still above 240 at the low end once documentation is included. **No combination of
+Options 1–4 together: **34–56 h saved**, bringing the build to roughly 250–414 and the whole to
+313–514. Still above 240 at the low end once documentation is included. **No combination of
 technical descoping alone brings the full scope inside 240 hours while keeping the engine.**
 That leaves 5, 6 or 7, which are the owner's to make.
+
+**Ruled 2026-09-11 (#63): option 6 with option 5** — the engine is built inside Phase 1 as
+investment, and the documentation packages are delivered at acceptance. Options 1–4 were not
+taken. The owner will work more than forty hours a week for the phase (#71).
 
 ---
 
@@ -138,14 +145,14 @@ Named, with which package they hit.
 
 ## 6. What this estimate does not know
 
-- **Whether code is carried.** Decision #27 chose the stack; the carry-forward decision (#21) was
-  about the schema. If the API and PWA are re-imported, A is 12–24; if rewritten, A alone exceeds
-  the saving of every descoping option combined. This is the single largest uncertainty and it is
-  a decision, not a discovery.
+- **Whether code is carried — ruled.** Decision #64, 2026-09-11: the application is rewritten;
+  only `PnC.Formula` and the deploy tooling are carried. A is 72–124. The single largest
+  uncertainty in v0.1 is now the single largest deliberate addition.
 - **The predecessor's tooling.** UNVERIFIED: a DDL/procedure generator; the applicability of its
   migration machinery to the legacy relay database. Both were assumed favourable at the low end
   and absent at the high.
-- **The owner's hours per week.** Four weeks at 40 is 160; the proposal's 180–240 already implies
-  more than that or more than four weeks.
+- **The owner's hours per week — partly ruled.** Decision #71: more than forty a week for this
+  phase, unquantified. Four weeks at 40 is 160; at 55 it is 220. Against 347–570 h, the calendar
+  is still the constraint, not the rate. Start date not given.
 - **What the client will accept as parity.** `LEGACY-SYSTEM.md` §8 is the measured surface; the
   client's reviewers have not confirmed it is the whole of what they use.

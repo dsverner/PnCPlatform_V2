@@ -274,3 +274,13 @@ updater (`progFRM_Update`).
 5. **`Verify Order` is rare — 77 of 8 409.** Verification as a distinct activity barely exists in
    the legacy process, which is worth knowing before assuming the group has an established
    verification practice to preserve.
+6. **`SET1` is already a settings-file format.** For the majority of the estate that has no vendor
+   file, the legacy system stored settings as name=value text — `WDG1=2.9, WDG2=2.9, SLOPE=25 %,
+   HARMONIC RESTRAINT = 20%` for a CGE BDD15B; `COMPENSATOR=1.4 OHMS, INST=14 AMPS` for a
+   Westinghouse CYL. Under the owner's ruling #61 that text *is* the platform's text settings-file
+   format: each populated `SET1` (13 771 rows) becomes a configuration-file revision of kind
+   `SettingsText`, and the per-model templates that make its settings readable as
+   `device.settings.<key>` are seeded by parsing every model's patterns. Active records by
+   manufacturer: SEL 1 273 · CGE 1 087 · Westinghouse 647 · Agastat 390 · GEC 333 · ABB 273 ·
+   Basler 246 · GE 219 · Beckwith 159 · P&B 151 · Omron 123 — most of the non-SEL ones are this
+   shape.

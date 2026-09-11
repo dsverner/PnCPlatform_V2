@@ -97,6 +97,23 @@ Twenty schemas. For each: what it owns, its size, the requirement it serves, and
 | `work` | 9 | 47 616 | `WorkRequest` (11 879), `WorkRequestCascadeLink`, `CascadeWorkOrder`, `Notification` / `NotificationDelivery`, `Subscription` | FR-5.1 | **carry** — except `WorkflowInstance` and `WorkflowTransition`, which are **replaced** |
 | **`process`** | 12 | 0 | **New — designed, not built.** Projections from approval: `ProcedureStep`, `ProcedureStepRole`, `ProcedureFactUse`, `ProcedureCall`. Runtime: `WorkflowInstance`, `WorkflowTransition` (re-homed), `ProcedureInstance`, `InstanceVersionSet`, `BlockInstance`, `StepInstance`, `HoldInstance`, `InstanceMigration` | FR-1.x, FR-2.x | **new** — `docs/design/PROCEDURE-ENGINE.md` §4 |
 
+### The application code — not carried
+
+This map is a map of the **schema**. The owner ruled on 2026-09-11 (decision #64) that the
+predecessor's **application is rewritten** on the same stack, against the recommendation to carry
+it. Two pieces of code are carried, each with the same deliberate re-justification as a schema
+subsystem:
+
+| Carried | Why |
+|---|---|
+| `src/PnC.Formula` — the grammar-1 library and its 133-case conformance suite | The engine's every condition, validation and cadence runs on it; the design (#43) depends on it unchanged |
+| `deploy.py`, sqlpackage publish profile, `Roles.sql`, the 252-check schema smoke, `rehearse_relocation.py` | Deployment and the QA environment already work on the client-shaped mimic; rebuilding them buys nothing |
+
+Not carried: `src/PnC.Api` (the generic dispatcher, forms, definitions editor, expression checker
+UI, rule runs, notifications, feed puller, Windows-auth middleware) and `wwwroot/` (the PWA).
+Their *designs* remain consultable in the predecessor's `PLATFORM-ARCHITECTURE.md`; their code is
+not imported. Estimated cost of the rewrite: 60–100 h (`PHASE-1-ESTIMATE.md` A).
+
 ### What is replaced
 
 Seven tables, 124 rows. See `docs/review/SCHEMA-REVIEW.md` §3 for why, and

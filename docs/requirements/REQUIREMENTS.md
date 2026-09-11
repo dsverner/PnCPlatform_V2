@@ -181,6 +181,12 @@ with a settings file.
 > seriously. That was wrong and was withdrawn after checking. `record.CharacteristicValue` and
 > `asset.CharacteristicValue` are generic and typed, and `ref.AssetType` carries 79 Secondary and
 > 11 Hybrid types against 56 Primary. The requirement stands; the predecessor already meets it.
+>
+> *How it is met, per the owner's ruling #61:* every device's settings are held as **a file** —
+> the vendor's native file where one exists, a text file in name=value form where not — parsed
+> against a **per-device template** naming the settings that device has, and read through **one
+> accessor**, `device.settings.<key>`. A relay with no vendor file is not a degenerate case; it is
+> a device whose file happens to be text. The legacy `SET1` column is that text format.
 
 ---
 

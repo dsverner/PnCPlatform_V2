@@ -1,9 +1,9 @@
 # The procedure engine — design
 
-**Status:** design v0.2, 2026-09-11. v0.1 was reviewed by the owner (twelve sections, all kept)
+**Status:** design v0.3, 2026-09-11. v0.1 was reviewed by the owner (twelve sections, all kept)
 and by the specification review (`docs/review/SPEC-PANEL-REVIEW.md`, 24 findings). Eight
-repair decisions were put to the owner as worked examples and ruled; they are folded in here and
-recorded as decisions #50–#58. No code exists.
+repair decisions were put to the owner as worked examples and ruled (#50–#58, v0.2); every
+remaining open question was then closed on one card (#59–#72, v0.3). No code exists.
 
 The engine is the part of the platform that the schema review found missing (`SCHEMA-REVIEW.md`
 §3) and the part `REQUIREMENTS.md` §3 makes central. This document is its design: what a procedure
@@ -31,6 +31,7 @@ The engine is the part of the platform that the schema review found missing (`SC
 | H5 — navigation by the tree | The tree is the model; the legacy Location / Protected Asset / Protection Function style is its default view, kept indefinitely (#57) | §10 |
 | Owner, unprompted — the legacy software track | Dropped from the procedure; its rows migrate as notes (#58) | §9, §10 |
 | M1–M9, L1–L6 | Clarifications, no ruling needed | throughout |
+| **v0.3** — the open-questions card | Every device's settings are a file, native or text, parsed by a per-model template, read as `device.settings.<key>` (#61); draft reads logged (#68); a hold past its maximum raises an obligation (#69); the eight predecessor workflows discarded (#70); role codes settled (#66); fact names accepted (#67); the application is rewritten, not carried (#64) | §3, §4, §5.1, §9, §12 |
 
 ---
 
@@ -174,8 +175,10 @@ A step is assigned to a role; a **claim** makes it one person's. The first perso
 step claims it (`ClaimedByActorId`, with a lease that renews while they work and expires when they
 stop). Everyone else in the role sees it read-only with *"R. Doucet is working this step"*. The
 claimant may release it; the responsible engineer may take it over with a reason, which is logged.
-The draft is writable only by the claimant. This is also the answer to who may read a draft
-(OQ-15): the claimant and the responsible role.
+The draft is writable only by the claimant, and readable by the claimant and the responsible
+role. **Every read of a draft by anyone other than its claimant is audit-logged** (#68), as reads
+of configuration files and evidence already are — so *"who looked at Doucet's readings before he
+committed them"* has an answer.
 
 ### 4.1 The evaluation model (#54)
 
@@ -230,7 +233,7 @@ The settings book is a consequence of commits, never edited by hand.
 |---|---|
 | `RequestConfirmation` with `produces: package` | a `document.SettingsIssuePackage` (the entity the lifecycle workflow governs), bound as `procedure.package`; its `SETTINGS_LIFECYCLE` instance starts in `Calculated` |
 | `ConfigurationFileRevision` | a `document.Revision` on the device's configuration document; a `document.ConfigurationFile` row with `CaptureKind = Design`, `DeviceEntityId` = the member device, `ParseStatus` from the parser; a `document.SettingsIssuePackageItem` linking the revision to `procedure.package` |
-| `DeviceSettings` (the electromechanical fork, #50) | a `document.Revision` on the device's configuration document with the captured taps, dial and instantaneous values as `record.CharacteristicValue` rows against `CharacteristicDefinition`s per device type; a `SettingsIssuePackageItem` likewise. No file, no parse |
+| `ConfigurationFileRevision` from a **text settings file** (the electromechanical fork, #50, #61) | exactly the same as the row above — a `document.Revision`, a `ConfigurationFile` with `CaptureKind = Design` and `FileKind = SettingsText`, a `SettingsIssuePackageItem` — parsed by the text reader against the device model's template. A relay without a vendor file is a device whose file is text, not a different kind of thing |
 | `Readback` | a `document.ConfigurationFile` row with `CaptureKind = Readback` from the readback file; a `record.Readback` comparing it (`ProducedConfigurationFileRevisionRowId`) with the approved design revision (`ComparedToConfigurationFileRevisionRowId`), `DifferenceCount` from the capture |
 | `Finding` | a `record.Finding` with the declared category |
 | `Approval` on the package | approval cascades to every revision in the package (PnCPlatform #60) |
@@ -363,10 +366,15 @@ correctly.
 `examples/settings-change.procedure.json`, v0.2. Fourteen steps; four things the legacy system
 could not do.
 
-**Electromechanical relays are first-class (#50).** The `BUILD` foreach's body is a `choice` on
-`device.technology`: a microprocessor relay gets `BUILD_SETTINGS` — file required; anything else
-gets `RECORD_SETTINGS` — tap, time dial, instantaneous and pickup captured as typed values. Both
-commit as revisions in the settings book.
+**Every device's settings are a file (#50, #61).** The `BUILD` foreach's body is a `choice` on
+`device.technology`: a microprocessor relay gets `BUILD_SETTINGS` — the vendor's native file,
+required; anything else gets `RECORD_SETTINGS` — a **text settings file in name=value form**, the
+legacy `SET1` format (`WDG1=2.9, WDG2=2.9, SLOPE=25 %, HARMONIC RESTRAINT = 20%`). Both commit as
+configuration-file revisions in the settings book. Each device model has a **template** naming the
+settings it carries; the file family's reader parses the file against the template; and every
+setting on every device is read through **one accessor** — the grammar's existing
+`device.settings.<key>` fact, which is the owner's `X('wdg1') = 2.9`. Adding a file type is
+writing a reader; adding a model is writing a template; neither is a release.
 
 **A relay can leave the change (#51).** `RESOLVE_DIFFERENCE` with outcome *ChangeRaised* ends that
 member's branch as `Superseded`; the corrective request owns the relay; the other ten continue;
@@ -440,14 +448,22 @@ named section above.
 
 ---
 
-## 12. Not decided here
+## 12. Settled since v0.1, and what remains
 
-- **The fact names in §7** — proposed, not agreed. OQ-14.
-- **The characteristic definitions for electromechanical settings** — tap, time dial,
-  instantaneous, pickup are placeholders; the real set per device type comes from the legacy
-  `DESC`/`REMARKS` columns and the owner (OQ-19).
-- **The predecessor's eight draft `Program.Workflow` definitions** — discard recommended. OQ-16.
-- **Whether a `hold` past its maximum raises an obligation.** OQ-17.
-- **`security.Role` codes.** OQ-18.
-- **API endpoints** — implied, not specified.
+Closed by the owner on 2026-09-11 (`DECISION-LOG.md` #59–#72):
+
+- **The fact names in §7** — accepted as proposed (#67).
+- **Electromechanical settings** — a text settings file parsed against a per-model template, read
+  as `device.settings.<key>` (#61). Templates are seeded from the legacy `SET1` patterns; a card
+  will put the per-model field sets to the owner.
+- **The predecessor's eight draft workflow definitions** — discarded (#70).
+- **A hold past its maximum raises an obligation** (#69). The sweep of §4.1 raises it.
+- **Reads of a step's draft are audit-logged** (#68), like reads of evidence.
+- **Role codes** — `PCEngineer` with scoped grants, `PCTechnician`, `Administrator`, `PCApprover`
+  as a grant (#66).
+
+Still not decided here:
+
+- **API endpoints** — implied by the shapes above, not specified.
 - **`DRAWING_REVISION`** — referenced, not authored.
+- **The per-model templates' actual field sets** — a task, with a card, not a design question.
