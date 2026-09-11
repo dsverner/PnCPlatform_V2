@@ -24,6 +24,12 @@ VM07.
 
 ## The install, step by step
 
+Steps 2–7 are also one script, `install-vm02-second-site.ps1` beside this file, to run on the VM in an
+elevated PowerShell with the package's path; it asks for the pool identity's password and writes it
+nowhere. Running it from the laptop through the Proxmox guest agent was attempted on 2026-09-11 and
+stopped by this session's permission mode (remote execution on the OT server); it stays the owner's
+to run, or the owner allows that path.
+
 1. **Database (VM01)** — **done** by the owner 2026-09-11 (card round 2 G1) and verified by query: `app_execute` on `_V2_DEV` holds `VGSOT\svc-pncapi`.
    ```sql
    USE PnCPlatform_V2_DEV;
