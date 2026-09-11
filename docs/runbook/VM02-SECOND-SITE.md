@@ -73,5 +73,5 @@ VM07.
 The owner runs steps 2–7 by hand on the VM (#91), the way the predecessor's installs were done. When
 the site answers, this session verifies from the laptop: `/health` over the Tailscale path is **not**
 expected to answer (Business → OT allows SQL only); the observation is the VM07 smoke output the owner
-pastes into the next card, and the `AccessRefused` and `SignIn`-shaped rows in `audit.vActionLog` on
-`_V2_DEV`, which this session can read.
+pastes into the next card, and the `AccessRefused` row the ReadOnly write check leaves in
+`audit.vActionLog` on `_V2_DEV`, which this session can read. (The API writes no sign-in rows.)
