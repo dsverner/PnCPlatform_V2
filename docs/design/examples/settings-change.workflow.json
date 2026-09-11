@@ -1,0 +1,30 @@
+{
+  "g": 1,
+  "kind": "workflow",
+  "key": "SETTINGS_CHANGE_REQUEST",
+  "name": "Settings change request",
+  "description": "The lifecycle of a work request whose work type is a settings change. Entering InProgress starts the SETTINGS_CHANGE procedure; closing requires that procedure to have completed. This is the workflow-to-procedure direction of the join (FR-2.1). Program.WorkType SETTINGS_CHANGE binds to this workflow.",
+  "subjectKind": "WorkRequest",
+  "states": [
+    { "code": "Raised", "name": "Raised", "initial": true, "roles": ["PCEngineer", "Administrator"] },
+    {
+      "code": "InProgress", "name": "In progress", "roles": ["PCEngineer", "PCTechnician", "PCApprover", "Administrator"],
+      "onEnter": [
+        { "startProcedure": "SETTINGS_CHANGE", "bind": { "package": "work.settings_package" } }
+      ]
+    },
+    { "code": "Closed", "name": "Closed", "terminal": true, "roles": [] },
+    { "code": "Cancelled", "name": "Cancelled", "terminal": true, "cancellation": true, "roles": [] }
+  ],
+  "transitions": [
+    { "from": "Raised", "to": "InProgress", "name": "Start", "roles": ["PCEngineer"] },
+    {
+      "from": "InProgress", "to": "Closed", "name": "Close", "roles": ["PCEngineer"],
+      "requires": [
+        { "procedure": "SETTINGS_CHANGE", "outcome": "Completed" }
+      ]
+    },
+    { "from": "Raised", "to": "Cancelled", "name": "Cancel", "requiresReason": true },
+    { "from": "InProgress", "to": "Cancelled", "name": "Cancel", "requiresReason": true, "roles": ["PCEngineer", "Administrator"] }
+  ]
+}

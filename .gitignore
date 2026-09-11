@@ -1,0 +1,57 @@
+# Build output
+/build/
+/dist/
+/out/
+Win64x/
+Win32/
+Debug/
+Release/
+*.o
+*.obj
+*.tds
+*.exe
+*.dll
+
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# Credentials and local config — never commit
+connection.ini
+server.ini
+dev.local
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# SQL Database Project build output
+docs/schema/ddl/bin/
+docs/schema/ddl/obj/
+
+# .NET build output (src/)
+bin/
+obj/
+.vs/
+
+# DEV-only application overrides (vision §8.6) — carries the DEV SQL login
+appsettings.Local.json
+.ssh-vm08/
+
+# the browser tier build (decision 257)
+src/PnC.Web/node_modules/
+src/PnC.Web/dist/

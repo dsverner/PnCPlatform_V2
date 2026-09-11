@@ -1,0 +1,32 @@
+{
+  "g": 1,
+  "kind": "workflow",
+  "key": "SETTINGS_LIFECYCLE",
+  "name": "Settings-issue package lifecycle",
+  "description": "The lifecycle of the thing — a settings-issue package and, through it, the configuration-file revisions it carries. It is advanced by steps of the SETTINGS_CHANGE procedure (step.advances), never by hand except Supersede. This is the procedure-to-workflow direction of the join (FR-2.1), and the replacement for the predecessor's SETTINGS_APPROVAL state machine, whose six states it keeps and extends with Issued.",
+  "subjectKind": "SettingsIssuePackage",
+  "states": [
+    { "code": "Calculated", "name": "Calculated", "initial": true, "roles": ["PCEngineer"] },
+    { "code": "Checked", "name": "Checked", "roles": ["PCEngineer", "PCApprover"] },
+    { "code": "Approved", "name": "Approved", "roles": ["PCEngineer"] },
+    { "code": "Issued", "name": "Issued", "roles": ["PCEngineer", "PCTechnician"] },
+    { "code": "Applied", "name": "Applied", "roles": ["PCEngineer", "PCTechnician"] },
+    { "code": "Verified", "name": "Verified", "roles": ["PCEngineer"] },
+    { "code": "InService", "name": "In service", "terminal": true, "roles": [] },
+    { "code": "Superseded", "name": "Superseded", "terminal": true, "roles": [] },
+    { "code": "Withdrawn", "name": "Withdrawn", "terminal": true, "cancellation": true, "roles": [] }
+  ],
+  "transitions": [
+    { "from": "Calculated", "to": "Checked", "name": "Check", "signoff": "Check" },
+    { "from": "Checked", "to": "Approved", "name": "Approve", "signoff": "Approve", "requires": [ { "when": "package.revision_count > 0" } ] },
+    { "from": "Approved", "to": "Issued", "name": "Issue" },
+    { "from": "Issued", "to": "Applied", "name": "Apply" },
+    { "from": "Applied", "to": "Verified", "name": "Verify", "signoff": "ReturnToService" },
+    { "from": "Verified", "to": "InService", "name": "Baseline" },
+    { "from": "InService", "to": "Superseded", "name": "Supersede", "roles": ["PCEngineer"], "requiresReason": true },
+    { "from": "Calculated", "to": "Withdrawn", "name": "Withdraw", "requiresReason": true },
+    { "from": "Checked", "to": "Withdrawn", "name": "Withdraw", "requiresReason": true },
+    { "from": "Approved", "to": "Withdrawn", "name": "Withdraw", "requiresReason": true },
+    { "from": "Issued", "to": "Withdrawn", "name": "Withdraw", "requiresReason": true }
+  ]
+}

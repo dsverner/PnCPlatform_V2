@@ -1,0 +1,73 @@
+# Decision log — PnCPlatform_V2
+
+Every decision taken on this project, in one sequence, numbered from 1.
+
+This is a **record, not a plan**. A decision is never deleted: one that no longer holds is marked
+superseded, with what replaced it, because the question an auditor asks years later is *why is it
+built this way* and the answer must survive the answer changing.
+
+**This log does not continue PnCPlatform's 258.** Where a V2 decision agrees with a predecessor
+decision, it cites it — `agrees with PnCPlatform #45` — rather than inheriting it. Carry-forward
+is deliberate re-justification.
+
+**Sources:** `R1`–`R7` are the interview rounds in `docs/interview/ROUNDS.md`. `Spec review` is
+the owner's mark-up of requirements v0.1. `Schema review` is `docs/review/SCHEMA-REVIEW.md`.
+`Plan` is the approved plan for the first commit, 2026-09-11.
+
+| # | Decision | Why | Source |
+|---|---|---|---|
+| 1 | `PnCPlatform_V2` is the **delivery repository**. `C:\Projects\PnCPlatform` at 0.10.5 becomes a reference corpus, consulted deliberately and inherited nowhere | Owner: *"I want a full review of the schema based upon an exhaustive interview of the desired outcomes."* | R1 |
+| 2 | The rebuild driver is **comprehensibility and end-state fit**, not defect | Owner: *"This project is very large and important, we need to make sure that the starting architecture sets us up for that end result and not just a phase 1 outcome."* Marked *"I can no longer hold it in my head"* | R1 |
+| 3 | The platform's primary identity is the **engineering work environment**. When it conflicts with other identities, this one wins | Owner: *"at the end of the day, I am contracted to replace the existing engineering environment."* | R2 |
+| 4 | Four answers must never fail: **point in time · proof of obligation · impact · reconstruction**. Change-and-rationale, estate and authorisation were left unmarked | Owner's selection. The unmarked three are not dropped; they are not must-never-fail | R2 |
+| 5 | **Impact** is the answer whose failure would be a serious professional problem | Owner's single pick | R2 |
+| 6 | The **tension** between decisions 3 and 4 — a work environment wants mutability, a record wants immutability — is carried explicitly, not resolved quietly | Stated to the owner in R3; resolution is decision 23 | R3 |
+| 7 | All **fourteen work steps** are real and distinct: request · scope · study · vendor tool · rationale · check · approval · issue · apply · readback · test · return to service · baseline · drawings | Owner ticked all fourteen. Nothing descoped on this basis | R3 |
+| 8 | All **eight impact triggers** must be traceable: standard · advisory · system change · template · primary plant · device swap · error found · misoperation | Owner ticked all eight | R3 |
+| 9 | The estate is **modest**: 50–150 stations, 2k–10k devices, 10k–100k settings records, 15–25 yr history, 25–75 users, <10 concurrent, 100–500 changes/yr, 25–50% microprocessor | Owner's dials. Consequence: a complexity problem, not a volume problem | R4 |
+| 10 | **Procedures are authored definitions, never code.** The engine interprets versioned, approved definitions | Owner: *"We need to create a process engine that will allow us to create/edit etc. all the various procedures that need to be followed in the group… There can be no hard coded procedures."* Agrees with PnCPlatform #45 | R4 |
+| 11 | **Two deliberate layers**: a workflow governs the lifecycle of a thing; a procedure governs the doing; one invokes the other at a step | Owner's pick from three shapes. The predecessor had two mechanisms that were never joined | R5 |
+| 12 | The procedure vocabulary is **twelve capabilities**: ordered steps · data capture · branching · guards · roles per step · sign-off · evidence · parallel · sub-procedures · due dates · hold points · deviation | Owner's selection | R5 |
+| 13 | **In-flight work is pinned** to the procedure version it started on | Owner reversed his R5 answer once the conflict with decision 4 (point in time) was put to him | R6 |
+| 14 | **Iteration over a set** is needed | Owner reversed his R5 answer. Reinforces PnCPlatform #60 (the settings-issue package is the approval subject) | R6 |
+| 15 | The **ownership boundary** — fourteen domains, each OURS, THEIRS or SPLIT — is as tabled in `REQUIREMENTS.md` §6 | Owner's grid, R6, with five conflicts reconciled in R7 | R6, R7 |
+| 16 | **Work orders are split**: Cascade owns the scheduled order; the platform owns the Work Request. Agrees with PnCPlatform #36 | Owner chose to keep #36 over his first answer of OURS | R7 |
+| 17 | **Assets are split**: the platform owns P&C engineering facts; SAP keeps purchase, stock, cost, warranty | Owner chose P&C-only. Respects the proposal's exclusion of enterprise asset-management replacement | R7 |
+| 18 | **Test records are split**: the tool keeps the raw file; the platform owns the result, readings and acceptance. Agrees with PnCPlatform #42 | Owner reversed THEIRS once the conflict with decision 4 (proof of obligation) was put to him | R7 |
+| 19 | **Drawings are split**: the drawing system holds the file; the platform records what each sheet depicts, by drawing key. Agrees with PnCPlatform #53 | Owner reversed THEIRS once the conflict with decision 5 (impact) was put to him | R7 |
+| 20 | **Wiring is ours, shape only in Phase 1** | Owner. Resolves the inconsistency between "unsure" and "everything below the panel is ours" | R7 |
+| 21 | **Carry forward** the proven subsystems; **design the procedure engine fresh** | The review found the failing part is 7 tables and 124 rows against 1 182 939 rows that work. Owner chose this over clean-sheet and over in-place replacement | Schema review |
+| 22 | The procedure layer being replaced is exactly: `config.TestPlanStep`, `TestPlanReading`, `work.WorkflowInstance`, `WorkflowTransition`, their registries, and the `Program.Workflow` / `Program.TestPlan` definition kinds | The two layers were never joined; 2 of 13 capabilities present; never activated | Schema review |
+| 23 | **Work is mutable until a procedure step commits it; committed facts are immutable thereafter.** The engine is the boundary between drafting and record | Resolves decision 6. Owner marked FR-2.2 *keep* | Spec review |
+| 24 | **Identity is the person; the account type is a platform grant.** AD authenticates; the seven account types are not directory groups | Owner: *"users will authenticate as themselves and then within the application they will be tied to the account types."* | Spec review |
+| 25 | **Two budgets**: architectural weight may be spent freely at this scale; the interface may not be slow | Owner: *"while true, the application must be responsive for usability's sake."* | Spec review |
+| 26 | **Non-microprocessor devices are first-class**, and the predecessor schema already satisfies this | Owner's dial (25–50% microprocessor) plus measurement of the characteristic model. An earlier claim to the contrary was withdrawn | R4, Schema review |
+| 27 | **Stack: .NET + PWA on SQL Server**, as PnCPlatform | Owner's choice from three. Deployment, IIS configuration and QA environment already exist and work | Plan |
+| 28 | **Authoring: the owner now, P&C engineers later.** The first editor is an expert surface; the model must admit a friendly authoring UI later without being reshaped | Owner's choice. Closes OQ-1 | Plan |
+| 29 | **The first commit is documents only.** No code, no scaffold, no DDL | Owner's choice. Establishes the record before anything is built against it | Plan |
+| 30 | **Phase 1 replaces the legacy application's functionality — not its structure or its stack** | Owner, mid-review | Plan |
+| 31 | Legacy `D`-prefixed rows (2 361) are **dropped at cutover** with a counted, recorded reason | Owner: *"D in the OLD_NO signifies that a work request was deleted prior to completion, in our cutover, these can be dropped as they have no significance."* | Plan |
+| 32 | Cutover is by **full-table content-hash diff**, not by watermark | The header table has no usable date (0 of 8 409) and no unique key (894 duplicated IDs); a watermark misses in-place edits; the whole database is 48 706 rows. Adopts the owner's import-now, delta-later strategy and rejects its obvious implementation | Plan |
+| 33 | `CDATE` is the **calculated date**; `VDATE` is the **verified date, when it went into service**. These two dates matter; `IDATE` is not yet characterised | Owner's correction | Plan |
+| 34 | Legacy state is decoded from **both** the `OLD_NO` prefix and the document filename rotation (`A9999` → `M9999_12345` → `P9999_12345` / `A9999`), and **state never survives into filenames** in the platform | Owner's description of the rotation, corroborated in the data | Plan |
+| 35 | This log starts at 1 and **cites** PnCPlatform decisions rather than continuing them | Carry-forward is deliberate re-justification, not inheritance | Plan |
+| 36 | The **decision-card convention** for asking the owner anything is carried forward unchanged, with one observed refinement: prefer propositions to accept/reject/amend over requests for narrative | Owner's standing instruction from PnCPlatform, 2026-09-08. Refinement from seven rounds of empty free-text boxes | Plan |
+| 37 | `docs/reference/CARRY-FORWARD-MAP.md` is **maintained, not written once**. Anything imported gets a line | It is the working answer to NFR-3 | Plan |
+| 38 | A procedure definition is **one JSON document per version**, authoritative in `config.DefinitionVersion.PayloadText`, **projected to rows on approval** for query | Owner's pick from three. The predecessor's `{"steps":"see config.TestPlanStep"}` pointer is why a procedure could not be versioned, diffed or approved as one thing. Agrees with PnCPlatform #78 | Design |
+| 39 | Control flow is **block-structured** — nested `sequence · parallel · choice · foreach · repeat · call · hold · step`. No arbitrary edges | Owner's pick. Cannot express deadlock or an unreachable step by construction; diffs cleanly; renders as an outline for a later friendly editor | Design |
+| 40 | A sub-procedure's version is **pinned when the root instance starts**; the whole tree is one version set (`process.InstanceVersionSet`) | Owner, after the alternative was shown to add silent drift. *"Which procedure did this request follow?"* has one answer per instance | Design |
+| 41 | Approval of a new procedure version **lists every affected running instance for a person to rule on**, singly or in bulk — Keep · Migrate from current step · Cancel and re-raise — each with a reason (`process.InstanceMigration`) | Owner: *"if I have 1000 outstanding work requests… will those changes not fall through the cracks?"* Nothing moves silently; every instance ends with a cited version and a cited decision | Design |
+| 42 | **Every committing step produces a `record.Record`.** The step instance holds the draft, then the pointer | Owner's pick. The record model is the platform's existing immutable object — bi-temporal acceptance, evidence links, obligations consume it. One evidence chain | Design |
+| 43 | Guards, preconditions, branch conditions, foreach sets, validations and workflow guards are **grammar-1 expressions**, checked against the fact catalogue and evaluated three-valued, using `src/PnC.Formula` unchanged | One expression language in the platform. `FORMULA-GRAMMAR.md` §7 already prescribes an AST under `"when"` for workflow guards. Agrees with PnCPlatform #248 | Design |
+| 44 | Step **due dates are derived on read** from a cadence and an anchor step — never stored | Owner, 2026-09-10 (`CALCULATION-ENGINE-DESIGN.md` §8): *"Allowing the application to 'calculate' the due date is actually a much more straight forward and correct method"* | Design |
+| 45 | A new **`process` schema** hosts both layers' runtime and the projections. `WorkflowInstance` / `WorkflowTransition` are re-homed from `work`. The seven predecessor procedure tables are not imported | One place to look (NFR-3). The layer being replaced is not entangled with carried tables | Design |
+| 46 | **Authoring v1** is the existing JSON editor with `procedure.schema.json` enforced live and every expression checked through `/formula/check`. The authored document carries expressions as text; approval stores the canonical AST. **The schema is the contract a later friendly editor targets** | Owner: authors now, engineers later. Nothing in the model changes for the friendly editor to exist | Design |
+| 47 | The join runs **in both directions**: a workflow state's `onEnter.startProcedure` and a transition's `requires.procedure`; a step's `advances` fires a transition | FR-2.1 in full. The predecessor had no column joining its two layers | Design |
+| 48 | A **deviation always requires a reason and always produces a `record.Finding`**; a step declares whether it allows `skip`, `vary`, both or neither | The record stays honest about what was not done as written | Design |
+| 49 | A step's **`precondition`** is the guard primitive; an **Unknown** result holds the step for a person and names the unknown facts, never proceeds and never silently blocks | Kleene semantics as `FORMULA-GRAMMAR.md` §5; missing data is shown, not hidden | Design |
+
+---
+
+## Superseded
+
+None yet.
