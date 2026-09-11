@@ -54,9 +54,12 @@ deviation, and the only one.
 
 **2.2 Who the person is.** IIS authenticates the browser with Windows authentication (Negotiate)
 against `vgsot.internal`. The authenticated name is matched, case-insensitively, to exactly one
-enabled `security.User` by `UserPrincipalName`. A domain account with no `security.User` row is
-refused with 401: **presence in the directory grants nothing** (agrees with §4.2). W2 adds the
-directory SID as an alternate key so a renamed account keeps its history; W1 matches on the name.
+enabled `security.User` by `UserPrincipalName`. IIS presents the name as `DOMAIN\sam`; the user
+rows hold the UPN (the predecessor's QA rows read `VGS01@vgsot.internal`, verified 2026-09-11), so
+`Auth:UpnSuffix` (`vgsot.internal`) turns `VGSOT\VGS01` into `VGS01@vgsot.internal` before the
+lookup — **unverified against IIS this session**; the W1 card carries it. A domain account with no
+`security.User` row is refused with 401: **presence in the directory grants nothing** (agrees with
+§4.2). W2 adds the directory SID as an alternate key so a renamed account keeps its history.
 
 **2.3 Attribution is the database's.** Before any call the request's connection sets
 `SESSION_CONTEXT('UserPrincipalName')`, and `DelegationEntityId` or `SponsoredPersonEntityId`
