@@ -116,6 +116,7 @@ subsystem:
 | `docs/schema/gate/` — the extensibility-gate toy (the predecessor's decision 77) | Re-run in W0 against `PnCPlatform_V2_GATE` (#81): nine checks PASS, result unchanged in substance |
 | `docs/schema/grammar/` — `formula.py` (the Python reference parser and canonical form) and its cases | `smoke.py` imports it to hand the engine canonical expressions; carried as a dependency of the gate (#77) |
 | `docs/schema/FORMULA-GRAMMAR.md` — grammar-1 as written | Cited by decisions #43 and #49 and by `PROCEDURE-ENGINE.md`; the design depends on it unchanged (#77) |
+| `docs/schema/SCHEMA-DESIGN.md` — the predecessor's schema design, as written | The citation target of 378 DDL file headers (`-- SCHEMA-DESIGN §10.3 (145)`); carried so a table file can be followed to its reasoning (#82). Its decision numbers are the predecessor's, never V2's |
 | `docs/schema/ddl/CONVENTIONS.md` · `PROCEDURES.md` · `STEPS.md` | The project's own record of its conventions, procedures and build steps; annotated where W0 removed something, never rewritten (#77) |
 | `src/PnC.Api.Smoke` | **Rewritten in W1**, not carried: it targets the API surface, which is new. Its role-based check shape is kept |
 
@@ -174,3 +175,5 @@ and is W3's to replace.
 - The 510 stored procedures and 365 views have not been catalogued here. They are generated from
   the tables and conventions above; a per-schema list is a later addition to this document.
 - `PnCPlatform_QA` has not been compared with `_DEV`.
+- `docs/schema/MIGRATION-PLAN.md` and `docs/schema/migration/` (the rehearsal scripts and reports) sit in the
+  working tree uncommitted until W7 re-copies them under their own decision (#82).

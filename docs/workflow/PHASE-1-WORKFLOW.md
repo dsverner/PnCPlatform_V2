@@ -72,7 +72,10 @@ No application.
 - `run_gate.py --database PnCPlatform_V2_GATE` — nine checks PASS; `RESULT.md` differs from the
   predecessor's only in the run line (#81).
 - `platform.Release` 0.10.16 (the sqlproj's `DacVersion`, unchanged from the predecessor) and one
-  `Succeeded` deployment recorded by `record_release.py`.
+  `Succeeded` deployment recorded by `record_release.py`. After the owner's ruling (#83) the
+  `DacVersion` is **0.1.0** and a second deploy recorded it: two releases, two succeeded deployments.
+- Card round 1 answered 2026-09-11 17:24Z: D1 keep, D2 accept, D3a carry, D3b W7, D3c commit, D4 leave,
+  D5 restart at 0.1.0, T1 not checked (#82, #83).
 
 ### W1 — API skeleton and PWA shell
 
