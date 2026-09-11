@@ -1,0 +1,102 @@
+{
+ "device.settings.50P1P": {
+  "type": "num",
+  "unit": "A",
+  "base": "Secondary",
+  "subject": "Device"
+ },
+ "device.settings.51P1P": {
+  "type": "num",
+  "unit": "A",
+  "base": "Secondary",
+  "subject": "Device"
+ },
+ "device.technology": {
+  "type": "text",
+  "subject": "Device",
+  "allowed": [
+   "Microprocessor",
+   "Electromechanical",
+   "Static"
+  ]
+ },
+ "device.model": {
+  "type": "text",
+  "subject": "Device"
+ },
+ "device.template.ct_ratio": {
+  "type": "num",
+  "subject": "Device"
+ },
+ "device.template.pt_ratio": {
+  "type": "num",
+  "subject": "Device"
+ },
+ "asset.voltage_class": {
+  "type": "text",
+  "subject": "Asset"
+ },
+ "asset.template.technology": {
+  "type": "text",
+  "subject": "Asset"
+ },
+ "asset.template.ct_ratio": {
+  "type": "num",
+  "subject": "Asset"
+ },
+ "asset.formula.is_microprocessor": {
+  "type": "bool",
+  "subject": "Asset"
+ },
+ "line.rating.emergency": {
+  "type": "num",
+  "unit": "A",
+  "subject": "Line"
+ },
+ "line.voltage_class": {
+  "type": "text",
+  "subject": "Line"
+ },
+ "line.length": {
+  "type": "num",
+  "unit": "km",
+  "subject": "Line"
+ },
+ "line.z1": {
+  "type": "num",
+  "unit": "Ω",
+  "subject": "Line"
+ },
+ "station.classification.BesStatus": {
+  "type": "text",
+  "subject": "Station"
+ },
+ "scheme.members": {
+  "type": "set",
+  "elem": {
+   "type": "ref",
+   "kind": "Device"
+  },
+  "params": {
+   "role": "text"
+  },
+  "subject": "Scheme"
+ },
+ "record.last": {
+  "type": "ref",
+  "kind": "Record",
+  "params": {
+   "kind": "text",
+   "accepted": "bool"
+  },
+  "subject": "Any"
+ },
+ "record.occurred_at": {
+  "type": "date",
+  "subject": "Record"
+ },
+ "platform.backup.last.Full": {
+  "type": "date",
+  "subject": "Platform"
+ }
+}

@@ -60,6 +60,20 @@ No application.
 
 **Depends on.** Nothing. **Estimate.** A, schema and tooling part: 15–25 h.
 
+**Gate record — 2026-09-11, observed on `PnCPlatform_V2_DEV`.**
+- `deploy.py --database PnCPlatform_V2_DEV --fresh` — green on the second run; the first failed one
+  check that was not fresh-database safe (#80). Build 0 warnings 0 errors, twice; generator
+  *827 generated objects; 0 written; 0 stale removed*; `check_generated.py` *generated files are current*.
+- `smoke.py` — **244 PASS, 0 FAIL**. Eight checks removed with the seven tables (#79). Engine
+  lines ran through the predecessor's built `PnC.Engine.Cli` via `PNC_ENGINE_DIR` (#79).
+- Catalogue: **295 tables**, 358 views, 497 procedures, 32 functions; none of the seven present;
+  `FK_TestResult_Step` and `FK_TestReading_PlanReading` absent (#78).
+- `dotnet run --project src/PnC.Formula.Conformance` — **133 passed, 0 failed**.
+- `run_gate.py --database PnCPlatform_V2_GATE` — nine checks PASS; `RESULT.md` differs from the
+  predecessor's only in the run line (#81).
+- `platform.Release` 0.10.16 (the sqlproj's `DacVersion`, unchanged from the predecessor) and one
+  `Succeeded` deployment recorded by `record_release.py`.
+
 ### W1 — API skeleton and PWA shell
 
 **Builds.** A new `src/PnC.Api` on .NET 10, reproducing the predecessor's *design* — consulted, not

@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  PnCPlatform — SQL Database Project (SDK-style, Microsoft.Build.Sql).
+  Source of truth for the database. See CONVENTIONS.md and STEPS.md.
+  Build:   dotnet build docs/schema/ddl/PnCPlatform.sqlproj
+  Deploy:  python docs/schema/ddl/tools/deploy.py   (build, publish, generate, rebuild, publish, smoke)
+-->
+<Project Sdk="Microsoft.Build.Sql/2.2.0">
+  <PropertyGroup>
+    <DacVersion>0.10.16</DacVersion>
+    <Name>PnCPlatform</Name>
+    <ProjectGuid>{5A0C8D2E-4B7F-4F3A-9C1D-7E2B8A6F1C43}</ProjectGuid>
+    <DSP>Microsoft.Data.Tools.Schema.Sql.Sql160DatabaseSchemaProvider</DSP>
+    <ModelCollation>1033, CI</ModelCollation>
+    <DefaultCollation>SQL_Latin1_General_CP1_CI_AS</DefaultCollation>
+    <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
+    <OutputPath>bin\$(Configuration)\</OutputPath>
+    <TreatTSqlWarningsAsErrors>True</TreatTSqlWarningsAsErrors>
+    <!-- database settings applied on publish -->
+    <AnsiNullsOn>True</AnsiNullsOn>
+    <QuotedIdentifierOn>True</QuotedIdentifierOn>
+    <IsChangeTrackingOn>False</IsChangeTrackingOn>
+    <Recovery>FULL</Recovery>
+    <!-- FILESTREAM: document.FileStore is a FileTable (SCHEMA-DESIGN §8.1, decision 125). The
+         DIRECTORY_NAME is deliberately NOT in the model: it must be unique per instance, so it is
+         the database name, set by tools/deploy.py when it creates the database (or by the DBA before
+         the first publish). Two PnCPlatform databases on one instance (DEV + QA on VM01) need this. -->
+    <NonTransactedFileStreamAccess>Full</NonTransactedFileStreamAccess>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <SqlCmdVariable Include="DataPath">
+      <DefaultValue>D:\SQLData\</DefaultValue>
+      <Value>$(SqlCmdVar__1)</Value>
+    </SqlCmdVariable>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- generated views and procedures are part of the build; tools and docs are not -->
+    <Build Remove="PostDeploy\**" />
+    <Build Remove="tools\**" />
+    <Build Remove="bin\**;obj\**" />
+    <!-- bootstrap: tables and seeds only, so the generator can read a catalog before any
+         procedure that depends on generated procedures exists (tools/deploy.py) -->
+    <Build Remove="**\Procedures\**;**\Views\**;**\Functions\**" Condition="'$(TablesOnly)' == 'true'" />
+    <PostDeploy Include="PostDeploy\PostDeploy.sql" />
+    <PostDeploy Remove="PostDeploy\PostDeploy.sql" Condition="'$(TablesOnly)' == 'true'" />
+    <None Include="PostDeploy\Seed_*.sql" />
+    <None Include="CONVENTIONS.md;STEPS.md;PROCEDURES.md" />
+  </ItemGroup>
+</Project>

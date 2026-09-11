@@ -1,0 +1,189 @@
+{
+ "at": "2026-09-05T00:00:00-03:00",
+ "subjects": {
+  "dev1": {
+   "device.settings.50P1P": {
+    "num": "2",
+    "u": "A",
+    "b": "Secondary"
+   },
+   "device.technology": {
+    "text": "Microprocessor"
+   },
+   "device.model": {
+    "text": "SEL-411L"
+   },
+   "device.template.ct_ratio": {
+    "num": "400"
+   },
+   "device.template.pt_ratio": {
+    "num": "600"
+   },
+   "asset.voltage_class": {
+    "text": "138"
+   },
+   "line.rating.emergency": {
+    "num": "500",
+    "u": "A"
+   },
+   "line.length": {
+    "num": "12.5",
+    "u": "km"
+   },
+   "line.z1": {
+    "num": "6.25",
+    "u": "Ω"
+   },
+   "asset.template.technology": {
+    "text": "Microprocessor"
+   },
+   "asset.template.ct_ratio": {
+    "num": "400"
+   },
+   "asset.formula.is_microprocessor": {
+    "bool": true
+   },
+   "scheme.members": {
+    "params": {
+     "role": "Relay"
+    },
+    "set": [
+     {
+      "ref": "dev1",
+      "kind": "Device"
+     },
+     {
+      "ref": "dev2",
+      "kind": "Device"
+     }
+    ]
+   },
+   "record.last": {
+    "params": {
+     "kind": "Maintenance",
+     "accepted": true
+    },
+    "ref": "r1",
+    "kind": "Record"
+   },
+   "platform.backup.last.Full": {
+    "date": "2026-09-04T22:00:00-03:00"
+   }
+  },
+  "dev2": {
+   "device.settings.50P1P": {
+    "num": "3.5",
+    "u": "A",
+    "b": "Secondary"
+   },
+   "device.technology": {
+    "text": "Electromechanical"
+   },
+   "device.model": {
+    "text": "IAC-53"
+   }
+  },
+  "dev3": {
+   "device.technology": {
+    "text": "Static"
+   }
+  },
+  "r1": {
+   "record.occurred_at": {
+    "date": "2020-03-01T10:00:00-04:00"
+   }
+  }
+ },
+ "at_history": {
+  "dev1": {
+   "device.settings.50P1P": [
+    [
+     "2024-01-01T00:00:00-04:00",
+     {
+      "num": "1",
+      "u": "A",
+      "b": "Secondary"
+     }
+    ],
+    [
+     "2026-01-01T00:00:00-04:00",
+     {
+      "num": "2",
+      "u": "A",
+      "b": "Secondary"
+     }
+    ]
+   ]
+  }
+ },
+ "env_types": {
+  "value_a": {
+   "type": "num",
+   "unit": "A",
+   "base": "Secondary"
+  },
+  "nominal": {
+   "type": "num",
+   "unit": "A",
+   "base": "Secondary"
+  },
+  "value_r": {
+   "type": "num"
+  },
+  "$": {
+   "type": "text"
+  },
+  "$line_number": {
+   "type": "text"
+  },
+  "x": {
+   "type": "num"
+  },
+  "a": {
+   "type": "bool"
+  },
+  "b": {
+   "type": "bool"
+  },
+  "c": {
+   "type": "bool"
+  }
+ },
+ "env_values": {
+  "value_a": {
+   "num": "1.52",
+   "u": "A",
+   "b": "Secondary"
+  },
+  "nominal": {
+   "num": "1.5",
+   "u": "A",
+   "b": "Secondary"
+  },
+  "value_r": {
+   "num": "400"
+  },
+  "$": {
+   "text": "170123"
+  },
+  "$line_number": {
+   "text": "1152"
+  },
+  "x": {
+   "num": "2"
+  },
+  "a": {
+   "bool": true
+  },
+  "b": {
+   "unknown": true
+  },
+  "c": {
+   "bool": true
+  }
+ },
+ "cadence_env": {
+  "effective": "2025-01-01T00:00:00-04:00",
+  "event": "2026-08-31T12:00:00-03:00"
+ }
+}

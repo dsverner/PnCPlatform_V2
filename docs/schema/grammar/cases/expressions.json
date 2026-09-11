@@ -1,0 +1,3033 @@
+[
+ {
+  "id": "lit-num",
+  "text": "1.5",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "lit": "1.5",
+   "t": "num"
+  },
+  "type": "num",
+  "value": {
+   "num": "1.5"
+  }
+ },
+ {
+  "id": "lit-qty",
+  "text": "13.8 kV",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "lit": "13.8",
+   "t": "num",
+   "u": "kV"
+  },
+  "type": "num[kV]",
+  "value": {
+   "num": "13.8",
+   "u": "kV"
+  }
+ },
+ {
+  "id": "lit-qty-base",
+  "text": "2.5 A@Secondary",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "lit": "2.5",
+   "t": "num",
+   "u": "A",
+   "b": "Secondary"
+  },
+  "type": "num[A]@Secondary",
+  "value": {
+   "num": "2.5",
+   "u": "A",
+   "b": "Secondary"
+  }
+ },
+ {
+  "id": "lit-qty-attached",
+  "text": "100A",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "lit": "100",
+   "t": "num",
+   "u": "A"
+  },
+  "type": "num[A]",
+  "value": {
+   "num": "100",
+   "u": "A"
+  }
+ },
+ {
+  "id": "lit-ohm",
+  "text": "0.5 Ω",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "lit": "0.5",
+   "t": "num",
+   "u": "Ω"
+  },
+  "type": "num[Ω]",
+  "value": {
+   "num": "0.5",
+   "u": "Ω"
+  }
+ },
+ {
+  "id": "lit-percent",
+  "text": "50 %",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "lit": "50",
+   "t": "num",
+   "u": "%"
+  },
+  "type": "num[%]",
+  "value": {
+   "num": "50",
+   "u": "%"
+  }
+ },
+ {
+  "id": "lit-neg",
+  "text": "-40 °C",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "lit": "-40",
+   "t": "num",
+   "u": "°C"
+  },
+  "type": "num[°C]",
+  "value": {
+   "num": "-40",
+   "u": "°C"
+  }
+ },
+ {
+  "id": "lit-text-escape",
+  "text": "'it''s'",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "lit": "it's",
+   "t": "text"
+  },
+  "type": "text",
+  "value": {
+   "text": "it's"
+  }
+ },
+ {
+  "id": "lit-date",
+  "text": "2026-09-05",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "lit": "2026-09-05T00:00:00-03:00",
+   "t": "date"
+  },
+  "type": "date",
+  "value": {
+   "date": "2026-09-05T00:00:00-03:00"
+  }
+ },
+ {
+  "id": "lit-date-offset",
+  "text": "2026-09-05T14:30:00+00:00",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "lit": "2026-09-05T14:30:00+00:00",
+   "t": "date"
+  },
+  "type": "date",
+  "value": {
+   "date": "2026-09-05T14:30:00+00:00"
+  }
+ },
+ {
+  "id": "lit-dur",
+  "text": "18 mo",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "lit": "18",
+   "t": "dur",
+   "u": "mo"
+  },
+  "type": "dur",
+  "value": {
+   "dur": "18",
+   "u": "mo"
+  }
+ },
+ {
+  "id": "lit-unknown",
+  "text": "unknown",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "lit": null
+  },
+  "type": "unknown",
+  "value": {
+   "unknown": true
+  }
+ },
+ {
+  "id": "prec-arith",
+  "text": "1 + 2 * 3 ^ 2",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "op": "+",
+   "l": {
+    "lit": "1",
+    "t": "num"
+   },
+   "r": {
+    "op": "*",
+    "l": {
+     "lit": "2",
+     "t": "num"
+    },
+    "r": {
+     "op": "^",
+     "l": {
+      "lit": "3",
+      "t": "num"
+     },
+     "r": {
+      "lit": "2",
+      "t": "num"
+     }
+    }
+   }
+  },
+  "type": "num",
+  "value": {
+   "num": "19"
+  }
+ },
+ {
+  "id": "prec-pow-right",
+  "text": "2 ^ 3 ^ 2",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "op": "^",
+   "l": {
+    "lit": "2",
+    "t": "num"
+   },
+   "r": {
+    "op": "^",
+    "l": {
+     "lit": "3",
+     "t": "num"
+    },
+    "r": {
+     "lit": "2",
+     "t": "num"
+    }
+   }
+  },
+  "type": "num",
+  "value": {
+   "num": "512"
+  }
+ },
+ {
+  "id": "prec-neg",
+  "text": "-2 ^ 2",
+  "subject": "dev1",
+  "note": "^ binds tighter than unary minus: -(2 ^ 2)",
+  "ast": {
+   "g": 1,
+   "op": "neg",
+   "x": {
+    "op": "^",
+    "l": {
+     "lit": "2",
+     "t": "num"
+    },
+    "r": {
+     "lit": "2",
+     "t": "num"
+    }
+   }
+  },
+  "type": "num",
+  "value": {
+   "num": "-4"
+  }
+ },
+ {
+  "id": "prec-neg-lit",
+  "text": "(-2) ^ 2",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "op": "^",
+   "l": {
+    "lit": "-2",
+    "t": "num"
+   },
+   "r": {
+    "lit": "2",
+    "t": "num"
+   }
+  },
+  "type": "num",
+  "value": {
+   "num": "4"
+  }
+ },
+ {
+  "id": "prec-logic",
+  "text": "not a or b and c",
+  "subject": "dev1",
+  "note": "not a = false; b and c unknown; false or unknown = unknown",
+  "ast": {
+   "g": 1,
+   "op": "or",
+   "a": [
+    {
+     "op": "not",
+     "x": {
+      "var": "a"
+     }
+    },
+    {
+     "op": "and",
+     "a": [
+      {
+       "var": "b"
+      },
+      {
+       "var": "c"
+      }
+     ]
+    }
+   ]
+  },
+  "type": "bool",
+  "value": {
+   "unknown": true
+  }
+ },
+ {
+  "id": "prec-parens",
+  "text": "not (a or b) and c",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "op": "and",
+   "a": [
+    {
+     "op": "not",
+     "x": {
+      "op": "or",
+      "a": [
+       {
+        "var": "a"
+       },
+       {
+        "var": "b"
+       }
+      ]
+     }
+    },
+    {
+     "var": "c"
+    }
+   ]
+  },
+  "type": "bool",
+  "value": {
+   "bool": false
+  }
+ },
+ {
+  "id": "prec-compare",
+  "text": "1 + 1 = 2 and 3 > 2",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "op": "and",
+   "a": [
+    {
+     "op": "=",
+     "l": {
+      "op": "+",
+      "l": {
+       "lit": "1",
+       "t": "num"
+      },
+      "r": {
+       "lit": "1",
+       "t": "num"
+      }
+     },
+     "r": {
+      "lit": "2",
+      "t": "num"
+     }
+    },
+    {
+     "op": ">",
+     "l": {
+      "lit": "3",
+      "t": "num"
+     },
+     "r": {
+      "lit": "2",
+      "t": "num"
+     }
+    }
+   ]
+  },
+  "type": "bool",
+  "value": {
+   "bool": true
+  }
+ },
+ {
+  "id": "comment",
+  "text": "1 -- one\n+ 1",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "op": "+",
+   "l": {
+    "lit": "1",
+    "t": "num"
+   },
+   "r": {
+    "lit": "1",
+    "t": "num"
+   }
+  },
+  "type": "num",
+  "value": {
+   "num": "2"
+  }
+ },
+ {
+  "id": "div-zero",
+  "text": "1 / 0",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "op": "/",
+   "l": {
+    "lit": "1",
+    "t": "num"
+   },
+   "r": {
+    "lit": "0",
+    "t": "num"
+   }
+  },
+  "type": "num",
+  "value": {
+   "unknown": true
+  }
+ },
+ {
+  "id": "div-zero-dim",
+  "text": "1 A / 0",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "op": "/",
+   "l": {
+    "lit": "1",
+    "t": "num",
+    "u": "A"
+   },
+   "r": {
+    "lit": "0",
+    "t": "num"
+   }
+  },
+  "type": "num[A]",
+  "value": {
+   "unknown": true
+  }
+ },
+ {
+  "id": "unit-add-convert",
+  "text": "1 kV + 500 V",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "op": "+",
+   "l": {
+    "lit": "1",
+    "t": "num",
+    "u": "kV"
+   },
+   "r": {
+    "lit": "500",
+    "t": "num",
+    "u": "V"
+   }
+  },
+  "type": "num[kV]",
+  "value": {
+   "num": "1.5",
+   "u": "kV"
+  }
+ },
+ {
+  "id": "unit-add-mismatch",
+  "text": "1 kV + 5 A",
+  "subject": "dev1",
+  "error": "dimension_mismatch",
+  "ast": {
+   "g": 1,
+   "op": "+",
+   "l": {
+    "lit": "1",
+    "t": "num",
+    "u": "kV"
+   },
+   "r": {
+    "lit": "5",
+    "t": "num",
+    "u": "A"
+   }
+  }
+ },
+ {
+  "id": "unit-mul-named",
+  "text": "13.8 kV * 100 A",
+  "subject": "dev1",
+  "note": "kV*A converts to base units: 13800 V * 100 A",
+  "ast": {
+   "g": 1,
+   "op": "*",
+   "l": {
+    "lit": "13.8",
+    "t": "num",
+    "u": "kV"
+   },
+   "r": {
+    "lit": "100",
+    "t": "num",
+    "u": "A"
+   }
+  },
+  "type": "num[VA]",
+  "value": {
+   "num": "1380000",
+   "u": "VA"
+  }
+ },
+ {
+  "id": "unit-div-named",
+  "text": "1 kV / 2 A",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "op": "/",
+   "l": {
+    "lit": "1",
+    "t": "num",
+    "u": "kV"
+   },
+   "r": {
+    "lit": "2",
+    "t": "num",
+    "u": "A"
+   }
+  },
+  "type": "num[Ω]",
+  "value": {
+   "num": "500",
+   "u": "Ω"
+  }
+ },
+ {
+  "id": "unit-div-same",
+  "text": "10 A / 4 A",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "op": "/",
+   "l": {
+    "lit": "10",
+    "t": "num",
+    "u": "A"
+   },
+   "r": {
+    "lit": "4",
+    "t": "num",
+    "u": "A"
+   }
+  },
+  "type": "num",
+  "value": {
+   "num": "2.5"
+  }
+ },
+ {
+  "id": "unit-mul-scalar",
+  "text": "2 * 3 A",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "op": "*",
+   "l": {
+    "lit": "2",
+    "t": "num"
+   },
+   "r": {
+    "lit": "3",
+    "t": "num",
+    "u": "A"
+   }
+  },
+  "type": "num[A]",
+  "value": {
+   "num": "6",
+   "u": "A"
+  }
+ },
+ {
+  "id": "unit-per-length",
+  "text": "line.z1 / line.length",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "op": "/",
+   "l": {
+    "fact": "line.z1"
+   },
+   "r": {
+    "fact": "line.length"
+   }
+  },
+  "type": "num[Ω/km]",
+  "value": {
+   "num": "0.5",
+   "u": "Ω/km"
+  }
+ },
+ {
+  "id": "unit-literal-missing",
+  "text": "device.settings.50P1P > 1.5",
+  "subject": "dev1",
+  "error": "missing_unit",
+  "ast": {
+   "g": 1,
+   "op": ">",
+   "l": {
+    "fact": "device.settings.50P1P"
+   },
+   "r": {
+    "lit": "1.5",
+    "t": "num"
+   }
+  }
+ },
+ {
+  "id": "unit-literal-ok",
+  "text": "device.settings.50P1P > 1.5 A",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "op": ">",
+   "l": {
+    "fact": "device.settings.50P1P"
+   },
+   "r": {
+    "lit": "1.5",
+    "t": "num",
+    "u": "A"
+   }
+  },
+  "type": "bool",
+  "value": {
+   "bool": true
+  }
+ },
+ {
+  "id": "unit-base-mismatch",
+  "text": "device.settings.50P1P = 2 A@Primary",
+  "subject": "dev1",
+  "error": "base_mismatch",
+  "ast": {
+   "g": 1,
+   "op": "=",
+   "l": {
+    "fact": "device.settings.50P1P"
+   },
+   "r": {
+    "lit": "2",
+    "t": "num",
+    "u": "A",
+    "b": "Primary"
+   }
+  }
+ },
+ {
+  "id": "unit-compare-convert",
+  "text": "device.settings.50P1P < 0.003 kA",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "op": "<",
+   "l": {
+    "fact": "device.settings.50P1P"
+   },
+   "r": {
+    "lit": "0.003",
+    "t": "num",
+    "u": "kA"
+   }
+  },
+  "type": "bool",
+  "value": {
+   "bool": true
+  }
+ },
+ {
+  "id": "unit-unknown-code",
+  "text": "5 furlongs",
+  "subject": "dev1",
+  "note": "an unknown unit is not lexed as a unit; 'furlongs' is a stray name",
+  "error": "syntax"
+ },
+ {
+  "id": "unit-to",
+  "text": "to(line.length, 'm')",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "a": [
+    {
+     "fact": "line.length"
+    },
+    {
+     "lit": "m",
+     "t": "text"
+    }
+   ],
+   "fn": "to"
+  },
+  "type": "num[m]",
+  "value": {
+   "num": "12500",
+   "u": "m"
+  }
+ },
+ {
+  "id": "unit-to-wrong-dim",
+  "text": "to(line.length, 'A')",
+  "subject": "dev1",
+  "error": "dimension_mismatch",
+  "ast": {
+   "g": 1,
+   "a": [
+    {
+     "fact": "line.length"
+    },
+    {
+     "lit": "A",
+     "t": "text"
+    }
+   ],
+   "fn": "to"
+  }
+ },
+ {
+  "id": "unit-base-primary",
+  "text": "base(device.settings.50P1P, 'Primary', device.template.ct_ratio)",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "a": [
+    {
+     "fact": "device.settings.50P1P"
+    },
+    {
+     "lit": "Primary",
+     "t": "text"
+    },
+    {
+     "fact": "device.template.ct_ratio"
+    }
+   ],
+   "fn": "base"
+  },
+  "type": "num[A]@Primary",
+  "value": {
+   "num": "800",
+   "u": "A",
+   "b": "Primary"
+  }
+ },
+ {
+  "id": "unit-base-no-ratio",
+  "text": "base(device.settings.50P1P, 'Primary', device.template.ct_ratio)",
+  "subject": "dev2",
+  "note": "dev2 has no ct_ratio: Unknown, never a guess",
+  "ast": {
+   "g": 1,
+   "a": [
+    {
+     "fact": "device.settings.50P1P"
+    },
+    {
+     "lit": "Primary",
+     "t": "text"
+    },
+    {
+     "fact": "device.template.ct_ratio"
+    }
+   ],
+   "fn": "base"
+  },
+  "type": "num[A]@Primary",
+  "value": {
+   "unknown": true
+  }
+ },
+ {
+  "id": "unit-base-ratio-dim",
+  "text": "base(device.settings.50P1P, 'Primary', line.rating.emergency)",
+  "subject": "dev1",
+  "error": "type_mismatch",
+  "ast": {
+   "g": 1,
+   "a": [
+    {
+     "fact": "device.settings.50P1P"
+    },
+    {
+     "lit": "Primary",
+     "t": "text"
+    },
+    {
+     "fact": "line.rating.emergency"
+    }
+   ],
+   "fn": "base"
+  }
+ },
+ {
+  "id": "unit-base-arity",
+  "text": "base(device.settings.50P1P, 'Primary')",
+  "subject": "dev1",
+  "error": "arity",
+  "ast": {
+   "g": 1,
+   "a": [
+    {
+     "fact": "device.settings.50P1P"
+    },
+    {
+     "lit": "Primary",
+     "t": "text"
+    }
+   ],
+   "fn": "base"
+  }
+ },
+ {
+  "id": "unit-pow",
+  "text": "line.length ^ 2",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "op": "^",
+   "l": {
+    "fact": "line.length"
+   },
+   "r": {
+    "lit": "2",
+    "t": "num"
+   }
+  },
+  "type": "num[km²]",
+  "value": {
+   "num": "156.25",
+   "u": "km"
+  }
+ },
+ {
+  "id": "cmp-text",
+  "text": "device.model = 'SEL-411L'",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "op": "=",
+   "l": {
+    "fact": "device.model"
+   },
+   "r": {
+    "lit": "SEL-411L",
+    "t": "text"
+   }
+  },
+  "type": "bool",
+  "value": {
+   "bool": true
+  }
+ },
+ {
+  "id": "cmp-text-no-coerce",
+  "text": "device.model = 1",
+  "subject": "dev1",
+  "error": "type_mismatch",
+  "ast": {
+   "g": 1,
+   "op": "=",
+   "l": {
+    "fact": "device.model"
+   },
+   "r": {
+    "lit": "1",
+    "t": "num"
+   }
+  }
+ },
+ {
+  "id": "cmp-enum-ok",
+  "text": "device.technology = 'Static'",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "op": "=",
+   "l": {
+    "fact": "device.technology"
+   },
+   "r": {
+    "lit": "Static",
+    "t": "text"
+   }
+  },
+  "type": "bool",
+  "value": {
+   "bool": false
+  }
+ },
+ {
+  "id": "cmp-enum-bad",
+  "text": "device.technology = 'Digital'",
+  "subject": "dev1",
+  "error": "enumeration_value",
+  "ast": {
+   "g": 1,
+   "op": "=",
+   "l": {
+    "fact": "device.technology"
+   },
+   "r": {
+    "lit": "Digital",
+    "t": "text"
+   }
+  }
+ },
+ {
+  "id": "cmp-like",
+  "text": "device.model like 'SEL-%'",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "op": "like",
+   "l": {
+    "fact": "device.model"
+   },
+   "r": {
+    "lit": "SEL-%",
+    "t": "text"
+   }
+  },
+  "type": "bool",
+  "value": {
+   "bool": true
+  }
+ },
+ {
+  "id": "cmp-matches",
+  "text": "device.model matches '^SEL-4[0-9]{2}L$'",
+  "subject": "dev1",
+  "sql": "unsupported",
+  "ast": {
+   "g": 1,
+   "op": "matches",
+   "l": {
+    "fact": "device.model"
+   },
+   "r": {
+    "lit": "^SEL-4[0-9]{2}L$",
+    "t": "text"
+   }
+  },
+  "type": "bool",
+  "value": {
+   "bool": true
+  }
+ },
+ {
+  "id": "cmp-in",
+  "text": "asset.voltage_class in {'138', '230'}",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "op": "in",
+   "l": {
+    "fact": "asset.voltage_class"
+   },
+   "r": {
+    "set": [
+     {
+      "lit": "138",
+      "t": "text"
+     },
+     {
+      "lit": "230",
+      "t": "text"
+     }
+    ]
+   }
+  },
+  "type": "bool",
+  "value": {
+   "bool": true
+  }
+ },
+ {
+  "id": "cmp-in-unknown-member",
+  "text": "x in {1, unknown, 3}",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "op": "in",
+   "l": {
+    "var": "x"
+   },
+   "r": {
+    "set": [
+     {
+      "lit": "1",
+      "t": "num"
+     },
+     {
+      "lit": null
+     },
+     {
+      "lit": "3",
+      "t": "num"
+     }
+    ]
+   }
+  },
+  "type": "bool",
+  "value": {
+   "unknown": true
+  }
+ },
+ {
+  "id": "cmp-in-found-despite-unknown",
+  "text": "x in {2, unknown}",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "op": "in",
+   "l": {
+    "var": "x"
+   },
+   "r": {
+    "set": [
+     {
+      "lit": "2",
+      "t": "num"
+     },
+     {
+      "lit": null
+     }
+    ]
+   }
+  },
+  "type": "bool",
+  "value": {
+   "bool": true
+  }
+ },
+ {
+  "id": "cmp-date",
+  "text": "platform.backup.last.Full > @at - 1 d",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "op": ">",
+   "l": {
+    "fact": "platform.backup.last.Full"
+   },
+   "r": {
+    "op": "-",
+    "l": {
+     "var": "@at"
+    },
+    "r": {
+     "lit": "1",
+     "t": "dur",
+     "u": "d"
+    }
+   }
+  },
+  "type": "bool",
+  "value": {
+   "bool": true
+  }
+ },
+ {
+  "id": "cmp-date-old",
+  "text": "platform.backup.last.Full > @at - 1 h",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "op": ">",
+   "l": {
+    "fact": "platform.backup.last.Full"
+   },
+   "r": {
+    "op": "-",
+    "l": {
+     "var": "@at"
+    },
+    "r": {
+     "lit": "1",
+     "t": "dur",
+     "u": "h"
+    }
+   }
+  },
+  "type": "bool",
+  "value": {
+   "bool": false
+  }
+ },
+ {
+  "id": "text-fns",
+  "text": "upper(substr(trim('  abc  '), 2, 2))",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "a": [
+    {
+     "a": [
+      {
+       "a": [
+        {
+         "lit": "  abc  ",
+         "t": "text"
+        }
+       ],
+       "fn": "trim"
+      },
+      {
+       "lit": "2",
+       "t": "num"
+      },
+      {
+       "lit": "2",
+       "t": "num"
+      }
+     ],
+     "fn": "substr"
+    }
+   ],
+   "fn": "upper"
+  },
+  "type": "text",
+  "value": {
+   "text": "BC"
+  }
+ },
+ {
+  "id": "text-len",
+  "text": "len(device.model)",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "a": [
+    {
+     "fact": "device.model"
+    }
+   ],
+   "fn": "len"
+  },
+  "type": "num",
+  "value": {
+   "num": "8"
+  }
+ },
+ {
+  "id": "text-startswith",
+  "text": "startswith(device.model, 'SEL')",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "a": [
+    {
+     "fact": "device.model"
+    },
+    {
+     "lit": "SEL",
+     "t": "text"
+    }
+   ],
+   "fn": "startswith"
+  },
+  "type": "bool",
+  "value": {
+   "bool": true
+  }
+ },
+ {
+  "id": "text-number",
+  "text": "number('12.5') * 2",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "op": "*",
+   "l": {
+    "a": [
+     {
+      "lit": "12.5",
+      "t": "text"
+     }
+    ],
+    "fn": "number"
+   },
+   "r": {
+    "lit": "2",
+    "t": "num"
+   }
+  },
+  "type": "num",
+  "value": {
+   "num": "25"
+  }
+ },
+ {
+  "id": "text-number-bad",
+  "text": "number('abc')",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "a": [
+    {
+     "lit": "abc",
+     "t": "text"
+    }
+   ],
+   "fn": "number"
+  },
+  "type": "num",
+  "value": {
+   "unknown": true
+  }
+ },
+ {
+  "id": "text-of",
+  "text": "text(device.settings.50P1P)",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "a": [
+    {
+     "fact": "device.settings.50P1P"
+    }
+   ],
+   "fn": "text"
+  },
+  "type": "text",
+  "value": {
+   "text": "2"
+  }
+ },
+ {
+  "id": "decode",
+  "text": "decode('^T([0-9]{3})L([0-9]{3})$', 'T012L345', 2)",
+  "subject": "dev1",
+  "sql": "unsupported",
+  "ast": {
+   "g": 1,
+   "a": [
+    {
+     "lit": "^T([0-9]{3})L([0-9]{3})$",
+     "t": "text"
+    },
+    {
+     "lit": "T012L345",
+     "t": "text"
+    },
+    {
+     "lit": "2",
+     "t": "num"
+    }
+   ],
+   "fn": "decode"
+  },
+  "type": "text",
+  "value": {
+   "text": "345"
+  }
+ },
+ {
+  "id": "decode-nomatch",
+  "text": "decode('^T([0-9]{3})L([0-9]{3})$', 'X', 2)",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "a": [
+    {
+     "lit": "^T([0-9]{3})L([0-9]{3})$",
+     "t": "text"
+    },
+    {
+     "lit": "X",
+     "t": "text"
+    },
+    {
+     "lit": "2",
+     "t": "num"
+    }
+   ],
+   "fn": "decode"
+  },
+  "type": "text",
+  "value": {
+   "unknown": true
+  }
+ },
+ {
+  "id": "map-hit",
+  "text": "map(substr($line_number, 1, 1), {'0': 69 kV, '1': 138 kV, '2': 230 kV, '3': 345 kV})",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "a": [
+    {
+     "a": [
+      {
+       "var": "$line_number"
+      },
+      {
+       "lit": "1",
+       "t": "num"
+      },
+      {
+       "lit": "1",
+       "t": "num"
+      }
+     ],
+     "fn": "substr"
+    },
+    {
+     "map": [
+      [
+       {
+        "lit": "0",
+        "t": "text"
+       },
+       {
+        "lit": "69",
+        "t": "num",
+        "u": "kV"
+       }
+      ],
+      [
+       {
+        "lit": "1",
+        "t": "text"
+       },
+       {
+        "lit": "138",
+        "t": "num",
+        "u": "kV"
+       }
+      ],
+      [
+       {
+        "lit": "2",
+        "t": "text"
+       },
+       {
+        "lit": "230",
+        "t": "num",
+        "u": "kV"
+       }
+      ],
+      [
+       {
+        "lit": "3",
+        "t": "text"
+       },
+       {
+        "lit": "345",
+        "t": "num",
+        "u": "kV"
+       }
+      ]
+     ]
+    }
+   ],
+   "fn": "map"
+  },
+  "type": "num[kV]",
+  "value": {
+   "num": "138",
+   "u": "kV"
+  }
+ },
+ {
+  "id": "map-miss",
+  "text": "map('9', {'0': 69 kV, '1': 138 kV})",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "a": [
+    {
+     "lit": "9",
+     "t": "text"
+    },
+    {
+     "map": [
+      [
+       {
+        "lit": "0",
+        "t": "text"
+       },
+       {
+        "lit": "69",
+        "t": "num",
+        "u": "kV"
+       }
+      ],
+      [
+       {
+        "lit": "1",
+        "t": "text"
+       },
+       {
+        "lit": "138",
+        "t": "num",
+        "u": "kV"
+       }
+      ]
+     ]
+    }
+   ],
+   "fn": "map"
+  },
+  "type": "num[kV]",
+  "value": {
+   "unknown": true
+  }
+ },
+ {
+  "id": "map-default",
+  "text": "map('9', {'0': 69 kV, '1': 138 kV}, 0 kV)",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "a": [
+    {
+     "lit": "9",
+     "t": "text"
+    },
+    {
+     "map": [
+      [
+       {
+        "lit": "0",
+        "t": "text"
+       },
+       {
+        "lit": "69",
+        "t": "num",
+        "u": "kV"
+       }
+      ],
+      [
+       {
+        "lit": "1",
+        "t": "text"
+       },
+       {
+        "lit": "138",
+        "t": "num",
+        "u": "kV"
+       }
+      ]
+     ]
+    },
+    {
+     "lit": "0",
+     "t": "num",
+     "u": "kV"
+    }
+   ],
+   "fn": "map"
+  },
+  "type": "num[kV]",
+  "value": {
+   "num": "0",
+   "u": "kV"
+  }
+ },
+ {
+  "id": "unk-missing-fact",
+  "text": "device.settings.51P1P > 1 A",
+  "subject": "dev1",
+  "note": "dev1 has no 51P1P: Unknown, not false",
+  "ast": {
+   "g": 1,
+   "op": ">",
+   "l": {
+    "fact": "device.settings.51P1P"
+   },
+   "r": {
+    "lit": "1",
+    "t": "num",
+    "u": "A"
+   }
+  },
+  "type": "bool",
+  "value": {
+   "unknown": true
+  }
+ },
+ {
+  "id": "unk-and-false",
+  "text": "device.settings.51P1P > 1 A and false",
+  "subject": "dev1",
+  "note": "Kleene: false and unknown = false",
+  "ast": {
+   "g": 1,
+   "op": "and",
+   "a": [
+    {
+     "op": ">",
+     "l": {
+      "fact": "device.settings.51P1P"
+     },
+     "r": {
+      "lit": "1",
+      "t": "num",
+      "u": "A"
+     }
+    },
+    {
+     "lit": false,
+     "t": "bool"
+    }
+   ]
+  },
+  "type": "bool",
+  "value": {
+   "bool": false
+  }
+ },
+ {
+  "id": "unk-or-true",
+  "text": "device.settings.51P1P > 1 A or true",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "op": "or",
+   "a": [
+    {
+     "op": ">",
+     "l": {
+      "fact": "device.settings.51P1P"
+     },
+     "r": {
+      "lit": "1",
+      "t": "num",
+      "u": "A"
+     }
+    },
+    {
+     "lit": true,
+     "t": "bool"
+    }
+   ]
+  },
+  "type": "bool",
+  "value": {
+   "bool": true
+  }
+ },
+ {
+  "id": "unk-not",
+  "text": "not (device.settings.51P1P > 1 A)",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "op": "not",
+   "x": {
+    "op": ">",
+    "l": {
+     "fact": "device.settings.51P1P"
+    },
+    "r": {
+     "lit": "1",
+     "t": "num",
+     "u": "A"
+    }
+   }
+  },
+  "type": "bool",
+  "value": {
+   "unknown": true
+  }
+ },
+ {
+  "id": "unk-is",
+  "text": "device.settings.51P1P is unknown",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "op": "isunknown",
+   "x": {
+    "fact": "device.settings.51P1P"
+   }
+  },
+  "type": "bool",
+  "value": {
+   "bool": true
+  }
+ },
+ {
+  "id": "unk-is-not",
+  "text": "device.settings.50P1P is not unknown",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "op": "not",
+   "x": {
+    "op": "isunknown",
+    "x": {
+     "fact": "device.settings.50P1P"
+    }
+   }
+  },
+  "type": "bool",
+  "value": {
+   "bool": true
+  }
+ },
+ {
+  "id": "unk-coalesce",
+  "text": "coalesce(device.settings.51P1P, device.settings.50P1P, 0 A)",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "a": [
+    {
+     "fact": "device.settings.51P1P"
+    },
+    {
+     "fact": "device.settings.50P1P"
+    },
+    {
+     "lit": "0",
+     "t": "num",
+     "u": "A"
+    }
+   ],
+   "fn": "coalesce"
+  },
+  "type": "num[A]@Secondary",
+  "value": {
+   "num": "2",
+   "u": "A",
+   "b": "Secondary"
+  }
+ },
+ {
+  "id": "unk-if-cond",
+  "text": "if(device.settings.51P1P > 1 A, 'x', 'y')",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "a": [
+    {
+     "op": ">",
+     "l": {
+      "fact": "device.settings.51P1P"
+     },
+     "r": {
+      "lit": "1",
+      "t": "num",
+      "u": "A"
+     }
+    },
+    {
+     "lit": "x",
+     "t": "text"
+    },
+    {
+     "lit": "y",
+     "t": "text"
+    }
+   ],
+   "fn": "if"
+  },
+  "type": "text",
+  "value": {
+   "unknown": true
+  }
+ },
+ {
+  "id": "unk-arith",
+  "text": "device.settings.51P1P + 1 A",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "op": "+",
+   "l": {
+    "fact": "device.settings.51P1P"
+   },
+   "r": {
+    "lit": "1",
+    "t": "num",
+    "u": "A"
+   }
+  },
+  "type": "num[A]@Secondary",
+  "value": {
+   "unknown": true
+  }
+ },
+ {
+  "id": "unk-fact-name",
+  "text": "device.settings.99X = 1 A",
+  "subject": "dev1",
+  "error": "unknown_fact",
+  "ast": {
+   "g": 1,
+   "op": "=",
+   "l": {
+    "fact": "device.settings.99X"
+   },
+   "r": {
+    "lit": "1",
+    "t": "num",
+    "u": "A"
+   }
+  }
+ },
+ {
+  "id": "fact-param",
+  "text": "count(scheme.members[role='Relay'])",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "a": [
+    {
+     "fact": "scheme.members",
+     "p": {
+      "role": {
+       "lit": "Relay",
+       "t": "text"
+      }
+     }
+    }
+   ],
+   "fn": "count"
+  },
+  "type": "num",
+  "value": {
+   "num": "2"
+  }
+ },
+ {
+  "id": "fact-param-missing",
+  "text": "count(scheme.members)",
+  "subject": "dev1",
+  "error": "unknown_parameter",
+  "ast": {
+   "g": 1,
+   "a": [
+    {
+     "fact": "scheme.members"
+    }
+   ],
+   "fn": "count"
+  }
+ },
+ {
+  "id": "fact-param-unknown",
+  "text": "count(scheme.members[rol='Relay'])",
+  "subject": "dev1",
+  "error": "unknown_parameter",
+  "ast": {
+   "g": 1,
+   "a": [
+    {
+     "fact": "scheme.members",
+     "p": {
+      "rol": {
+       "lit": "Relay",
+       "t": "text"
+      }
+     }
+    }
+   ],
+   "fn": "count"
+  }
+ },
+ {
+  "id": "fact-param-type",
+  "text": "count(scheme.members[role=1])",
+  "subject": "dev1",
+  "error": "parameter_type",
+  "ast": {
+   "g": 1,
+   "a": [
+    {
+     "fact": "scheme.members",
+     "p": {
+      "role": {
+       "lit": "1",
+       "t": "num"
+      }
+     }
+    }
+   ],
+   "fn": "count"
+  }
+ },
+ {
+  "id": "fact-param-nomatch",
+  "text": "count(scheme.members[role='Breaker'])",
+  "subject": "dev1",
+  "note": "an empty set is a value",
+  "ast": {
+   "g": 1,
+   "a": [
+    {
+     "fact": "scheme.members",
+     "p": {
+      "role": {
+       "lit": "Breaker",
+       "t": "text"
+      }
+     }
+    }
+   ],
+   "fn": "count"
+  },
+  "type": "num",
+  "value": {
+   "num": "0"
+  }
+ },
+ {
+  "id": "path-set",
+  "text": "scheme.members[role='Relay'].device.settings.50P1P",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "fact": "device.settings.50P1P",
+   "from": {
+    "fact": "scheme.members",
+    "p": {
+     "role": {
+      "lit": "Relay",
+      "t": "text"
+     }
+    }
+   }
+  },
+  "type": "set<num[A]@Secondary>",
+  "value": {
+   "set": [
+    {
+     "num": "2",
+     "u": "A",
+     "b": "Secondary"
+    },
+    {
+     "num": "3.5",
+     "u": "A",
+     "b": "Secondary"
+    }
+   ]
+  }
+ },
+ {
+  "id": "path-any",
+  "text": "any(scheme.members[role='Relay'], m -> m.device.technology = 'Electromechanical')",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "var": "m",
+   "a": [
+    {
+     "fact": "scheme.members",
+     "p": {
+      "role": {
+       "lit": "Relay",
+       "t": "text"
+      }
+     }
+    }
+   ],
+   "fn": "any",
+   "body": {
+    "op": "=",
+    "l": {
+     "fact": "device.technology",
+     "from": {
+      "var": "m"
+     }
+    },
+    "r": {
+     "lit": "Electromechanical",
+     "t": "text"
+    }
+   }
+  },
+  "type": "bool",
+  "value": {
+   "bool": true
+  }
+ },
+ {
+  "id": "path-all",
+  "text": "all(scheme.members[role='Relay'], m -> m.device.technology = 'Microprocessor')",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "var": "m",
+   "a": [
+    {
+     "fact": "scheme.members",
+     "p": {
+      "role": {
+       "lit": "Relay",
+       "t": "text"
+      }
+     }
+    }
+   ],
+   "fn": "all",
+   "body": {
+    "op": "=",
+    "l": {
+     "fact": "device.technology",
+     "from": {
+      "var": "m"
+     }
+    },
+    "r": {
+     "lit": "Microprocessor",
+     "t": "text"
+    }
+   }
+  },
+  "type": "bool",
+  "value": {
+   "bool": false
+  }
+ },
+ {
+  "id": "path-where-count",
+  "text": "count(where(scheme.members[role='Relay'], m -> m.device.technology = 'Electromechanical'))",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "a": [
+    {
+     "var": "m",
+     "a": [
+      {
+       "fact": "scheme.members",
+       "p": {
+        "role": {
+         "lit": "Relay",
+         "t": "text"
+        }
+       }
+      }
+     ],
+     "fn": "where",
+     "body": {
+      "op": "=",
+      "l": {
+       "fact": "device.technology",
+       "from": {
+        "var": "m"
+       }
+      },
+      "r": {
+       "lit": "Electromechanical",
+       "t": "text"
+      }
+     }
+    }
+   ],
+   "fn": "count"
+  },
+  "type": "num",
+  "value": {
+   "num": "1"
+  }
+ },
+ {
+  "id": "path-select-max",
+  "text": "max(select(scheme.members[role='Relay'], m -> m.device.settings.50P1P))",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "a": [
+    {
+     "var": "m",
+     "a": [
+      {
+       "fact": "scheme.members",
+       "p": {
+        "role": {
+         "lit": "Relay",
+         "t": "text"
+        }
+       }
+      }
+     ],
+     "fn": "select",
+     "body": {
+      "fact": "device.settings.50P1P",
+      "from": {
+       "var": "m"
+      }
+     }
+    }
+   ],
+   "fn": "max"
+  },
+  "type": "num[A]@Secondary",
+  "value": {
+   "num": "3.5",
+   "u": "A",
+   "b": "Secondary"
+  }
+ },
+ {
+  "id": "path-sum",
+  "text": "sum(scheme.members[role='Relay'].device.settings.50P1P)",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "a": [
+    {
+     "fact": "device.settings.50P1P",
+     "from": {
+      "fact": "scheme.members",
+      "p": {
+       "role": {
+        "lit": "Relay",
+        "t": "text"
+       }
+      }
+     }
+    }
+   ],
+   "fn": "sum"
+  },
+  "type": "num[A]@Secondary",
+  "value": {
+   "num": "5.5",
+   "u": "A",
+   "b": "Secondary"
+  }
+ },
+ {
+  "id": "path-avg",
+  "text": "avg(scheme.members[role='Relay'].device.settings.50P1P)",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "a": [
+    {
+     "fact": "device.settings.50P1P",
+     "from": {
+      "fact": "scheme.members",
+      "p": {
+       "role": {
+        "lit": "Relay",
+        "t": "text"
+       }
+      }
+     }
+    }
+   ],
+   "fn": "avg"
+  },
+  "type": "num[A]@Secondary",
+  "value": {
+   "num": "2.75",
+   "u": "A",
+   "b": "Secondary"
+  }
+ },
+ {
+  "id": "path-single-ref",
+  "text": "record.last[kind='Maintenance', accepted=true].record.occurred_at",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "fact": "record.occurred_at",
+   "from": {
+    "fact": "record.last",
+    "p": {
+     "accepted": {
+      "lit": true,
+      "t": "bool"
+     },
+     "kind": {
+      "lit": "Maintenance",
+      "t": "text"
+     }
+    }
+   }
+  },
+  "type": "date",
+  "value": {
+   "date": "2020-03-01T10:00:00-04:00"
+  }
+ },
+ {
+  "id": "path-empty-any",
+  "text": "any(scheme.members[role='Breaker'], m -> true)",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "var": "m",
+   "a": [
+    {
+     "fact": "scheme.members",
+     "p": {
+      "role": {
+       "lit": "Breaker",
+       "t": "text"
+      }
+     }
+    }
+   ],
+   "fn": "any",
+   "body": {
+    "lit": true,
+    "t": "bool"
+   }
+  },
+  "type": "bool",
+  "value": {
+   "bool": false
+  }
+ },
+ {
+  "id": "path-empty-all",
+  "text": "all(scheme.members[role='Breaker'], m -> false)",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "var": "m",
+   "a": [
+    {
+     "fact": "scheme.members",
+     "p": {
+      "role": {
+       "lit": "Breaker",
+       "t": "text"
+      }
+     }
+    }
+   ],
+   "fn": "all",
+   "body": {
+    "lit": false,
+    "t": "bool"
+   }
+  },
+  "type": "bool",
+  "value": {
+   "bool": true
+  }
+ },
+ {
+  "id": "path-empty-sum",
+  "text": "sum(scheme.members[role='Breaker'].device.settings.50P1P)",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "a": [
+    {
+     "fact": "device.settings.50P1P",
+     "from": {
+      "fact": "scheme.members",
+      "p": {
+       "role": {
+        "lit": "Breaker",
+        "t": "text"
+       }
+      }
+     }
+    }
+   ],
+   "fn": "sum"
+  },
+  "type": "num[A]@Secondary",
+  "value": {
+   "unknown": true
+  }
+ },
+ {
+  "id": "path-unbound",
+  "text": "m.device.technology = 'Static'",
+  "subject": "dev1",
+  "note": "outside a lambda, m.device.technology is a fact name that does not exist",
+  "error": "unknown_fact",
+  "ast": {
+   "g": 1,
+   "op": "=",
+   "l": {
+    "fact": "m.device.technology"
+   },
+   "r": {
+    "lit": "Static",
+    "t": "text"
+   }
+  }
+ },
+ {
+  "id": "asof",
+  "text": "device.settings.50P1P at (@at - 1 y)",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "fact": "device.settings.50P1P",
+   "at": {
+    "op": "-",
+    "l": {
+     "var": "@at"
+    },
+    "r": {
+     "lit": "1",
+     "t": "dur",
+     "u": "y"
+    }
+   }
+  },
+  "type": "num[A]@Secondary",
+  "value": {
+   "num": "1",
+   "u": "A",
+   "b": "Secondary"
+  }
+ },
+ {
+  "id": "asof-now",
+  "text": "device.settings.50P1P at (@at)",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "fact": "device.settings.50P1P",
+   "at": {
+    "var": "@at"
+   }
+  },
+  "type": "num[A]@Secondary",
+  "value": {
+   "num": "2",
+   "u": "A",
+   "b": "Secondary"
+  }
+ },
+ {
+  "id": "is-empty",
+  "text": "scheme.members[role='Breaker'] is empty",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "op": "=",
+   "l": {
+    "a": [
+     {
+      "fact": "scheme.members",
+      "p": {
+       "role": {
+        "lit": "Breaker",
+        "t": "text"
+       }
+      }
+     }
+    ],
+    "fn": "count"
+   },
+   "r": {
+    "lit": "0",
+    "t": "num"
+   }
+  },
+  "type": "bool",
+  "value": {
+   "bool": true
+  }
+ },
+ {
+  "id": "exists",
+  "text": "exists(scheme.members[role='Relay'])",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "a": [
+    {
+     "fact": "scheme.members",
+     "p": {
+      "role": {
+       "lit": "Relay",
+       "t": "text"
+      }
+     }
+    }
+   ],
+   "fn": "exists"
+  },
+  "type": "bool",
+  "value": {
+   "bool": true
+  }
+ },
+ {
+  "id": "date-add",
+  "text": "2026-01-31 + 1 mo",
+  "subject": "dev1",
+  "note": "calendar month add clamps the day",
+  "ast": {
+   "g": 1,
+   "op": "+",
+   "l": {
+    "lit": "2026-01-31T00:00:00-03:00",
+    "t": "date"
+   },
+   "r": {
+    "lit": "1",
+    "t": "dur",
+    "u": "mo"
+   }
+  },
+  "type": "date",
+  "value": {
+   "date": "2026-02-28T00:00:00-03:00"
+  }
+ },
+ {
+  "id": "date-add-year",
+  "text": "2024-02-29 + 1 y",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "op": "+",
+   "l": {
+    "lit": "2024-02-29T00:00:00-03:00",
+    "t": "date"
+   },
+   "r": {
+    "lit": "1",
+    "t": "dur",
+    "u": "y"
+   }
+  },
+  "type": "date",
+  "value": {
+   "date": "2025-02-28T00:00:00-03:00"
+  }
+ },
+ {
+  "id": "date-add-days",
+  "text": "2026-09-05 + 30 d",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "op": "+",
+   "l": {
+    "lit": "2026-09-05T00:00:00-03:00",
+    "t": "date"
+   },
+   "r": {
+    "lit": "30",
+    "t": "dur",
+    "u": "d"
+   }
+  },
+  "type": "date",
+  "value": {
+   "date": "2026-10-05T00:00:00-03:00"
+  }
+ },
+ {
+  "id": "date-add-time-unit",
+  "text": "2026-09-05 + 90 min",
+  "subject": "dev1",
+  "note": "a Time-dimension number serves as a duration",
+  "ast": {
+   "g": 1,
+   "op": "+",
+   "l": {
+    "lit": "2026-09-05T00:00:00-03:00",
+    "t": "date"
+   },
+   "r": {
+    "lit": "90",
+    "t": "num",
+    "u": "min"
+   }
+  },
+  "type": "date",
+  "value": {
+   "date": "2026-09-05T01:30:00-03:00"
+  }
+ },
+ {
+  "id": "date-diff",
+  "text": "days_between(2026-09-01, 2026-09-05)",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "a": [
+    {
+     "lit": "2026-09-01T00:00:00-03:00",
+     "t": "date"
+    },
+    {
+     "lit": "2026-09-05T00:00:00-03:00",
+     "t": "date"
+    }
+   ],
+   "fn": "days_between"
+  },
+  "type": "num",
+  "value": {
+   "num": "4"
+  }
+ },
+ {
+  "id": "date-parts",
+  "text": "year(@at) * 100 + month(@at)",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "op": "+",
+   "l": {
+    "op": "*",
+    "l": {
+     "a": [
+      {
+       "var": "@at"
+      }
+     ],
+     "fn": "year"
+    },
+    "r": {
+     "lit": "100",
+     "t": "num"
+    }
+   },
+   "r": {
+    "a": [
+     {
+      "var": "@at"
+     }
+    ],
+    "fn": "month"
+   }
+  },
+  "type": "num",
+  "value": {
+   "num": "202609"
+  }
+ },
+ {
+  "id": "dur-mul",
+  "text": "2 * 6 mo",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "op": "*",
+   "l": {
+    "lit": "2",
+    "t": "num"
+   },
+   "r": {
+    "lit": "6",
+    "t": "dur",
+    "u": "mo"
+   }
+  },
+  "type": "dur",
+  "value": {
+   "dur": "12",
+   "u": "mo"
+  }
+ },
+ {
+  "id": "dur-compare",
+  "text": "30 d > 4 w",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "op": ">",
+   "l": {
+    "lit": "30",
+    "t": "dur",
+    "u": "d"
+   },
+   "r": {
+    "lit": "4",
+    "t": "dur",
+    "u": "w"
+   }
+  },
+  "type": "bool",
+  "value": {
+   "bool": true
+  }
+ },
+ {
+  "id": "fn-round",
+  "text": "round(2.345 A, 2)",
+  "subject": "dev1",
+  "note": "half away from zero on both interpreters",
+  "ast": {
+   "g": 1,
+   "a": [
+    {
+     "lit": "2.345",
+     "t": "num",
+     "u": "A"
+    },
+    {
+     "lit": "2",
+     "t": "num"
+    }
+   ],
+   "fn": "round"
+  },
+  "type": "num[A]",
+  "value": {
+   "num": "2.35",
+   "u": "A"
+  }
+ },
+ {
+  "id": "fn-abs-floor-ceil",
+  "text": "abs(floor(-2.5)) + ceil(2.1)",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "op": "+",
+   "l": {
+    "a": [
+     {
+      "a": [
+       {
+        "lit": "-2.5",
+        "t": "num"
+       }
+      ],
+      "fn": "floor"
+     }
+    ],
+    "fn": "abs"
+   },
+   "r": {
+    "a": [
+     {
+      "lit": "2.1",
+      "t": "num"
+     }
+    ],
+    "fn": "ceil"
+   }
+  },
+  "type": "num",
+  "value": {
+   "num": "6"
+  }
+ },
+ {
+  "id": "fn-minmax",
+  "text": "max(1 A, 3 A, 2 A) - min(1 A, 3 A)",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "op": "-",
+   "l": {
+    "a": [
+     {
+      "lit": "1",
+      "t": "num",
+      "u": "A"
+     },
+     {
+      "lit": "3",
+      "t": "num",
+      "u": "A"
+     },
+     {
+      "lit": "2",
+      "t": "num",
+      "u": "A"
+     }
+    ],
+    "fn": "max"
+   },
+   "r": {
+    "a": [
+     {
+      "lit": "1",
+      "t": "num",
+      "u": "A"
+     },
+     {
+      "lit": "3",
+      "t": "num",
+      "u": "A"
+     }
+    ],
+    "fn": "min"
+   }
+  },
+  "type": "num[A]",
+  "value": {
+   "num": "2",
+   "u": "A"
+  }
+ },
+ {
+  "id": "fn-clamp",
+  "text": "clamp(15 A, 0 A, 10 A)",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "a": [
+    {
+     "lit": "15",
+     "t": "num",
+     "u": "A"
+    },
+    {
+     "lit": "0",
+     "t": "num",
+     "u": "A"
+    },
+    {
+     "lit": "10",
+     "t": "num",
+     "u": "A"
+    }
+   ],
+   "fn": "clamp"
+  },
+  "type": "num[A]",
+  "value": {
+   "num": "10",
+   "u": "A"
+  }
+ },
+ {
+  "id": "fn-arity",
+  "text": "round(1.5)",
+  "subject": "dev1",
+  "error": "arity",
+  "ast": {
+   "g": 1,
+   "a": [
+    {
+     "lit": "1.5",
+     "t": "num"
+    }
+   ],
+   "fn": "round"
+  }
+ },
+ {
+  "id": "fn-unknown",
+  "text": "sqrt(4)",
+  "subject": "dev1",
+  "error": "unknown_function",
+  "ast": {
+   "g": 1,
+   "a": [
+    {
+     "lit": "4",
+     "t": "num"
+    }
+   ],
+   "fn": "sqrt"
+  }
+ },
+ {
+  "id": "fn-if",
+  "text": "if(device.technology = 'Microprocessor', 1 A, 2 A)",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "a": [
+    {
+     "op": "=",
+     "l": {
+      "fact": "device.technology"
+     },
+     "r": {
+      "lit": "Microprocessor",
+      "t": "text"
+     }
+    },
+    {
+     "lit": "1",
+     "t": "num",
+     "u": "A"
+    },
+    {
+     "lit": "2",
+     "t": "num",
+     "u": "A"
+    }
+   ],
+   "fn": "if"
+  },
+  "type": "num[A]",
+  "value": {
+   "num": "1",
+   "u": "A"
+  }
+ },
+ {
+  "id": "fn-if-type",
+  "text": "if(true, 1 A, 'x')",
+  "subject": "dev1",
+  "error": "type_mismatch",
+  "ast": {
+   "g": 1,
+   "a": [
+    {
+     "lit": true,
+     "t": "bool"
+    },
+    {
+     "lit": "1",
+     "t": "num",
+     "u": "A"
+    },
+    {
+     "lit": "x",
+     "t": "text"
+    }
+   ],
+   "fn": "if"
+  }
+ },
+ {
+  "id": "host-validation",
+  "text": "value_r >= 1 and value_r <= 10000 and floor(value_r) = value_r",
+  "subject": "dev1",
+  "note": "E6 ValidationExpression with value bound dimensionless",
+  "ast": {
+   "g": 1,
+   "op": "and",
+   "a": [
+    {
+     "op": ">=",
+     "l": {
+      "var": "value_r"
+     },
+     "r": {
+      "lit": "1",
+      "t": "num"
+     }
+    },
+    {
+     "op": "<=",
+     "l": {
+      "var": "value_r"
+     },
+     "r": {
+      "lit": "10000",
+      "t": "num"
+     }
+    },
+    {
+     "op": "=",
+     "l": {
+      "a": [
+       {
+        "var": "value_r"
+       }
+      ],
+      "fn": "floor"
+     },
+     "r": {
+      "var": "value_r"
+     }
+    }
+   ]
+  },
+  "type": "bool",
+  "value": {
+   "bool": true
+  }
+ },
+ {
+  "id": "host-limit",
+  "text": "value_a >= nominal * 0.95 and value_a <= nominal * 1.05",
+  "subject": "dev1",
+  "note": "E7 LimitExpression",
+  "ast": {
+   "g": 1,
+   "op": "and",
+   "a": [
+    {
+     "op": ">=",
+     "l": {
+      "var": "value_a"
+     },
+     "r": {
+      "op": "*",
+      "l": {
+       "var": "nominal"
+      },
+      "r": {
+       "lit": "0.95",
+       "t": "num"
+      }
+     }
+    },
+    {
+     "op": "<=",
+     "l": {
+      "var": "value_a"
+     },
+     "r": {
+      "op": "*",
+      "l": {
+       "var": "nominal"
+      },
+      "r": {
+       "lit": "1.05",
+       "t": "num"
+      }
+     }
+    }
+   ]
+  },
+  "type": "bool",
+  "value": {
+   "bool": true
+  }
+ },
+ {
+  "id": "host-conversion",
+  "text": "$ matches '^17[0-9]{4}$'",
+  "subject": "dev1",
+  "note": "E4 ConversionExpression over the source token",
+  "sql": "unsupported",
+  "ast": {
+   "g": 1,
+   "op": "matches",
+   "l": {
+    "var": "$"
+   },
+   "r": {
+    "lit": "^17[0-9]{4}$",
+    "t": "text"
+   }
+  },
+  "type": "bool",
+  "value": {
+   "bool": true
+  }
+ },
+ {
+  "id": "E1-formula",
+  "text": "asset.template.technology = 'Microprocessor'",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "op": "=",
+   "l": {
+    "fact": "asset.template.technology"
+   },
+   "r": {
+    "lit": "Microprocessor",
+    "t": "text"
+   }
+  },
+  "type": "bool",
+  "value": {
+   "bool": true
+  }
+ },
+ {
+  "id": "E1-rule",
+  "text": "asset.formula.is_microprocessor = true",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "op": "=",
+   "l": {
+    "fact": "asset.formula.is_microprocessor"
+   },
+   "r": {
+    "lit": true,
+    "t": "bool"
+   }
+  },
+  "type": "bool",
+  "value": {
+   "bool": true
+  }
+ },
+ {
+  "id": "E2-scope",
+  "text": "scheme.members[role='Relay'] is not empty and any(scheme.members[role='Relay'], m -> m.device.technology = 'Microprocessor')",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "op": "and",
+   "a": [
+    {
+     "op": "not",
+     "x": {
+      "op": "=",
+      "l": {
+       "a": [
+        {
+         "fact": "scheme.members",
+         "p": {
+          "role": {
+           "lit": "Relay",
+           "t": "text"
+          }
+         }
+        }
+       ],
+       "fn": "count"
+      },
+      "r": {
+       "lit": "0",
+       "t": "num"
+      }
+     }
+    },
+    {
+     "var": "m",
+     "a": [
+      {
+       "fact": "scheme.members",
+       "p": {
+        "role": {
+         "lit": "Relay",
+         "t": "text"
+        }
+       }
+      }
+     ],
+     "fn": "any",
+     "body": {
+      "op": "=",
+      "l": {
+       "fact": "device.technology",
+       "from": {
+        "var": "m"
+       }
+      },
+      "r": {
+       "lit": "Microprocessor",
+       "t": "text"
+      }
+     }
+    }
+   ]
+  },
+  "type": "bool",
+  "value": {
+   "bool": true
+  }
+ },
+ {
+  "id": "E3-loadability-shape",
+  "text": "base(device.settings.50P1P, 'Primary', device.template.ct_ratio) > 1.5 * line.rating.emergency",
+  "subject": "dev1",
+  "note": "800 A@Primary > 750 A; the factor 1.5 is a placeholder, not PRC-023's value",
+  "ast": {
+   "g": 1,
+   "op": ">",
+   "l": {
+    "a": [
+     {
+      "fact": "device.settings.50P1P"
+     },
+     {
+      "lit": "Primary",
+      "t": "text"
+     },
+     {
+      "fact": "device.template.ct_ratio"
+     }
+    ],
+    "fn": "base"
+   },
+   "r": {
+    "op": "*",
+    "l": {
+     "lit": "1.5",
+     "t": "num"
+    },
+    "r": {
+     "fact": "line.rating.emergency"
+    }
+   }
+  },
+  "type": "bool",
+  "value": {
+   "bool": true
+  }
+ },
+ {
+  "id": "syntax-1",
+  "text": "1 +",
+  "subject": "dev1",
+  "error": "syntax"
+ },
+ {
+  "id": "syntax-2",
+  "text": "device.settings.50P1P >",
+  "subject": "dev1",
+  "error": "syntax"
+ },
+ {
+  "id": "syntax-3",
+  "text": "any(scheme.members[role='Relay'], m m.x)",
+  "subject": "dev1",
+  "error": "syntax"
+ }
+]

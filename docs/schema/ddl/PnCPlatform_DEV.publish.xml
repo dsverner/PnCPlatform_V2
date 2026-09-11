@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Publish profile for PnCPlatform_DEV on VM01. No credentials here: deploy.py supplies
+     /TargetUser and /TargetPassword from dev.local at run time. -->
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <TargetDatabaseName>PnCPlatform_DEV</TargetDatabaseName>
+    <TargetConnectionString>Data Source=10.10.70.25;Integrated Security=False;Persist Security Info=False;Encrypt=True;TrustServerCertificate=True</TargetConnectionString>
+    <ProfileVersionNumber>1</ProfileVersionNumber>
+    <BlockOnPossibleDataLoss>True</BlockOnPossibleDataLoss>
+    <DropObjectsNotInSource>True</DropObjectsNotInSource>
+    <DoNotDropObjectTypes>Users;Logins;RoleMembership;Permissions</DoNotDropObjectTypes>
+    <IncludeTransactionalScripts>True</IncludeTransactionalScripts>
+    <CreateNewDatabase>False</CreateNewDatabase>
+    <ScriptDatabaseOptions>True</ScriptDatabaseOptions>
+    <IgnoreFilegroupPlacement>False</IgnoreFilegroupPlacement>
+    <IgnoreFileAndLogFilePath>True</IgnoreFileAndLogFilePath>
+    <IgnoreFileSize>True</IgnoreFileSize>
+    <IgnoreFillFactor>True</IgnoreFillFactor>
+    <ScriptRefreshModule>True</ScriptRefreshModule>
+  </PropertyGroup>
+  <ItemGroup>
+    <SqlCmdVariable Include="DataPath">
+      <Value>D:\SQLData\</Value>
+    </SqlCmdVariable>
+  </ItemGroup>
+</Project>

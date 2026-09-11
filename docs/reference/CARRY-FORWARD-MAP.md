@@ -110,10 +110,13 @@ subsystem:
 | `docs/schema/ddl/` — the SQL project that builds `PnCPlatform.dacpac`, with `Roles.sql` and the publish profile | The schema itself is carried (#21); the project is how it deploys |
 | `ddl/tools/deploy.py` — build → publish → generate → build → publish → smoke, `--fresh` | The one command every wave's gate starts with (#76) |
 | `ddl/tools/generate.py` · `check_generated.py` — temporal views and base write procedures emitted from the deployed catalogue via the `PnC.TemporalClass` extended property | The `process` schema's twelve tables get their views and procedures without hand-writing; the check keeps generated files honest |
-| `ddl/tools/smoke.py` — 252 schema checks, re-runnable on a populated database | The schema gate; the seven replaced tables' checks are removed in W0 and the new total recorded |
+| `ddl/tools/smoke.py` — **244** schema checks (252 less the eight over the seven replaced tables, W0), re-runnable on a populated database | The schema gate. Its engine-driven lines run through the engine named by `PNC_ENGINE_DIR` — the predecessor's built `PnC.Engine.Cli` until W4 (#79); fresh-database safe (#80) |
 | `ddl/tools/record_release.py` · `tools/package_release.py` — the `platform.Release` fact; dacpac + published site + SBOM + `release.json` with SHA-256s | Every deploy to DEV or QA goes through a release package |
 | `tools/rehearse_relocation.py` | The QA acceptance run from three vantage points; W8's gate |
-| `docs/schema/gate/` — the extensibility-gate toy (decision #77) | Re-run once in W0 to prove the carried schema still has the property |
+| `docs/schema/gate/` — the extensibility-gate toy (the predecessor's decision 77) | Re-run in W0 against `PnCPlatform_V2_GATE` (#81): nine checks PASS, result unchanged in substance |
+| `docs/schema/grammar/` — `formula.py` (the Python reference parser and canonical form) and its cases | `smoke.py` imports it to hand the engine canonical expressions; carried as a dependency of the gate (#77) |
+| `docs/schema/FORMULA-GRAMMAR.md` — grammar-1 as written | Cited by decisions #43 and #49 and by `PROCEDURE-ENGINE.md`; the design depends on it unchanged (#77) |
+| `docs/schema/ddl/CONVENTIONS.md` · `PROCEDURES.md` · `STEPS.md` | The project's own record of its conventions, procedures and build steps; annotated where W0 removed something, never rewritten (#77) |
 | `src/PnC.Api.Smoke` | **Rewritten in W1**, not carried: it targets the API surface, which is new. Its role-based check shape is kept |
 
 Not carried: `src/PnC.Api` (the generic dispatcher, forms, definitions editor, expression checker
@@ -136,6 +139,19 @@ work.WorkflowTransition                                        → process.Workf
 Plus the `Program.Workflow` and `Program.TestPlan` definition kinds, whose payloads are the shape
 being replaced — by `workflow.schema.json` and `procedure.schema.json` respectively. The
 `config.Definition` base they sit in is carried unchanged.
+
+**Done in W0 (2026-09-11, #78).** The seven tables and their generated objects are gone from the
+project, with three hand-written procedures over them: `work.StartWorkflow`, `work.Transition` and
+`record.RecordTestResult`. Two columns still point where the tables were and wait for W3:
+
+```
+record.TestResult.TestPlanStepRowId       — FK dropped; re-pointed at process.ProcedureStep in W3
+record.TestReading.TestPlanReadingRowId   — FK dropped; re-pointed at the step's capture in W3
+```
+
+`PostDeploy/Seed_config_Workflow_Standard.sql` still seeds one `Program.Workflow` definition
+(`Standard`) in the old payload shape; it sits in `config.Definition`, not in the replaced tables,
+and is W3's to replace.
 
 ---
 

@@ -1,0 +1,118 @@
+[
+ {
+  "id": "g0-leaf",
+  "grammar0": {
+   "fact": "asset.template.technology",
+   "op": "=",
+   "value": "Microprocessor"
+  },
+  "grammar1": {
+   "g": 1,
+   "op": "=",
+   "l": {
+    "fact": "asset.template.technology"
+   },
+   "r": {
+    "lit": "Microprocessor",
+    "t": "text"
+   }
+  },
+  "text": "asset.template.technology = 'Microprocessor'"
+ },
+ {
+  "id": "g0-tree",
+  "grammar0": {
+   "all": [
+    {
+     "fact": "asset.voltage_class",
+     "op": "in",
+     "value": [
+      "138",
+      "230"
+     ]
+    },
+    {
+     "not": {
+      "any": [
+       {
+        "fact": "device.technology",
+        "op": "=",
+        "value": "Static"
+       }
+      ]
+     }
+    }
+   ]
+  },
+  "grammar1": {
+   "g": 1,
+   "op": "and",
+   "a": [
+    {
+     "op": "in",
+     "l": {
+      "fact": "asset.voltage_class"
+     },
+     "r": {
+      "set": [
+       {
+        "lit": "138",
+        "t": "text"
+       },
+       {
+        "lit": "230",
+        "t": "text"
+       }
+      ]
+     }
+    },
+    {
+     "op": "not",
+     "x": {
+      "op": "=",
+      "l": {
+       "fact": "device.technology"
+      },
+      "r": {
+       "lit": "Static",
+       "t": "text"
+      }
+     }
+    }
+   ]
+  },
+  "text": "asset.voltage_class in {'138', '230'} and not device.technology = 'Static'"
+ },
+ {
+  "id": "g0-rule",
+  "grammar0": {
+   "requirement": "toy",
+   "subjectKinds": [
+    "Asset"
+   ],
+   "predicate": {
+    "fact": "asset.formula.is_microprocessor",
+    "op": "=",
+    "value": true
+   }
+  },
+  "grammar1": {
+   "g": 1,
+   "requirement": "toy",
+   "scope": {
+    "op": "=",
+    "l": {
+     "fact": "asset.formula.is_microprocessor"
+    },
+    "r": {
+     "lit": true,
+     "t": "bool"
+    }
+   },
+   "subjectKinds": [
+    "Asset"
+   ]
+  },
+  "text": null
+ }
+]

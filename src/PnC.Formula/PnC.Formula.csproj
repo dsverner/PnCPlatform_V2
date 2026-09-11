@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- PnCPlatform formula language — the C# port of docs/schema/grammar/formula.py (FORMULA-GRAMMAR.md,
+       PLATFORM-ARCHITECTURE decision 206). No package references by design (vision §7.4): the base class
+       library carries everything the grammar needs. Proven by src/PnC.Formula.Conformance over
+       docs/schema/grammar/cases. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <RootNamespace>PnC.Formula</RootNamespace>
+    <AssemblyName>PnC.Formula</AssemblyName>
+    <Version>0.9.0</Version>
+  </PropertyGroup>
+</Project>

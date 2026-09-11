@@ -1,0 +1,163 @@
+[
+ {
+  "id": "cad-interval-anchor",
+  "text": "every 12 y from record.last[kind='Maintenance', accepted=true].record.occurred_at",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "from": {
+    "fact": "record.occurred_at",
+    "from": {
+     "fact": "record.last",
+     "p": {
+      "accepted": {
+       "lit": true,
+       "t": "bool"
+      },
+      "kind": {
+       "lit": "Maintenance",
+       "t": "text"
+      }
+     }
+    }
+   },
+   "cadence": "interval",
+   "every": {
+    "lit": "12",
+    "t": "dur",
+    "u": "y"
+   }
+  },
+  "value": {
+   "date": "2032-03-01T10:00:00-04:00"
+  }
+ },
+ {
+  "id": "cad-interval-anchor-unknown",
+  "text": "every 12 y from record.last[kind='Calibration', accepted=true].record.occurred_at",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "from": {
+    "fact": "record.occurred_at",
+    "from": {
+     "fact": "record.last",
+     "p": {
+      "accepted": {
+       "lit": true,
+       "t": "bool"
+      },
+      "kind": {
+       "lit": "Calibration",
+       "t": "text"
+      }
+     }
+    }
+   },
+   "cadence": "interval",
+   "every": {
+    "lit": "12",
+    "t": "dur",
+    "u": "y"
+   }
+  },
+  "value": {
+   "unknown": true
+  }
+ },
+ {
+  "id": "cad-interval-effective",
+  "text": "every 6 y from effective",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "from": "effective",
+   "cadence": "interval",
+   "every": {
+    "lit": "6",
+    "t": "dur",
+    "u": "y"
+   }
+  },
+  "value": {
+   "date": "2031-01-01T00:00:00-04:00"
+  }
+ },
+ {
+  "id": "cad-interval-bare",
+  "text": "every 6 y",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "cadence": "interval",
+   "every": {
+    "lit": "6",
+    "t": "dur",
+    "u": "y"
+   }
+  },
+  "value": {
+   "date": "2031-01-01T00:00:00-04:00"
+  }
+ },
+ {
+  "id": "cad-calendar",
+  "text": "every calendar_year",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "cadence": "calendar",
+   "period": "year"
+  },
+  "value": {
+   "date": "2027-01-01T00:00:00-03:00"
+  }
+ },
+ {
+  "id": "cad-calendar-offset",
+  "text": "every calendar_quarter offset 30 d",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "cadence": "calendar",
+   "period": "quarter",
+   "offset": {
+    "lit": "30",
+    "t": "dur",
+    "u": "d"
+   }
+  },
+  "value": {
+   "date": "2026-10-31T00:00:00-03:00"
+  }
+ },
+ {
+  "id": "cad-event",
+  "text": "within 30 d of event",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "cadence": "event",
+   "within": {
+    "lit": "30",
+    "t": "dur",
+    "u": "d"
+   }
+  },
+  "value": {
+   "date": "2026-09-30T12:00:00-03:00"
+  }
+ },
+ {
+  "id": "cad-once",
+  "text": "once",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "cadence": "once"
+  },
+  "value": {
+   "date": "2025-01-01T00:00:00-04:00"
+  }
+ }
+]

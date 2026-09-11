@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Runs docs/schema/grammar/cases/*.json through the C# port (FORMULA-GRAMMAR.md §12, decision 196).
+       A console runner rather than a test framework: no package references (vision §7.4). Exit code 1 on any failure. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <RootNamespace>PnC.Formula.Conformance</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\PnC.Formula\PnC.Formula.csproj" />
+  </ItemGroup>
+</Project>
