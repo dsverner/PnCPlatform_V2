@@ -35,8 +35,8 @@ public sealed class RequestUserMiddleware(RequestDelegate next, IConfiguration c
             // IIS presents DOMAIN\sam; security.User holds the UPN (the predecessor's QA rows read VGS01@vgsot.internal).
             // Auth:UpnSuffix maps one to the other until W2 keys users by directory SID (API.md §2.2).
             var suffix = config["Auth:UpnSuffix"];
-            if (name is not null && !string.IsNullOrEmpty(suffix) && name.Contains('\') && !name.Contains('@'))
-                name = name[(name.LastIndexOf('\') + 1)..] + "@" + suffix;
+            if (name is not null && !string.IsNullOrEmpty(suffix) && name.Contains('\\') && !name.Contains('@'))
+                name = name[(name.LastIndexOf('\\') + 1)..] + "@" + suffix;
         }
         else throw new ApiException(500, "auth_mode", $"Auth:Mode '{mode}' is not Windows or Development.");
 
