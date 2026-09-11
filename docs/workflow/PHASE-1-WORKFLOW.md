@@ -113,6 +113,17 @@ as Administrator.
   package is built before the deploy that first records a version.
 - **Not done:** the Windows-mode run from VGS-VM07 against a release installed on VGS-VM02. Where W1's
   gate runs on the OT VMs is on the W1 card (VM02 hosts the predecessor's release against `_QA`).
+- **Card round 1 answered 2026-09-11 19:26Z** (#89, #90): D1 second IIS site on VM02, port 8443;
+  D2–D5 accepted as proposed; T1 *different* — the PowerShell `set` did nothing and the host came up
+  Production with Development mode, which the API now refuses at start. The owner reported the
+  browser showed the expected panel. **Still owed:** the second site on VM02 and the VM07 run.
+  The role grant on `PnCPlatform_V2_DEV`, to be run by the owner (`dev_pnc` may not grant it here):
+
+  ```sql
+  USE PnCPlatform_V2_DEV;
+  CREATE USER [VGSOT\svc-pncapi] FOR LOGIN [VGSOT\svc-pncapi];
+  ALTER ROLE [app_execute] ADD MEMBER [VGSOT\svc-pncapi];
+  ```
 
 ### W2 — Identity, roles, scopes
 

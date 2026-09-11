@@ -282,7 +282,16 @@ Recorded in `DECISION-LOG.md` when W1 commits; listed here so they can be overtu
 
 ---
 
-## 12. Open questions
+## 12. Open questions — answered by the W1 card, 2026-09-11
+
+- **Gate location:** a **second IIS site on VGS-VM02, port 8443**, against `PnCPlatform_V2_DEV`; the
+  predecessor's site stays (D1, #89). `VGSOT\svc-pncapi` gets `app_execute` on `_V2_DEV` — a role grant
+  the owner runs (the statements are in the workflow's W1 gate record).
+- **Windows-mode name:** `Auth:UpnSuffix` accepted until W2 keys users by SID (D2).
+- **Permission map defaults** accepted for W1, reviewed in W2 (D3). **Catalogue visible to every
+  signed-in user** kept (D4). **SQL certificate trust** moves to W8's QA rebuild (D5).
+
+The questions as they stood before the card:
 
 - **Where does W1's gate run?** VGS-VM02 currently hosts the predecessor's release against
   `PnCPlatform_QA`, and the workflow assumes the QA VMs are rebuilt clean for W8. Installing the

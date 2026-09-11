@@ -20,6 +20,9 @@ var connectionString = builder.Configuration["Database:ConnectionString"]
                        ?? throw new InvalidOperationException("Database:ConnectionString is not configured (appsettings.Local.json on DEV; the service's settings elsewhere).");
 var schemas = builder.Configuration.GetSection("Api:Schemas").Get<string[]>() ?? [];
 var authMode = builder.Configuration["Auth:Mode"] ?? "Windows";
+if (authMode.Equals("Development", StringComparison.OrdinalIgnoreCase) && !builder.Environment.EnvironmentName.Equals("DEV", StringComparison.OrdinalIgnoreCase))
+    throw new InvalidOperationException($"Auth:Mode=Development is only valid when the environment name is DEV; this host is '{builder.Environment.EnvironmentName}'. "
+        + "On the build laptop: $env:ASPNETCORE_ENVIRONMENT = 'DEV' (PowerShell) before dotnet run. (W1 card T1: `set` does not set a variable in PowerShell.)");
 
 var catalog = Catalog.Load(connectionString, schemas);
 var map = PermissionMap.Load(Path.Combine(AppContext.BaseDirectory, "api-permissions.json"));
