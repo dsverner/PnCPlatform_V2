@@ -103,6 +103,12 @@ card and hand over the link — a **test card** (what to check on a screen) or a
 
 - **One card per round**, with its own artifact URL, so an earlier round's answers stay readable.
 - Every item states **what is being asked and why it matters**, in a sentence each.
+- **Every item shows a concrete example of what is being asked** — the thing as it would actually
+  look: a step as the technician sees it, a screen, a data row, a filename, a before and after.
+  Never describe a mechanism in the abstract and ask for a ruling on it. Where two options are
+  offered, show both as examples side by side. If an item cannot be illustrated, it is not yet a
+  decision. Owner's instruction, 2026-09-11, after an abstract design card came back all-keep with
+  no notes: *"An example showing what you are asking would be extremely helpful."*
 - **Buttons for the discrete answers**, and a **free-text box on every item**, because the useful
   answer is often the one that fits no button.
 - **Autosave on every keystroke and click** to the artifact's `db` capability under a stable
