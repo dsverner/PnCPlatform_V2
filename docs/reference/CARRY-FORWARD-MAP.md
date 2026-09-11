@@ -107,7 +107,14 @@ subsystem:
 | Carried | Why |
 |---|---|
 | `src/PnC.Formula` — the grammar-1 library and its 133-case conformance suite | The engine's every condition, validation and cadence runs on it; the design (#43) depends on it unchanged |
-| `deploy.py`, sqlpackage publish profile, `Roles.sql`, the 252-check schema smoke, `rehearse_relocation.py` | Deployment and the QA environment already work on the client-shaped mimic; rebuilding them buys nothing |
+| `docs/schema/ddl/` — the SQL project that builds `PnCPlatform.dacpac`, with `Roles.sql` and the publish profile | The schema itself is carried (#21); the project is how it deploys |
+| `ddl/tools/deploy.py` — build → publish → generate → build → publish → smoke, `--fresh` | The one command every wave's gate starts with (#76) |
+| `ddl/tools/generate.py` · `check_generated.py` — temporal views and base write procedures emitted from the deployed catalogue via the `PnC.TemporalClass` extended property | The `process` schema's twelve tables get their views and procedures without hand-writing; the check keeps generated files honest |
+| `ddl/tools/smoke.py` — 252 schema checks, re-runnable on a populated database | The schema gate; the seven replaced tables' checks are removed in W0 and the new total recorded |
+| `ddl/tools/record_release.py` · `tools/package_release.py` — the `platform.Release` fact; dacpac + published site + SBOM + `release.json` with SHA-256s | Every deploy to DEV or QA goes through a release package |
+| `tools/rehearse_relocation.py` | The QA acceptance run from three vantage points; W8's gate |
+| `docs/schema/gate/` — the extensibility-gate toy (decision #77) | Re-run once in W0 to prove the carried schema still has the property |
+| `src/PnC.Api.Smoke` | **Rewritten in W1**, not carried: it targets the API surface, which is new. Its role-based check shape is kept |
 
 Not carried: `src/PnC.Api` (the generic dispatcher, forms, definitions editor, expression checker
 UI, rule runs, notifications, feed puller, Windows-auth middleware) and `wwwroot/` (the PWA).
