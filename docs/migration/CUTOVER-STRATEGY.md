@@ -96,7 +96,8 @@ How legacy rows become platform facts. The rules, not the code.
 | **Base number** (`OLD_NO` minus prefix) | The device / setting identity | 6 842 distinct. Ties a revision chain together |
 | `A` row | The **current in-service** revision | Exactly one per base — verified 0 violations |
 | `P` rows | **Revision history**, ordered by ascending Change Request ID | The `A` row carries the highest CR in its chain. Several revisions may share a `VDATE`, so `VDATE` cannot order |
-| `M` rows | **Open work in flight** — 357, one per device | These become in-progress procedure instances, not settings revisions |
+| `M` rows | **Open work in flight** — 357, one per device | Each becomes a running `SETTINGS_CHANGE` instance **landed at the `COMPLETION` block**, with its two branch states set from the legacy documentation and database tracks (Complete → Completed · NA → NotApplicable · Change In Progress → Running) and steps 1–12 recorded as *migrated — not performed in this platform*, using the migration list's own mechanism (design §6). Owner's ruling #56. Nothing about the earlier steps is invented |
+| The three track tables — **software** column | Notes on the migrated request | The software track is not in the new procedure (owner's ruling #58). Its 1 906 non-NA rows — 1 572 Complete, 334 In Progress — are carried as dated notes with their text, never dropped |
 | `D` rows | **Dropped** — 2 361 rows | Work request deleted before completion; no significance (owner). Dropped with a **counted, recorded reason**, never silently |
 | The 2 rows prefixed `2` | **Reconciled explicitly** | Never dropped silently |
 | The 17 bases where an archived CR exceeds the active CR | **Reconciled explicitly** | Genuine ordering violations. A ruling is needed — see `docs/OPEN-QUESTIONS.md` |

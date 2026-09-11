@@ -45,9 +45,10 @@ central requirement, which is why it is not a multiplier.
 | C | **The settings-change procedure and two workflows** authored, plus `DRAWING_REVISION`, run end to end on DEV | 8 | 14 | The documents exist and verify; this is exercising them against the live engine and fixing what that finds |
 | D | **Parity screens** — grid with state toggle, column chooser and print; change-request status with the three tracks; setting display; verified-date action; user administration | 30 | 50 | The legacy surface is small and fully specified (`LEGACY-SYSTEM.md` §8). The PWA's generic dispatcher and `forms.js` exist; spread is how much the grid and print need that is not generic |
 | E | **Migration** — legacy mapping (base → device; `P` → revisions; `A` → current; `M` → open instances; `D` dropped and counted; filenames decoded; overflow columns → characteristics), the hash-diff cutover tool, and reconciliation reports for the 17 ordering violations, 2 malformed rows and 617 pre-numbering rows | 30 | 50 | *UNVERIFIED how much of the predecessor's `migration` schema and `MIGRATION-FLOC-PLAN` machinery applies to the legacy relay database. If little, the high end.* The reconciliation rules also need the owner's rulings (OQ-7, OQ-8) |
+| D2 | **Navigation by the tree** — the Location / Protected Asset / Protection Function view as a projection of `location.Node` → `asset.Placement` → `scheme.CommissionedFunction`, plus browse by station, panel, scheme and device type (FR-7.2, binding; decision #57) | 12 | 20 | Added after the specification review (H5). The `location` and `scheme` schemas are carried; this is screens, not schema. Spread is the projection query's complexity against 208k location rows |
 | F | **Authentication and the seven account types** — Windows/Kerberos auth exists (`Auth.Mode: Windows`, app-pool SPN registered); map the seven types to `security.Role` grants with functional-location and device-type scope; read-scope enforcement | 8 | 14 | Role codes undecided (OQ-18). Auth itself is carried |
 | H | **Testing, UAT support, defect fixing, cutover rehearsal** | 24 | 40 | The predecessor's relocation rehearsal found five defects DEV structurally could not show. Expect the same shape |
-| | **Build subtotal (A–F, H)** | **212** | **350** | |
+| | **Build subtotal (A–F, H)** | **224** | **370** | *v0.2: +12–20 for D2, added after the specification review* |
 
 ### Documentation packages in the fixed price
 
@@ -80,9 +81,9 @@ credited.
 
 | | Low | High |
 |---|---:|---:|
-| Build (A–F, H) | 212 | 350 |
+| Build (A–F, H) | 224 | 370 |
 | Documentation remaining | 63 | 100 |
-| **Phase 1 as scoped in `REQUIREMENTS.md` §10** | **275** | **450** |
+| **Phase 1 as scoped in `REQUIREMENTS.md` §10** | **287** | **470** |
 | Contracted effort basis | 180 | 240 |
 | Four weeks at 40 h/week | 160 | 160 |
 
@@ -111,8 +112,8 @@ These are the owner's choices. Each is stated with what it costs.
 | **6. Recognise the engine as investment.** Build it as designed inside Phase 1; treat ~100–160 h of it as unfunded, recovered in phases 2–5 where every phase reuses it | 0 | Commercial, not technical. The engine is what makes phases 2–5 cheap; the SOW's Phase 2 (*settings automation, logic exports*) and Phase 4 (*compliance*) are procedures |
 | **7. Re-baseline with the client.** Present the measured scope and this estimate; propose Phase 1 at its real size or split it | 0 | The proposal's own §8 lists *Phase 1 scope expansion* as its first risk and prescribes change control for it |
 
-Options 1–4 together: **34–56 h saved**, bringing the build to roughly 178–294 and the whole to
-241–394. Still above 240 at the low end once documentation is included. **No combination of
+Options 1–4 together: **34–56 h saved**, bringing the build to roughly 190–314 and the whole to
+253–414. Still above 240 at the low end once documentation is included. **No combination of
 technical descoping alone brings the full scope inside 240 hours while keeping the engine.**
 That leaves 5, 6 or 7, which are the owner's to make.
 

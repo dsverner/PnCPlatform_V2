@@ -171,6 +171,21 @@
             "findingCategory": { "$ref": "#/$defs/code", "description": "ref.FindingCategory code for the finding raised." }
           }
         },
+        "produces": {
+          "type": "object",
+          "description": "On commit, create an entity and bind it to a procedure-scoped name (decision #52). Referenced afterwards as procedure.<as>. The REQUEST step of a settings change produces the settings-issue package.",
+          "required": ["kind", "as"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "$ref": "#/$defs/subjectKind" },
+            "as": { "$ref": "#/$defs/code" }
+          }
+        },
+        "branchOutcome": {
+          "type": "object",
+          "description": "For a named step outcome, end the enclosing foreach member or parallel branch with a branch outcome, skipping its remaining steps (decision #51). The join counts the branch as complete. Keys are this step's outcomes; values are branch outcome codes such as Superseded. This is how a precondition that can never become true is avoided: every step with a precondition sits in a branch that some branchOutcome can end.",
+          "additionalProperties": { "$ref": "#/$defs/code" }
+        },
         "advances": {
           "type": "object",
           "description": "On commit, fire a transition on a workflow instance — the procedure-to-workflow direction of the join (FR-2.1). The transition's own roles and guards still apply.",

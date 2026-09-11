@@ -1,6 +1,9 @@
 # The procedure engine — design
 
-**Status:** design v0.1, 2026-09-11, for the owner's mark-up. No code exists.
+**Status:** design v0.2, 2026-09-11. v0.1 was reviewed by the owner (twelve sections, all kept)
+and by the specification review (`docs/review/SPEC-PANEL-REVIEW.md`, 24 findings). Eight
+repair decisions were put to the owner as worked examples and ruled; they are folded in here and
+recorded as decisions #50–#58. No code exists.
 
 The engine is the part of the platform that the schema review found missing (`SCHEMA-REVIEW.md`
 §3) and the part `REQUIREMENTS.md` §3 makes central. This document is its design: what a procedure
@@ -14,8 +17,20 @@ The engine is the part of the platform that the schema review found missing (`SC
 | `examples/settings-change.workflow.json` | The work-request lifecycle that starts it |
 | `examples/settings-lifecycle.workflow.json` | The package lifecycle its steps advance |
 
-Five forks were put to the owner before this was written and are recorded as decisions #38–#42.
-Everything else here is proposed and open to mark-up.
+### What changed in v0.2
+
+| Review finding | Owner's ruling | Where |
+|---|---|---|
+| C2 — electromechanical relays have no settings file | Fork on the device: a file for microprocessor relays, typed settings for the rest (#50) | §3, §9 |
+| C1 — a readback difference ending in *Change raised* deadlocks the branch | That relay leaves the change as *Superseded by …*; the others continue (#51) | §3 `branchOutcome`, §9 |
+| C3 — how a commit becomes a settings-book revision | Committing the step creates the revision and adds it to the package; step 1 creates the package (#52) | §5.1 |
+| C4 — offline field work cannot commit | Captured offline, committed at check-in with the technician as actor and the reviewer as second person (#53) | §5.2 |
+| H1 — when conditions are evaluated | On every commit, plus a scheduled sweep for anything time-based (#54) | §4.1 |
+| H2 — two people, one draft | First to open claims it; others read-only; an engineer may take over with a reason (#55) | §4, §5 |
+| H3 — where open legacy work lands | At the completion tracks with the legacy states; earlier steps recorded as migrated (#56) | §6, `CUTOVER-STRATEGY.md` |
+| H5 — navigation by the tree | The tree is the model; the legacy Location / Protected Asset / Protection Function style is its default view, kept indefinitely (#57) | §10 |
+| Owner, unprompted — the legacy software track | Dropped from the procedure; its rows migrate as notes (#58) | §9, §10 |
+| M1–M9, L1–L6 | Clarifications, no ruling needed | throughout |
 
 ---
 
@@ -31,12 +46,12 @@ release. The engine has no knowledge of settings, tests or compliance; it knows 
 roles, facts and records. The settings change in `examples/` is the first document it runs, not a
 special case inside it.
 
-**The commit boundary (FR-2.2).** Before a step commits, everything in it is a draft: editable,
-unlogged as evidence, visible only to those working it. When a step commits, a `record.Record` is
-written and the step becomes immutable. The record is the platform's existing immutable object —
-bi-temporal acceptance, evidence links, obligations already consume it. This is how the work
-environment and the system of record coexist: they are the same rows, on opposite sides of one
-event.
+**The commit boundary (FR-2.2).** Before a step commits, everything in it is a draft: editable by
+its claimant, unlogged as evidence, visible to the claimant and the responsible role. When a step
+commits, a `record.Record` is written and the step becomes immutable. The record is the platform's
+existing immutable object — bi-temporal acceptance, evidence links, obligations already consume
+it. This is how the work environment and the system of record coexist: they are the same rows, on
+opposite sides of one event.
 
 ---
 
@@ -73,15 +88,15 @@ engine parses every expression to its canonical AST and stores the canonical doc
 is the version's identity. Both forms validate against `procedure.schema.json`.
 
 The body is a **block tree**. Block-structured (#39): every block has one entry and one exit, nests
-cleanly, and cannot express a deadlock or an unreachable step. That property is what lets a later
-friendly editor render a procedure as an outline rather than a diagram.
+cleanly, and cannot express a structural deadlock or an unreachable step. That property is what
+lets a later friendly editor render a procedure as an outline rather than a diagram.
 
 | Block | What it does | Capability it delivers |
 |---|---|---|
 | `step` | One unit of work a person performs and commits | ordered steps · data capture · role and competency · sign-off · evidence · due · deviation · guard (`precondition`) |
 | `sequence` | Items in order | ordered steps |
 | `parallel` | Branches concurrently, rejoining on `all`, `any` or *n*; a branch may declare `applies` | parallel branches |
-| `choice` | The first case whose `when` is true; optional `else` | conditional branching |
+| `choice` | The first case whose `when` is true; optional `else` | conditional branching — including **per-device applicability** inside a `foreach` (#50) |
 | `foreach` | The body once per member of a set, subject rebound to the member; `all`/`any`/*n* join | iteration over a set |
 | `repeat` | The body again until a condition holds, with a maximum | rework, without a back-edge |
 | `call` | Another procedure as a child instance, version pinned with the parent | sub-procedures |
@@ -93,21 +108,29 @@ A step names a **role** (an alias resolved to a `security.Role` code, optionally
 `requires` expression over `person.*` facts for competency). It may declare:
 
 - `precondition` — a boolean that must be true before the step can start. Unknown holds it and
-  names the facts that were unknown.
+  names the facts that were unknown. **A precondition that is false is not a hold; it is a wait
+  that may never end.** So every step with a precondition sits on a path where some other outcome
+  can end the branch — enforced by the structural check in §8 and delivered by `branchOutcome`.
 - `capture` — typed fields (`num` with unit and base, `text` with an allowed list, `bool`, `date`,
   `ref`, `set`, `file`), each optionally `required` and with a `validate` expression over `value`.
   Held as a draft; written as characteristic values on the record at commit.
 - `record` — the `ref.RecordKind` the commit produces, and its template where it has one. **Every
-  step produces a record** (#42).
+  step produces a record** (#42). New record kinds are reference data, seeded with the procedure
+  that needs them.
+- `produces` — an entity the commit creates and binds to a procedure-scoped name (#52): the
+  `REQUEST` step produces the settings-issue package as `package`, referenced afterwards as
+  `procedure.package`.
 - `outcomes` — the step's outcome vocabulary, chosen at commit. Default `Done`.
+- `branchOutcome` — for a named outcome, **end the enclosing foreach member or parallel branch**
+  with a branch outcome, skipping its remaining steps (#51). *Change raised* on the readback
+  resolution ends that relay's branch as `Superseded`; the join counts it as complete.
 - `signoff` — the segregation `action` this commit is (*Calculate*, *Check*, *Approve*…), and
-  whether a `witness` must co-attest. `Program.SegregationRule` already carries actionA/actionB
-  pairs and the WarnAndLog / Block modes; the engine adds rows for its actions and calls the
-  existing check.
+  whether a `witness` must co-attest. Segregation is evaluated **instance-wide**: any of three
+  engineers who calculated any of eleven devices is barred from the check.
 - `evidence` — files bound to the record, with required kinds and a minimum.
 - `due` — a cadence and an anchor step. **Derived on read, never stored** (#44).
 - `deviation` — whether the person may `skip` or `vary`, and the finding category. **A deviation
-  always requires a reason and always produces a `record.Finding`** on the instance (#48).
+  always requires a reason and always produces a `record.Finding`** (#48).
 - `advances` — the transition to fire on a workflow instance at commit (§2).
 
 ---
@@ -115,9 +138,9 @@ A step names a **role** (an alias resolved to a `security.Role` code, optionally
 ## 4. Runtime — the `process` schema
 
 A new schema, `process`, hosts both layers' runtime and the projections (#45). Every table carries
-the four conventions of `CARRY-FORWARD-MAP.md` §2; only domain columns are listed. All temporal
-classes as the conventions require; instances and steps are system-versioned so that "what did
-this step look like when it was committed" is answerable.
+the four conventions of `CARRY-FORWARD-MAP.md` §2; only domain columns are listed. Instances and
+steps are system-versioned so that "what did this step look like when it was committed" is
+answerable.
 
 ### Definitions — projected on approval
 
@@ -125,35 +148,48 @@ this step look like when it was committed" is answerable.
 |---|---|---|
 | `ProcedureStep` | `DefinitionVersionRowId` · `StepId` · `BlockPath` · `Title` · `RoleAlias` · `RoleCode` · `RecordKindCode` · `SignoffAction` · `HasDue` · `AllowsDeviation` | One row per step; what screens list and what impact queries join |
 | `ProcedureStepRole` | `ProcedureStepRowId` · `RoleCode` · `RequiresAst` | Who may perform it |
-| `ProcedureFactUse` | `DefinitionVersionRowId` · `BlockPath` · `FactName` | Every fact any expression in the document reads — the impact index: *which procedures read `device.technology`?* |
+| `ProcedureFactUse` | `DefinitionVersionRowId` · `BlockPath` · `FactName` | Every fact any expression reads — the impact index |
 | `ProcedureCall` | `DefinitionVersionRowId` · `BlockPath` · `CalleeKey` | The call graph, for pinning and impact |
 
-The document is authoritative; these rows are derived and rebuilt on approval. Nothing writes to
-them otherwise.
+The document is authoritative; these rows are derived and rebuilt on approval.
 
 ### Instances
 
 | Table | Domain columns | Purpose |
 |---|---|---|
 | `WorkflowInstance` | `WorkflowDefinitionVersionRowId` · `SubjectKind` · `SubjectEntityId` · `CurrentState` · `StartedAt` · `StartedByActorId` · `CompletedAt` · `IsCancelled` | Re-homed from `work` with the same shape |
-| `WorkflowTransition` | `WorkflowInstanceEntityId` · `OccurredAt` · `FromState` · `ToState` · `TransitionName` · `ActorId` · `Reason` · `FiredByStepInstanceEntityId` · `GuardEvaluation` (JSON: each guard, its result, its unknowns) · `ActionLogId` | Every transition, with why it was allowed |
-| `ProcedureInstance` | `DefinitionVersionRowId` · `ParentInstanceEntityId` · `CallBlockPath` · `WorkflowInstanceEntityId` · `InvokedAtState` · `SubjectKind` · `SubjectEntityId` · `WorkRequestEntityId` · `Inputs` (JSON) · `State` (Running · Held · Completed · Cancelled) · `Outcome` · `StartedAt` · `StartedByActorId` · `CompletedAt` | One run. `ParentInstanceEntityId` is set for a `call` |
-| `InstanceVersionSet` | `ProcedureInstanceEntityId` · `CalleeKey` · `DefinitionVersionRowId` | Every callee version resolved at the root's start (#40). The whole tree is one version set |
-| `BlockInstance` | `ProcedureInstanceEntityId` · `ParentBlockInstanceEntityId` · `BlockPath` · `BlockKind` · `IterationKey` · `MemberSubjectKind` · `MemberSubjectEntityId` · `State` · `Outcome` · `StartedAt` · `CompletedAt` | One row per activation of a structural block; a `foreach` member or a `repeat` pass is its own row |
-| `StepInstance` | `BlockInstanceEntityId` · `StepId` · `State` (Pending · Ready · Active · Held · Committed · Skipped · Varied) · `AssignedRoleCode` · `Draft` (JSON) · `DraftModifiedAt` · `CommittedRecordEntityId` · `CommittedByActorId` · `WitnessedByActorId` · `CommittedAt` · `Outcome` · `DeviationFindingEntityId` · `HeldReason` | The mutable side, then the pointer to the immutable side |
-| `HoldInstance` | `BlockInstanceEntityId` · `Reason` · `HeldAt` · `HeldByActorId` · `ReleasedAt` · `ReleasedByActorId` · `ReleaseBasis` (Condition · Manual · Expired) | A hold is reportable as such, never as an abandoned step |
+| `WorkflowTransition` | `WorkflowInstanceEntityId` · `OccurredAt` · `FromState` · `ToState` · `TransitionName` · `ActorId` · `Reason` · `FiredByStepInstanceEntityId` · `GuardEvaluation` (JSON) · `ActionLogId` | Every transition, with why it was allowed |
+| `ProcedureInstance` | `DefinitionVersionRowId` · `ParentInstanceEntityId` · `CallBlockPath` · `WorkflowInstanceEntityId` · `InvokedAtState` · `SubjectKind` · `SubjectEntityId` · `WorkRequestEntityId` · `Inputs` (JSON) · `Produced` (JSON: name → EntityId) · `State` (Running · Held · Completed · Cancelled) · `Outcome` · `StartedAt` · `StartedByActorId` · `CompletedAt` | One run |
+| `InstanceVersionSet` | `ProcedureInstanceEntityId` · `CalleeKey` · `DefinitionVersionRowId` | Every callee version resolved at the root's start (#40) |
+| `BlockInstance` | `ProcedureInstanceEntityId` · `ParentBlockInstanceEntityId` · `BlockPath` · `BlockKind` · `IterationKey` · `Pass` · `MemberSubjectKind` · `MemberSubjectEntityId` · `State` · `Outcome` (incl. branch outcomes such as `Superseded`, `NotApplicable`) · `StartedAt` · `CompletedAt` | One row per activation; a `foreach` member or a `repeat` pass is its own row |
+| `StepInstance` | `BlockInstanceEntityId` · `StepId` · `State` (Pending · Ready · Active · Held · Committed · Skipped · Varied) · `AssignedRoleCode` · **`ClaimedByActorId` · `ClaimedAt` · `ClaimExpiresAt`** · `Draft` (JSON) · `DraftModifiedAt` · **`CapturedAt` · `CapturedByActorId` · `CaptureSource` (Online · FieldPack) · `CaptureTimeQuality`** · `CommittedRecordEntityId` · `CommittedByActorId` · `WitnessedByActorId` · `AcceptedIntoPlatformByActorId` · `CommittedAt` · `Outcome` · `DeviationFindingEntityId` · `HeldReason` | The mutable side, then the pointer to the immutable side |
+| `HoldInstance` | `BlockInstanceEntityId` · `Reason` · `HeldAt` · `HeldByActorId` · `ReleasedAt` · `ReleasedByActorId` · `ReleaseBasis` (Condition · Manual · Expired) | A hold is reportable as such |
 | `InstanceMigration` | `ProcedureInstanceEntityId` · `FromDefinitionVersionRowId` · `ToDefinitionVersionRowId` · `Decision` (Keep · Migrate · Cancel) · `Reason` · `DecidedByActorId` · `DecidedAt` · `StepMapping` (JSON) | The outstanding-work decision (#41) |
 
-`DueAt` is **not a column**. It is derived on read from the step's cadence and the anchor step's
-`CommittedAt`, by the application, exactly as obligations' due dates are (#44).
+`DueAt` is **not a column**; it is derived on read (#44).
 
-### What is not here
+### The claim (#55)
 
-The seven predecessor tables (`config.TestPlanStep`, `TestPlanReading`, `work.WorkflowInstance`,
-`WorkflowTransition`, their registries) are **not imported**. `record.TestSheet` keeps its
-`TestPlanDefinitionVersionRowId` column name for now; it will point at a `Program.Procedure`
-version whose document is a test procedure. That rename is a migration-time decision, not a
-design one.
+A step is assigned to a role; a **claim** makes it one person's. The first person to open a Ready
+step claims it (`ClaimedByActorId`, with a lease that renews while they work and expires when they
+stop). Everyone else in the role sees it read-only with *"R. Doucet is working this step"*. The
+claimant may release it; the responsible engineer may take it over with a reason, which is logged.
+The draft is writable only by the claimant. This is also the answer to who may read a draft
+(OQ-15): the claimant and the responsible role.
+
+### 4.1 The evaluation model (#54)
+
+Two mechanisms, each simple:
+
+- **On every commit** in an instance, the engine re-evaluates the readiness of every Pending step,
+  every `choice`, every `repeat.until`, every `parallel` join and every `hold.until` in that
+  instance. A commit is the event that can change any of them.
+- **On a scheduled sweep** — every 15 minutes by default, a platform setting — the engine
+  re-evaluates every `hold.until` and `parallel.applies` that reads `@at`, and derives due dates
+  for escalation. Time passing is the other event, and nothing else notices it.
+
+A person may force re-evaluation of an instance. `@at` in any procedure expression is **the
+evaluation instant** — the commit's or the sweep's.
 
 ---
 
@@ -161,275 +197,257 @@ design one.
 
 The one event that matters. In order, and atomically:
 
-1. **Precondition** — already true, or the step could not have started.
-2. **Validation** — every `capture` field's `validate` expression is evaluated with `value` bound.
-   A false or **Unknown** result refuses the commit and names the unknown facts
-   (`FORMULA-GRAMMAR.md` §5: a value that cannot be validated is not accepted).
-3. **Competency** — the role alias's `requires` expression for the committing person.
-4. **Segregation** — `signoff.action` against `Program.SegregationRule` for this procedure instance
-   as subject; WarnAndLog needs a stated reason, Block needs a second person's override
-   (`security.SegregationOverride`), as the definitions screen already does today.
-5. **Witness** — a second attributed actor where `signoff.witness` is true.
-6. **Record** — a `record.Record` of the declared kind: `SubjectKind` / `SubjectEntityId` = the
-   step's subject (the foreach member where inside one), `WorkRequestEntityId`, `PerformedByActorId`,
-   `WitnessedByActorId`, `OccurredAt`, `OverallResult` = the outcome,
+1. **Claim** — the committing person holds the claim.
+2. **Precondition** — already true, or the step could not have started.
+3. **Validation** — every `capture` field's `validate` expression with `value` bound. False or
+   **Unknown** refuses the commit and names the unknown facts.
+4. **Competency** — the role alias's `requires` expression for the committing person.
+5. **Segregation** — `signoff.action` against `Program.SegregationRule` with the procedure
+   instance as subject; WarnAndLog needs a reason, Block needs a second person's override.
+6. **Witness** — where `signoff.witness` is true, a second attributed actor who **re-authenticates
+   on the same device**; their identity is recorded, never a typed name.
+7. **Record** — a `record.Record` of the declared kind: subject, work request, `PerformedByActorId`,
+   `WitnessedByActorId`, `OccurredAt` = the capture instant, `OverallResult` = the outcome,
    `TemplateDefinitionVersionRowId` = the procedure version. Captured fields become
    `record.CharacteristicValue` rows; evidence files become `document.File` rows linked to it.
-7. **Kind-specific rows** — a `Readback` step writes `record.Readback`; a deviation writes
-   `record.Finding` with the declared category and the reason; a `Finding` record kind writes one
-   directly.
-8. **Acceptance** — where the step's record kind requires acceptance, a `record.Acceptance` row is
-   opened for the accepting role. Acceptance is bi-temporal; it is a later act, not part of commit.
-9. **Advances** — the declared workflow transition is fired with the step instance as the actor's
-   basis; its guards and roles apply; `WorkflowTransition.FiredByStepInstanceEntityId` records it.
-10. **Immutability** — `StepInstance.State` = Committed; `Draft` is retained as it stood (system
-    versioning keeps the history) but is no longer writable; `CommittedRecordEntityId` is set.
+8. **Kind-specific rows** — §5.1.
+9. **Acceptance** — where the record kind requires it, a `record.Acceptance` row is opened for the
+   accepting role. Acceptance is bi-temporal; it is a later act.
+10. **Produces** — the entity named by `produces` is created and bound in `Produced`.
+11. **Branch outcome** — if the outcome has a `branchOutcome`, the enclosing member or branch
+    completes with it and its remaining steps are Skipped with that as the reason.
+12. **Advances** — the declared workflow transition is fired; its guards and roles apply.
+13. **Immutability** — `State` = Committed; `Draft` retained as it stood; `CommittedRecordEntityId`
+    set.
 
-Before step 1 there is a draft and nothing else. After step 10 there is a record and a pointer.
 Correcting a committed step is a new valid-time assertion on the record, never an edit of it.
+
+### 5.1 Commit into the document schema (#52)
+
+The settings book is a consequence of commits, never edited by hand.
+
+| Step commits with record kind | The commit also writes |
+|---|---|
+| `RequestConfirmation` with `produces: package` | a `document.SettingsIssuePackage` (the entity the lifecycle workflow governs), bound as `procedure.package`; its `SETTINGS_LIFECYCLE` instance starts in `Calculated` |
+| `ConfigurationFileRevision` | a `document.Revision` on the device's configuration document; a `document.ConfigurationFile` row with `CaptureKind = Design`, `DeviceEntityId` = the member device, `ParseStatus` from the parser; a `document.SettingsIssuePackageItem` linking the revision to `procedure.package` |
+| `DeviceSettings` (the electromechanical fork, #50) | a `document.Revision` on the device's configuration document with the captured taps, dial and instantaneous values as `record.CharacteristicValue` rows against `CharacteristicDefinition`s per device type; a `SettingsIssuePackageItem` likewise. No file, no parse |
+| `Readback` | a `document.ConfigurationFile` row with `CaptureKind = Readback` from the readback file; a `record.Readback` comparing it (`ProducedConfigurationFileRevisionRowId`) with the approved design revision (`ComparedToConfigurationFileRevisionRowId`), `DifferenceCount` from the capture |
+| `Finding` | a `record.Finding` with the declared category |
+| `Approval` on the package | approval cascades to every revision in the package (PnCPlatform #60) |
+| `Baseline` | the design revision's `InServiceFrom` is set from `RETURN_TO_SERVICE`'s capture instant (FR-3.3) |
+
+### 5.2 Deferred commit — field work (#53)
+
+The field pack **captures; it does not authorise** (FR-7.1). A step performed offline is captured
+as a draft with `CapturedAt` from the device clock, `CaptureTimeQuality = DeviceClock`,
+`CapturedByActorId` = the technician, `CaptureSource = FieldPack`. It **commits at check-in**:
+
+- `CommittedByActorId` = the technician who captured — the act is theirs;
+- `AcceptedIntoPlatformByActorId` = the person checking in, who is the second attributed person;
+- `OccurredAt` on the record = `CapturedAt`, not the check-in instant;
+- competency and segregation are evaluated at check-in **against the technician**, not the
+  reviewer;
+- a witnessed step is witnessed in the field: the witness re-authenticates on the field device
+  against the pack's credential store, and the attestation travels with the draft;
+- a draft whose cited references were superseded while the pack was out is flagged for the
+  reviewer, as the pack design already does.
 
 ---
 
 ## 6. Version pinning and migration
 
 **Pinning (#40, FR-1.3).** When a root procedure instance starts, the engine resolves the approved
-version of the root document and, walking its `ProcedureCall` rows transitively, of every callee.
-All are written to `InstanceVersionSet`. From then on the run reads only those versions. A `call`
-reached later starts its child against the pinned version, not the current one. *Which procedure did
-this request follow?* has exactly one answer per instance.
+version of the root document and, walking `ProcedureCall` transitively, of every callee. All are
+written to `InstanceVersionSet`. *Which procedure did this request follow?* has exactly one answer.
 
-**A new version is approved (#41).** The owner's concern, verbatim from the design interview:
-*"if I have 1000 outstanding work requests dealing with compliance issues based on a particular
-standard requirement and that requirement changes… will those changes not fall through the
-cracks?"* They do not, because nothing is silent:
+**A new version is approved (#41).** Nothing is silent:
 
 1. Approval of version *n+1* computes the **affected instances**: every running instance whose
-   `InstanceVersionSet` contains version *n* of this document, directly or as a callee. This is
-   the impact trigger *a template revision* / *a standard changes* of FR-4.3, applied to work.
-2. The engine opens a **migration list** — the affected instances, their current step, and how far
-   each has progressed.
-3. A person with the Administrator or responsible-engineer role **rules on each**, singly or in
-   bulk: **Keep** (finish on the pinned version), **Migrate** (continue on *n+1* from the current
-   step), or **Cancel and re-raise**. Every ruling carries a reason and lands in
-   `InstanceMigration`.
-4. **Migrate** re-plans: the engine matches committed steps by `StepId` between the two versions,
-   carries the committed records forward unchanged (they are facts; they do not move), records the
-   mapping in `StepMapping`, and resumes at the first step of *n+1* not satisfied by a carried
-   commit. A step present in *n* and absent in *n+1* is reported, not dropped. A step new in *n+1*
-   and earlier than the current position is placed on the migration list's report as *not
-   performed under this version* — a person decides whether that is acceptable, and the decision
-   is the reason.
+   `InstanceVersionSet` contains version *n*, directly or as a callee.
+2. The engine opens a **migration list**.
+3. A person rules on each, singly or in bulk: **Keep**, **Migrate**, or **Cancel and re-raise**,
+   with a reason, into `InstanceMigration`.
+4. **Migrate** re-plans: committed steps are matched between versions by
+   **(`StepId`, `IterationKey`, `Pass`)**; their records are carried forward unchanged; a step
+   whose `record.kind` changed between versions is carried and flagged, not re-done; a step present
+   in *n* and absent in *n+1* is reported, not dropped; a step new in *n+1* and earlier than the
+   current position is placed on the report as *not performed under this version* — a person
+   decides whether that is acceptable.
 5. Until ruled on, an affected instance continues on its pinned version and shows as *awaiting a
-   version ruling* on every board that lists it.
+   version ruling*.
 
-An instance that was never affected is never touched. The thousand each end with a cited version
-and a cited decision.
+**Legacy work at cutover (#56)** uses the same mechanism: every open legacy change lands at the
+`COMPLETION` block with its branch states set from the legacy tracks, and steps 1–12 recorded as
+*migrated — not performed in this platform*. Detail in `CUTOVER-STRATEGY.md` §5.
 
 ---
 
 ## 7. Guards, conditions, due — the expression language
 
-All expressions are grammar-1 (`docs/schema/FORMULA-GRAMMAR.md`, C# `src/PnC.Formula`), checked at
-authoring against the fact catalogue and evaluated three-valued (#43). This is not a new language;
-it is the one the predecessor already uses for obligation scope, validation and transforms, and its
-§7 already prescribes an AST under `"when"` for workflow guards.
+All expressions are grammar-1 (`docs/schema/FORMULA-GRAMMAR.md`, C# `src/PnC.Formula`), checked
+at authoring against the fact catalogue and evaluated three-valued (#43).
 
-| Where | Expression | Result type | Unknown means |
-|---|---|---|---|
-| `step.precondition` | boolean | Bool | held for a person; unknown facts named |
-| `capture.*.validate` | boolean over `value` | Bool | commit refused |
-| `roles.*.requires` | boolean over `person.*` | Bool | person refused |
-| `choice.cases[].when` | boolean | Bool | all Unknown → held for a person |
-| `parallel.branches[].applies` | boolean | Bool | branch held open for a person |
-| `foreach.over` | set of Reference | Set | block held; cannot iterate an unknown set |
-| `repeat.until` | boolean | Bool | held for a person |
-| `hold.until` | boolean | Bool | stays held |
-| `advances.subject`, `call.subject` | Reference | Ref | commit refused |
-| `step.due.cadence` | cadence | DateTime | `AnchorUnknown`, as obligations do |
-| workflow `transition.requires[].when` | boolean | Bool | transition blocked; unknown facts named |
+| Where | Result type | Unknown means |
+|---|---|---|
+| `step.precondition` | Bool | held for a person; unknown facts named |
+| `capture.*.validate` | Bool | commit refused |
+| `roles.*.requires` | Bool | person refused |
+| `choice.cases[].when` | Bool | all Unknown → held for the responsible role |
+| `parallel.branches[].applies` | Bool | branch held open for the responsible role |
+| `foreach.over` | Set | block held |
+| `repeat.until` | Bool | held for the responsible role |
+| `hold.until` | Bool | stays held |
+| `advances.subject`, `call.subject` | Ref | commit refused |
+| `step.due.cadence` | DateTime | `AnchorUnknown` |
+| workflow `transition.requires[].when` | Bool | transition blocked; unknown facts named |
+
+**Resolution scope.** Inside a `foreach`, the subject is the member, so a body step's expressions
+read `device.*` facts directly. `step.*` facts resolve to **the current member and the current
+pass** first, then the enclosing instance; `pass=` and `member=` parameters reach earlier ones.
 
 ### Facts the engine publishes
 
-The catalogue holds 45 facts today, six of them under `record.*`, `person.*` and `work.*`
-(`compliance.vFactCatalogue`, read 2026-09-11). Procedures need to reason about their own state
-and about work. The engine contributes the following; names and types are **proposed** (OQ-14).
+Proposed; names not yet agreed (OQ-14). `step.capture` and `input.*` / `procedure.*` take their
+type **from the document**, so the checker consults the document being authored for them.
 
 | Fact | Type | Subject | Parameters |
 |---|---|---|---|
-| `step.state` | Text | ProcedureInstance | `id` |
-| `step.outcome` | Text | ProcedureInstance | `id` |
-| `step.committed_at` | DateTime | ProcedureInstance | `id` |
-| `step.committed_by` | Reference (Actor) | ProcedureInstance | `id` |
-| `step.capture` | the field's declared type | ProcedureInstance | `id`, `field` |
-| `foreach.outcome` | Text | ProcedureInstance | `id`, `member` |
+| `step.state` · `step.outcome` | Text | ProcedureInstance | `id`, `pass?`, `member?` |
+| `step.committed_at` | DateTime | ProcedureInstance | `id`, `pass?`, `member?` |
+| `step.committed_by` | Reference (Actor) | ProcedureInstance | `id`, `pass?`, `member?` |
+| `step.capture` | the field's declared type | ProcedureInstance | `id`, `field`, `pass?`, `member?` |
+| `branch.outcome` | Text | ProcedureInstance | `id`, `member?` |
 | `procedure.outcome` | Text | ProcedureInstance | — |
-| `procedure.instances` | Set (ProcedureInstance) | WorkflowInstance | `key` |
+| `procedure.<name>` | the produced entity's kind | ProcedureInstance | — |
 | `input.<name>` | the input's declared type | ProcedureInstance | — |
-| `work.outage_required` | Bool | WorkRequest | — |
-| `work.outage_window_start` | DateTime | WorkRequest | — |
-| `work.settings_package` | Reference (SettingsIssuePackage) | WorkRequest | — |
-| `package.revisions` | Set (ConfigurationFileRevision) | SettingsIssuePackage | — |
-| `package.revision_count` | Number | SettingsIssuePackage | — |
-| `record.last` — extend with `.performed_by` path | Reference (Actor) | Any | existing fact, new path |
+| `work.outage_required` · `work.outage_window_start` | Bool · DateTime | WorkRequest | — |
+| `package.revisions` · `package.revision_count` | Set · Number | SettingsIssuePackage | — |
+| `record.last` — extend with `.performed_by` | Reference (Actor) | Any | existing fact, new path |
 
-Inside a `foreach`, the subject is the member, so a body step's expressions read `device.*` facts
-directly; `step.*` facts resolve within the member's own branch first, then the enclosing instance.
+`device.technology` (Text: Microprocessor / Electromechanical / Static) already exists in the
+catalogue and is what the electromechanical fork reads.
 
 ### Due dates
 
-`due.cadence` is the obligation cadence sub-language unchanged: `within 30 d of event` anchored at
-the named step's commit, `every 6 mo from …`, `once`. The due instant is derived when a board or
-a notification run asks, never stored, exactly as obligations after the owner's 2026-09-10 ruling.
+`due.cadence` is the obligation cadence sub-language unchanged; the due instant is derived when a
+board or the sweep asks, never stored (#44). A board derives once per request, not per row.
 `escalation` reuses `Program.NotificationType`'s `[{after, role}]` shape.
 
 ---
 
 ## 8. Authoring, version 1
 
-The owner authors now; P&C engineers later. So the first surface is an expert's, and the contract
-it works to is the thing a friendlier surface will target (#46).
+The owner authors now; P&C engineers later (#28). The first surface is an expert's; the contract it
+works to is the thing a friendlier surface will target (#46).
 
-- **The document is edited as JSON**, in the existing definitions screen's editor, with
-  `procedure.schema.json` enforced live: wrong key, missing required, bad enum — marked in place.
-- **Every expression is checked live** through the existing `POST /api/v1/formula/check` against
-  the fact catalogue extended with §7's facts: the error position, the canonical form and the
-  inferred type shown, as `expression.js` already does for formulas.
-- **Structural checks at save**: every `id` unique; every `role` alias declared; every
-  `precondition`/`when`/`until` reads only facts that exist; every `advances` names a workflow key,
-  a transition on it, and a subject whose kind matches the workflow's; every `call` names a
-  procedure that has at least one approved version; every `due.anchor` names an earlier step.
-- **Approval** through the existing `config.*` procedures: a different person from the author
-  (`Program.SegregationRule` Author/Approve on DefinitionVersion already exists), a change note, the
-  canonical document and its hash stored.
-- **Projection** on approval into `process.ProcedureStep`, `ProcedureStepRole`,
-  `ProcedureFactUse`, `ProcedureCall`.
+- **The document is edited as JSON** in the existing definitions screen, with
+  `procedure.schema.json` enforced live.
+- **Every expression is checked live** through `POST /api/v1/formula/check` against the catalogue
+  extended with §7's facts and the document's own declared types.
+- **Structural checks at save**: every `id` unique; every `role` alias declared; every expression
+  reads only facts that exist; every `advances` names a workflow, a transition on it, and a
+  subject of the right kind; every `call` names a procedure with an approved version; every
+  `due.anchor` names an earlier step; **every step with a `precondition` sits inside a branch that
+  some `branchOutcome` can end** (the C1 check); every `produces` name is unique.
+- **Approval** through the existing `config.*` procedures with segregation.
+- **Projection** on approval.
 
-What a later friendly editor does is render the same document as an outline of blocks, offer the
-allowed children at each point, and build expressions from the fact catalogue — and produce
-exactly the JSON this schema accepts. Nothing in the model changes for it to exist.
+In production at NB Power, until the friendly editor exists, procedures are authored by the
+supplier at the client's request. `REQUIREMENTS.md` FR-1.5 says so, so the client reads FR-1.1
+correctly.
 
 ---
 
 ## 9. The worked example — the settings change
 
-`examples/settings-change.procedure.json` is the fourteen-step path of FR-3.1 as one document. It
-exists to prove the vocabulary is sufficient, and it does three things the legacy system could not.
+`examples/settings-change.procedure.json`, v0.2. Fourteen steps; four things the legacy system
+could not do.
 
-**The three tracks are one block.** `LEGACY-SYSTEM.md` §6 found the change request completed
-across three hard-coded tables — documentation, settings database, settings software — each
-independently Complete / NA / In progress. Here that is `COMPLETION`, a `parallel` block with three
-branches and `join: all`. One branch is a `call` to a drawing-revision procedure; two are steps.
-Adding a fourth track is adding a branch.
+**Electromechanical relays are first-class (#50).** The `BUILD` foreach's body is a `choice` on
+`device.technology`: a microprocessor relay gets `BUILD_SETTINGS` — file required; anything else
+gets `RECORD_SETTINGS` — tap, time dial, instantaneous and pickup captured as typed values. Both
+commit as revisions in the settings book.
 
-**Rework is a loop, not a back-edge.** `DESIGN_AND_CHECK` is a `repeat` around build → rationale →
-check, `until` the check's outcome is *Pass*, with a maximum of five passes. Each pass is its own
-set of committed steps; the second check does not overwrite the first. `APPROVAL` is a second
-`repeat` around the approval step for the *Rejected* case.
+**A relay can leave the change (#51).** `RESOLVE_DIFFERENCE` with outcome *ChangeRaised* ends that
+member's branch as `Superseded`; the corrective request owns the relay; the other ten continue;
+the request can close.
 
-**The join runs both ways.** The request's own workflow starts the procedure on *In progress* and
-cannot *Close* until it completes. Inside, four steps `advance` the package's lifecycle — Approve,
-Issue, Verify, Baseline — so the package's state is always a consequence of committed, attributed
-work and never something a person sets.
+**Two completion tracks, not three (#58).** `COMPLETION` is a `parallel` block with two branches:
+*Documentation* (a `call` to `DRAWING_REVISION`) and *Settings database* (`BASELINE`). The legacy
+software track is gone from the procedure; its 1,906 non-NA rows migrate as notes on the change.
+
+**The package is created by the procedure (#52).** `REQUEST` produces it; every later `advances`
+names `procedure.package`.
 
 | FR-3.1 step | Block | Delivers |
 |---|---|---|
-| 1 request | `REQUEST` | capture with an allowed list |
-| 2 scope and design | `SCOPE` | the `devices` set every `foreach` iterates |
-| 3 study | `STUDY` | required evidence of a kind |
-| 4 vendor tool | `BUILD` foreach → `BUILD_SETTINGS` | iteration; signoff action *Calculate* |
+| 1 request | `REQUEST` | produces the package |
+| 2 scope and design | `SCOPE` | the `devices` set |
+| 3 study | `STUDY` | required evidence |
+| 4 vendor tool | `BUILD` foreach → `choice` → `BUILD_SETTINGS` / `RECORD_SETTINGS` | iteration; the electromechanical fork |
 | 5 rationale | `RATIONALE` | |
-| 6 independent check | `CHECK` | signoff action *Check* — segregated from *Calculate*; outcomes; `repeat` |
-| 7 approval | `APPROVE` | `precondition` on the check; signoff *Approve*; `advances`; `repeat` |
-| 8 issue | `ISSUE` | `precondition`; `advances` |
-| — | `AWAIT_OUTAGE` | `hold` with a release condition and a maximum |
-| 9 apply | `FIELD` foreach → `APPLY` | per device; competency on the technician role |
-| 10 readback | `READBACK` | `validate` on a captured number; `choice` on its value; a `Finding` |
-| 11 test | `TEST` | `precondition` on the readback outcome; `due` anchored at `APPLY` with escalation; `deviation: vary` |
+| 6 independent check | `CHECK` | segregation; `repeat` |
+| 7 approval | `APPROVE` | `precondition`; `advances`; `repeat` |
+| 8 issue | `ISSUE` | `advances` |
+| — | `AWAIT_OUTAGE` | `hold` |
+| 9 apply | `FIELD` foreach → `APPLY` | field capture, deferred commit |
+| 10 readback | `READBACK` → `READBACK_RESULT` → `RESOLVE_DIFFERENCE` | `validate`; `choice`; `branchOutcome` |
+| 11 test | `TEST` | `due`; `deviation` |
 | 12 return to service | `RETURN_TO_SERVICE` | `witness`; `advances` |
-| 13 baseline | `COMPLETION` → `BASELINE` | one of three parallel tracks; `advances` |
-| 14 drawings | `COMPLETION` → `UPDATE_DRAWINGS` | `call` to `DRAWING_REVISION` |
-
-`DRAWING_REVISION` is referenced and not yet authored. It is the next document.
+| 13 baseline | `COMPLETION` → `BASELINE` | parallel track; `advances` |
+| 14 drawings | `COMPLETION` → `UPDATE_DRAWINGS` | `call` |
 
 ---
 
 ## 10. Reporting parity — how the legacy views become queries
 
-`FR-8.2` makes parity with the legacy application the acceptance gate. Every legacy view maps to a
-query over `process.*` and the carried schemas.
-
 | Legacy | Platform |
 |---|---|
-| Grid state **Active** (`A`) | `SETTINGS_LIFECYCLE` instances in `InService` |
-| Grid state **Outstanding** (`M`) | `SETTINGS_LIFECYCLE` instances in any non-terminal state; equivalently `SETTINGS_CHANGE` instances Running or Held |
-| Grid state **Archived** (`P`) | `SETTINGS_LIFECYCLE` instances in `Superseded` |
-| Track status **Complete / NA / Change In Progress** | `BlockInstance` rows under `COMPLETION`: Completed / NotApplicable / Running |
-| Action type **Change / Add / Delete / Verify** | `Program.WorkType` key on the work request |
-| **Set Verified Date** | the commit instant of `RETURN_TO_SERVICE` — `step.committed_at[id='RETURN_TO_SERVICE']` |
-| **Request Change** | *Start* on `SETTINGS_CHANGE_REQUEST` |
-| **Post Request / Close** | *Close*, guarded by the procedure's completion |
-| **Cancel / Delete Work Request** | *Cancel* with a reason; nothing is deleted |
-| **Print** by state | the same grid query, filtered by lifecycle state |
-
-The legacy `D` rows have no counterpart; they are dropped at cutover (#31).
+| Grid state **Active** (`A`) | `SETTINGS_LIFECYCLE` in `InService` |
+| Grid state **Outstanding** (`M`) | `SETTINGS_LIFECYCLE` in any non-terminal state |
+| Grid state **Archived** (`P`) | `SETTINGS_LIFECYCLE` in `Superseded` |
+| Track status **Complete / NA / In progress** — documentation, database | `BlockInstance` rows under `COMPLETION`: Completed / NotApplicable / Running |
+| Track status — **software** | not modelled (#58); legacy values are notes on the migrated request |
+| Action type **Change / Add / Delete / Verify** | four `Program.WorkType` keys |
+| **Set Verified Date** | `step.committed_at[id='RETURN_TO_SERVICE']` |
+| **Request Change** / **Post-Close** / **Cancel** | *Start* / *Close* (guarded) / *Cancel* with a reason |
+| **Print** by state | the grid query, filtered |
+| **Grid by Location / Protected Asset / Protection Function** | **the default view over the FLOC tree** (#57): a projection of `location.Node` → `asset.Placement` → `scheme.CommissionedFunction`, kept indefinitely. Navigation by station, panel, scheme and device type (FR-7.2) is the same tree, browsed |
 
 ---
 
 ## 11. Coverage
 
-### The thirteen capabilities
-
 | Capability | Delivered by | Exercised in the example |
 |---|---|---|
 | Ordered steps | `sequence` | `MAIN` |
-| Typed data capture | `step.capture` | `SCOPE`, `READBACK` |
-| Conditional branching | `choice` | `READBACK_RESULT` |
+| Typed data capture | `step.capture` | `SCOPE`, `RECORD_SETTINGS`, `READBACK` |
+| Conditional branching | `choice` | `DEVICE_KIND`, `READBACK_RESULT` |
 | Guards and preconditions | `step.precondition`; workflow `requires` | `APPROVE`, `ISSUE`, `TEST`; *Close* |
-| Role and competency per step | `step.role` → `roles.*.role` + `requires` | `technician` |
-| Sign-off with attribution | `step.signoff` + segregation | `CHECK` vs `BUILD_SETTINGS`; `RETURN_TO_SERVICE` witness |
+| Role and competency | `roles.*` | `technician` |
+| Sign-off with attribution | `step.signoff` + segregation | `CHECK`, `RETURN_TO_SERVICE` |
 | Evidence at a step | `step.evidence` | `STUDY`, `BUILD_SETTINGS`, `READBACK`, `TEST` |
 | Parallel branches | `parallel` | `COMPLETION` |
 | Sub-procedures | `call` | `UPDATE_DRAWINGS` |
 | Timing and due dates | `step.due` | `TEST` |
 | Hold points | `hold` | `AWAIT_OUTAGE` |
-| Recorded deviation | `step.deviation` → `Finding` | `TEST` |
+| Recorded deviation | `step.deviation` | `TEST` |
 | Iteration over a set | `foreach` | `BUILD`, `FIELD` |
+| Branch exit | `step.branchOutcome` | `RESOLVE_DIFFERENCE` |
 
-### Requirements
-
-| Requirement | Where |
-|---|---|
-| FR-1.1 procedures are definitions, never code | §1, §3, §8 |
-| FR-1.2 the vocabulary | §3, this table |
-| FR-1.3 in-flight work pinned | §6 |
-| FR-1.4 iteration | §3 `foreach`; `BUILD`, `FIELD` |
-| FR-1.5 authoring surface | §8 |
-| FR-2.1 workflow invokes procedure; completion satisfies guard | §2; both example workflows |
-| FR-2.2 mutable until commit | §1, §5 |
-| FR-3.1 the fourteen steps | §9 |
-| FR-3.2 approval precedes application | `APPLY` follows `ISSUE` follows `APPROVE` in sequence; `ISSUE.precondition` |
-| FR-3.3 in-service separate from approved | `READBACK` → `Readback` record → `RESOLVE_DIFFERENCE` |
+Requirements FR-1.1–1.5, FR-2.1–2.2, FR-3.1–3.4, FR-7.1 (shape), FR-7.2 are each satisfied by a
+named section above.
 
 ---
 
 ## 12. Not decided here
 
 - **The fact names in §7** — proposed, not agreed. OQ-14.
-- **Read logging of a step's draft** — decision #65 logs configuration files and evidence; a draft
-  is neither yet. OQ-15.
-- **The predecessor's eight draft `Program.Workflow` definitions** — this design recommends
-  discarding them and authoring fresh; `SETTINGS_LIFECYCLE` already supersedes `SETTINGS_APPROVAL`.
-  Not ruled. OQ-16.
-- **Whether a `hold` past its `maxDuration` raises an obligation** or only escalates. OQ-17.
-- **`security.Role` codes for V2** — `PCEngineer`, `PCApprover`, `PCTechnician` are placeholders
-  pending the seven account types' mapping. OQ-18.
-- **Document-aware typing.** `step.capture[id=…, field=…]` and `input.<name>` have the type the
-  document declares for that field or input, not one fixed catalogue type. The generic checker
-  cannot know this: in verification, `foreach.over` expressions type-checked as `num` against a
-  placeholder entry, which is not a type check at all. The C# checker therefore needs a
-  document-aware catalogue hook — given the document being authored, it resolves those facts'
-  types from it. Without that hook, `over`, `advances.subject` and `call.subject` are not
-  genuinely type-checked at authoring. Part of OQ-14.
-- **API endpoints** — the shapes above imply them; they are not specified.
-- **The `DRAWING_REVISION` procedure** — referenced, not authored.
-- **How `record.TestSheet.TestPlanDefinitionVersionRowId` is renamed** at migration.
+- **The characteristic definitions for electromechanical settings** — tap, time dial,
+  instantaneous, pickup are placeholders; the real set per device type comes from the legacy
+  `DESC`/`REMARKS` columns and the owner (OQ-19).
+- **The predecessor's eight draft `Program.Workflow` definitions** — discard recommended. OQ-16.
+- **Whether a `hold` past its maximum raises an obligation.** OQ-17.
+- **`security.Role` codes.** OQ-18.
+- **API endpoints** — implied, not specified.
+- **`DRAWING_REVISION`** — referenced, not authored.

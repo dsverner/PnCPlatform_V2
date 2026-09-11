@@ -344,7 +344,15 @@ the reviewer, never silently accepted.
 All end-user access is through a web browser, with filtering, search and navigation by station,
 terminal, asset, functional location, protection scheme and device type.
 
-> *Provenance:* SOW §5.2 — binding, and stated as "all".
+The legacy application's Location / Protected Asset / Protection Function view is **a view over
+the functional-location tree, kept indefinitely** — not a separate navigation mechanism. Engineers
+and technicians continue to work in that style; it is a projection of the tree, and tree
+navigation is the same data browsed another way.
+
+> *Provenance:* SOW §5.2 — binding, and stated as "all". The view ruling is the owner's, decision
+> #57: *"Protection Engineers and Techs will always operate off of Location/Protected
+> Asset/Protection function and that really should just be a particular view on the new FLOC
+> segmentation."*
 
 ---
 

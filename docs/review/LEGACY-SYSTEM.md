@@ -193,6 +193,24 @@ That is precisely **capability #9, parallel branches**, from the procedure vocab
 legacy system proved the group needs parallel tracks and could only express them by writing three
 tables.
 
+### The software track — owner's ruling, and what the data says
+
+**Owner, 2026-09-11:** *"the software track was never implemented and can be dropped (this can be
+verified by noting that all software status' are NA)."*
+
+**Measured** (`Setting Software Management`, re-counted the same day): NA 6 487 · **Complete
+1 572** · Change In Progress 334 · null 15. The Complete rows are dated 2005 through 2025, with
+spikes in 2018 (234) and 2021 (212); 231 carry no date. **137 of them carry their own notes** —
+e.g. *"Settings file on T drive under Norton. 2005-09-27 DML"*, *"Settings file completed and
+placed under Norton on 'T' drive"*. So the track was used, by some people, in some years — 19% of
+requests marked it Complete — and was not used consistently. "All NA" is the practice as
+remembered, not the data as stored.
+
+**Ruling stands.** The software track is dropped from the new procedure (decision #58). Its
+**1 906 non-NA rows are not discarded**: they migrate as notes on the change request, so the
+history survives even though the branch does not. Reporting parity for the software column is
+therefore "not modelled", and the parity screens show two tracks.
+
 ---
 
 ## 7. Users

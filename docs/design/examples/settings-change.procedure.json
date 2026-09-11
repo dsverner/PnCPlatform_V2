@@ -3,11 +3,8 @@
   "kind": "procedure",
   "key": "SETTINGS_CHANGE",
   "name": "Relay settings change",
-  "description": "The fourteen-step path of REQUIREMENTS.md FR-3.1, as one authored procedure. Expressions are grammar-1 text; on approval the engine stores their canonical AST. Role codes are placeholders until security.Role is populated for V2. Steps are tagged [n] with the FR-3.1 step they deliver.",
+  "description": "v0.2. The fourteen-step path of REQUIREMENTS.md FR-3.1 as one authored procedure. Changes from v0.1: the package is produced by step 1 (#52); the build step forks on device technology so electromechanical relays record typed settings instead of a file (#50); a readback difference resolved by raising a change ends that relay's branch as Superseded (#51); the completion block has two tracks, the legacy software track being dropped (#58). Expressions are grammar-1 text; on approval the engine stores their canonical AST. Role codes are placeholders (OQ-18).",
   "subjectKind": "WorkRequest",
-  "inputs": {
-    "package": { "type": "ref", "refKind": "SettingsIssuePackage", "required": true }
-  },
   "roles": {
     "engineer":   { "role": "PCEngineer" },
     "checker":    { "role": "PCEngineer" },
@@ -23,12 +20,13 @@
         "block": "step",
         "id": "REQUEST",
         "title": "[1] Confirm the request and its trigger",
-        "instruction": "Record what started this change and where it came from — an obligation, a finding, a project, a misoperation.",
+        "instruction": "Record what started this change and where it came from. Committing this step creates the settings-issue package that every later step fills and the lifecycle workflow governs.",
         "role": "engineer",
         "capture": {
           "trigger": { "type": "text", "required": true, "allowed": ["Obligation", "Finding", "Project", "Misoperation", "Advisory", "Other"] },
           "sourceReference": { "type": "text" }
         },
+        "produces": { "kind": "SettingsIssuePackage", "as": "package" },
         "record": { "kind": "RequestConfirmation" }
       },
       {
@@ -66,21 +64,46 @@
             {
               "block": "foreach",
               "id": "BUILD",
-              "title": "Build settings for every device in scope",
+              "title": "Settings for every device in scope",
               "over": "step.capture[id='SCOPE', field='devices']",
               "as": "device",
               "subjectKind": "Device",
               "concurrency": "parallel",
               "join": "all",
               "body": {
-                "block": "step",
-                "id": "BUILD_SETTINGS",
-                "title": "[4] Settings built in the vendor tool",
-                "instruction": "Produce the settings file for this device in the manufacturer's tool and attach it. The file becomes a ConfigurationFile revision in the package.",
-                "role": "engineer",
-                "evidence": { "required": true, "kinds": ["SettingsFile"], "min": 1 },
-                "signoff": { "action": "Calculate" },
-                "record": { "kind": "ConfigurationFileRevision" }
+                "block": "choice",
+                "id": "DEVICE_KIND",
+                "title": "A settings file for a microprocessor relay; typed settings for anything else",
+                "cases": [
+                  {
+                    "title": "Microprocessor relay",
+                    "when": "device.technology = 'Microprocessor'",
+                    "body": {
+                      "block": "step",
+                      "id": "BUILD_SETTINGS",
+                      "title": "[4] Settings built in the vendor tool",
+                      "instruction": "Produce the settings file for this device in the manufacturer's tool and attach it. The file becomes a configuration-file revision in the package.",
+                      "role": "engineer",
+                      "evidence": { "required": true, "kinds": ["SettingsFile"], "min": 1 },
+                      "signoff": { "action": "Calculate" },
+                      "record": { "kind": "ConfigurationFileRevision" }
+                    }
+                  }
+                ],
+                "else": {
+                  "block": "step",
+                  "id": "RECORD_SETTINGS",
+                  "title": "[4] Record the relay's settings",
+                  "instruction": "Electromechanical or static relay: record the settings directly. They become a revision in the package like a file would. The fields here are placeholders until the per-device-type definitions are agreed (OQ-19).",
+                  "role": "engineer",
+                  "capture": {
+                    "tap":           { "type": "num", "unit": "A", "base": "Secondary", "required": true, "validate": "value > 0" },
+                    "timeDial":      { "type": "num", "required": true, "validate": "value > 0" },
+                    "instantaneous": { "type": "num", "unit": "A", "base": "Secondary" }
+                  },
+                  "signoff": { "action": "Calculate" },
+                  "record": { "kind": "DeviceSettings" }
+                }
               }
             },
             {
@@ -96,7 +119,7 @@
               "block": "step",
               "id": "CHECK",
               "title": "[6] Independent engineering check",
-              "instruction": "Review the settings and rationale. Segregation: the checker may not be the person who calculated.",
+              "instruction": "Review the settings and rationale. Segregation: the checker may not be anyone who calculated.",
               "role": "checker",
               "capture": { "comments": { "type": "text" } },
               "signoff": { "action": "Check" },
@@ -116,13 +139,13 @@
           "block": "step",
           "id": "APPROVE",
           "title": "[7] Formal approval",
-          "instruction": "A named authority approves the settings-issue package. Approval cascades to every configuration-file revision in it.",
+          "instruction": "A named authority approves the settings-issue package. Approval cascades to every revision in it.",
           "role": "approver",
           "precondition": "step.outcome[id='CHECK'] = 'Pass'",
           "signoff": { "action": "Approve" },
           "outcomes": ["Approved", "Rejected"],
           "record": { "kind": "Approval" },
-          "advances": { "workflow": "SETTINGS_LIFECYCLE", "subject": "input.package", "transition": "Approve", "onOutcome": "Approved" }
+          "advances": { "workflow": "SETTINGS_LIFECYCLE", "subject": "procedure.package", "transition": "Approve", "onOutcome": "Approved" }
         },
         "until": "step.outcome[id='APPROVE'] = 'Approved'",
         "max": 3
@@ -136,7 +159,7 @@
         "precondition": "step.outcome[id='APPROVE'] = 'Approved'",
         "evidence": { "required": true, "kinds": ["IssuePackage"], "min": 1 },
         "record": { "kind": "SettingsIssue" },
-        "advances": { "workflow": "SETTINGS_LIFECYCLE", "subject": "input.package", "transition": "Issue" }
+        "advances": { "workflow": "SETTINGS_LIFECYCLE", "subject": "procedure.package", "transition": "Issue" }
       },
       {
         "block": "hold",
@@ -163,7 +186,7 @@
               "block": "step",
               "id": "APPLY",
               "title": "[9] Applied to the relay",
-              "instruction": "Load the approved settings to this device.",
+              "instruction": "Load the approved settings to this device. Captured in the field; commits at check-in.",
               "role": "technician",
               "capture": { "appliedAt": { "type": "date", "required": true } },
               "signoff": { "action": "Apply" },
@@ -173,7 +196,7 @@
               "block": "step",
               "id": "READBACK",
               "title": "[10] Readback and as-found verification",
-              "instruction": "Read the settings back from the relay and compare them with the approved file. Record the number of differences.",
+              "instruction": "Read the settings back from the relay and compare them with the approved revision. Record the number of differences.",
               "role": "technician",
               "capture": {
                 "differenceCount": { "type": "num", "required": true, "validate": "value >= 0" }
@@ -192,9 +215,10 @@
                     "block": "step",
                     "id": "RESOLVE_DIFFERENCE",
                     "title": "Resolve the as-found discrepancy",
-                    "instruction": "A finding is raised. Resolve it now by restoring the approved settings, or raise a change. The unapproved-in-service state is never left standing.",
+                    "instruction": "A finding is raised. Restore the approved settings now, or raise a corrective change — in which case this relay leaves this change and the corrective request owns it.",
                     "role": "engineer",
                     "outcomes": ["Restored", "ChangeRaised"],
+                    "branchOutcome": { "ChangeRaised": "Superseded" },
                     "record": { "kind": "Finding" }
                   }
                 }
@@ -225,16 +249,16 @@
         "block": "step",
         "id": "RETURN_TO_SERVICE",
         "title": "[12] Return to service declared",
-        "instruction": "Protection is declared back in service. Witnessed.",
+        "instruction": "Protection is declared back in service. Witnessed: the witness re-authenticates on the same device.",
         "role": "engineer",
         "signoff": { "action": "ReturnToService", "witness": true },
         "record": { "kind": "ReturnToService" },
-        "advances": { "workflow": "SETTINGS_LIFECYCLE", "subject": "input.package", "transition": "Verify" }
+        "advances": { "workflow": "SETTINGS_LIFECYCLE", "subject": "procedure.package", "transition": "Verify" }
       },
       {
         "block": "parallel",
         "id": "COMPLETION",
-        "title": "The three completion tracks — the legacy system's three tables, as one block",
+        "title": "The two completion tracks",
         "join": "all",
         "branches": [
           {
@@ -254,22 +278,10 @@
               "block": "step",
               "id": "BASELINE",
               "title": "[13] Record filed as the in-service baseline",
-              "instruction": "The settings book now says this is the truth.",
+              "instruction": "The settings book now says this is the truth. The design revision's in-service date is set from the return-to-service instant.",
               "role": "engineer",
               "record": { "kind": "Baseline" },
-              "advances": { "workflow": "SETTINGS_LIFECYCLE", "subject": "input.package", "transition": "Baseline" }
-            }
-          },
-          {
-            "id": "SOFTWARE",
-            "title": "Settings software",
-            "body": {
-              "block": "step",
-              "id": "ARCHIVE_SOFTWARE",
-              "title": "Vendor-tool file archived and superseded file retired",
-              "instruction": "The vendor tool's copy is filed against the package; the superseded copy is retired.",
-              "role": "engineer",
-              "record": { "kind": "SoftwareArchive" }
+              "advances": { "workflow": "SETTINGS_LIFECYCLE", "subject": "procedure.package", "transition": "Baseline" }
             }
           }
         ]

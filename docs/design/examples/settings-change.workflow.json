@@ -10,7 +10,7 @@
     {
       "code": "InProgress", "name": "In progress", "roles": ["PCEngineer", "PCTechnician", "PCApprover", "Administrator"],
       "onEnter": [
-        { "startProcedure": "SETTINGS_CHANGE", "bind": { "package": "work.settings_package" } }
+        { "startProcedure": "SETTINGS_CHANGE" }
       ]
     },
     { "code": "Closed", "name": "Closed", "terminal": true, "roles": [] },

@@ -101,9 +101,18 @@ the example changes with them.
 
 ### OQ-15 — Is a step's draft read-logged?
 
-Decision #65 (PnCPlatform) logs reads of configuration files and evidence packages. A step's draft
-is neither until it commits. Whether reading someone else's uncommitted draft is logged has not
-been asked.
+**Partly resolved 2026-09-11 by decision #55:** a draft is readable only by its claimant and the
+responsible role, so the population that can read it is small and named. Whether those reads are
+*logged* is still not asked. Decision #65 (PnCPlatform) logs reads of configuration files and
+evidence packages; a draft is neither until it commits.
+
+### OQ-19 — The typed settings for electromechanical and static relays
+
+Decision #50 forks the build step so that a relay without a settings file records its settings as
+typed values. The example uses **tap, time dial, instantaneous** as placeholders. The real set per
+device type — and the `CharacteristicDefinition`s that govern them — has not been agreed. The owner
+left the R1 free-text box empty, so the fallback stands: derive candidates from the legacy
+`DESC1–4` and `REMARKS1–5` columns and put them to the owner as a card.
 
 ### OQ-16 — The predecessor's eight draft `Program.Workflow` definitions
 
