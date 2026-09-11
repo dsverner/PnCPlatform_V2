@@ -1,0 +1,77 @@
+{
+  "_": "docs/design/API.md §4. (schema, object) → <SubjectClass>.<Verb>. Subject classes are the twelve seeded by PostDeploy/Seed_security_Permission.sql. An explicit null is not callable over HTTP; a hand-written procedure absent from 'procedures' is not callable either. W1 defaults — the schema→class assignments marked (W2) are reviewed when roles and scopes are built.",
+
+  "subjectClassBySchema": {
+    "location":   "Node",
+    "network":    "Node",
+    "asset":      "Asset",
+    "core":       "Asset",
+    "device":     "Device",
+    "connection": "Connection",
+    "scheme":     "Scheme",
+    "document":   "Document",
+    "archive":    "Document",
+    "work":       "WorkRequest",
+    "record":     "Record",
+    "event":      "Record",
+    "compliance": "Obligation",
+    "config":     "Definition",
+    "ref":        "Definition",
+    "security":   "Grant",
+    "personnel":  "Grant",
+    "party":      "Grant",
+    "audit":      "Grant",
+    "platform":   "Grant",
+    "migration":  "Grant"
+  },
+
+  "subjectClassByPrefix": {
+    "document.ConfigurationFile":   "ConfigurationFile",
+    "document.ParsedSetting":       "ConfigurationFile",
+    "document.SettingsIssuePackage": "ConfigurationFile"
+  },
+
+  "subjectKeys": [
+    "EntityId", "AssetEntityId", "DeviceEntityId", "NodeEntityId", "SchemeEntityId", "ConnectionEntityId",
+    "DocumentEntityId", "WorkRequestEntityId", "RecordEntityId", "PersonEntityId", "UserEntityId"
+  ],
+
+  "procedures": {
+    "asset.PlaceAsset":                    "Asset.Modify",
+    "audit.LogAction":                     null,
+    "audit.LogRead":                       null,
+    "audit.RecordBackupRun":               null,
+    "audit.RecordRestoreTest":             null,
+    "compliance.ApproveEvidencePackage":   "Obligation.Approve",
+    "compliance.ValidateProgramFacts":     null,
+    "config.AddCharacteristic":            "Definition.Modify",
+    "config.AddDefinition":                "Definition.Modify",
+    "config.AddDefinitionVersion":         "Definition.Modify",
+    "config.ApproveDefinitionVersion":     "Definition.Approve",
+    "config.ResolveDefinition":            null,
+    "connection.Connect":                  "Connection.Modify",
+    "device.ApplyFirmware":                "Device.Modify",
+    "document.ApproveRevision":            "Document.Approve",
+    "document.ApproveSettingsIssuePackage": "ConfigurationFile.Approve",
+    "document.File_Write":                 null,
+    "document.SetInService":               "ConfigurationFile.Modify",
+    "location.AddAdjacency":               "Node.Modify",
+    "location.AddNode":                    "Node.Modify",
+    "location.MoveNode":                   "Node.Modify",
+    "migration.CompleteRun":               null,
+    "migration.Run_Append":                null,
+    "network.AddLayerNodeEndpoint":        "Node.Modify",
+    "network.ApplyReconciliation":         "Node.Modify",
+    "personnel.ResolveActor":              null,
+    "platform.Release_Append":             null,
+    "platform.Deployment_Append":          null,
+    "record.AcceptRecord":                 "Record.Approve",
+    "record.RecordReadback":               "Record.Modify",
+    "record.RunConsistencyCheck":          "Record.Modify",
+    "scheme.AddSchemeMember":              "Scheme.Modify",
+    "scheme.RaiseProtectionOperation":     "Record.Modify",
+    "security.CheckSegregation":           null,
+    "security.Delegate":                   "Grant.Modify",
+    "work.AssignPerson":                   "WorkRequest.Modify"
+  }
+}

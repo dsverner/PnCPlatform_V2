@@ -95,6 +95,25 @@ as Administrator.
 
 **Depends on.** W0. **Estimate.** A, rewrite part: 25–40 h.
 
+**Gate record — 2026-09-11, observed on the build laptop against `PnCPlatform_V2_DEV`. Partial.**
+- `src/PnC.Api` and `src/PnC.Api.Smoke` on .NET 10, `src/PnC.slnx`; `dotnet build` 0 warnings 0 errors.
+  Design: `docs/design/API.md` v0.1; decisions #84–#88; security analysis `docs/review/API-W1-SECURITY.md`
+  (five findings fixed, three verified without change, two carried to W2).
+- Run locally on Kestrel in Development mode (`ASPNETCORE_ENVIRONMENT=DEV`): catalogue **497 procedures,
+  375 views, 21 schemas**; `/health` reports release 0.1.0 and database ok.
+- `PnC.Api.Smoke` — **19 PASS, 0 FAIL** with DEV-header identities: `/me` as Administrator and ReadOnly,
+  no identity → 401, unknown identity → 401, `/catalog`, view read as ReadOnly, unknown column → 400,
+  write refused as ReadOnly (and logged `AccessRefused`) and allowed as Administrator, missing parameter
+  → 400, unknown procedure → 404, not-callable → 404, client `ActorId` → 400, THROW → 409 in the
+  procedure's words, form POST → 415, soft-delete cleanup.
+- The shell observed in Chrome: health panel, *not signed in*, no console errors.
+- `package_release.py` — `dist/0.1.0`: dacpac, `app/`, `PnC.Api-0.1.0.zip`, `tools/PnC.Api.Smoke.exe`,
+  `sbom.json` (28 packages, 1 direct), `release.json`; `appsettings.Local.json` absent from the package.
+  The 0.1.0 `platform.Release` row predates the package, so its `PackageHash` is null; from W2 the
+  package is built before the deploy that first records a version.
+- **Not done:** the Windows-mode run from VGS-VM07 against a release installed on VGS-VM02. Where W1's
+  gate runs on the OT VMs is on the W1 card (VM02 hosts the predecessor's release against `_QA`).
+
 ### W2 — Identity, roles, scopes
 
 **Builds.** `security.Role` rows per #66 — `PCEngineer` with per-person scoped grants

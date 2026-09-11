@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!-- docs/design/API.md §7, §10. One package (agrees with PnCPlatform #239). -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <InvariantGlobalization>false</InvariantGlobalization>
+    <Version>0.1.0</Version>
+    <RootNamespace>PnC.Api</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="6.0.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\PnC.Formula\PnC.Formula.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- the permission map ships beside the binary and is part of the release package (API.md §4) -->
+    <None Update="api-permissions.json" CopyToOutputDirectory="PreserveNewest" />
+    <!-- DEV-only overrides never ship: gitignored, and excluded from publish -->
+    <Content Update="appsettings.Local.json" CopyToPublishDirectory="Never" Condition="Exists('appsettings.Local.json')" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="PnC.Api.Smoke/PnC.Api.Smoke.csproj" />
+  <Project Path="PnC.Api/PnC.Api.csproj" />
+  <Project Path="PnC.Formula.Conformance/PnC.Formula.Conformance.csproj" />
+  <Project Path="PnC.Formula/PnC.Formula.csproj" />
+</Solution>

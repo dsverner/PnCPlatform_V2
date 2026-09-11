@@ -1,0 +1,22 @@
+/* docs/design/API.md §9 — the shell's only stylesheet (the CSP allows no inline style). */
+:root { --ink: #1b2228; --muted: #5c6770; --rule: #d5dad8; --ground: #f7f8f6; --panel: #ffffff; --bar: #1f3a4d; --bar-ink: #e9f0f5; }
+@media (prefers-color-scheme: dark) {
+  :root { --ink: #e6e9e7; --muted: #9aa5ac; --rule: #2c3438; --ground: #15191c; --panel: #1c2226; --bar: #0f1d27; --bar-ink: #cfdbe4; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--ground); color: var(--ink); font: 15px/1.5 "Segoe UI", system-ui, sans-serif; }
+.bar { display: flex; justify-content: space-between; align-items: center; padding: 10px 20px; background: var(--bar); color: var(--bar-ink); }
+.brand { font-weight: 600; letter-spacing: .02em; }
+.who { font-size: 13px; opacity: .9; }
+main { max-width: 1100px; margin: 0 auto; padding: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.panel { background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; padding: 14px 18px; }
+.panel.wide { grid-column: 1 / -1; }
+h2 { margin: 0 0 8px; font-size: 16px; }
+h3 { margin: 12px 0 6px; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.facts { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; margin: 0; }
+.facts dt { color: var(--muted); }
+.facts dd { margin: 0; }
+.muted { color: var(--muted); }
+.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.list { margin: 0; padding-left: 18px; font: 13px/1.5 Consolas, ui-monospace, monospace; max-height: 60vh; overflow: auto; }
+@media (max-width: 720px) { main, .cols { grid-template-columns: 1fr; } }

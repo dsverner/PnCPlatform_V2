@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>P&amp;C Platform</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+  <meta name="theme-color" content="#1f3a4d">
+</head>
+<body>
+  <!-- docs/design/API.md §9: the shell. No inline script or style — the CSP forbids both. -->
+  <header class="bar">
+    <span class="brand">P&amp;C Platform</span>
+    <span id="who" class="who">signing in…</span>
+  </header>
+  <main>
+    <section id="health" class="panel">
+      <h2>Platform</h2>
+      <dl class="facts">
+        <dt>Environment</dt><dd id="env">…</dd>
+        <dt>Release</dt><dd id="release">…</dd>
+        <dt>Database</dt><dd id="db">…</dd>
+        <dt>Catalogue loaded</dt><dd id="loaded">…</dd>
+      </dl>
+    </section>
+    <section id="me" class="panel">
+      <h2>You</h2>
+      <dl class="facts">
+        <dt>Person</dt><dd id="person">…</dd>
+        <dt>Account</dt><dd id="upn">…</dd>
+        <dt>Grants</dt><dd id="grants">…</dd>
+      </dl>
+    </section>
+    <section id="catalog" class="panel wide">
+      <h2>Catalogue</h2>
+      <p class="muted" id="catalog-summary">…</p>
+      <div class="cols">
+        <div><h3>Procedures</h3><ul id="procs" class="list"></ul></div>
+        <div><h3>Views</h3><ul id="views" class="list"></ul></div>
+      </div>
+    </section>
+  </main>
+  <script src="/app.js"></script>
+</body>
+</html>
