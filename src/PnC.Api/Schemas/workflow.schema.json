@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vernergrid.ca/pnc/workflow.schema.json",
+  "title": "Program.Workflow — the workflow document",
+  "description": "A workflow governs the lifecycle of a thing: its states, the transitions between them, who may make each, and what each requires. It does not describe how work is done — a procedure does that. The join between the two layers is here (state.onEnter.startProcedure, transition.requires.procedure) and in the procedure's step.advances. Stored whole in config.DefinitionVersion.PayloadText. See docs/design/PROCEDURE-ENGINE.md.",
+  "type": "object",
+  "required": ["g", "kind", "key", "name", "subjectKind", "states", "transitions"],
+  "additionalProperties": false,
+  "properties": {
+    "g": { "const": 1 },
+    "kind": { "const": "workflow" },
+    "key": { "$ref": "#/$defs/key" },
+    "name": { "type": "string", "minLength": 1 },
+    "description": { "type": "string" },
+    "subjectKind": { "type": "string", "enum": ["WorkRequest", "Device", "Asset", "Scheme", "SettingsIssuePackage", "ConfigurationFileRevision", "DefinitionVersion", "Document"] },
+    "states": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "required": ["code", "name"],
+        "additionalProperties": false,
+        "properties": {
+          "code": { "$ref": "#/$defs/code" },
+          "name": { "type": "string", "minLength": 1 },
+          "initial": { "type": "boolean", "default": false, "description": "Exactly one state is initial." },
+          "terminal": { "type": "boolean", "default": false },
+          "cancellation": { "type": "boolean", "default": false, "description": "A terminal state reached by abandoning the subject rather than completing it." },
+          "roles": { "type": "array", "items": { "type": "string" }, "description": "security.Role codes permitted to act on the subject while in this state. Empty: read-only." },
+          "onEnter": {
+            "type": "array",
+            "description": "Effects when the subject enters this state. The workflow-to-procedure direction of the join (FR-2.1).",
+            "items": { "$ref": "#/$defs/effect" }
+          },
+          "onExit": { "type": "array", "items": { "$ref": "#/$defs/effect" } }
+        }
+      }
+    },
+    "transitions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["from", "to", "name"],
+        "additionalProperties": false,
+        "properties": {
+          "from": { "$ref": "#/$defs/code" },
+          "to": { "$ref": "#/$defs/code" },
+          "name": { "type": "string", "minLength": 1, "description": "The verb on the button, and what a procedure step's advances.transition cites." },
+          "roles": { "type": "array", "items": { "type": "string" }, "description": "Who may make this transition. Default: the from-state's roles." },
+          "requiresReason": { "type": "boolean", "default": false },
+          "signoff": { "type": "string", "description": "A segregation action name, when this transition is an attested act." },
+          "requires": {
+            "type": "array",
+            "description": "Guards. All must hold. A guard that is Unknown blocks the transition and says which facts were unknown.",
+            "items": { "$ref": "#/$defs/guard" }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "key": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$", "maxLength": 64 },
+    "code": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_]*$", "maxLength": 64 },
+    "expression": { "oneOf": [ { "type": "string", "minLength": 1 }, { "type": "object" } ] },
+    "effect": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["startProcedure"],
+          "additionalProperties": false,
+          "properties": {
+            "startProcedure": { "$ref": "#/$defs/key", "description": "Program.Procedure key. Starts an instance over this workflow's subject, pinned to the procedure's approved version at that instant." },
+            "bind": { "type": "object", "additionalProperties": { "$ref": "#/$defs/expression" }, "description": "Values for the procedure's inputs." }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["notify"],
+          "additionalProperties": false,
+          "properties": {
+            "notify": { "$ref": "#/$defs/key", "description": "Program.NotificationType key." }
+          }
+        }
+      ]
+    },
+    "guard": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["procedure"],
+          "additionalProperties": false,
+          "description": "Satisfied when a procedure instance started from this workflow instance has completed with the named outcome.",
+          "properties": {
+            "procedure": { "$ref": "#/$defs/key" },
+            "outcome": { "$ref": "#/$defs/code", "default": "Completed" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["when"],
+          "additionalProperties": false,
+          "description": "A grammar-1 boolean over the subject's facts — an AST node under \"when\", as FORMULA-GRAMMAR.md §7 prescribes.",
+          "properties": {
+            "when": { "$ref": "#/$defs/expression" }
+          }
+        }
+      ]
+    }
+  }
+}

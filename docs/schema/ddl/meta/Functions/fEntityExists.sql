@@ -33,6 +33,7 @@ RETURNS BIT AS BEGIN
         WHEN N'Person' THEN CASE WHEN EXISTS (SELECT 1 FROM [personnel].[PersonRegistry] WHERE [EntityId] = @entityId) THEN 1 ELSE 0 END
         WHEN N'Platform' THEN 1
         WHEN N'Port' THEN CASE WHEN EXISTS (SELECT 1 FROM [connection].[PortRegistry] WHERE [EntityId] = @entityId) THEN 1 ELSE 0 END
+        WHEN N'ProcedureInstance' THEN CASE WHEN EXISTS (SELECT 1 FROM [process].[ProcedureInstanceRegistry] WHERE [EntityId] = @entityId) THEN 1 ELSE 0 END
         WHEN N'ProtectionCondition' THEN CASE WHEN EXISTS (SELECT 1 FROM [scheme].[ProtectionConditionRegistry] WHERE [EntityId] = @entityId) THEN 1 ELSE 0 END
         WHEN N'ProtectionFunction' THEN CASE WHEN EXISTS (SELECT 1 FROM [location].[NodeRegistry] WHERE [EntityId] = @entityId) THEN 1 ELSE 0 END
         WHEN N'ProtectionOperation' THEN CASE WHEN EXISTS (SELECT 1 FROM [scheme].[ProtectionOperationRegistry] WHERE [EntityId] = @entityId) THEN 1 ELSE 0 END
@@ -40,11 +41,13 @@ RETURNS BIT AS BEGIN
         WHEN N'RouteStep' THEN CASE WHEN EXISTS (SELECT 1 FROM [location].[RouteStepRegistry] WHERE [EntityId] = @entityId) THEN 1 ELSE 0 END
         WHEN N'Scheme' THEN CASE WHEN EXISTS (SELECT 1 FROM [scheme].[SchemeRegistry] WHERE [EntityId] = @entityId) THEN 1 ELSE 0 END
         WHEN N'SecurityPerimeter' THEN CASE WHEN EXISTS (SELECT 1 FROM [connection].[SecurityPerimeterRegistry] WHERE [EntityId] = @entityId) THEN 1 ELSE 0 END
+        WHEN N'SettingsIssuePackage' THEN CASE WHEN EXISTS (SELECT 1 FROM [document].[Revision] WHERE [RowId] = @entityId) THEN 1 ELSE 0 END
         WHEN N'Station' THEN CASE WHEN EXISTS (SELECT 1 FROM [location].[NodeRegistry] WHERE [EntityId] = @entityId) THEN 1 ELSE 0 END
         WHEN N'Structure' THEN CASE WHEN EXISTS (SELECT 1 FROM [location].[NodeRegistry] WHERE [EntityId] = @entityId) THEN 1 ELSE 0 END
         WHEN N'Stud' THEN CASE WHEN EXISTS (SELECT 1 FROM [location].[NodeRegistry] WHERE [EntityId] = @entityId) THEN 1 ELSE 0 END
         WHEN N'TrainingModule' THEN CASE WHEN EXISTS (SELECT 1 FROM [personnel].[TrainingModule] WHERE [EntityId] = @entityId) THEN 1 ELSE 0 END
         WHEN N'User' THEN CASE WHEN EXISTS (SELECT 1 FROM [security].[UserRegistry] WHERE [EntityId] = @entityId) THEN 1 ELSE 0 END
+        WHEN N'WorkflowInstance' THEN CASE WHEN EXISTS (SELECT 1 FROM [process].[WorkflowInstanceRegistry] WHERE [EntityId] = @entityId) THEN 1 ELSE 0 END
         WHEN N'WorkRequest' THEN CASE WHEN EXISTS (SELECT 1 FROM [work].[WorkRequestRegistry] WHERE [EntityId] = @entityId) THEN 1 ELSE 0 END
         ELSE 0 END;
 END;

@@ -132,6 +132,11 @@ row the ReadOnly write check leaves in `audit.vActionLog` is what this session r
     Performance Log Users, IIS_IUSRS); verified by re-export. Reversible: the same template without them.
   - **The run's command and output files are in `C:\Users\Public`**, not in `tools\smoke`: the accounts have
     `BUILTIN\Users` read and execute on `C:\inetpub\PnCPlatform_V2`, so a redirect into it fails (exit 1, no file).
+- **W3, 2026-09-12:** a fourth account, `pnc-gate-approver` (Administrator, Global; SID `…-1607`, batch-logon right
+  granted the same way), so the Author/Approve segregation can be observed on the Windows path: the Administrator run
+  authors a Draft, the Approver run approves it. 0.3.0 deployed the same way as 0.2.1 (stop pool, keep
+  `appsettings.Local.json`, expand, restart) — `/health` → `release 0.3.0`; runs: admin 49, approver 8, read-only 10,
+  hydro 6 PASS.
 - First full run 2026-09-12 09:42–09:45: Administrator 31 PASS, ReadOnly 9 PASS, Hydro 6 PASS (after the smoke's
   role-list check was corrected to expect the engineer's 403); recorded in `PHASE-1-WORKFLOW.md`, W2.
 - The three gate accounts are platform users on `_V2_DEV` (Administrator Global, ReadOnly Global,

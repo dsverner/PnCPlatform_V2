@@ -325,6 +325,31 @@ Not built (PROCEDURES.md #36–#37, #40–#41): the line-constants engine run, a
 
 Note: `app_execute` holds schema-level EXECUTE on `audit`, so the application *could* call the record procedures; the design's boundary (the application never issues `BACKUP`) is about the backup itself, which no procedure here performs. `TargetRpoMinutes` / `TargetRtoMinutes` live in the policy payload, null until NB Power sets them (decision 185).
 
+## Step 16 — the `process` schema ✅ (W3, 2026-09-12)
+
+PROCEDURE-ENGINE.md §4, decision #100. Every table carries the CONVENTIONS block verbatim; domain columns are the
+design's own lists. Types defaulted by the rules above: `BlockPath` NVARCHAR(400), `StepId` NVARCHAR(64) (the schema's
+id pattern, max 64), `RoleAlias` / `RoleCode` / `State` / `Outcome` NVARCHAR(40), `CalleeKey` NVARCHAR(100), JSON
+columns (`RequiresAst`, `Inputs`, `Produced`, `Draft`, `GuardEvaluation`, `StepMapping`) NVARCHAR(MAX) with an ISJSON
+CHECK; `CaptureTimeQuality` TINYINT 0–4 like `TimeSourceQuality`.
+
+| Object | File | Notes |
+|---|---|---|
+| `process.ProcedureStep` (+ `Ordinal`, `RequiresWitness`, `HasPrecondition`, `AdvancesWorkflowKey` / `AdvancesTransition`, `ProducesName` / `ProducesKind` beyond the design's list — what the projection can read off the document for free and screens will want) | `process/Tables/ProcedureStep.sql` | unique (`DefinitionVersionRowId`, `StepId`) among live rows |
+| `process.ProcedureStepRole`, `ProcedureFactUse`, `ProcedureCall` | `process/Tables/*` | Versioned; rebuilt by `ProjectProcedureVersion` (prior rows soft-deleted) |
+| `process.WorkflowInstance`, `ProcedureInstance`, `InstanceVersionSet`, `BlockInstance`, `StepInstance`, `HoldInstance`, `InstanceMigration` | `process/Tables/*` | Versioned; state sets CHECKed per §4; `BlockKind` includes `branch` (a parallel branch is its own activation); W4 writes them |
+| `process.WorkflowTransition` | `process/Tables/WorkflowTransition.sql` | AppendOnly (`TransitionId` identity); `_Append` is the only write path |
+| `process.fProcedureBlocks`, `fExpressionSites` | `process/Functions/*` | the block tree as rows (depth-first, `BlockPath`, `ScopePath` for the C1 check); the expression sites of one block |
+| the five procedures | `process/Procedures/*` | PROCEDURES.md #45 |
+| `ref.DefinitionKind` `Program.Procedure`; eleven `ref.RecordKind` rows; `ref.SubjectKind` `SettingsIssuePackage` (→ `document.Revision.RowId`), `ProcedureInstance`, `WorkflowInstance` | `PostDeploy/Seed_ref_*` | idempotent |
+| `compliance.vFactCatalogue` engine facts; `work.outage_*` in `fFixedFactValue` | `compliance/Views/vFactCatalogue.sql`, `Functions/fFixedFactValue.sql` | decision #101 |
+| `DRAWING_REVISION` placeholder definition; `Standard` workflow retired | `PostDeploy/Seed_config_Procedure_Placeholders.sql`, `Seed_config_Workflow_Standard.sql` | decision #102 |
+| the two electromechanical templates | `PostDeploy/Seed_config_SettingsTemplates_Electromechanical.sql` | decision #104 |
+
+Lesson: OPENJSON's `key` column is `Latin1_General_BIN2`; every comparison or concatenation with document text
+carries `COLLATE DATABASE_DEFAULT`, or the procedure fails at run time with a collation conflict that the build does
+not see.
+
 ## Reconciliation — every table the design names
 
 Method: every `schema.Table` token in SCHEMA-DESIGN.md steps 0–15 and Appendix B, compared with `*/Tables/*.sql` in this project (2026-09-04, after wave 5).

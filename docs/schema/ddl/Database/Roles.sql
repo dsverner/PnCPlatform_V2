@@ -52,6 +52,8 @@ GRANT EXECUTE ON SCHEMA::[archive]    TO [app_execute];
 GO
 GRANT EXECUTE ON SCHEMA::[core]       TO [app_execute];
 GO
+GRANT EXECUTE ON SCHEMA::[process]    TO [app_execute];
+GO
 -- VIEW DEFINITION on the same schemas: the application reads each procedure's parameter list and T-SQL defaults
 -- (OBJECT_DEFINITION) to build its catalog; without it every parameter looks required. Found on QA 2026-09-07
 -- (decision 256): DEV never showed it because dev_pnc is db_owner. Procedure text is the platform's own, not data.
@@ -94,6 +96,8 @@ GO
 GRANT VIEW DEFINITION ON SCHEMA::[archive] TO [app_execute];
 GO
 GRANT VIEW DEFINITION ON SCHEMA::[core] TO [app_execute];
+GO
+GRANT VIEW DEFINITION ON SCHEMA::[process] TO [app_execute];
 GO
 -- SELECT on views only is granted object-by-object by the generator (Views/*.sql carry their
 -- own GRANT), so a hand-written table never becomes readable by accident.

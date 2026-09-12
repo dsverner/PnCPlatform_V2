@@ -61,6 +61,7 @@ app.UseDefaultFiles();
 app.UseStaticFiles();
 
 // 5. the endpoints (§6, §7)
+DefinitionEndpoints.Map(app, catalog, map, authz);   // W3: fixed routes before the generic {schema}/{procedure}
 ApiEndpoints.Map(app, catalog, map, authz, app.Environment.EnvironmentName, connectionString);
 
 app.Run();

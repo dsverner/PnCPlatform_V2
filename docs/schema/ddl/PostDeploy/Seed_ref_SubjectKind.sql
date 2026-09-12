@@ -46,7 +46,11 @@ USING (VALUES
     (N'Audit',                     N'Compliance audit',                 N'compliance', N'AuditRegistry',                N'EntityId'),
     (N'Definition',                N'Definition',                       N'config',     N'DefinitionRegistry',           N'EntityId'),
     (N'DefinitionVersion',         N'Definition version (fact version)',N'config',     N'DefinitionVersion',            N'RowId'),
-    (N'Platform',                  N'The platform itself (decision 56)',NULL,          NULL,                            NULL)
+    (N'Platform',                  N'The platform itself (decision 56)',NULL,          NULL,                            NULL),
+    -- PROCEDURE-ENGINE §4 (W3): the runtime's own subjects, and the package a procedure produces (§5.1; a revision whose class is the package, STEPS.md reconciliation)
+    (N'SettingsIssuePackage',      N'Settings-issue package (document.Revision of that class)', N'document', N'Revision',        N'RowId'),
+    (N'ProcedureInstance',         N'Procedure instance (one run)',     N'process',    N'ProcedureInstanceRegistry',    N'EntityId'),
+    (N'WorkflowInstance',          N'Workflow instance (one lifecycle)',N'process',    N'WorkflowInstanceRegistry',     N'EntityId')
 ) AS s ([SubjectKindCode], [Name], [SchemaName], [TableName], [KeyColumnName])
 ON t.[SubjectKindCode] = s.[SubjectKindCode]
 WHEN MATCHED AND (t.[Name] <> s.[Name] OR ISNULL(t.[SchemaName], N'') <> ISNULL(s.[SchemaName], N'') OR ISNULL(t.[TableName], N'') <> ISNULL(s.[TableName], N'') OR ISNULL(t.[KeyColumnName], N'') <> ISNULL(s.[KeyColumnName], N''))

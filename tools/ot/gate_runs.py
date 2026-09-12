@@ -11,7 +11,7 @@ import pve
 env = {}
 for line in open(r"C:\Projects\PnCPlatform\dev.local", encoding="utf-8"):
     if "=" in line and not line.startswith("#"): k, v = line.split("=", 1); env[k.strip()] = v.strip()
-RUNS = [("pnc-gate-admin", "PNC_GATE_ADMIN_PWD", "Administrator"), ("pnc-gate-ro", "PNC_GATE_RO_PWD", "ReadOnly"), ("pnc-gate-hydro", "PNC_GATE_HYDRO_PWD", "Hydro")]
+RUNS = [("pnc-gate-admin", "PNC_GATE_ADMIN_PWD", "Administrator"), ("pnc-gate-approver", "PNC_GATE_APPROVER_PWD", "Approver"), ("pnc-gate-ro", "PNC_GATE_RO_PWD", "ReadOnly"), ("pnc-gate-hydro", "PNC_GATE_HYDRO_PWD", "Hydro")]
 only = sys.argv[1:]
 TOOLS = "C:/inetpub/PnCPlatform_V2/tools/smoke"
 p = pve.Pve()

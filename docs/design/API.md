@@ -239,6 +239,20 @@ as ReadOnly and allowed as Administrator. Deployed from a release package.
 
 ---
 
+## 8a. The definitions endpoints — W3
+
+Three fixed routes, mapped before the generic dispatcher (`src/PnC.Api/Endpoints/DefinitionEndpoints.cs`; decision #100):
+
+| Route | Does | Permission |
+|---|---|---|
+| `POST /api/v1/definitions/documents` `{document, changeNote?}` | validates the authored document against `Schemas/procedure.schema.json` or `workflow.schema.json` (`SchemaCheck`, the subset the two schemas use), parses and type-checks every expression against `compliance.vFactCatalogue` plus the document's own declared names (`DocumentCompiler`), replaces text with canonical AST, calls `process.AddProcedureVersion` / `AddWorkflowVersion` → `{versionRowId, versionNumber, existing}`; **400 `document_invalid`** with `errors[{path, code, message}]`; the database's structural rules answer 409 in the rule's words | `Definition.Modify` |
+| `POST /api/v1/definitions/documents/{versionRowId}/approve` `{effectiveFrom?, overrideReason?, overrideApprovedByActorId?}` | `process.ApproveProcedureVersion` (approval + projection, one transaction) or `config.ApproveDefinitionVersion` for a workflow → `{approved, projectedSteps}` | `Definition.Approve` |
+| `POST /api/v1/formula/check` `{expression, subjectKind?, env?}` | one expression parsed and typed → `{ok, type, facts, canonical}` or `{ok:false, code, message, position}` — the live check of PROCEDURE-ENGINE §8, W5's editor reuses it | any signed-in user |
+
+`PnC.Api.Smoke` extends the W2 run with the W3 section (the three example documents, the approval by a second
+person, the projection counts, the refusals) — 73 checks in DEV mode; in Windows mode the Administrator run authors a
+fresh `W3_GATE_APPROVAL` Draft and the Approver run (`--windows=Approver`) approves it.
+
 ## 9. The PWA shell
 
 `wwwroot/`: `index.html` (no inline script or style — the CSP forbids it), `app.js`, `styles.css`,

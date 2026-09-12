@@ -44,3 +44,5 @@ CREATE SCHEMA [meta];
 GO
 CREATE SCHEMA [platform];   -- PLATFORM-ARCHITECTURE §8: the platform's own releases and deployments
 GO
+CREATE SCHEMA [process];    -- PROCEDURE-ENGINE §4 (decision #45): the workflow and procedure runtime and the projections (W3)
+GO

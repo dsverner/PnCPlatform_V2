@@ -7,7 +7,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <InvariantGlobalization>false</InvariantGlobalization>
-    <Version>0.2.1</Version>
+    <Version>0.3.0</Version>
     <RootNamespace>PnC.Api</RootNamespace>
   </PropertyGroup>
 
@@ -22,6 +22,8 @@
   <ItemGroup>
     <!-- the permission map ships beside the binary and is part of the release package (API.md §4) -->
     <None Update="api-permissions.json" CopyToOutputDirectory="PreserveNewest" />
+    <!-- W3: the authoring contracts (docs/design/*.schema.json, copied here by tools/sync_schemas.py) ship beside the binary -->
+    <None Update="Schemas\*.json" CopyToOutputDirectory="PreserveNewest" />
     <!-- DEV-only overrides never ship: gitignored, and excluded from publish -->
     <Content Update="appsettings.Local.json" CopyToPublishDirectory="Never" Condition="Exists('appsettings.Local.json')" />
   </ItemGroup>

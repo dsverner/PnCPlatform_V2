@@ -1,0 +1,332 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vernergrid.ca/pnc/procedure.schema.json",
+  "title": "Program.Procedure — the procedure document",
+  "description": "The authoring contract for a procedure definition. Stored whole in config.DefinitionVersion.PayloadText. An authored document may carry expressions as grammar-1 text; on approval the engine parses each to its canonical AST, and the canonical document is what is stored and hashed. This schema is the contract a later friendly editor targets. See docs/design/PROCEDURE-ENGINE.md.",
+  "type": "object",
+  "required": ["g", "kind", "key", "name", "subjectKind", "body"],
+  "additionalProperties": false,
+  "properties": {
+    "g": { "const": 1, "description": "Grammar generation of every embedded expression." },
+    "kind": { "const": "procedure" },
+    "key": { "$ref": "#/$defs/key", "description": "The definition key — matches config.Definition.DefinitionKey." },
+    "name": { "type": "string", "minLength": 1 },
+    "description": { "type": "string" },
+    "subjectKind": { "$ref": "#/$defs/subjectKind", "description": "What one run of this procedure is about. Facts in expressions resolve against it unless a foreach rebinds the subject." },
+    "inputs": {
+      "type": "object",
+      "description": "Named values bound when the instance starts — by the invoking workflow (bind), a call block (bind), or the person starting it. Referenced in expressions as input.<name>.",
+      "additionalProperties": { "$ref": "#/$defs/valueType" }
+    },
+    "roles": {
+      "type": "object",
+      "description": "Role aliases used by steps. Each maps to a security.Role code and may add a competency requirement — a grammar-1 boolean over person.* facts, evaluated for the person attempting the step.",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["role"],
+        "additionalProperties": false,
+        "properties": {
+          "role": { "type": "string", "minLength": 1, "description": "security.Role code." },
+          "requires": { "$ref": "#/$defs/expression", "description": "Boolean over person.* facts. Unknown refuses — a person whose competency cannot be established may not perform the step." }
+        }
+      }
+    },
+    "outcomes": {
+      "type": "array",
+      "description": "The procedure's outcome vocabulary. Default [\"Completed\",\"Cancelled\"]. A workflow guard may require a named outcome.",
+      "items": { "$ref": "#/$defs/code" },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "body": { "$ref": "#/$defs/block" }
+  },
+  "$defs": {
+    "key": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$", "maxLength": 64 },
+    "code": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_]*$", "maxLength": 64 },
+    "id": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$", "maxLength": 64, "description": "Unique within the document. Facts such as step.outcome[id='CHECK'] cite it." },
+    "subjectKind": { "type": "string", "enum": ["WorkRequest", "Device", "Asset", "Scheme", "SettingsIssuePackage", "ConfigurationFileRevision", "Person", "Station", "Any"] },
+    "expression": {
+      "description": "A grammar-1 expression. Authored as text; stored as the canonical AST object (FORMULA-GRAMMAR.md §8).",
+      "oneOf": [
+        { "type": "string", "minLength": 1 },
+        { "type": "object" }
+      ]
+    },
+    "cadence": {
+      "description": "A grammar-1 cadence (FORMULA-GRAMMAR.md §6). Authored as text; stored canonical. Due instants are derived on read, never stored.",
+      "oneOf": [
+        { "type": "string", "minLength": 1 },
+        { "type": "object" }
+      ]
+    },
+    "duration": { "type": "string", "pattern": "^[0-9]+ ?(min|h|d|w|mo|y)$", "description": "A grammar-1 duration literal in text form." },
+    "valueType": {
+      "type": "object",
+      "required": ["type"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "type": "string", "enum": ["num", "text", "bool", "date", "dur", "ref", "set", "file"] },
+        "unit": { "type": "string" },
+        "base": { "type": "string", "enum": ["Primary", "Secondary"] },
+        "refKind": { "$ref": "#/$defs/subjectKind", "description": "For ref and set-of-ref: what is referenced." },
+        "allowed": { "type": "array", "items": { "type": "string" }, "description": "For text: the closed list of values." },
+        "required": { "type": "boolean", "default": false },
+        "validate": { "$ref": "#/$defs/expression", "description": "Boolean over `value` plus the subject's facts. Unknown refuses the commit (FORMULA-GRAMMAR.md §5)." }
+      }
+    },
+    "block": {
+      "description": "One block. The body of a procedure is a tree of these. Block-structured: no arbitrary edges.",
+      "oneOf": [
+        { "$ref": "#/$defs/step" },
+        { "$ref": "#/$defs/sequence" },
+        { "$ref": "#/$defs/parallel" },
+        { "$ref": "#/$defs/choice" },
+        { "$ref": "#/$defs/foreach" },
+        { "$ref": "#/$defs/repeat" },
+        { "$ref": "#/$defs/call" },
+        { "$ref": "#/$defs/hold" }
+      ]
+    },
+    "step": {
+      "type": "object",
+      "description": "A unit of work a person performs and commits. Commit produces a record.Record. Delivers: data capture, role and competency, sign-off, evidence, due date, deviation.",
+      "required": ["block", "id", "title", "role"],
+      "additionalProperties": false,
+      "properties": {
+        "block": { "const": "step" },
+        "id": { "$ref": "#/$defs/id" },
+        "title": { "type": "string", "minLength": 1 },
+        "instruction": { "type": "string", "description": "What the person does. Shown on the step; carried into the record." },
+        "role": { "$ref": "#/$defs/code", "description": "A role alias from the document's roles map." },
+        "precondition": { "$ref": "#/$defs/expression", "description": "Boolean. The step cannot be started until this is true. Unknown holds it for a person and names the unknown facts. Delivers: guards and preconditions — e.g. approval cannot start until step.outcome[id='CHECK'] = 'Pass'." },
+        "capture": {
+          "type": "object",
+          "description": "Typed fields captured at this step. Held as a draft until commit; then written as characteristic values on the record. Referenced afterwards as step.capture[id=…, field=…].",
+          "additionalProperties": { "$ref": "#/$defs/valueType" }
+        },
+        "record": {
+          "type": "object",
+          "description": "What the commit produces. Every step produces a record.Record; this names its kind and, where the kind has one, its template.",
+          "required": ["kind"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "$ref": "#/$defs/code", "description": "ref.RecordKind code." },
+            "template": { "$ref": "#/$defs/key", "description": "CharacteristicSchema.RecordTemplate key, where the kind is templated." }
+          }
+        },
+        "outcomes": {
+          "type": "array",
+          "description": "The step's outcome vocabulary, chosen by the person at commit. Default [\"Done\"]. Referenced as step.outcome[id=…].",
+          "items": { "$ref": "#/$defs/code" },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "signoff": {
+          "type": "object",
+          "description": "The commit is an attested act. `action` names the segregation action (Program.SegregationRule matches actionA/actionB on the procedure instance); `witness` requires a second attributed person.",
+          "required": ["action"],
+          "additionalProperties": false,
+          "properties": {
+            "action": { "$ref": "#/$defs/code" },
+            "witness": { "type": "boolean", "default": false }
+          }
+        },
+        "evidence": {
+          "type": "object",
+          "description": "Files bound to the record at commit.",
+          "additionalProperties": false,
+          "properties": {
+            "required": { "type": "boolean", "default": false },
+            "kinds": { "type": "array", "items": { "type": "string" }, "description": "Accepted file kinds — ref codes." },
+            "min": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "due": {
+          "type": "object",
+          "description": "When this step is due. Derived on read from the cadence and the anchor — never stored.",
+          "required": ["cadence"],
+          "additionalProperties": false,
+          "properties": {
+            "cadence": { "$ref": "#/$defs/cadence" },
+            "anchor": { "$ref": "#/$defs/id", "description": "The step whose commit instant is the event / anchor. Default: the instance start." },
+            "escalation": {
+              "type": "array",
+              "description": "As Program.NotificationType: after a duration past due, notify a role.",
+              "items": {
+                "type": "object",
+                "required": ["after", "role"],
+                "additionalProperties": false,
+                "properties": { "after": { "$ref": "#/$defs/duration" }, "role": { "$ref": "#/$defs/code" } }
+              }
+            }
+          }
+        },
+        "deviation": {
+          "type": "object",
+          "description": "Whether the person may deviate, and what it costs. A deviation always requires a reason and always produces a record.Finding on the instance.",
+          "required": ["allow"],
+          "additionalProperties": false,
+          "properties": {
+            "allow": { "type": "string", "enum": ["none", "skip", "vary", "skipOrVary"], "default": "none" },
+            "findingCategory": { "$ref": "#/$defs/code", "description": "ref.FindingCategory code for the finding raised." }
+          }
+        },
+        "produces": {
+          "type": "object",
+          "description": "On commit, create an entity and bind it to a procedure-scoped name (decision #52). Referenced afterwards as procedure.<as>. The REQUEST step of a settings change produces the settings-issue package.",
+          "required": ["kind", "as"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "$ref": "#/$defs/subjectKind" },
+            "as": { "$ref": "#/$defs/code" }
+          }
+        },
+        "branchOutcome": {
+          "type": "object",
+          "description": "For a named step outcome, end the enclosing foreach member or parallel branch with a branch outcome, skipping its remaining steps (decision #51). The join counts the branch as complete. Keys are this step's outcomes; values are branch outcome codes such as Superseded. This is how a precondition that can never become true is avoided: every step with a precondition sits in a branch that some branchOutcome can end.",
+          "additionalProperties": { "$ref": "#/$defs/code" }
+        },
+        "advances": {
+          "type": "object",
+          "description": "On commit, fire a transition on a workflow instance — the procedure-to-workflow direction of the join (FR-2.1). The transition's own roles and guards still apply.",
+          "required": ["workflow", "transition"],
+          "additionalProperties": false,
+          "properties": {
+            "workflow": { "$ref": "#/$defs/key", "description": "Program.Workflow key." },
+            "subject": { "$ref": "#/$defs/expression", "description": "A Reference-valued expression naming the workflow subject. Default: this procedure's subject." },
+            "transition": { "$ref": "#/$defs/code", "description": "The transition name in that workflow." },
+            "onOutcome": { "$ref": "#/$defs/code", "description": "Only when the step's outcome is this. Default: any." }
+          }
+        }
+      }
+    },
+    "sequence": {
+      "type": "object",
+      "description": "Items run in order. Delivers: ordered steps.",
+      "required": ["block", "items"],
+      "additionalProperties": false,
+      "properties": {
+        "block": { "const": "sequence" },
+        "id": { "$ref": "#/$defs/id" },
+        "title": { "type": "string" },
+        "items": { "type": "array", "items": { "$ref": "#/$defs/block" }, "minItems": 1 }
+      }
+    },
+    "parallel": {
+      "type": "object",
+      "description": "Branches run concurrently and rejoin. Delivers: parallel branches. The legacy system's three completion tracks are one of these.",
+      "required": ["block", "id", "branches", "join"],
+      "additionalProperties": false,
+      "properties": {
+        "block": { "const": "parallel" },
+        "id": { "$ref": "#/$defs/id" },
+        "title": { "type": "string" },
+        "branches": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "object",
+            "required": ["id", "title", "body"],
+            "additionalProperties": false,
+            "properties": {
+              "id": { "$ref": "#/$defs/id" },
+              "title": { "type": "string", "minLength": 1 },
+              "applies": { "$ref": "#/$defs/expression", "description": "Boolean. A branch whose condition is false is recorded NotApplicable and counts as joined. Unknown holds the branch open for a person to decide." },
+              "body": { "$ref": "#/$defs/block" }
+            }
+          }
+        },
+        "join": {
+          "description": "\"all\" — every branch complete or not applicable; \"any\" — the first completion proceeds and the rest are cancelled; an integer n — n completions.",
+          "oneOf": [ { "type": "string", "enum": ["all", "any"] }, { "type": "integer", "minimum": 1 } ]
+        }
+      }
+    },
+    "choice": {
+      "type": "object",
+      "description": "The first case whose condition is true runs. Delivers: conditional branching. All cases Unknown holds the choice for a person; none true and no else → the block completes with nothing run.",
+      "required": ["block", "id", "cases"],
+      "additionalProperties": false,
+      "properties": {
+        "block": { "const": "choice" },
+        "id": { "$ref": "#/$defs/id" },
+        "title": { "type": "string" },
+        "cases": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["when", "body"],
+            "additionalProperties": false,
+            "properties": {
+              "title": { "type": "string" },
+              "when": { "$ref": "#/$defs/expression" },
+              "body": { "$ref": "#/$defs/block" }
+            }
+          }
+        },
+        "else": { "$ref": "#/$defs/block" }
+      }
+    },
+    "foreach": {
+      "type": "object",
+      "description": "The body runs once per member of a set, each as its own branch with the subject rebound to the member. Delivers: iteration over a set. The eleven relays in one package.",
+      "required": ["block", "id", "over", "as", "body", "join"],
+      "additionalProperties": false,
+      "properties": {
+        "block": { "const": "foreach" },
+        "id": { "$ref": "#/$defs/id" },
+        "title": { "type": "string" },
+        "over": { "$ref": "#/$defs/expression", "description": "A Set-of-Reference expression, evaluated once when the block starts." },
+        "as": { "$ref": "#/$defs/code", "description": "The member's name for the outer scope, e.g. in join conditions and in facts such as foreach.outcome[id=…, member=…]." },
+        "subjectKind": { "$ref": "#/$defs/subjectKind", "description": "What each member is. Facts inside the body resolve against the member." },
+        "concurrency": { "type": "string", "enum": ["parallel", "serial"], "default": "parallel" },
+        "body": { "$ref": "#/$defs/block" },
+        "join": { "oneOf": [ { "type": "string", "enum": ["all", "any"] }, { "type": "integer", "minimum": 1 } ] }
+      }
+    },
+    "repeat": {
+      "type": "object",
+      "description": "The body runs, then runs again until the condition is true. Delivers: rework without an arbitrary back-edge. Each pass is its own set of step instances; earlier passes stay committed and visible.",
+      "required": ["block", "id", "body", "until"],
+      "additionalProperties": false,
+      "properties": {
+        "block": { "const": "repeat" },
+        "id": { "$ref": "#/$defs/id" },
+        "title": { "type": "string" },
+        "body": { "$ref": "#/$defs/block" },
+        "until": { "$ref": "#/$defs/expression", "description": "Boolean, evaluated after each pass. Unknown holds for a person." },
+        "max": { "type": "integer", "minimum": 1, "description": "After this many passes the block holds for a person rather than looping again." }
+      }
+    },
+    "call": {
+      "type": "object",
+      "description": "Runs another procedure as a child instance. Delivers: sub-procedures. The callee's version is pinned when the parent instance starts — the whole tree is one version set.",
+      "required": ["block", "id", "procedure"],
+      "additionalProperties": false,
+      "properties": {
+        "block": { "const": "call" },
+        "id": { "$ref": "#/$defs/id" },
+        "title": { "type": "string" },
+        "procedure": { "$ref": "#/$defs/key", "description": "Program.Procedure key." },
+        "subject": { "$ref": "#/$defs/expression", "description": "Reference-valued. Default: the current subject." },
+        "bind": { "type": "object", "additionalProperties": { "$ref": "#/$defs/expression" }, "description": "Values for the callee's inputs." }
+      }
+    },
+    "hold": {
+      "type": "object",
+      "description": "Work legitimately stops and waits. Delivers: hold points and suspension. The instance is Held, not abandoned, and reports as such.",
+      "required": ["block", "id", "reason"],
+      "additionalProperties": false,
+      "properties": {
+        "block": { "const": "hold" },
+        "id": { "$ref": "#/$defs/id" },
+        "title": { "type": "string" },
+        "reason": { "type": "string", "enum": ["outage", "part", "approval", "external", "other"] },
+        "until": { "$ref": "#/$defs/expression", "description": "Boolean. When true the hold releases itself. Absent: a person releases it." },
+        "releaseRole": { "$ref": "#/$defs/code", "description": "Who may release it by hand. Default: the procedure's starting role." },
+        "maxDuration": { "$ref": "#/$defs/duration", "description": "Past this the hold is reported overdue and escalates as a step would." }
+      }
+    }
+  }
+}

@@ -1,6 +1,7 @@
 """W2 card A1 (standing authorisation, 2026-09-12): the three gate accounts on vgsot.internal, created through the
 Samba domain controller VGS-VM05 (Proxmox VM 105) with samba-tool, passwords generated here and written ONLY to the
-predecessor's gitignored dev.local (PNC_GATE_ADMIN_PWD, PNC_GATE_RO_PWD, PNC_GATE_HYDRO_PWD). Idempotent: an account
+predecessor's gitignored dev.local (PNC_GATE_ADMIN_PWD, PNC_GATE_RO_PWD, PNC_GATE_HYDRO_PWD; W3 adds
+PNC_GATE_APPROVER_PWD for the second Administrator the Author/Approve segregation needs). Idempotent: an account
 that exists is left alone (its password on file is kept). Nothing is printed but names and outcomes."""
 import os, secrets, string, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -9,7 +10,8 @@ import pve
 DEV_LOCAL = r"C:\Projects\PnCPlatform\dev.local"
 ACCOUNTS = [("pnc-gate-admin", "PNC_GATE_ADMIN_PWD", "PnC gate: Administrator"),
             ("pnc-gate-ro", "PNC_GATE_RO_PWD", "PnC gate: ReadOnly"),
-            ("pnc-gate-hydro", "PNC_GATE_HYDRO_PWD", "PnC gate: Hydro-scoped engineer")]
+            ("pnc-gate-hydro", "PNC_GATE_HYDRO_PWD", "PnC gate: Hydro-scoped engineer"),
+            ("pnc-gate-approver", "PNC_GATE_APPROVER_PWD", "PnC gate: second Administrator (W3, approves what pnc-gate-admin authored)")]
 ALPHABET = string.ascii_letters + string.digits
 
 def read_env():

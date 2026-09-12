@@ -9,7 +9,14 @@ DECLARE @approver UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000002';
 IF NOT EXISTS (SELECT 1 FROM [personnel].[Actor] WHERE [ActorId] = @approver)
     INSERT [personnel].[Actor] ([ActorId], [ActorKind], [SystemName]) VALUES (@approver, N'System', N'Platform.SeedApprover');
 
-IF NOT EXISTS (SELECT 1 FROM [config].[Definition] WHERE [DefinitionKind] = N'Program.Workflow' AND [DefinitionKey] = N'Standard' AND [IsDeleted] = 0)
+-- W3 (decision #103): Program.Workflow documents now follow docs/design/workflow.schema.json and are loaded through the
+-- API (process.AddWorkflowVersion); this pre-W3 payload shape is retired. On a database that carries the seed, its
+-- Effective version is set Retired (soft; the rows stay); on a fresh database the workflow is no longer seeded.
+UPDATE dv SET dv.[Status] = N'Retired', dv.[EffectiveTo] = SYSDATETIMEOFFSET(), dv.[ModifiedBy] = @author, dv.[ModifiedAt] = SYSDATETIMEOFFSET()
+FROM [config].[DefinitionVersion] dv JOIN [config].[Definition] d ON d.[EntityId] = dv.[DefinitionEntityId]
+WHERE d.[DefinitionKind] = N'Program.Workflow' AND d.[DefinitionKey] = N'Standard' AND d.[IsDeleted] = 0 AND dv.[IsDeleted] = 0 AND dv.[Status] = N'Effective';
+
+IF 1 = 0 AND NOT EXISTS (SELECT 1 FROM [config].[Definition] WHERE [DefinitionKind] = N'Program.Workflow' AND [DefinitionKey] = N'Standard' AND [IsDeleted] = 0)
 BEGIN
     DECLARE @defEntity UNIQUEIDENTIFIER, @verRowId UNIQUEIDENTIFIER, @verNo INT;
     EXEC [config].[AddDefinition] @DefinitionKind = N'Program.Workflow', @DefinitionKey = N'Standard',

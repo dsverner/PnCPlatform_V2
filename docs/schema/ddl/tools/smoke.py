@@ -1372,6 +1372,72 @@ def main():
     cat2 = {r[0]: r for r in q("SELECT FactName, DataType, Parameters FROM compliance.vFactCatalogue WHERE FactName IN (N'scheme.members', N'record.last', N'record.occurred_at')")}
     check(len(cat2) == 3 and cat2["scheme.members"][2] == '["role"]', f"fact catalogue lists the parameterised facts with their parameters ({[(k, v[2]) for k, v in cat2.items()]})")
 
+    # ================================================================ W3: the process schema and the definitions rules
+    # (PROCEDURE-ENGINE §4, §8; decision #100 rules in SQL). The document under test is canonical JSON (the API produces
+    # it); the structural rules are asserted by their THROW numbers and words, and the projection by its counts.
+    pk = q("SELECT COUNT(*) FROM sys.tables t JOIN sys.schemas s ON s.schema_id = t.schema_id WHERE s.name = 'process'")[0][0]
+    pcls = dict(q("SELECT ep.value, COUNT(*) FROM sys.tables t JOIN sys.schemas s ON s.schema_id = t.schema_id JOIN sys.extended_properties ep ON ep.major_id = t.object_id AND ep.minor_id = 0 AND ep.name = N'PnC.TemporalClass' WHERE s.name = 'process' GROUP BY ep.value"))
+    check(pk == 34 and pcls.get("Versioned") == 11 and pcls.get("AppendOnly") == 1 and pcls.get("Registry") == 11, f"process schema: 12 design tables (11 Versioned + 1 AppendOnly) with their registries ({pk} tables: {pcls})")
+    check(q("SELECT COUNT(*) FROM ref.DefinitionKind WHERE DefinitionKind = N'Program.Procedure' AND HasPayloadText = 1 AND IsActive = 1")[0][0] == 1, "Program.Procedure is a program definition kind")
+    eng = {r[0]: r[1] for r in q("SELECT FactName, Parameters FROM compliance.vFactCatalogue WHERE FactName IN (N'step.outcome', N'step.capture', N'work.outage_required', N'package.revision_count')")}
+    check(len(eng) == 4 and eng["step.capture"] == '["id","field"]', f"the engine's facts of PROCEDURE-ENGINE §7 are in the catalogue ({eng})")
+    # a workflow with an initial state, effective, so a procedure may advance it
+    W5 = "SMOKE_W3_" + uuid.uuid4().hex[:6].upper()
+    wf = ('{"g":1,"kind":"workflow","key":"' + W5 + '_WF","name":"smoke lifecycle","subjectKind":"WorkRequest",'
+          '"states":[{"code":"Open","name":"Open","initial":true},{"code":"Closed","name":"Closed","terminal":true}],'
+          '"transitions":[{"from":"Open","to":"Closed","name":"Close"}]}')
+    check(expect_error(cur, "EXEC process.ValidateWorkflowDocument @Canonical=?", wf.replace('"initial":true', '"initial":false'), contains="Exactly one state"), "ValidateWorkflowDocument refuses a workflow with no initial state (50131)")
+    check(expect_error(cur, "EXEC process.ValidateWorkflowDocument @Canonical=?", wf.replace('"to":"Closed"', '"to":"Gone"'), contains="declared states"), "ValidateWorkflowDocument refuses a transition to an undeclared state (50132)")
+    wfv = q("DECLARE @v UNIQUEIDENTIFIER, @n INT, @x BIT; EXEC process.AddWorkflowVersion @Canonical=?, @ChangeNote=N'smoke', @ActorId=?, @VersionRowId=@v OUTPUT, @VersionNumber=@n OUTPUT, @Existing=@x OUTPUT; SELECT @v, @n, @x", wf, SYSTEM_ACTOR)[0]
+    check(wfv[1] == 1 and wfv[2] == 0, "AddWorkflowVersion stores a Draft version 1")
+    wfv2 = q("DECLARE @v UNIQUEIDENTIFIER, @n INT, @x BIT; EXEC process.AddWorkflowVersion @Canonical=?, @ActorId=?, @VersionRowId=@v OUTPUT, @VersionNumber=@n OUTPUT, @Existing=@x OUTPUT; SELECT @v, @n, @x", wf, SYSTEM_ACTOR)[0]
+    check(lo(wfv2[0]) == lo(wfv[0]) and wfv2[2] == 1, "AddWorkflowVersion is idempotent on content (same hash → the same version, Existing = 1)")
+    cur.execute("EXEC config.ApproveDefinitionVersion @VersionRowId=?, @ActorId=?", wfv[0], a1)
+    # the procedure: two steps in a foreach member, one with a precondition and a branch exit; an advances; a call to a defined key
+    cur.execute("DECLARE @e UNIQUEIDENTIFIER; EXEC config.AddDefinition N'Program.Procedure', ?, N'smoke callee', @ActorId=?, @EntityId=@e OUTPUT", W5 + "_CALLEE", SYSTEM_ACTOR)
+    def proc(**over):
+        d = {"g": 1, "kind": "procedure", "key": W5 + "_P", "name": "smoke procedure", "subjectKind": "WorkRequest",
+             "roles": {"eng": {"role": over.get("role", "PCEngineer")}},
+             "body": {"block": "sequence", "id": "MAIN", "items": [
+                 {"block": "step", "id": "A", "title": "[1] a", "role": "eng", "record": {"kind": over.get("kind", "Finding")},
+                  "produces": {"kind": "SettingsIssuePackage", "as": "pkg"},
+                  "advances": {"workflow": over.get("wf", W5 + "_WF"), "subject": {"fact": "procedure.pkg"}, "transition": over.get("tr", "Close")}},
+                 {"block": "foreach", "id": "F", "over": {"fact": "step.capture", "p": {"id": {"lit": "A", "t": "text"}, "field": {"lit": "devices", "t": "text"}}}, "as": "device", "subjectKind": "Device", "join": "all",
+                  "body": {"block": "sequence", "items": [
+                      {"block": "step", "id": over.get("bid", "B"), "title": "[2] b", "role": "eng", "record": {"kind": "Finding"},
+                       "precondition": {"op": "=", "l": {"fact": "device.technology"}, "r": {"lit": "Microprocessor", "t": "text"}}},
+                      {"block": "step", "id": "C", "title": "[3] c", "role": "eng", "record": {"kind": "Finding"}, "outcomes": ["Done", "Out"],
+                       **({"branchOutcome": {"Out": "Superseded"}} if over.get("exit", True) else {})}]}},
+                 {"block": "call", "id": "K", "procedure": over.get("callee", W5 + "_CALLEE")},
+                 {"block": "step", "id": "D", "title": "[4] d", "role": "eng", "record": {"kind": "Finding"}, "due": {"cadence": {"cadence": "event", "within": {"lit": "30", "t": "dur", "u": "d"}}, "anchor": over.get("anchor", "A")}}]}}
+        return json.dumps(d)
+    for over, num, words in [({"bid": "A"}, 50121, "unique"), ({"role": "NoSuchRole"}, 50122, "active security.Role"), ({"kind": "NoSuchKind"}, 50123, "RecordKind"),
+                             ({"tr": "Reopen"}, 50125, "transitions"), ({"callee": "NO_SUCH_PROCEDURE"}, 50126, "Program.Procedure definition"),
+                             ({"anchor": "D"}, 50127, "earlier step"), ({"exit": False}, 50129, "branchOutcome")]:
+        check(expect_error(cur, "EXEC process.ValidateProcedureDocument @Canonical=?", proc(**over), contains=words), f"ValidateProcedureDocument refuses {over} ({num}: {words!a})")
+    pv = q("DECLARE @v UNIQUEIDENTIFIER, @n INT, @x BIT; EXEC process.AddProcedureVersion @Canonical=?, @ChangeNote=N'smoke', @ActorId=?, @VersionRowId=@v OUTPUT, @VersionNumber=@n OUTPUT, @Existing=@x OUTPUT; SELECT @v, @n, @x", proc(), SYSTEM_ACTOR)[0]
+    check(pv[1] == 1 and pv[2] == 0, "AddProcedureVersion stores a valid document as Draft version 1")
+    check(expect_error(cur, "EXEC process.ApproveProcedureVersion @VersionRowId=?, @ActorId=?", pv[0], SYSTEM_ACTOR, contains="segregation"), "ApproveProcedureVersion refuses the author (Author/Approve segregation)")
+    check(q("SELECT COUNT(*) FROM process.vProcedureStep WHERE DefinitionVersionRowId = ?", pv[0])[0][0] == 0, "no projection before approval")
+    cur.execute("EXEC process.ApproveProcedureVersion @VersionRowId=?, @ActorId=?", pv[0], a1)
+    st = q("SELECT StepId, BlockPath, RoleCode, HasPrecondition, AdvancesTransition, ProducesName FROM process.vProcedureStep WHERE DefinitionVersionRowId = ? ORDER BY Ordinal", pv[0])
+    check([r[0] for r in st] == ["A", "B", "C", "D"] and st[1][1] == "MAIN/F/B" and st[1][3] == 1 and st[0][4] == "Close" and st[0][5] == "pkg", f"approval projects the steps in document order with paths, flags and advances ({[(r[0], r[1]) for r in st]})")
+    check(q("SELECT COUNT(*) FROM process.vProcedureStepRole r JOIN process.vProcedureStep s ON s.RowId = r.ProcedureStepRowId WHERE s.DefinitionVersionRowId = ? AND r.RoleCode = N'PCEngineer'", pv[0])[0][0] == 4, "every projected step has its role row")
+    fu = sorted(tuple(r) for r in q("SELECT BlockPath, FactName FROM process.vProcedureFactUse WHERE DefinitionVersionRowId = ?", pv[0]))
+    check(("MAIN/F", "step.capture") in fu and ("MAIN/F/B", "device.technology") in fu and ("MAIN/A", "procedure.pkg") in fu, f"fact uses are attributed to the block that reads them ({fu})")
+    check([r[0] for r in q("SELECT CalleeKey FROM process.vProcedureCall WHERE DefinitionVersionRowId = ?", pv[0])] == [W5 + "_CALLEE"], "the call graph names the callee")
+    check(q("SELECT Status FROM config.vDefinitionVersion WHERE RowId = ?", pv[0])[0][0] == "Effective", "the approved procedure version is Effective")
+    cur.execute("EXEC process.ProjectProcedureVersion @VersionRowId=?, @ActorId=?", pv[0], SYSTEM_ACTOR)
+    live = q("SELECT COUNT(*) FROM process.vProcedureStep WHERE DefinitionVersionRowId = ?", pv[0])[0][0]
+    hist = q("SELECT COUNT(*) FROM process.vProcedureStepHistory WHERE DefinitionVersionRowId = ? AND IsDeleted = 1", pv[0])[0][0]
+    check(live == 4 and hist >= 4, f"re-projection replaces the rows softly: {live} live, {hist} retired in history")
+    check(expect_error(cur, "EXEC process.ProjectProcedureVersion @VersionRowId=?, @ActorId=?", wfv[0], SYSTEM_ACTOR, contains="Program.Procedure"), "ProjectProcedureVersion refuses a workflow version (50134)")
+    # cleanup (soft)
+    for kk in (W5 + "_WF", W5 + "_P", W5 + "_CALLEE"):
+        de = q("SELECT EntityId FROM config.vDefinition WHERE DefinitionKey=?", kk)[0][0]
+        cur.execute("EXEC config.Definition_SoftDelete @EntityId=?, @ActorId=?", de, SYSTEM_ACTOR)
+        cur.execute("UPDATE config.DefinitionVersion SET IsDeleted=1, DeletedBy=?, DeletedAt=SYSDATETIMEOFFSET() WHERE DefinitionEntityId=? AND IsDeleted=0", SYSTEM_ACTOR, de)
+
     # ---- privilege boundary: app_execute has no table SELECT
     tbl_grants = q("""SELECT COUNT(*) FROM sys.database_permissions p JOIN sys.database_principals r ON r.principal_id = p.grantee_principal_id
                       JOIN sys.objects o ON o.object_id = p.major_id WHERE r.name = 'app_execute' AND o.type = 'U' AND p.permission_name = 'SELECT'""")[0][0]

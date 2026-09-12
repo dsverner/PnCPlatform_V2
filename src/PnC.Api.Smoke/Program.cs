@@ -18,10 +18,10 @@ if (args.Length < 1) { Console.Error.WriteLine("usage: PnC.Api.Smoke <api base u
 var baseUrl = args[0].TrimEnd('/');
 var cs = args.Length > 1 && args[1] != "-" ? args[1] : null;
 var windows = args.FirstOrDefault(a => a.StartsWith("--windows="))?["--windows=".Length..];
-if (windows is not null and not ("Administrator" or "ReadOnly" or "Hydro")) { Console.Error.WriteLine("--windows must be Administrator, ReadOnly or Hydro"); return 2; }
+if (windows is not null and not ("Administrator" or "ReadOnly" or "Hydro" or "Approver")) { Console.Error.WriteLine("--windows must be Administrator, ReadOnly, Hydro or Approver"); return 2; }
 
 var systemActor = new Guid("00000000-0000-0000-0000-000000000001");
-var adminUpn = "smoke.admin@pnc.local"; var readUpn = "smoke.readonly@pnc.local"; var hydroUpn = "smoke.hydro@pnc.local";
+var adminUpn = "smoke.admin@pnc.local"; var readUpn = "smoke.readonly@pnc.local"; var hydroUpn = "smoke.hydro@pnc.local"; var approverUpn = "smoke.approver@pnc.local";
 const string HydroDivision = "Generation · Hydro", TransmissionDivision = "Transmission";
 int passed = 0, failed = 0, skipped = 0;
 void Check(bool ok, string what) { if (ok) { passed++; Console.WriteLine("  PASS " + what); } else { failed++; Console.WriteLine("  FAIL " + what); } }
@@ -38,6 +38,8 @@ HttpClient Client(string? upn)
 HttpClient? admin = windows is null || windows == "Administrator" ? Client(windows is null ? adminUpn : "self") : null;
 HttpClient? readOnly = windows is null || windows == "ReadOnly" ? Client(windows is null ? readUpn : "self") : null;
 HttpClient? hydro = windows is null || windows == "Hydro" ? Client(windows is null ? hydroUpn : "self") : null;
+// W3: a second Administrator, so approval by someone other than the author can be observed (Author/Approve segregation)
+HttpClient? approver = windows is null || windows == "Approver" ? Client(windows is null ? approverUpn : "self") : null;
 var anonymous = Client(null);
 var unknown = windows is null ? Client("nobody@pnc.local") : null;
 
@@ -103,6 +105,7 @@ if (windows is null)
     }
     await Ensure(adminUpn, "Administrator", "Admin", "Global", null);
     await Ensure(readUpn, "ReadOnly", "Reader", "Global", null);
+    await Ensure(approverUpn, "Administrator", "Approver", "Global", null);
     var hydroDiv = await DivisionId(HydroDivision);
     if (hydroDiv is null) { Console.Error.WriteLine($"division '{HydroDivision}' is not seeded on this database (Seed_location_Divisions.sql)"); return 2; }
     await Ensure(hydroUpn, "PCEngineer", "Hydro", "NodeSubtree", hydroDiv);
@@ -113,7 +116,7 @@ Console.WriteLine($"PnC.Api.Smoke against {baseUrl} ({(windows is null ? "DEV he
 // ======================================================================= W1 — the surface
 // 1. /health — the app ignores the identity, but in Windows mode IIS authenticates every caller first.
 {
-    var (st, b) = await Get(windows is null ? anonymous : (admin ?? readOnly ?? hydro)!, "health");
+    var (st, b) = await Get(windows is null ? anonymous : (admin ?? approver ?? readOnly ?? hydro)!, "health");
     Check(st == HttpStatusCode.OK && b?["database"]?.ToString() == "ok", $"/health database ok (release {b?["release"]}, environment {b?["environment"]})");
     Check(b?["release"] is not null, "/health reports a release");
 }
@@ -139,7 +142,7 @@ if (unknown is not null)
 else Skip("/me with an unknown identity (needs the DEV header)");
 
 // 4. /catalog
-var any = (admin ?? readOnly ?? hydro)!;
+var any = (admin ?? approver ?? readOnly ?? hydro)!;
 {
     var (st, b) = await Get(any, "api/v1/catalog");
     var schemas = (b?["schemas"] as JsonArray)?.Count ?? 0;
@@ -343,6 +346,149 @@ if (admin is not null)
         Check(st == HttpStatusCode.OK, $"cleanup {proc} {id} → {(int)st} {Code(b)} {b?["detail"]}");
     }
     if (fixtureOk) { var (ts, tb) = await Post(admin, "api/v1/ref/AssetType_Deactivate", new { AssetTypeCode = typeCode }); Check(ts == HttpStatusCode.OK, $"cleanup ref/AssetType_Deactivate {typeCode} → {(int)ts} {Code(tb)}"); }
+}
+
+// ======================================================================= W3 — definitions and the process schema
+// The three example documents of PROCEDURE-ENGINE.md load through the API, are approved by a second person, and project.
+// Idempotent: a document already stored (same canonical hash) answers existing=true; approval of an already Effective
+// version is refused by the database (50031 "Only Draft versions can be approved"), which the run treats as done.
+string Example(string name)
+{
+    using var st = typeof(Program).Assembly.GetManifestResourceStream("examples/" + name) ?? throw new InvalidOperationException("missing embedded " + name);
+    using var rd = new StreamReader(st); return rd.ReadToEnd();
+}
+string Short(JsonNode? b) { var d = b?["detail"]?.ToString() ?? ""; return d.Length > 80 ? d[..80] : d; }
+bool AlreadyApproved(JsonNode? b) => b?["sqlNumber"]?.GetValue<int>() == 50031;
+if (admin is not null)
+{
+    async Task<(HttpStatusCode, JsonNode?)> Load(string file) =>
+        await Post(admin, "api/v1/definitions/documents", new { document = JsonNode.Parse(Example(file)), changeNote = "W3 gate" });
+    async Task<(HttpStatusCode, JsonNode?)> Approve(HttpClient who, string rowId) => await Post(who, $"api/v1/definitions/documents/{rowId}/approve", new { });
+    string Errors(JsonNode? b) => b?["errors"] is JsonArray ea ? string.Join(" | ", ea.Select(x => x?["path"] + ": " + x?["message"])) : "";
+
+    // order: the lifecycle workflow (the procedure's advances need it Effective); the procedure (the request workflow names it); the request workflow
+    var (ls, lb) = await Load("settings-lifecycle.workflow.json");
+    Check(ls == HttpStatusCode.OK && lb?["versionRowId"] is not null, $"load SETTINGS_LIFECYCLE workflow → {(int)ls} {Code(lb)} {Errors(lb)} (version {lb?["versionNumber"]}, existing {lb?["existing"]})");
+    string? lifecycleRow = lb?["versionRowId"]?.ToString();
+    if (lifecycleRow is not null)
+    {
+        var (as1, ab1) = await Approve(admin, lifecycleRow);
+        Check(as1 == HttpStatusCode.Conflict, $"approve SETTINGS_LIFECYCLE as its author → 409 ({Short(ab1)})");
+        if (approver is not null)
+        {
+            var (as2, ab2) = await Approve(approver, lifecycleRow);
+            Check(as2 == HttpStatusCode.OK || AlreadyApproved(ab2), $"approve SETTINGS_LIFECYCLE as the second Administrator → {(int)as2} {Code(ab2)}");
+        }
+        else Skip("approve SETTINGS_LIFECYCLE (needs the Approver identity)");
+    }
+
+    var (ps, pb) = await Load("settings-change.procedure.json");
+    Check(ps == HttpStatusCode.OK && pb?["versionRowId"] is not null, $"load SETTINGS_CHANGE procedure → {(int)ps} {Code(pb)} {Errors(pb)} {Short(pb)} (version {pb?["versionNumber"]}, existing {pb?["existing"]})");
+    string? procRow = pb?["versionRowId"]?.ToString();
+
+    var (rs, rb) = await Load("settings-change.workflow.json");
+    Check(rs == HttpStatusCode.OK && rb?["versionRowId"] is not null, $"load SETTINGS_CHANGE_REQUEST workflow → {(int)rs} {Code(rb)} {Errors(rb)} {Short(rb)} (version {rb?["versionNumber"]}, existing {rb?["existing"]})");
+    if (rb?["versionRowId"]?.ToString() is { } reqRow && approver is not null)
+    {
+        var (as3, ab3) = await Approve(approver, reqRow);
+        Check(as3 == HttpStatusCode.OK || AlreadyApproved(ab3), $"approve SETTINGS_CHANGE_REQUEST as the second Administrator → {(int)as3} {Code(ab3)}");
+    }
+
+    if (procRow is not null)
+    {
+        var (as4, ab4) = await Approve(admin, procRow);
+        Check(as4 == HttpStatusCode.Conflict, $"approve SETTINGS_CHANGE as its author → 409 ({Short(ab4)})");
+        if (approver is not null)
+        {
+            var (as5, ab5) = await Approve(approver, procRow);
+            Check(as5 == HttpStatusCode.OK || AlreadyApproved(ab5), $"approve SETTINGS_CHANGE as the second Administrator → {(int)as5} {Code(ab5)} (projected {ab5?["projectedSteps"]})");
+        }
+        else Skip("approve SETTINGS_CHANGE (needs the Approver identity)");
+        // the projection — the design verification's counts: 14 steps, 4 advances, 1 call
+        var (ss, sb) = await Get(admin, $"api/v1/process/vProcedureStep?DefinitionVersionRowId={procRow}&take=100");
+        var steps = (sb?["rows"] as JsonArray) ?? new JsonArray();
+        // FR-3.1's fourteen numbered steps are fifteen step blocks plus one call: [4] has two variants (BUILD_SETTINGS /
+        // RECORD_SETTINGS, the electromechanical fork), RESOLVE_DIFFERENCE is unnumbered, and [14] is the call block.
+        Check(ss == HttpStatusCode.OK && steps.Count == 15, $"process/vProcedureStep holds 15 rows for SETTINGS_CHANGE — the 14 FR-3.1 steps as 15 step blocks + 1 call ({steps.Count})");
+        var numbered = steps.Select(r => r?["Title"]?.ToString() ?? "").Where(t => t.StartsWith('[')).Select(t => t[1..t.IndexOf(']')]).Distinct().Count();
+        Check(numbered == 13 && steps.Any(r => r?["StepId"]?.ToString() == "RESOLVE_DIFFERENCE"), $"the step titles carry FR-3.1 numbers [1]–[13] ({numbered} distinct; [14] is the call) plus the unnumbered RESOLVE_DIFFERENCE");
+        var advancing = steps.Count(r => r?["AdvancesTransition"] is not null);
+        Check(advancing == 4, $"4 steps advance the lifecycle workflow ({advancing})");
+        Check(steps.Count(r => r?["RequiresWitness"]?.GetValue<bool>() == true) == 1 && steps.Any(r => r?["StepId"]?.ToString() == "RETURN_TO_SERVICE" && r?["RequiresWitness"]?.GetValue<bool>() == true), "RETURN_TO_SERVICE is the one witnessed step");
+        var (cs1, cb1) = await Get(admin, $"api/v1/process/vProcedureCall?DefinitionVersionRowId={procRow}");
+        var calls = (cb1?["rows"] as JsonArray) ?? new JsonArray();
+        Check(cs1 == HttpStatusCode.OK && calls.Count == 1 && calls[0]?["CalleeKey"]?.ToString() == "DRAWING_REVISION", $"process/vProcedureCall: 1 call, to DRAWING_REVISION ({calls.Count})");
+        var (fs, fb) = await Get(admin, $"api/v1/process/vProcedureFactUse?DefinitionVersionRowId={procRow}&take=200");
+        var facts = ((fb?["rows"] as JsonArray) ?? new JsonArray()).Select(r => r?["FactName"]?.ToString()).Distinct().OrderBy(x => x).ToList();
+        Check(fs == HttpStatusCode.OK && facts.Contains("device.technology") && facts.Contains("step.outcome") && facts.Contains("work.outage_required") && facts.Contains("person.training_current"),
+              $"process/vProcedureFactUse indexes the facts the document reads ({string.Join(", ", facts)})");
+        var (rls, rlb) = await Get(admin, "api/v1/process/vProcedureStepRole?RoleCode=PCTechnician&take=100");
+        Check(rls == HttpStatusCode.OK && ((rlb?["rows"] as JsonArray) ?? new JsonArray()).Any(r => r?["RequiresAst"] is not null), "process/vProcedureStepRole carries the technician's competency expression as canonical AST");
+    }
+
+    // a document the grammar refuses is refused with its path; one the structure refuses, in the rule's words
+    var bad = (JsonObject)JsonNode.Parse(Example("settings-change.procedure.json"))!;
+    bad["key"] = "SMOKE_BAD"; ((JsonObject)bad["roles"]!["technician"]!)["requires"] = "person.training_current = 'yes'";
+    var (bs, bb) = await Post(admin, "api/v1/definitions/documents", new { document = bad });
+    Check(bs == HttpStatusCode.BadRequest && Code(bb) == "document_invalid" && (bb?["errors"] as JsonArray)?.Any(e => e?["path"]?.ToString() == "$.roles.technician.requires") == true,
+          $"a document whose expression fails the type check → 400 document_invalid at $.roles.technician.requires ({(bb?["errors"] as JsonArray)?[0]?["message"]})");
+    var bad2 = (JsonObject)JsonNode.Parse(Example("settings-change.procedure.json"))!;
+    bad2["key"] = "SMOKE_BAD2"; ((JsonObject)((JsonArray)bad2["body"]!["items"]!)[1]!)["id"] = "REQUEST";
+    var (b2s, b2b) = await Post(admin, "api/v1/definitions/documents", new { document = bad2 });
+    Check(b2s == HttpStatusCode.Conflict && b2b?["sqlNumber"]?.GetValue<int>() == 50121, $"a document with a duplicate block id → 409 in the rule's words ({Short(b2b)})");
+
+    // the live expression check
+    var (fcs, fcb) = await Post(admin, "api/v1/formula/check", new { expression = "value >= 0", env = new { value = new { type = "num" } } });
+    Check(fcs == HttpStatusCode.OK && fcb?["ok"]?.GetValue<bool>() == true && fcb?["type"]?.ToString() == "bool", $"formula/check: value >= 0 → {fcb?["type"]}");
+    var (fes, feb) = await Post(admin, "api/v1/formula/check", new { expression = "device.no_such_fact = 1" });
+    Check(fes == HttpStatusCode.OK && feb?["ok"]?.GetValue<bool>() == false && feb?["code"]?.ToString() == "unknown_fact", $"formula/check: an unknown fact → {feb?["code"]}");
+}
+else Skip("W3 definitions (needs the Administrator identity)");
+// A second person's approval, observable in every mode: the Administrator run authors a small distinct document (a
+// fresh Draft each run, its description carrying the run instant); the Approver run — a different Windows identity on
+// VM02, a different DEV-header user on the laptop — approves that key's latest Draft. Together the two runs show
+// Author ≠ Approver on the Windows path, which the example documents cannot once they are Effective.
+const string GateKey = "W3_GATE_APPROVAL";
+if (admin is not null)
+{
+    var gateDoc = new
+    {
+        g = 1, kind = "procedure", key = GateKey, name = "W3 gate: authored by one Administrator, approved by another", subjectKind = "WorkRequest",
+        description = $"authored {DateTimeOffset.UtcNow:O} by the gate's Administrator run; a fresh Draft each run",
+        roles = new { eng = new { role = "PCEngineer" } },
+        body = new { block = "sequence", id = "MAIN", items = new object[] {
+            new { block = "step", id = "ONE", title = "[1] one", role = "eng", record = new { kind = "Finding" } },
+            new { block = "step", id = "TWO", title = "[2] two", role = "eng", record = new { kind = "Finding" }, precondition = "step.outcome[id='ONE'] = 'Done'" } } }
+    };
+    var (gs, gb) = await Post(admin, "api/v1/definitions/documents", new { document = gateDoc, changeNote = "W3 gate" });
+    Check(gs == HttpStatusCode.OK && gb?["existing"]?.GetValue<bool>() == false, $"author a fresh {GateKey} Draft as the Administrator → {(int)gs} (version {gb?["versionNumber"]})");
+    if (gb?["versionRowId"]?.ToString() is { } gRow)
+    {
+        var (gas, gab) = await Post(admin, $"api/v1/definitions/documents/{gRow}/approve", new { });
+        Check(gas == HttpStatusCode.Conflict && (gab?["detail"]?.ToString().Contains("segregation", StringComparison.OrdinalIgnoreCase) ?? false), $"the author cannot approve it → 409 segregation");
+    }
+}
+if (approver is not null)
+{
+    // the latest Draft of the gate key, whoever authored it (the Administrator run, moments ago)
+    var (dfs, dfb) = await Get(approver, $"api/v1/config/vDefinition?DefinitionKey={GateKey}");
+    var defId = (dfb?["rows"] as JsonArray)?.FirstOrDefault()?["EntityId"]?.ToString();
+    var (ds, db) = await Get(approver, $"api/v1/config/vDefinitionVersion?DefinitionEntityId={defId}&Status=Draft&take=100");
+    var draft = (db?["rows"] as JsonArray)?.OrderByDescending(r => r?["VersionNumber"]?.GetValue<int>() ?? 0).FirstOrDefault();
+    Check(ds == HttpStatusCode.OK && draft is not null, $"a {GateKey} Draft authored by the Administrator run is waiting ({draft?["VersionNumber"]})");
+    if (draft?["RowId"]?.ToString() is { } dRow)
+    {
+        var (aps, apb) = await Post(approver, $"api/v1/definitions/documents/{dRow}/approve", new { });
+        Check(aps == HttpStatusCode.OK && apb?["projectedSteps"]?.GetValue<int>() == 2, $"approve it as the second Administrator → {(int)aps} {Code(apb)} (projected {apb?["projectedSteps"]})");
+        var (vs, vb) = await Get(approver, $"api/v1/config/vDefinitionVersion?RowId={dRow}");
+        var row = (vb?["rows"] as JsonArray)?.FirstOrDefault();
+        Check(row?["Status"]?.ToString() == "Effective" && row?["ApprovedBy"]?.ToString() != row?["CreatedBy"]?.ToString(), $"the version is Effective with ApprovedBy ≠ CreatedBy (author {row?["CreatedBy"]?.ToString()?[..8]}…, approver {row?["ApprovedBy"]?.ToString()?[..8]}…)");
+    }
+}
+if (readOnly is not null)
+{
+    var (rs2, rb2) = await Post(readOnly, "api/v1/definitions/documents", new { document = JsonNode.Parse(Example("settings-lifecycle.workflow.json")) });
+    Check(rs2 == HttpStatusCode.Forbidden && Code(rb2) == "forbidden", "load a document as ReadOnly → 403 forbidden");
 }
 
 Console.WriteLine($"SMOKE {(failed == 0 ? "PASS" : "FAIL")}: {passed} passed, {failed} failed, {skipped} skipped");

@@ -95,7 +95,7 @@ Twenty schemas. For each: what it owns, its size, the requirement it serves, and
 |---|---:|---:|---|---|---|
 | `config` | 11 | 59 600 | The definition engine: `Definition` / `DefinitionVersion` / `DefinitionAppliesTo` (17 kinds, 1 821 definitions). `CharacteristicDefinition` (23 386). `SettingDefinition`, `StandardSettingEntry`, `EnumerationValue`, `TransformMapping`, `ReadLoggedClass` | FR-1.1, FR-1.3 | **carry** — except `TestPlanStep` and `TestPlanReading`, which are **replaced** |
 | `work` | 9 | 47 616 | `WorkRequest` (11 879), `WorkRequestCascadeLink`, `CascadeWorkOrder`, `Notification` / `NotificationDelivery`, `Subscription` | FR-5.1 | **carry** — except `WorkflowInstance` and `WorkflowTransition`, which are **replaced** |
-| **`process`** | 12 | 0 | **New — designed, not built.** Projections from approval: `ProcedureStep`, `ProcedureStepRole`, `ProcedureFactUse`, `ProcedureCall`. Runtime: `WorkflowInstance`, `WorkflowTransition` (re-homed), `ProcedureInstance`, `InstanceVersionSet`, `BlockInstance`, `StepInstance`, `HoldInstance`, `InstanceMigration` | FR-1.x, FR-2.x | **new** — `docs/design/PROCEDURE-ENGINE.md` §4 |
+| **`process`** | 12 | 0 | **New — built in W3 (decision #100), nothing imported.** Projections from approval: `ProcedureStep`, `ProcedureStepRole`, `ProcedureFactUse`, `ProcedureCall`. Runtime: `WorkflowInstance`, `WorkflowTransition` (re-homed), `ProcedureInstance`, `InstanceVersionSet`, `BlockInstance`, `StepInstance`, `HoldInstance`, `InstanceMigration` | FR-1.x, FR-2.x | **new** — `docs/design/PROCEDURE-ENGINE.md` §4 |
 
 ### The application code — not carried
 

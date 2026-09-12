@@ -22,7 +22,19 @@ USING (VALUES
     (N'VulnerabilityAssessment',     N'Vulnerability assessment (§12.10)'),
     (N'TrainingAttendance',          N'Training attendance (§11.6)'),
     (N'LayerReconciliation',         N'Layer reconciliation session: an external model aligned with the physical model (§13.1, 189)'),
-    (N'LayerMatchCandidate',         N'Proposed physical endpoint for a layer node, accepted by a person before it is applied (§13.1, 189)')
+    (N'LayerMatchCandidate',         N'Proposed physical endpoint for a layer node, accepted by a person before it is applied (§13.1, 189)'),
+    -- PROCEDURE-ENGINE §3 (#42): every step produces a record; the kinds the SETTINGS_CHANGE example names, seeded with it (W3)
+    (N'RequestConfirmation',         N'Request confirmation (settings change step 1; produces the settings-issue package, #52)'),
+    (N'ScopeDecision',               N'Scope and design decision (step 2)'),
+    (N'Study',                       N'Study or calculation (step 3)'),
+    (N'ConfigurationFileRevision',   N'Configuration-file revision committed into the settings book (step 4, §5.1)'),
+    (N'Rationale',                   N'Rationale document (step 5)'),
+    (N'EngineeringCheck',            N'Independent engineering check (step 6)'),
+    (N'Approval',                    N'Formal approval of a settings-issue package (step 7)'),
+    (N'SettingsIssue',               N'Issue to the field (step 8)'),
+    (N'FieldApplication',            N'Settings applied to the relay (step 9)'),
+    (N'ReturnToService',             N'Return to service declared, witnessed (step 12)'),
+    (N'Baseline',                    N'Record filed as the in-service baseline (step 13)')
 ) AS s ([RecordKindCode], [Name])
 ON t.[RecordKindCode] = s.[RecordKindCode]
 WHEN MATCHED AND t.[Name] <> s.[Name] THEN UPDATE SET [Name] = s.[Name], [ModifiedBy] = @actor, [ModifiedAt] = @now

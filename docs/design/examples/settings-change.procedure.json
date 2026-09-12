@@ -3,13 +3,13 @@
   "kind": "procedure",
   "key": "SETTINGS_CHANGE",
   "name": "Relay settings change",
-  "description": "v0.2. The fourteen-step path of REQUIREMENTS.md FR-3.1 as one authored procedure. Changes from v0.1: the package is produced by step 1 (#52); the build step forks on device technology so electromechanical relays record typed settings instead of a file (#50); a readback difference resolved by raising a change ends that relay's branch as Superseded (#51); the completion block has two tracks, the legacy software track being dropped (#58). Expressions are grammar-1 text; on approval the engine stores their canonical AST. Role codes are placeholders (OQ-18).",
+  "description": "v0.2. The fourteen-step path of REQUIREMENTS.md FR-3.1 as one authored procedure. Changes from v0.1: the package is produced by step 1 (#52); the build step forks on device technology so electromechanical relays record typed settings instead of a file (#50); a readback difference resolved by raising a change ends that relay's branch as Superseded (#51); the completion block has two tracks, the legacy software track being dropped (#58). Expressions are grammar-1 text; on approval the engine stores their canonical AST. Role codes are placeholders (OQ-18). W3 (2026-09-12): person.training_current takes a module parameter in the fact catalogue (PROCEDURES.md #35), so the technician's competency names one; PC_FIELD_SETTINGS is a placeholder module code until the training modules are seeded (W7) — until then the fact is Unknown and the person is refused, which is the fail-closed reading of FORMULA-GRAMMAR §5.",
   "subjectKind": "WorkRequest",
   "roles": {
     "engineer":   { "role": "PCEngineer" },
     "checker":    { "role": "PCEngineer" },
     "approver":   { "role": "PCApprover" },
-    "technician": { "role": "PCTechnician", "requires": "person.training_current = true" }
+    "technician": { "role": "PCTechnician", "requires": "person.training_current[module='PC_FIELD_SETTINGS'] = true" }
   },
   "outcomes": ["Completed", "Cancelled"],
   "body": {

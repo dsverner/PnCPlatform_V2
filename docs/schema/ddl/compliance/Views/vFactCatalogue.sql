@@ -56,7 +56,24 @@ FROM (VALUES
     (N'platform.release',        N'Fixed', N'platform.release',        NULL, N'platform',   N'vDeployment',           N'ReleaseId',        N'Text',        NULL, N'Platform',           N'AppendOnly', NULL, NULL, NULL),
     (N'platform.baseline',       N'Fixed', N'platform.baseline',       NULL, N'platform',   N'vRelease',              N'ReleaseId',        N'Reference',   NULL, N'Platform',           N'AppendOnly', NULL, N'Release', NULL),
     (N'operation.lightning_nearby', N'Fixed', N'operation.lightning_nearby', NULL, N'event', N'vLightningStrike',     N'StrikeId',         N'Set',         NULL, N'ProtectionOperation', N'AppendOnly', NULL, N'LightningStrike', N'["km","minutes"]'),
-    (N'operation.lightning_count',  N'Fixed', N'operation.lightning_count',  NULL, N'event', N'vLightningStrike',     N'StrikeId',         N'Integer',     NULL, N'ProtectionOperation', N'AppendOnly', NULL, NULL, N'["km","minutes"]')
+    (N'operation.lightning_count',  N'Fixed', N'operation.lightning_count',  NULL, N'event', N'vLightningStrike',     N'StrikeId',         N'Integer',     NULL, N'ProtectionOperation', N'AppendOnly', NULL, NULL, N'["km","minutes"]'),
+    -- PROCEDURE-ENGINE §7 "Facts the engine publishes" (#67), entered in W3 so a canonical procedure document passes
+    -- compliance.ValidateProgramFacts; the reads (compliance.fFactRead) arrive with the interpreter in W4 (decision #101).
+    -- step.capture takes its type from the document (DataType Any here; the checker types it from the document).
+    -- procedure.<name> (a produces.as) and input.<name> are document-declared names: not rows here — ValidateProgramFacts
+    -- passes those prefixes for a Program.Procedure and process.ValidateProcedureDocument checks them against the document.
+    -- Parameters list what the checker requires; pass= and member= (optional in §7) arrive with the interpreter (W4).
+    (N'step.state',             N'Engine', N'step.state',             NULL, N'process', N'vStepInstance',       N'State',       N'Text',      NULL, N'ProcedureInstance',   N'Versioned', NULL, NULL,      N'["id"]'),
+    (N'step.outcome',           N'Engine', N'step.outcome',           NULL, N'process', N'vStepInstance',       N'Outcome',     N'Text',      NULL, N'ProcedureInstance',   N'Versioned', NULL, NULL,      N'["id"]'),
+    (N'step.committed_at',      N'Engine', N'step.committed_at',      NULL, N'process', N'vStepInstance',       N'CommittedAt', N'DateTime',  NULL, N'ProcedureInstance',   N'Versioned', NULL, NULL,      N'["id"]'),
+    (N'step.committed_by',      N'Engine', N'step.committed_by',      NULL, N'process', N'vStepInstance',       N'CommittedByActorId', N'Reference', NULL, N'ProcedureInstance', N'Versioned', NULL, N'Actor', N'["id"]'),
+    (N'step.capture',           N'Engine', N'step.capture',           NULL, N'process', N'vStepInstance',       N'Draft',       N'Any',       NULL, N'ProcedureInstance',   N'Versioned', NULL, NULL,      N'["id","field"]'),
+    (N'branch.outcome',         N'Engine', N'branch.outcome',         NULL, N'process', N'vBlockInstance',      N'Outcome',     N'Text',      NULL, N'ProcedureInstance',   N'Versioned', NULL, NULL,      N'["id"]'),
+    (N'procedure.outcome',      N'Engine', N'procedure.outcome',      NULL, N'process', N'vProcedureInstance',  N'Outcome',     N'Text',      NULL, N'ProcedureInstance',   N'Versioned', NULL, NULL,      NULL),
+    (N'work.outage_required',   N'Fixed',  N'work.outage_required',   NULL, N'work',    N'vWorkRequest',        N'OutageRequired',      N'Boolean',  NULL, N'WorkRequest',      N'ValidTime', NULL, NULL,      NULL),
+    (N'work.outage_window_start', N'Fixed', N'work.outage_window_start', NULL, N'work',  N'vWorkRequest',        N'OutageWindowStartAt', N'DateTime', NULL, N'WorkRequest',      N'ValidTime', NULL, NULL,      NULL),
+    (N'package.revisions',      N'Engine', N'package.revisions',      NULL, N'document', N'vSettingsIssuePackageItem', N'RevisionRowId', N'Set', NULL, N'SettingsIssuePackage', N'ValidTime', NULL, N'ConfigurationFileRevision', NULL),
+    (N'package.revision_count', N'Engine', N'package.revision_count', NULL, N'document', N'vSettingsIssuePackageItem', N'RevisionRowId', N'Integer', NULL, N'SettingsIssuePackage', N'ValidTime', NULL, NULL, NULL)
 ) AS f ([FactName], [FactSource], [FactKey], [DefinitionEntityId], [SourceSchema], [SourceObject], [SourceColumn], [DataType], [UnitCode], [SubjectKind], [TemporalClass], [PublishedByDefinitionVersionRowId], [ReferenceKind], [Parameters])
 UNION ALL
 SELECT N'station.classification.' + k.[ClassificationKindCode], N'Fixed', N'station.classification.' + k.[ClassificationKindCode], NULL,

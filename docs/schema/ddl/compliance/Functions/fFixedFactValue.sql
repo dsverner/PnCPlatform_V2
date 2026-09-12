@@ -37,6 +37,13 @@ BEGIN
         SELECT TOP (1) @v = cf.[AnsiCode] FROM [scheme].[CommissionedFunction] cf
         WHERE cf.[ProtectionFunctionNodeEntityId] = @subjectEntityId AND cf.[IsDeleted] = 0 AND cf.[ValidFrom] <= @at AND (cf.[ValidTo] IS NULL OR cf.[ValidTo] > @at)
         ORDER BY cf.[IsPrincipal] DESC, cf.[ValidFrom] DESC, cf.[RowSeq] DESC;
+    ELSE IF @factName IN (N'work.outage_required', N'work.outage_window_start')
+        -- PROCEDURE-ENGINE §7 (W3): the work request's own outage columns; DateTime as ISO 8601 text like the platform facts
+        SELECT TOP (1) @v = CASE @factName WHEN N'work.outage_required' THEN CASE w.[OutageRequired] WHEN 1 THEN N'true' ELSE N'false' END
+                                           ELSE CONVERT(NVARCHAR(40), w.[OutageWindowStartAt], 127) END
+        FROM [work].[WorkRequest] w
+        WHERE w.[EntityId] = @subjectEntityId AND w.[IsDeleted] = 0 AND w.[ValidFrom] <= @at AND (w.[ValidTo] IS NULL OR w.[ValidTo] > @at)
+        ORDER BY w.[ValidFrom] DESC, w.[RowSeq] DESC;
     ELSE IF @factName LIKE N'station.classification.%' OR @factName LIKE N'line.classification.%'
         SELECT TOP (1) @v = c.[ClassificationValue] FROM [asset].[Classification] c
         WHERE c.[SubjectEntityId] = @subjectEntityId

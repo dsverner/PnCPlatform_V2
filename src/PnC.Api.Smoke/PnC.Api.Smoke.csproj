@@ -16,4 +16,9 @@
     <PackageReference Include="Microsoft.Data.SqlClient" Version="6.0.2" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- W3: the three example documents of docs/design/examples are the gate's fixture, embedded so the exe is self-contained on the OT hosts -->
+    <EmbeddedResource Include="..\..\docs\design\examples\*.json" LogicalName="examples/%(Filename)%(Extension)" />
+  </ItemGroup>
+
 </Project>

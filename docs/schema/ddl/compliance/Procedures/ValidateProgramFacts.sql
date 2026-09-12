@@ -12,7 +12,10 @@ BEGIN
     SELECT @missing = STRING_AGG(f.[FactName], N', ')
     FROM [compliance].[fPayloadFactNames](@PayloadText) f
     LEFT JOIN [compliance].[vFactCatalogue] c ON c.[FactName] = f.[FactName]
-    WHERE c.[FactName] IS NULL;
+    WHERE c.[FactName] IS NULL
+      -- PROCEDURE-ENGINE §7 (W3): procedure.<name> and input.<name> are declared by the procedure document itself;
+      -- process.ValidateProcedureDocument checks them against its produces and inputs
+      AND NOT (@DefinitionKind = N'Program.Procedure' AND (f.[FactName] LIKE N'procedure.%' OR f.[FactName] LIKE N'input.%'));
     IF @missing IS NOT NULL
     BEGIN
         DECLARE @msg NVARCHAR(MAX) = N'Program references facts not in the catalogue: ' + @missing;

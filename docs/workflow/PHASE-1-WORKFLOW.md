@@ -257,6 +257,32 @@ verification's (14 steps, 4 `advances`, 1 `call`); approval by the author is ref
 
 **Depends on.** W0, W1, W2. **Estimate.** B1: 16–24 h · B2: 12–20 h.
 
+**Gate record — 2026-09-12, observed on `PnCPlatform_V2_DEV` and on VGS-VM02 as release 0.3.0.**
+- Schema: the `process` schema — 12 design tables (11 `Versioned`, `WorkflowTransition` `AppendOnly`) with their
+  registries, generated views and procedures; `fProcedureBlocks` / `fExpressionSites`; the five hand-written procedures
+  (`ValidateProcedureDocument`, `ValidateWorkflowDocument`, `AddProcedureVersion`, `AddWorkflowVersion`,
+  `ApproveProcedureVersion` → `ProjectProcedureVersion`); `Program.Procedure`; eleven record kinds; three subject kinds;
+  the engine's facts in the catalogue (#101); the two electromechanical templates (#104). `deploy.py` green,
+  `check_generated.py` current, schema smoke **268 PASS, 0 FAIL** (24 new, decision #100); release **0.3.0** recorded.
+- API: `POST /api/v1/definitions/documents`, `…/{versionRowId}/approve`, `POST /api/v1/formula/check` (API.md §8a);
+  `process` in the catalogue and the permission map (`Definition.Modify` / `.Approve`). DEV-header smoke on the laptop
+  **73 PASS, 0 FAIL**: the three example documents load (schema-validated, every expression parsed, type-checked and
+  canonicalised), the author's approval is refused (409, segregation), the second Administrator's succeeds, and
+  **`process.vProcedureStep` holds 15 rows for `SETTINGS_CHANGE`** — the fourteen FR-3.1 steps as fifteen step blocks
+  plus one call (#103) — with **4 `advances`**, **1 `call`** to `DRAWING_REVISION`, the technician's competency as
+  canonical AST on every technician step, and 17 fact uses attributed to the blocks that read them. A document whose
+  expression fails the type check → 400 with the path; a duplicate block id → 409 in the rule's words; ReadOnly → 403.
+- Windows mode on VM02 (0.3.0 deployed through the guest agent, `/health` → `release 0.3.0, database ok`), four gate
+  accounts (#105): **admin 49 PASS**, **approver 8 PASS**, **read-only 10 PASS**, **hydro 6 PASS**, 0 FAIL. The
+  Administrator run authored `W3_GATE_APPROVAL` v3; the Approver run approved it: `ApprovedBy ≠ CreatedBy`, verified
+  by query as `pnc-gate-admin` / `pnc-gate-approver`. The approver's SID registered on first sign-in (#95).
+- Found on the way, all recorded: the design example lacked the `module` parameter the catalogue requires (#103);
+  OPENJSON `key` columns are `Latin1_General_BIN2` and every comparison with document text needs
+  `COLLATE DATABASE_DEFAULT`; the smoke crashed in a mode with no fallback identity (fixed).
+- **Not done in W3, by design:** no interpreter runs anything (W4); `fFactRead` has no reader for the `Engine` facts
+  (W4); `document.ConfigurationFile.FileKind` has no `SettingsText` value yet, which §5.1's text-file commit needs (W4);
+  the training modules behind `person.training_current` are unseeded (W7); the per-model field sets are W7's card.
+
 ### W4 — The interpreter
 
 **Builds.** Workflow instances, transitions and guard evaluation, with `onEnter.startProcedure`
