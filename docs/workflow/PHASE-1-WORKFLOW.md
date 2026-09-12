@@ -147,6 +147,15 @@ as Administrator.
   no credentials → IIS 401. The host reports environment **QA**: a machine-level
   `ASPNETCORE_ENVIRONMENT=QA` exists on VM02 (where the predecessor set it was not recorded).
   **Still owed:** the VM07 vantage point as VGS01 and VGS99 (browser, then the smoke).
+- **Observed from VGS-VM07 as VGS01, 2026-09-11 (owner's screenshot).** Edge first refused the correct
+  password: the site lacked `useAppPoolCredentials`, which the predecessor's site has (Kerberos tickets
+  for the service-account SPN); set, and the page loaded. Shown: *Environment QA · Release 0.1.0 ·
+  Database ok · Catalogue loaded 2026-09-11 10:17:58 p.m. · Person VGS01 · Account VGS01@vgsot.internal
+  · Grants Administrator (Global) · 21 schemas · 495 procedures · 375 views* with permission codes.
+  495, not the laptop's 497: `app_execute` cannot see the two `platform` procedures — consistent with
+  348a631. Gate items met from VM07: `/health` reports the release; `/me` as VGS01; `/catalog` lists the
+  schemas. **Still owed:** `/me` as VGS99, one view read as ReadOnly, one write refused as ReadOnly and
+  allowed as Administrator — the smoke runs.
 
 ### W2 — Identity, roles, scopes
 
