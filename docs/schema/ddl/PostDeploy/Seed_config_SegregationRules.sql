@@ -24,3 +24,27 @@ BEGIN
     EXEC [config].[ApproveDefinitionVersion] @VersionRowId = @verRowId, @ActorId = @approver;
 END
 GO
+-- W4 (decision #110): the procedure engine evaluates signoff.action against the procedure instance as subject
+-- (PROCEDURE-ENGINE §5 action 5), instance-wide (§3: "any of three engineers who calculated any of eleven devices is
+-- barred from the check"). Version 2 of DefaultSegregation adds the pairs the SETTINGS_CHANGE example commits with,
+-- WarnAndLog (the design default). Idempotent on content: added only when no version carries this payload.
+DECLARE @author2   UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000001';
+DECLARE @approver2 UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000002';
+DECLARE @payload2 NVARCHAR(MAX) = N'{"rules":[' +
+    N'{"actionA":"Prepare","actionB":"Approve","subjectKind":"ConfigurationFileRevision","mode":"WarnAndLog"},' +
+    N'{"actionA":"Author","actionB":"Approve","subjectKind":"DefinitionVersion","mode":"WarnAndLog"},' +
+    N'{"actionA":"Test","actionB":"Accept","subjectKind":"Record","mode":"WarnAndLog"},' +
+    N'{"actionA":"Calculate","actionB":"Check","subjectKind":"ProcedureInstance","mode":"WarnAndLog"},' +
+    N'{"actionA":"Check","actionB":"Approve","subjectKind":"ProcedureInstance","mode":"WarnAndLog"},' +
+    N'{"actionA":"Calculate","actionB":"Approve","subjectKind":"ProcedureInstance","mode":"WarnAndLog"}]}';
+-- Apply/Test is NOT a pair: the example's technician applies and tests the same relay (FR-3.1 steps 9 and 11, one role).
+IF NOT EXISTS (SELECT 1 FROM [config].[Definition] d JOIN [config].[DefinitionVersion] dv ON dv.[DefinitionEntityId] = d.[EntityId] AND dv.[IsDeleted] = 0
+               WHERE d.[DefinitionKind] = N'Program.SegregationRule' AND d.[DefinitionKey] = N'DefaultSegregation' AND d.[IsDeleted] = 0
+                 AND dv.[PayloadHash] = HASHBYTES('SHA2_256', @payload2))
+BEGIN
+    DECLARE @v2 UNIQUEIDENTIFIER, @n2 INT;
+    EXEC [config].[AddDefinitionVersion] @DefinitionKey = N'DefaultSegregation', @DefinitionKind = N'Program.SegregationRule',
+         @ChangeNote = N'W4: the procedure engine''s signoff pairs on ProcedureInstance (decision #110)', @PayloadText = @payload2, @ActorId = @author2, @VersionRowId = @v2 OUTPUT, @VersionNumber = @n2 OUTPUT;
+    EXEC [config].[ApproveDefinitionVersion] @VersionRowId = @v2, @ActorId = @approver2;
+END
+GO

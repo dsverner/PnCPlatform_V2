@@ -84,6 +84,10 @@ def main():
         return doc
 
     def evaluate(text, subj, env=None):
+        # W4 (2026-09-12): the predecessor CLI evaluates at the laptop's clock, measured 0.7 s behind VM01's; a fact read
+        # in the same second as the row it depends on was written came back Unknown on three different checks in
+        # three deploys (never the same one twice). One second of patience before each evaluation removes the race.
+        time.sleep(1.0)
         """One expression, as compliance.fEvalNode answered it — the grammar's typed value JSON."""
         return engine("eval", FG.canonical(FG.parse(text), root=False), str(subj) if subj else "-", env or "-")
     ev = evaluate          # a later wave rebinds `ev` to a query result; `evaluate` is never rebound
@@ -1380,7 +1384,7 @@ def main():
     check(pk == 34 and pcls.get("Versioned") == 11 and pcls.get("AppendOnly") == 1 and pcls.get("Registry") == 11, f"process schema: 12 design tables (11 Versioned + 1 AppendOnly) with their registries ({pk} tables: {pcls})")
     check(q("SELECT COUNT(*) FROM ref.DefinitionKind WHERE DefinitionKind = N'Program.Procedure' AND HasPayloadText = 1 AND IsActive = 1")[0][0] == 1, "Program.Procedure is a program definition kind")
     eng = {r[0]: r[1] for r in q("SELECT FactName, Parameters FROM compliance.vFactCatalogue WHERE FactName IN (N'step.outcome', N'step.capture', N'work.outage_required', N'package.revision_count')")}
-    check(len(eng) == 4 and eng["step.capture"] == '["id","field"]', f"the engine's facts of PROCEDURE-ENGINE §7 are in the catalogue ({eng})")
+    check(len(eng) == 4 and eng["step.capture"] == '["id","field","pass?","member?"]', f"the engine's facts of PROCEDURE-ENGINE §7 are in the catalogue, pass= and member= optional ({eng})")
     # a workflow with an initial state, effective, so a procedure may advance it
     W5 = "SMOKE_W3_" + uuid.uuid4().hex[:6].upper()
     wf = ('{"g":1,"kind":"workflow","key":"' + W5 + '_WF","name":"smoke lifecycle","subjectKind":"WorkRequest",'

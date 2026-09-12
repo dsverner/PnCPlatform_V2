@@ -25,27 +25,27 @@ BEGIN
            @capture = [CaptureKind], @diff = [DifferentialRecordEntityId], @ps = [ParseStatus], @pe = [ParseError], @sg = [SettingsGroupCount]
     FROM [document].[vConfigurationFile] WHERE [RevisionRowId] = @RevisionRowId;
     IF @kind IS NULL THROW 50244, N'document.SetInService: the revision carries no current configuration file.', 1;
-    IF @kind <> N'NativeSettings' OR @device IS NULL THROW 50245, N'document.SetInService: only a NativeSettings file of a device has an in-service period (§8.3).', 1;
+    IF @kind NOT IN (N'NativeSettings', N'SettingsText') OR @device IS NULL THROW 50245, N'document.SetInService: only a settings file (NativeSettings or SettingsText, #61) of a device has an in-service period (§8.3).', 1;
     IF @from IS NOT NULL AND @to IS NULL THROW 50246, N'document.SetInService: the revision is already in service.', 1;
 
     DECLARE @priorRev UNIQUEIDENTIFIER, @priorFrom DATETIMEOFFSET(7);
     SELECT @priorRev = [RevisionRowId], @priorFrom = [InServiceFrom]
     FROM [document].[vConfigurationFile]
-    WHERE [DeviceEntityId] = @device AND [FileKind] = N'NativeSettings' AND [InServiceFrom] IS NOT NULL AND [InServiceTo] IS NULL AND [RevisionRowId] <> @RevisionRowId;
+    WHERE [DeviceEntityId] = @device AND [FileKind] IN (N'NativeSettings', N'SettingsText') AND [InServiceFrom] IS NOT NULL AND [InServiceTo] IS NULL AND [RevisionRowId] <> @RevisionRowId;
     IF @priorFrom IS NOT NULL AND @priorFrom >= @InServiceFrom
         THROW 50247, N'document.SetInService: the new period must start after the prior period began.', 1;
 
     BEGIN TRANSACTION;
     IF @priorRev IS NOT NULL
     BEGIN
-        DECLARE @pModel UNIQUEIDENTIFIER, @pFw UNIQUEIDENTIFIER, @pCapture NVARCHAR(20), @pDiff UNIQUEIDENTIFIER, @pPs NVARCHAR(20), @pPe NVARCHAR(MAX), @pSg TINYINT, @pQ TINYINT;
-        SELECT @pModel = [ModelId], @pFw = [FirmwareVersionId], @pCapture = [CaptureKind], @pDiff = [DifferentialRecordEntityId], @pPs = [ParseStatus], @pPe = [ParseError], @pSg = [SettingsGroupCount], @pQ = [InServiceFromQuality]
+        DECLARE @pKind NVARCHAR(20), @pModel UNIQUEIDENTIFIER, @pFw UNIQUEIDENTIFIER, @pCapture NVARCHAR(20), @pDiff UNIQUEIDENTIFIER, @pPs NVARCHAR(20), @pPe NVARCHAR(MAX), @pSg TINYINT, @pQ TINYINT;
+        SELECT @pKind = [FileKind], @pModel = [ModelId], @pFw = [FirmwareVersionId], @pCapture = [CaptureKind], @pDiff = [DifferentialRecordEntityId], @pPs = [ParseStatus], @pPe = [ParseError], @pSg = [SettingsGroupCount], @pQ = [InServiceFromQuality]
         FROM [document].[vConfigurationFile] WHERE [RevisionRowId] = @priorRev;
-        EXEC [document].[ConfigurationFile_Update] @RevisionRowId = @priorRev, @DeviceEntityId = @device, @FileKind = N'NativeSettings', @ModelId = @pModel, @FirmwareVersionId = @pFw,
+        EXEC [document].[ConfigurationFile_Update] @RevisionRowId = @priorRev, @DeviceEntityId = @device, @FileKind = @pKind, @ModelId = @pModel, @FirmwareVersionId = @pFw,
              @CaptureKind = @pCapture, @InServiceFrom = @priorFrom, @InServiceTo = @InServiceFrom, @InServiceFromQuality = @pQ,
              @DifferentialRecordEntityId = @pDiff, @ParseStatus = @pPs, @ParseError = @pPe, @SettingsGroupCount = @pSg, @ActorId = @ActorId;
     END;
-    EXEC [document].[ConfigurationFile_Update] @RevisionRowId = @RevisionRowId, @DeviceEntityId = @device, @FileKind = N'NativeSettings', @ModelId = @model, @FirmwareVersionId = @fw,
+    EXEC [document].[ConfigurationFile_Update] @RevisionRowId = @RevisionRowId, @DeviceEntityId = @device, @FileKind = @kind, @ModelId = @model, @FirmwareVersionId = @fw,
          @CaptureKind = @capture, @InServiceFrom = @InServiceFrom, @InServiceTo = NULL, @InServiceFromQuality = @InServiceFromQuality,
          @DifferentialRecordEntityId = @diff, @ParseStatus = @ps, @ParseError = @pe, @SettingsGroupCount = @sg, @ActorId = @ActorId;
     COMMIT TRANSACTION;

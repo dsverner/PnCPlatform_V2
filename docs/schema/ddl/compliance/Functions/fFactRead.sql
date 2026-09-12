@@ -262,6 +262,71 @@ BEGIN
         RETURN @out;
     END
 
+    -- ------------------------------------------------------------------ the procedure engine's facts (PROCEDURE-ENGINE §7; W4, decision #107)
+    -- Subject: the ProcedureInstance (step.*, branch.*, procedure.outcome) or the settings-issue package revision (package.*).
+    -- Resolution scope (§7): member= and pass= name a foreach member (its subject id) and a repeat pass; the interpreter
+    -- supplies the current member and pass when the expression omits them and the reading block sits inside one, so
+    -- "the current member and the current pass first, then the enclosing instance" holds. Absent both: rows outside any
+    -- member first, then the latest committed.
+    IF @source = N'Engine'
+    BEGIN
+        DECLARE @sid NVARCHAR(64) = JSON_VALUE(@params, '$.id'), @member NVARCHAR(100) = JSON_VALUE(@params, '$.member'),
+                @pass INT = TRY_CONVERT(INT, JSON_VALUE(@params, '$.pass')), @field NVARCHAR(100) = JSON_VALUE(@params, '$.field');
+        IF @factName LIKE N'step.%'
+        BEGIN
+            DECLARE @stState NVARCHAR(40), @stOutcome NVARCHAR(40), @stAt DATETIMEOFFSET(7), @stBy UNIQUEIDENTIFIER, @stDraft NVARCHAR(MAX);
+            SELECT TOP (1) @stState = s.[State], @stOutcome = s.[Outcome], @stAt = s.[CommittedAt], @stBy = s.[CommittedByActorId], @stDraft = s.[Draft]
+            FROM [process].[StepInstance] s JOIN [process].[BlockInstance] b ON b.[EntityId] = s.[BlockInstanceEntityId] AND b.[IsDeleted] = 0
+            WHERE b.[ProcedureInstanceEntityId] = @subjectEntityId AND s.[IsDeleted] = 0 AND s.[StepId] = @sid
+              AND (@member IS NULL OR b.[IterationKey] = @member) AND (@pass IS NULL OR b.[Pass] = @pass)
+              AND (s.[CommittedAt] IS NULL OR s.[CommittedAt] <= @at)
+            ORDER BY CASE WHEN @member IS NULL AND b.[IterationKey] IS NULL THEN 0 ELSE 1 END, b.[Pass] DESC, s.[CommittedAt] DESC, s.[RowSeq] DESC;
+            IF @stState IS NULL RETURN @unk;
+            IF @factName = N'step.state' RETURN CONCAT(N'{"k":"text","v":"', STRING_ESCAPE(@stState, 'json'), N'"}');
+            IF @factName = N'step.outcome' RETURN CASE WHEN @stOutcome IS NULL THEN @unk ELSE CONCAT(N'{"k":"text","v":"', STRING_ESCAPE(@stOutcome, 'json'), N'"}') END;
+            IF @factName = N'step.committed_at' RETURN CASE WHEN @stAt IS NULL THEN @unk ELSE CONCAT(N'{"k":"date","v":"', CONVERT(NVARCHAR(40), @stAt, 127), N'"}') END;
+            IF @factName = N'step.committed_by' RETURN CASE WHEN @stBy IS NULL THEN @unk ELSE CONCAT(N'{"k":"ref","id":"', LOWER(CONVERT(NVARCHAR(36), @stBy)), N'","kind":"Actor"}') END;
+            IF @factName = N'step.capture'
+            BEGIN
+                -- typed by the document in the interpreter (DataType Any); here a best-effort reading of the draft value
+                IF @stDraft IS NULL OR @field IS NULL RETURN @unk;
+                DECLARE @cv NVARCHAR(MAX) = JSON_VALUE(@stDraft, '$."' + @field + '"'), @cq NVARCHAR(MAX) = JSON_QUERY(@stDraft, '$."' + @field + '"');
+                IF @cq IS NOT NULL AND LEFT(LTRIM(@cq), 1) = N'['
+                    RETURN CONCAT(N'{"k":"set","v":[', ISNULL((SELECT STRING_AGG(CASE WHEN TRY_CONVERT(UNIQUEIDENTIFIER, x.[value]) IS NOT NULL THEN CONCAT(N'{"k":"ref","id":"', LOWER(x.[value]), N'","kind":"Any"}') ELSE CONCAT(N'{"k":"text","v":"', STRING_ESCAPE(x.[value], 'json'), N'"}') END, N',') FROM OPENJSON(@cq) x), N''), N']}');
+                IF @cv IS NULL RETURN @unk;
+                IF @cv IN (N'true', N'false') RETURN CONCAT(N'{"k":"bool","v":', @cv, N'}');
+                IF TRY_CONVERT(DECIMAL(28,10), @cv) IS NOT NULL RETURN CONCAT(N'{"k":"num","v":"', [compliance].[fDecText](TRY_CONVERT(DECIMAL(28,10), @cv)), N'"}');
+                IF TRY_CONVERT(UNIQUEIDENTIFIER, @cv) IS NOT NULL RETURN CONCAT(N'{"k":"ref","id":"', LOWER(@cv), N'","kind":"Any"}');
+                RETURN CONCAT(N'{"k":"text","v":"', STRING_ESCAPE(@cv, 'json'), N'"}');
+            END
+            RETURN @unk;
+        END
+        IF @factName = N'branch.outcome'
+        BEGIN
+            DECLARE @bo NVARCHAR(40), @bs NVARCHAR(40);
+            SELECT TOP (1) @bo = b.[Outcome], @bs = b.[State] FROM [process].[BlockInstance] b
+            WHERE b.[ProcedureInstanceEntityId] = @subjectEntityId AND b.[IsDeleted] = 0
+              AND (b.[BlockPath] = @sid OR b.[BlockPath] LIKE N'%/' + @sid) AND (@member IS NULL OR b.[IterationKey] = @member)
+            ORDER BY CASE WHEN @member IS NULL AND b.[IterationKey] IS NULL THEN 0 ELSE 1 END, b.[Pass] DESC, b.[CompletedAt] DESC, b.[RowSeq] DESC;
+            IF @bs IS NULL OR @bo IS NULL RETURN @unk;
+            RETURN CONCAT(N'{"k":"text","v":"', STRING_ESCAPE(@bo, 'json'), N'"}');
+        END
+        IF @factName = N'procedure.outcome'
+        BEGIN
+            SELECT @v = [Outcome] FROM [process].[ProcedureInstance] WHERE [EntityId] = @subjectEntityId AND [IsDeleted] = 0;
+            RETURN CASE WHEN @v IS NULL THEN @unk ELSE CONCAT(N'{"k":"text","v":"', STRING_ESCAPE(@v, 'json'), N'"}') END;
+        END
+        IF @factName IN (N'package.revisions', N'package.revision_count')
+        BEGIN
+            IF @factName = N'package.revision_count'
+                RETURN CONCAT(N'{"k":"num","v":"', (SELECT COUNT(*) FROM [document].[SettingsIssuePackageItem] i WHERE i.[PackageRevisionRowId] = @subjectEntityId AND i.[IsDeleted] = 0 AND i.[ValidTo] IS NULL AND i.[ValidFrom] <= @at), N'"}');
+            SELECT @out = N'{"k":"set","v":[' + ISNULL(STRING_AGG(CONCAT(N'{"k":"ref","id":"', LOWER(CONVERT(NVARCHAR(36), i.[ConfigurationFileRevisionRowId])), N'","kind":"ConfigurationFileRevision"}'), N',') WITHIN GROUP (ORDER BY i.[Sequence]), N'') + N']}'
+            FROM [document].[SettingsIssuePackageItem] i WHERE i.[PackageRevisionRowId] = @subjectEntityId AND i.[IsDeleted] = 0 AND i.[ValidTo] IS NULL AND i.[ValidFrom] <= @at;
+            RETURN @out;
+        END
+        RETURN @unk;
+    END
+
     -- ------------------------------------------------------------------ plain column facts
     IF @source = N'Fixed'
         SET @v = [compliance].[fFixedFactValue](@subjectEntityId, @factName, @at);

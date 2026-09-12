@@ -18,7 +18,7 @@ CREATE TABLE [document].[ConfigurationFile] (
     [DeletedAt]         DATETIMEOFFSET(7) NULL,
     [MigrationRunId]    UNIQUEIDENTIFIER  NULL     CONSTRAINT [FK_ConfigurationFile_MigrationRun] REFERENCES [migration].[Run] ([RunId]),
     [DeviceEntityId]     UNIQUEIDENTIFIER NULL     CONSTRAINT [FK_ConfigurationFile_Device] REFERENCES [asset].[AssetRegistry] ([EntityId]),
-    [FileKind]           NVARCHAR(20)     NOT NULL CONSTRAINT [CK_ConfigurationFile_Kind] CHECK ([FileKind] IN (N'NativeSettings', N'Cid', N'Scd', N'Icd', N'Iid', N'Ssd', N'DfrConfig', N'PmuConfig', N'VendorProject')),
+    [FileKind]           NVARCHAR(20)     NOT NULL CONSTRAINT [CK_ConfigurationFile_Kind] CHECK ([FileKind] IN (N'NativeSettings', N'SettingsText', N'Cid', N'Scd', N'Icd', N'Iid', N'Ssd', N'DfrConfig', N'PmuConfig', N'VendorProject')),   -- SettingsText: the name=value text file of decision #61 (W4)
     [ModelId]            UNIQUEIDENTIFIER NULL     CONSTRAINT [FK_ConfigurationFile_Model] REFERENCES [ref].[Model] ([ModelId]),
     [FirmwareVersionId]  UNIQUEIDENTIFIER NULL     CONSTRAINT [FK_ConfigurationFile_Firmware] REFERENCES [ref].[FirmwareVersion] ([FirmwareVersionId]),
     [CaptureKind]        NVARCHAR(20)     NOT NULL CONSTRAINT [CK_ConfigurationFile_Capture] CHECK ([CaptureKind] IN (N'Designed', N'Generated', N'AsLeftReadback', N'AsFound')),
@@ -36,7 +36,7 @@ CREATE TABLE [document].[ConfigurationFile] (
 GO
 -- the in-service invariant: one NativeSettings file in service per device at an instant
 CREATE UNIQUE INDEX [UX_ConfigurationFile_InService] ON [document].[ConfigurationFile] ([DeviceEntityId])
-    WHERE [FileKind] = N'NativeSettings' AND [InServiceFrom] IS NOT NULL AND [InServiceTo] IS NULL AND [IsDeleted] = 0;
+    WHERE [FileKind] IN (N'NativeSettings', N'SettingsText') AND [InServiceFrom] IS NOT NULL AND [InServiceTo] IS NULL AND [IsDeleted] = 0;
 GO
 CREATE INDEX [IX_ConfigurationFile_Device] ON [document].[ConfigurationFile] ([DeviceEntityId], [FileKind]) WHERE [IsDeleted] = 0;
 GO

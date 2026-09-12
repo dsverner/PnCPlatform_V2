@@ -253,6 +253,27 @@ Three fixed routes, mapped before the generic dispatcher (`src/PnC.Api/Endpoints
 person, the projection counts, the refusals) — 73 checks in DEV mode; in Windows mode the Administrator run authors a
 fresh `W3_GATE_APPROVAL` Draft and the Approver run (`--windows=Approver`) approves it.
 
+## 8b. The procedure engine's endpoints — W4
+
+`src/PnC.Api/Endpoints/ProcessEndpoints.cs` (decisions #106, #114, #115). Every write is a `process.*` procedure;
+permissions are the map's for that procedure, decided on the work request the run belongs to.
+
+| Route | Does | Permission |
+|---|---|---|
+| `POST process/workflows/start` `{workflowKey, subjectKind, subjectEntityId, inputs?}` | `process.StartWorkflow`; the started run is advanced | `WorkRequest.Modify` |
+| `POST process/workflow-instances/{id}/transitions` `{name, reason?, overrideReason?}` | when-guards evaluated over the subject, then `process.Transition`; a started run is advanced | `WorkRequest.Modify` |
+| `GET process/procedure-instances/{id}` | the tree (`vProcedureInstanceTree`) with titles, ready steps and derived due dates (#44) | `WorkRequest.Read` |
+| `POST process/procedure-instances/{id}/evaluate` | re-evaluate and advance now (§4.1) | `WorkRequest.Modify` |
+| `GET process/step-instances/{id}/draft` | the draft; a read by anyone but the claimant is logged (#68) | `WorkRequest.Read` |
+| `POST process/step-instances/{id}/claim` · `release` · `takeover {reason}` · `draft {draft}` · `witness` | the claim (#55) and the attestation (#114) | `Record.Modify` |
+| `POST process/step-instances/{id}/commit` `{outcome, capture?, evidence?[{name, mimeType, kind, contentBase64}], overrideReason?}` | validation and competency evaluated here, then `process.CommitStep`; the declared `advances` fired; a branch outcome ends its scope; the run advanced | `Record.Modify` |
+| `POST process/step-instances/{id}/checkin` `{capturedBy, capturedAt, …}` | the deferred commit (#115) | `Record.Modify` |
+| `POST process/block-instances/{id}/release-hold` `{reason}` | a person releases a hold | `WorkRequest.Modify` |
+| `POST process/sweep` | the sweep now | `Grant.Administer` |
+
+`PnC.Api.Smoke`'s W4 section runs the whole fixture (139 checks in DEV mode, 2026-09-12); it needs four identities in one
+process and is skipped in Windows mode.
+
 ## 9. The PWA shell
 
 **DEV sign-in (2026-09-12, after W3).** When `/health` reports environment `DEV` the shell shows an *act as* field;

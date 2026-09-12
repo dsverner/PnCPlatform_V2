@@ -239,6 +239,10 @@ The settings book is a consequence of commits, never edited by hand.
 | `Approval` on the package | approval cascades to every revision in the package (PnCPlatform #60) |
 | `Baseline` | the design revision's `InServiceFrom` is set from `RETURN_TO_SERVICE`'s capture instant (FR-3.3) |
 
+**W4 note (2026-09-12, decision #108).** The deployed schema's values are `CaptureKind = Designed` (not *Design*)
+and `AsLeftReadback` (not *Readback*), and the text file's kind is `SettingsText`; the table above reads with those
+substitutions. The lifecycle's `Check` and `Apply` transitions are fired by the `CHECK` and `APPLY` steps (#112).
+
 ### 5.2 Deferred commit — field work (#53)
 
 The field pack **captures; it does not authorise** (FR-7.1). A step performed offline is captured

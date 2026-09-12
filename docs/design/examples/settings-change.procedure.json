@@ -3,7 +3,7 @@
   "kind": "procedure",
   "key": "SETTINGS_CHANGE",
   "name": "Relay settings change",
-  "description": "v0.2. The fourteen-step path of REQUIREMENTS.md FR-3.1 as one authored procedure. Changes from v0.1: the package is produced by step 1 (#52); the build step forks on device technology so electromechanical relays record typed settings instead of a file (#50); a readback difference resolved by raising a change ends that relay's branch as Superseded (#51); the completion block has two tracks, the legacy software track being dropped (#58). Expressions are grammar-1 text; on approval the engine stores their canonical AST. Role codes are placeholders (OQ-18). W3 (2026-09-12): person.training_current takes a module parameter in the fact catalogue (PROCEDURES.md #35), so the technician's competency names one; PC_FIELD_SETTINGS is a placeholder module code until the training modules are seeded (W7) — until then the fact is Unknown and the person is refused, which is the fail-closed reading of FORMULA-GRAMMAR §5.",
+  "description": "v0.2. The fourteen-step path of REQUIREMENTS.md FR-3.1 as one authored procedure. Changes from v0.1: the package is produced by step 1 (#52); the build step forks on device technology so electromechanical relays record typed settings instead of a file (#50); a readback difference resolved by raising a change ends that relay's branch as Superseded (#51); the completion block has two tracks, the legacy software track being dropped (#58). Expressions are grammar-1 text; on approval the engine stores their canonical AST. Role codes are placeholders (OQ-18). W3 (2026-09-12): person.training_current takes a module parameter in the fact catalogue (PROCEDURES.md #35), so the technician's competency names one; PC_FIELD_SETTINGS is a placeholder module code until the training modules are seeded (W7) — until then the fact is Unknown and the person is refused, which is the fail-closed reading of FORMULA-GRAMMAR §5. W4: CHECK advances the lifecycle's Check on Pass and APPLY its Apply (the lifecycle declared both transitions and no step fired them); a per-device APPLY fires Apply once per device, so a transition whose target state the instance already holds is a no-op (decision #117).",
   "subjectKind": "WorkRequest",
   "roles": {
     "engineer":   { "role": "PCEngineer" },
@@ -120,7 +120,8 @@
               "capture": { "comments": { "type": "text" } },
               "signoff": { "action": "Check" },
               "outcomes": ["Pass", "ReturnForRework"],
-              "record": { "kind": "EngineeringCheck" }
+              "record": { "kind": "EngineeringCheck" },
+              "advances": { "workflow": "SETTINGS_LIFECYCLE", "subject": "procedure.package", "transition": "Check", "onOutcome": "Pass" }
             }
           ]
         },
@@ -186,7 +187,8 @@
               "role": "technician",
               "capture": { "appliedAt": { "type": "date", "required": true } },
               "signoff": { "action": "Apply" },
-              "record": { "kind": "FieldApplication" }
+              "record": { "kind": "FieldApplication" },
+              "advances": { "workflow": "SETTINGS_LIFECYCLE", "subject": "procedure.package", "transition": "Apply" }
             },
             {
               "block": "step",

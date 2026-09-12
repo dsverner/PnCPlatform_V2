@@ -14,7 +14,7 @@ namespace PnC.Api.Data;
 public sealed record SessionIdentity(string UserPrincipalName, Guid? DelegationEntityId, Guid? SponsoredPersonEntityId);
 
 /// <summary>A list read's scope (IDENTITY.md §5): which column of the view names the subject, of which family, for whom, under which permission.</summary>
-public sealed record ScopeFilter(string Column, string Family, Guid UserEntityId, string PermissionCode);
+public sealed record ScopeFilter(string Column, string Family, Guid UserEntityId, string PermissionCode, string? KindColumn = null);
 
 public sealed class SqlSession : IAsyncDisposable
 {
@@ -158,7 +158,15 @@ public sealed class SqlSession : IAsyncDisposable
             cmd.Parameters.Add("@sp", SqlDbType.NVarChar, 80).Value = scope.PermissionCode;
             var families = scope.Family == "Any" ? new[] { "Node", "Asset", "Record", "WorkRequest", "Scheme" } : new[] { scope.Family };
             var sets = families.Select(f => $"SELECT [SubjectEntityId] FROM [security].[fReadableSubjects](@su, @sp, N'{f}', SYSDATETIMEOFFSET())");
-            where.Add($"{Q(scope.Column)} IN ({string.Join(" UNION ", sets)})");
+            var inScope = $"{Q(scope.Column)} IN ({string.Join(" UNION ", sets)})";
+            if (scope.Family == "Any")
+            {
+                // W4 (decision #118): a subject of a kind outside the five scoped families (a settings-issue package, a
+                // procedure instance…) has no node to scope by; its rows are readable under a Global grant only (IDENTITY.md §5)
+                var outside = scope.KindColumn is null ? "1 = 1" : $"{Q(scope.KindColumn)} NOT IN (N'Node', N'Station', N'Panel', N'DevicePosition', N'ProtectionFunction', N'Asset', N'Device', N'Record', N'WorkRequest', N'Scheme')";
+                inScope = $"({inScope} OR ({outside} AND [security].[fHasPermission](@su, @sp, NULL, NULL, SYSDATETIMEOFFSET()) = 1))";
+            }
+            where.Add(inScope);
         }
 
         // Stable ordering: RowSeq is always the tiebreaker, so paging never repeats or skips a row.
@@ -284,20 +292,22 @@ public sealed class SqlSession : IAsyncDisposable
     {
         if (node is JsonObject or JsonArray) return node.ToJsonString();     // JSON payloads are text to the procedure
         var jv = (JsonValue)node;
+        // a JsonValue wrapping a CLR value (a Guid, a DateTimeOffset the engine passes) renders as JSON text with quotes; take the unquoted text
+        string T() => jv.TryGetValue<string>(out var s) ? s : jv.TryGetValue<DateTimeOffset>(out var dto) ? dto.ToString("o") : jv.ToJsonString().Trim('"');
         try
         {
             switch (SqlDbTypeOf(p.SqlType))
             {
-                case SqlDbType.UniqueIdentifier: return Guid.Parse(jv.ToString());
-                case SqlDbType.Bit: return jv.TryGetValue<bool>(out var b) ? b : bool.Parse(jv.ToString());
-                case SqlDbType.TinyInt: return byte.Parse(jv.ToString(), CultureInfo.InvariantCulture);
-                case SqlDbType.SmallInt: return short.Parse(jv.ToString(), CultureInfo.InvariantCulture);
-                case SqlDbType.Int: return int.Parse(jv.ToString(), CultureInfo.InvariantCulture);
-                case SqlDbType.BigInt: return long.Parse(jv.ToString(), CultureInfo.InvariantCulture);
-                case SqlDbType.Decimal or SqlDbType.Money: return decimal.Parse(jv.ToString(), CultureInfo.InvariantCulture);
-                case SqlDbType.Float or SqlDbType.Real: return double.Parse(jv.ToString(), CultureInfo.InvariantCulture);
-                case SqlDbType.DateTimeOffset: return DateTimeOffset.Parse(jv.ToString(), CultureInfo.InvariantCulture);
-                case SqlDbType.DateTime2 or SqlDbType.DateTime or SqlDbType.Date: return DateTime.Parse(jv.ToString(), CultureInfo.InvariantCulture);
+                case SqlDbType.UniqueIdentifier: return Guid.Parse(T());
+                case SqlDbType.Bit: return jv.TryGetValue<bool>(out var b) ? b : bool.Parse(T());
+                case SqlDbType.TinyInt: return byte.Parse(T(), CultureInfo.InvariantCulture);
+                case SqlDbType.SmallInt: return short.Parse(T(), CultureInfo.InvariantCulture);
+                case SqlDbType.Int: return int.Parse(T(), CultureInfo.InvariantCulture);
+                case SqlDbType.BigInt: return long.Parse(T(), CultureInfo.InvariantCulture);
+                case SqlDbType.Decimal or SqlDbType.Money: return decimal.Parse(T(), CultureInfo.InvariantCulture);
+                case SqlDbType.Float or SqlDbType.Real: return double.Parse(T(), CultureInfo.InvariantCulture);
+                case SqlDbType.DateTimeOffset: return DateTimeOffset.Parse(T(), CultureInfo.InvariantCulture);
+                case SqlDbType.DateTime2 or SqlDbType.DateTime or SqlDbType.Date: return DateTime.Parse(T(), CultureInfo.InvariantCulture);
                 case SqlDbType.Time: return TimeSpan.Parse(jv.ToString(), CultureInfo.InvariantCulture);
                 case SqlDbType.VarBinary: return Convert.FromBase64String(jv.ToString());
                 default: return jv.ToString();

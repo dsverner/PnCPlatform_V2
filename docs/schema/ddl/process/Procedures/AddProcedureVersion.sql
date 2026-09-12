@@ -30,10 +30,12 @@ BEGIN
 
     IF @DefinitionEntityId IS NOT NULL
     BEGIN
-        SELECT @VersionRowId = [RowId], @VersionNumber = [VersionNumber], @Existing = 1
+        -- the same content already stored: the Effective version first, then an Approved one, then the latest Draft
+        SELECT TOP (1) @VersionRowId = [RowId], @VersionNumber = [VersionNumber], @Existing = 1
         FROM [config].[DefinitionVersion]
         WHERE [DefinitionEntityId] = @DefinitionEntityId AND [IsDeleted] = 0 AND [PayloadHash] = @hash
-          AND [Status] IN (N'Draft', N'Approved', N'Effective');
+          AND [Status] IN (N'Draft', N'Approved', N'Effective')
+        ORDER BY CASE [Status] WHEN N'Effective' THEN 0 WHEN N'Approved' THEN 1 ELSE 2 END, [VersionNumber] DESC;
         IF @Existing = 1 RETURN;
     END
 

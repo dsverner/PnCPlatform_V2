@@ -62,13 +62,13 @@ FROM (VALUES
     -- step.capture takes its type from the document (DataType Any here; the checker types it from the document).
     -- procedure.<name> (a produces.as) and input.<name> are document-declared names: not rows here — ValidateProgramFacts
     -- passes those prefixes for a Program.Procedure and process.ValidateProcedureDocument checks them against the document.
-    -- Parameters list what the checker requires; pass= and member= (optional in §7) arrive with the interpreter (W4).
-    (N'step.state',             N'Engine', N'step.state',             NULL, N'process', N'vStepInstance',       N'State',       N'Text',      NULL, N'ProcedureInstance',   N'Versioned', NULL, NULL,      N'["id"]'),
-    (N'step.outcome',           N'Engine', N'step.outcome',           NULL, N'process', N'vStepInstance',       N'Outcome',     N'Text',      NULL, N'ProcedureInstance',   N'Versioned', NULL, NULL,      N'["id"]'),
-    (N'step.committed_at',      N'Engine', N'step.committed_at',      NULL, N'process', N'vStepInstance',       N'CommittedAt', N'DateTime',  NULL, N'ProcedureInstance',   N'Versioned', NULL, NULL,      N'["id"]'),
-    (N'step.committed_by',      N'Engine', N'step.committed_by',      NULL, N'process', N'vStepInstance',       N'CommittedByActorId', N'Reference', NULL, N'ProcedureInstance', N'Versioned', NULL, N'Actor', N'["id"]'),
-    (N'step.capture',           N'Engine', N'step.capture',           NULL, N'process', N'vStepInstance',       N'Draft',       N'Any',       NULL, N'ProcedureInstance',   N'Versioned', NULL, NULL,      N'["id","field"]'),
-    (N'branch.outcome',         N'Engine', N'branch.outcome',         NULL, N'process', N'vBlockInstance',      N'Outcome',     N'Text',      NULL, N'ProcedureInstance',   N'Versioned', NULL, NULL,      N'["id"]'),
+    -- Parameters: a name ending in '?' is optional (pass=, member=; §7 resolution scope); the checker and fFactRead honour it (W4).
+    (N'step.state',             N'Engine', N'step.state',             NULL, N'process', N'vStepInstance',       N'State',       N'Text',      NULL, N'ProcedureInstance',   N'Versioned', NULL, NULL,      N'["id","pass?","member?"]'),
+    (N'step.outcome',           N'Engine', N'step.outcome',           NULL, N'process', N'vStepInstance',       N'Outcome',     N'Text',      NULL, N'ProcedureInstance',   N'Versioned', NULL, NULL,      N'["id","pass?","member?"]'),
+    (N'step.committed_at',      N'Engine', N'step.committed_at',      NULL, N'process', N'vStepInstance',       N'CommittedAt', N'DateTime',  NULL, N'ProcedureInstance',   N'Versioned', NULL, NULL,      N'["id","pass?","member?"]'),
+    (N'step.committed_by',      N'Engine', N'step.committed_by',      NULL, N'process', N'vStepInstance',       N'CommittedByActorId', N'Reference', NULL, N'ProcedureInstance', N'Versioned', NULL, N'Actor', N'["id","pass?","member?"]'),
+    (N'step.capture',           N'Engine', N'step.capture',           NULL, N'process', N'vStepInstance',       N'Draft',       N'Any',       NULL, N'ProcedureInstance',   N'Versioned', NULL, NULL,      N'["id","field","pass?","member?"]'),
+    (N'branch.outcome',         N'Engine', N'branch.outcome',         NULL, N'process', N'vBlockInstance',      N'Outcome',     N'Text',      NULL, N'ProcedureInstance',   N'Versioned', NULL, NULL,      N'["id","member?"]'),
     (N'procedure.outcome',      N'Engine', N'procedure.outcome',      NULL, N'process', N'vProcedureInstance',  N'Outcome',     N'Text',      NULL, N'ProcedureInstance',   N'Versioned', NULL, NULL,      NULL),
     (N'work.outage_required',   N'Fixed',  N'work.outage_required',   NULL, N'work',    N'vWorkRequest',        N'OutageRequired',      N'Boolean',  NULL, N'WorkRequest',      N'ValidTime', NULL, NULL,      NULL),
     (N'work.outage_window_start', N'Fixed', N'work.outage_window_start', NULL, N'work',  N'vWorkRequest',        N'OutageWindowStartAt', N'DateTime', NULL, N'WorkRequest',      N'ValidTime', NULL, NULL,      NULL),

@@ -19,9 +19,9 @@ CREATE TABLE [record].[Record] (
     [DeletedAt]         DATETIMEOFFSET(7) NULL,
     [MigrationRunId]    UNIQUEIDENTIFIER  NULL     CONSTRAINT [FK_Record_MigrationRun] REFERENCES [migration].[Run] ([RunId]),
     [RecordKindCode]     NVARCHAR(40)     NOT NULL CONSTRAINT [FK_Record_Kind] REFERENCES [ref].[RecordKind] ([RecordKindCode]),
-    [SubjectKind]        NVARCHAR(40)     NOT NULL CONSTRAINT [CK_Record_SubjectKind] CHECK ([SubjectKind] IN (N'Layer', N'LayerNode', N'Node', N'Asset', N'Device', N'Scheme', N'Connection', N'Channel', N'ConfigurationFileRevision', N'DrawingRevision', N'Instrument', N'Person', N'Record', N'Audit', N'SecurityPerimeter', N'Platform')),
+    [SubjectKind]        NVARCHAR(40)     NOT NULL CONSTRAINT [CK_Record_SubjectKind] CHECK ([SubjectKind] IN (N'Layer', N'LayerNode', N'Node', N'Asset', N'Device', N'Scheme', N'Connection', N'Channel', N'ConfigurationFileRevision', N'DrawingRevision', N'Instrument', N'Person', N'Record', N'Audit', N'SecurityPerimeter', N'Platform', N'WorkRequest', N'SettingsIssuePackage', N'ProcedureInstance')),   -- the last three: PROCEDURE-ENGINE §5 (W4, decision #108)
     [SubjectEntityId]    UNIQUEIDENTIFIER NULL,
-    [SecondSubjectKind]  NVARCHAR(40)     NULL     CONSTRAINT [CK_Record_SecondSubjectKind] CHECK ([SecondSubjectKind] IS NULL OR [SecondSubjectKind] IN (N'Layer', N'LayerNode', N'RouteStep', N'Document', N'Node', N'Asset', N'Device', N'Scheme', N'Connection', N'Channel', N'ConfigurationFileRevision', N'DrawingRevision', N'Instrument', N'Person', N'Record', N'TrainingModule')),
+    [SecondSubjectKind]  NVARCHAR(40)     NULL     CONSTRAINT [CK_Record_SecondSubjectKind] CHECK ([SecondSubjectKind] IS NULL OR [SecondSubjectKind] IN (N'Layer', N'LayerNode', N'RouteStep', N'Document', N'Node', N'Asset', N'Device', N'Scheme', N'Connection', N'Channel', N'ConfigurationFileRevision', N'DrawingRevision', N'Instrument', N'Person', N'Record', N'TrainingModule', N'WorkRequest', N'SettingsIssuePackage', N'ProcedureInstance')),
     [SecondSubjectEntityId] UNIQUEIDENTIFIER NULL,
     [WorkRequestEntityId] UNIQUEIDENTIFIER NULL    CONSTRAINT [FK_Record_WorkRequest] REFERENCES [work].[WorkRequestRegistry] ([EntityId]),
     [OccurredAt]         DATETIMEOFFSET(7) NOT NULL,

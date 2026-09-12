@@ -28,6 +28,8 @@ var catalog = Catalog.Load(connectionString, schemas);
 var map = PermissionMap.Load(Path.Combine(AppContext.BaseDirectory, "api-permissions.json"));
 var unseen = map.Validate(catalog);
 var authz = new AuthorizationService();
+builder.Services.AddSingleton(catalog);
+builder.Services.AddHostedService<PnC.Api.Engine.SweepService>();   // W4: the scheduled sweep (PROCEDURE-ENGINE §4.1)
 
 if (authMode.Equals("Windows", StringComparison.OrdinalIgnoreCase))
     builder.Services.AddAuthentication(IISDefaults.AuthenticationScheme);
@@ -61,7 +63,8 @@ app.UseDefaultFiles();
 app.UseStaticFiles();
 
 // 5. the endpoints (§6, §7)
-DefinitionEndpoints.Map(app, catalog, map, authz);   // W3: fixed routes before the generic {schema}/{procedure}
+DefinitionEndpoints.Map(app, catalog, map, authz);
+ProcessEndpoints.Map(app, catalog, map, authz, connectionString);   // W4: the procedure engine   // W3: fixed routes before the generic {schema}/{procedure}
 ApiEndpoints.Map(app, catalog, map, authz, app.Environment.EnvironmentName, connectionString);
 
 app.Run();

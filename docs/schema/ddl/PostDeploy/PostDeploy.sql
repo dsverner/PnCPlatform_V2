@@ -16,6 +16,7 @@
 :r .\Seed_ref_AssetClass.sql
 :r .\Seed_ref_ClassificationKind.sql
 :r .\Seed_config_SegregationRules.sql
+:r .\Seed_config_DocumentClasses.sql
 :r .\Seed_config_Enumerations.sql
 :r .\Seed_ref_PortKind.sql
 :r .\Seed_ref_ConnectionRealisation.sql
@@ -34,4 +35,6 @@
 :r .\Seed_config_Workflow_Standard.sql
 :r .\Seed_config_Procedure_Placeholders.sql
 :r .\Seed_config_SettingsTemplates_Electromechanical.sql
+:r .\Seed_ref_Model_SEL421.sql
+:r .\Seed_config_Procedure_DrawingRevision.sql
 :r .\Seed_location_Divisions.sql

@@ -127,7 +127,7 @@ public static class ApiEndpoints
                 await s.ExecAsync("EXEC [audit].[LogRead] @SubjectSchema = @sc, @SubjectTable = @tb, @SubjectEntityId = @id",
                     new Dictionary<string, object?> { ["@sc"] = v.Schema, ["@tb"] = baseTable, ["@id"] = subject }, ct);
 
-            var scope = v.SubjectColumn is null ? null : new ScopeFilter(v.SubjectColumn, v.SubjectFamily!, u.UserEntityId, code);
+            var scope = v.SubjectColumn is null ? null : new ScopeFilter(v.SubjectColumn, v.SubjectFamily!, u.UserEntityId, code, v.Columns.Any(c => c.Name == "SubjectKind") ? "SubjectKind" : null);
             var rows = await s.QueryViewAsync(v, filters, q["orderBy"].FirstOrDefault(), skip, take, asOf, scope, ct);
             return Results.Json(new { view = v.Key, skip, take, scope = scope is null ? "class" : $"{scope.Column} as {scope.Family}", rows });
         });

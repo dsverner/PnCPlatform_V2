@@ -142,11 +142,11 @@ public sealed class Checker
         if (p is not null)
             foreach (var kv in p)
             {
-                if (!info.ParamTypes.TryGetValue(kv.Key, out var pt)) throw new FormulaException(ErrorCodes.UnknownParameter, $"'{name}' has no parameter '{kv.Key}'");
+                if (!info.ParamTypes.TryGetValue(kv.Key, out var pt) && !info.ParamTypes.TryGetValue(kv.Key + "?", out pt)) throw new FormulaException(ErrorCodes.UnknownParameter, $"'{name}' has no parameter '{kv.Key}'");
                 Same(pt, TLit((JsonObject)kv.Value!), $"parameter {kv.Key}", code: ErrorCodes.ParameterType);
             }
         foreach (var k in info.ParamTypes.Keys)
-            if (p is null || !p.ContainsKey(k)) throw new FormulaException(ErrorCodes.UnknownParameter, $"'{name}' requires parameter '{k}'");
+            if (!k.EndsWith('?') && (p is null || !p.ContainsKey(k))) throw new FormulaException(ErrorCodes.UnknownParameter, $"'{name}' requires parameter '{k}'");   // a trailing '?' marks an optional parameter (PROCEDURE-ENGINE §7: pass=, member=)
         if (n["at"] is JsonObject at) Expect(Check(at, env, sk), "date", "at");
         var t = info.Type;
         if (n["from"] is JsonObject from)

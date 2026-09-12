@@ -7,7 +7,7 @@
 -->
 <Project Sdk="Microsoft.Build.Sql/2.2.0">
   <PropertyGroup>
-    <DacVersion>0.3.0</DacVersion>
+    <DacVersion>0.4.0</DacVersion>
     <Name>PnCPlatform</Name>
     <ProjectGuid>{5A0C8D2E-4B7F-4F3A-9C1D-7E2B8A6F1C43}</ProjectGuid>
     <DSP>Microsoft.Data.Tools.Schema.Sql.Sql160DatabaseSchemaProvider</DSP>

@@ -34,7 +34,8 @@ USING (VALUES
     (N'SettingsIssue',               N'Issue to the field (step 8)'),
     (N'FieldApplication',            N'Settings applied to the relay (step 9)'),
     (N'ReturnToService',             N'Return to service declared, witnessed (step 12)'),
-    (N'Baseline',                    N'Record filed as the in-service baseline (step 13)')
+    (N'Baseline',                    N'Record filed as the in-service baseline (step 13)'),
+    (N'DrawingUpdate',               N'Drawings and documentation updated (step 14; the DRAWING_REVISION procedure, W4 placeholder / W5)')
 ) AS s ([RecordKindCode], [Name])
 ON t.[RecordKindCode] = s.[RecordKindCode]
 WHEN MATCHED AND t.[Name] <> s.[Name] THEN UPDATE SET [Name] = s.[Name], [ModifiedBy] = @actor, [ModifiedAt] = @now

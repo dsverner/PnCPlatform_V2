@@ -350,6 +350,23 @@ Lesson: OPENJSON's `key` column is `Latin1_General_BIN2`; every comparison or co
 carries `COLLATE DATABASE_DEFAULT`, or the procedure fails at run time with a collation conflict that the build does
 not see.
 
+## Step 17 — the interpreter's procedures ✅ (W4, 2026-09-12)
+
+PROCEDURE-ENGINE.md §2–§6, decisions #106–#118. No new table: the `process` runtime tables of step 16 are written by
+sixteen hand-written procedures (PROCEDURES.md #47), the `Engine` branches of `compliance.fFactRead` (#46) and the
+seeds below. Schema changes: `record.Record` subject kinds and `document.ConfigurationFile.FileKind` widened (#108).
+
+| Object | File | Notes |
+|---|---|---|
+| `process.StartWorkflow`, `StartProcedure`, `MaterialiseBlock`, `SetBlockState`, `SetStepState`, `OpenHold`, `ReleaseHold`, `CompleteInstance`, `Transition` | `process/Procedures/*` | the run; `StartProcedure` walks the call graph in a loop (a recursive CTE may carry neither TOP nor an outer join) |
+| `process.ClaimStep`, `ReleaseStep`, `TakeOverStep`, `SaveDraft`, `WitnessStep` | `process/Procedures/*` | the claim (#55) and the witness (#114); the role is the grant's (`security.fGrantAsOf`) |
+| `process.CommitStep`, `WriteConfigurationRevision`, `WriteEvidence`, `ParseSettingsText` | `process/Procedures/*` | §5 in one transaction; §5.1 by record kind; the text reader (#113) |
+| `compliance.fFactRead` Engine branches | `compliance/Functions/fFactRead.sql` | #107 |
+| `Seed_config_DocumentClasses.sql`, `Seed_config_SegregationRules.sql` v2, `Seed_ref_Model_SEL421.sql`, `Seed_config_Procedure_DrawingRevision.sql`, `Seed_config_ReadLoggedClass.sql` (`process.StepInstance`) | `PostDeploy/*` | #109, #110, #113, #112, #68 |
+
+Lessons: an EXEC argument may not be a CASE expression (compute it into a variable first); an OUTPUT variable keeps
+its value across a cursor's rows (reset it, or `Definition_Add` reuses the id).
+
 ## Reconciliation — every table the design names
 
 Method: every `schema.Table` token in SCHEMA-DESIGN.md steps 0–15 and Appendix B, compared with `*/Tables/*.sql` in this project (2026-09-04, after wave 5).

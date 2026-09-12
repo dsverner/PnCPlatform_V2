@@ -306,6 +306,61 @@ v2 of `SETTINGS_CHANGE`; the running v1 instance is untouched and appears on the
 
 **Depends on.** W3. **Estimate.** B3: 40–60 h · B4: 8–14 h · B5: 12–20 h · B6: 4–6 h.
 
+**Gate record — 2026-09-12, observed on `PnCPlatform_V2_DEV` through the API with DEV-header identities.**
+- Schema: 16 hand-written `process` procedures and 2 functions, the Engine branches of `compliance.fFactRead`, the CHECK
+  widenings (#108), the document classes, the segregation rules v2, the SEL-421 model and the `DRAWING_REVISION`
+  placeholder (decisions #106–#118). `deploy.py` green, `check_generated.py` current, schema smoke **268 PASS**;
+  release **0.4.0** recorded.
+- API: `Engine/` (`Interpreter`, `DbFactReader`, `SweepService`) and `ProcessEndpoints` (API.md §8b); the sweep every
+  15 minutes; `process` procedures in the permission map on `WorkRequest.*` / `Record.Modify`.
+- **The run (API smoke, 139 PASS, 0 FAIL)** — fixture: a station under Generation · Hydro with three placed relays
+  (SEL-421 microprocessor; CGE BDD15B and Westinghouse CYL electromechanical, each with its firmware and template), a
+  scheme, a work type bound to `SETTINGS_CHANGE_REQUEST`, a work request whose outage window opens 100 s later, the
+  technician's `PC_FIELD_SETTINGS` training attendance. Then, read back by query afterwards:
+  - `Start` → InProgress started `SETTINGS_CHANGE` pinned with `DRAWING_REVISION` (two rows in `InstanceVersionSet`);
+  - REQUEST produced the package and its `SETTINGS_LIFECYCLE` instance in Calculated; SCOPE captured the scheme and the
+    three devices; BUILD ran per device — the SEL-421's native file stored `NotParsed`, the two text files **parsed to
+    six settings** (`WDG1 2.9`, `WDG2 4.2`, `SLOPE 25` Ok…; `COMPENSATOR 1.4` Ok, `INST 14`) — three package items;
+  - CHECK by a second engineer (Pass → Checked); **APPROVE by the calculator refused, 409 segregation**; APPROVE by the
+    second Administrator → Approved with the three revisions approved; ISSUE → Issued;
+  - AWAIT_OUTAGE Held; **the sweep released it** (`Condition`) once the window opened;
+  - APPLY ×3 (**one a check-in: committed by `smoke.tech`, accepted by `smoke.admin`, `FieldPack`**), the lifecycle
+    Applied once (the repeats no-ops, #117); READBACK ×3 (Identical, Identical, **Differs 1** on the CYL);
+    RESOLVE_DIFFERENCE ChangeRaised → **the CYL member Superseded**, its TEST skipped; TEST ×2 Pass;
+  - RETURN_TO_SERVICE **witnessed by the second Administrator from their own session** → Verified;
+  - COMPLETION: the `DRAWING_REVISION` child run started, its step committed, the call block completed; BASELINE →
+    **InService, two revisions in service from the return-to-service instant, the CYL's not**;
+  - the instance **Completed / Completed**; `Close` (requires the procedure completed) → Closed.
+  - Counts: 21 committed steps (20 online, 1 field pack), 6 skipped; 45 block activations; 6 configuration-file
+    revisions (3 designed, 3 readbacks); records by kind: ConfigurationFileRevision 3, Readback 3, FieldApplication 3,
+    Finding 2, TestSheet 2, and one each of RequestConfirmation, ScopeDecision, Study, Rationale, EngineeringCheck,
+    Approval, SettingsIssue, ReturnToService, Baseline, DrawingUpdate; 5 evidence links; the package's transitions
+    Check, Approve, Issue, Apply, Verify, Baseline; the request's Start, Close.
+- **Migration**: a v2 of `SETTINGS_CHANGE` approved while a second run is half-way: the second run is on
+  `vMigrationList` (root), the completed first is not, both stay pinned to the version they started on.
+- Found on the way, all recorded: the design's §5.1 vocabulary against the deployed CHECKs (#108); the lifecycle's
+  `Check` and `Apply` transitions that no step fired (#112); `Apply/Test` seeded as a pair by mistake and removed
+  (#110); a JSON value carrying a CLR instant or id rendered with quotes on its way to a procedure parameter (fixed in
+  `SqlSession`); 'Any'-subject views invisible even to the Administrator (#118); a recursive CTE may carry neither
+  `TOP` nor an outer join (the version pin walks the call graph in a loop); an OUTPUT variable reused across a seed
+  cursor's rows.
+- **Windows mode on VM02 (0.4.0, deployed through the guest agent, `/health` → `release 0.4.0, database ok`)**: the
+  W4 run needs four persons in one process and is DEV-only; the gate accounts ran the W1–W3 sections against 0.4.0:
+  **admin 49 PASS**, **approver 8 PASS**, **read-only 10 PASS**, **hydro 6 PASS**, 0 FAIL. The first Administrator run
+  found the example document as a Draft another person had authored (the DEV run's migration check had retired the
+  Effective one); `AddProcedureVersion` now answers the Effective version first for identical content, and the DEV
+  run restores the example after its migration check.
+- **The schema smoke's time race**: three deploys failed one different fact check each (`person.authorisations`,
+  `entity.agreements`, `study.is_stale`, then an advisory disposition), never the same twice, and a standalone run
+  passed 268. VM01's clock was measured 0.7 s ahead of the laptop's and the predecessor CLI evaluates at the laptop's
+  instant (#79), so a fact read in the same second as its row was written came back Unknown. `smoke.py` now waits one
+  second before each evaluation. The 0.4.0 release row was recorded by hand with the package hash after the deploy
+  that flaked (267 of 268).
+- **Not done in W4, by design and recorded**: no obligation is raised on a hold's expiry (#111); captured fields are
+  not `record.CharacteristicValue` rows (#115); the migration re-plan (B6'); read scope for instances by node (W6);
+  the smoke's Windows-mode run of the procedure; each gate run adds two `SETTINGS_CHANGE` versions on DEV (the example
+  re-loaded after its retirement, and the migration's v2).
+
 ### W5 — Authoring v1 and the second procedure
 
 **Builds.** The definitions screen: JSON editor with `procedure.schema.json` enforced live and
