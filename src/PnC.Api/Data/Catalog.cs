@@ -113,15 +113,16 @@ public sealed class Catalog
             }
         }
 
-        // --- which base table each view (and as-of function) reads, and which registry that table's EntityId points at
+        // --- which base tables each view (and as-of function) reads: from its own definition text, which the
+        //     per-schema VIEW DEFINITION grant allows (sys.sql_expression_dependencies needs it on the whole database,
+        //     which the service account rightly lacks — found on VGS-VM02, 2026-09-12). The views are the platform's
+        //     own SQL: every source is written "FROM [schema].[table]" or "JOIN [schema].[table]".
         var viewBases = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);     // "schema.view" -> ["schema.table", ...]
         using (var cmd = con.CreateCommand())
         {
             cmd.CommandText = $"""
-                SELECT s.name, o.name, d.referenced_schema_name, d.referenced_entity_name
-                FROM sys.objects o
-                JOIN sys.schemas s ON s.schema_id = o.schema_id
-                JOIN sys.sql_expression_dependencies d ON d.referencing_id = o.object_id AND d.referenced_minor_id = 0 AND d.referenced_class = 1
+                SELECT s.name, o.name, OBJECT_DEFINITION(o.object_id)
+                FROM sys.objects o JOIN sys.schemas s ON s.schema_id = o.schema_id
                 WHERE s.name IN ({inList}) AND ((o.type = 'V' AND o.name LIKE 'v%') OR (o.type = 'IF' AND o.name LIKE 'f%AsOf'))
                 """;
             BindSchemas(cmd);
@@ -129,8 +130,11 @@ public sealed class Catalog
             while (r.Read())
             {
                 var key = $"{r.GetString(0)}.{r.GetString(1)}";
-                if (!viewBases.TryGetValue(key, out var list)) { list = []; viewBases[key] = list; }
-                if (!r.IsDBNull(2) && !r.IsDBNull(3)) list.Add($"{r.GetString(2)}.{r.GetString(3)}");
+                var list = new List<string>();
+                if (!r.IsDBNull(2))
+                    foreach (Match m in SourceTable.Matches(r.GetString(2)))
+                        if (!list.Contains($"{m.Groups[1].Value}.{m.Groups[2].Value}", StringComparer.OrdinalIgnoreCase)) list.Add($"{m.Groups[1].Value}.{m.Groups[2].Value}");
+                viewBases[key] = list;
             }
         }
         var registryOf = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);        // "schema.table" -> "schema.XRegistry"
@@ -209,6 +213,9 @@ public sealed class Catalog
             if (has.Contains(col)) return (col, fam);
         return (null, null);
     }
+
+    // "FROM [schema].[table]" / "JOIN [schema].[table]" in a view or function body (brackets optional).
+    private static readonly Regex SourceTable = new(@"\b(?:FROM|JOIN)\s+\[?([A-Za-z_][\w]*)\]?\s*\.\s*\[?([A-Za-z_][\w]*)\]?", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     // The parameter list precedes the first "AS" standing alone on a line.
     private static readonly Regex AsLine = new(@"^\s*AS\s*$", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Compiled);
