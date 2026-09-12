@@ -16,11 +16,14 @@ public sealed class PermissionMap
         [JsonPropertyName("subjectClassBySchema")] public Dictionary<string, string> BySchema { get; set; } = new();
         [JsonPropertyName("subjectClassByPrefix")] public Dictionary<string, string> ByPrefix { get; set; } = new();
         [JsonPropertyName("procedures")] public Dictionary<string, string?> Procedures { get; set; } = new();
-        [JsonPropertyName("subjectKeys")] public List<string> SubjectKeys { get; set; } = new();
+        [JsonPropertyName("subjectKeys")] public List<SubjectKey> SubjectKeys { get; set; } = new();
     }
 
+    /// <summary>A body key that names a write's subject, and the subject kind it implies ("*" = the object's class; "$SubjectKind" / "$MemberKind" = the body's own kind field).</summary>
+    public sealed record SubjectKey([property: JsonPropertyName("key")] string Key, [property: JsonPropertyName("kind")] string Kind);
+
     private readonly File _f;
-    public IReadOnlyList<string> SubjectKeys => _f.SubjectKeys;
+    public IReadOnlyList<SubjectKey> SubjectKeys => _f.SubjectKeys;
 
     private PermissionMap(File f) => _f = f;
 

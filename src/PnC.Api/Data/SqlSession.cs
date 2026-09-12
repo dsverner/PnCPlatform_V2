@@ -13,6 +13,9 @@ namespace PnC.Api.Data;
 
 public sealed record SessionIdentity(string UserPrincipalName, Guid? DelegationEntityId, Guid? SponsoredPersonEntityId);
 
+/// <summary>A list read's scope (IDENTITY.md §5): which column of the view names the subject, of which family, for whom, under which permission.</summary>
+public sealed record ScopeFilter(string Column, string Family, Guid UserEntityId, string PermissionCode);
+
 public sealed class SqlSession : IAsyncDisposable
 {
     private readonly SqlConnection _con;
@@ -116,7 +119,7 @@ public sealed class SqlSession : IAsyncDisposable
     /// catalogue; nothing from the query string reaches SQL text.
     /// </summary>
     public async Task<JsonArray> QueryViewAsync(ViewInfo view, IReadOnlyDictionary<string, string> filters, string? orderBy,
-        int skip, int take, DateTimeOffset? asOf, CancellationToken ct)
+        int skip, int take, DateTimeOffset? asOf, ScopeFilter? scope, CancellationToken ct)
     {
         await using var cmd = _con.CreateCommand();
         var select = string.Join(", ", view.Columns.Select(c => UdtTypes.Contains(c.SqlType) ? $"{Q(c.Name)}.ToString() AS {Q(c.Name)}" : Q(c.Name)));
@@ -145,6 +148,17 @@ public sealed class SqlSession : IAsyncDisposable
             var sp = new SqlParameter(pn, SqlDbTypeOf(col.SqlType)) { Value = ConvertScalar(value, col.SqlType) };
             cmd.Parameters.Add(sp);
             where.Add($"{Q(col.Name)} = {pn}");
+        }
+
+        // IDENTITY.md §5: read scope is as strict as write scope. The set of readable subjects is the database's
+        // (security.fReadableSubjects); the API contributes only the subject column and family.
+        if (scope is not null)
+        {
+            cmd.Parameters.Add("@su", SqlDbType.UniqueIdentifier).Value = scope.UserEntityId;
+            cmd.Parameters.Add("@sp", SqlDbType.NVarChar, 80).Value = scope.PermissionCode;
+            var families = scope.Family == "Any" ? new[] { "Node", "Asset", "Record", "WorkRequest", "Scheme" } : new[] { scope.Family };
+            var sets = families.Select(f => $"SELECT [SubjectEntityId] FROM [security].[fReadableSubjects](@su, @sp, N'{f}', SYSDATETIMEOFFSET())");
+            where.Add($"{Q(scope.Column)} IN ({string.Join(" UNION ", sets)})");
         }
 
         // Stable ordering: RowSeq is always the tiebreaker, so paging never repeats or skips a row.

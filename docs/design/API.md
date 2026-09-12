@@ -137,6 +137,10 @@ list); for a read it is the `EntityId` filter when present, else the class alone
 A refusal is written to `audit.ActionLog` as `AccessRefused` (operation, permission, host)
 **before** the 403 is returned; an unauthenticated request is 401 and not logged.
 
+**W2 (IDENTITY.md §5).** A list read of a view with a subject column is gated by `security.fHoldsPermission`
+(held in any scope) and its rows filtered by `security.fReadableSubjects`; a write's subject comes from the
+map's typed `subjectKeys`. A view with no subject column keeps the class decision.
+
 **Read logging — V2 departs from the predecessor.** The predecessor hard-coded the one logged
 class in C#. Here the API loads `config.vReadLoggedClass` with the catalogue and, for a read of a
 view whose base table is listed, calls `audit.LogRead` **before** the rows are returned (FR-6.4;

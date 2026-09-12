@@ -4,8 +4,10 @@ using Microsoft.Data.SqlClient;
 
 namespace PnC.Api.Data;
 
-// docs/design/API.md §3. What the database exposes, read once at start from sys.*; the dispatcher
-// serves exactly this and nothing else. A deploy that adds an object is followed by a restart.
+// docs/design/API.md §3, IDENTITY.md §5. What the database exposes, read once at start from sys.*; the
+// dispatcher serves exactly this and nothing else. A deploy that adds an object is followed by a restart.
+// W2: every view also carries which of its columns is the subject a scoped read is decided on, and of
+// what family — derived from the catalogue (the base table's registry) and the map's subject keys.
 
 public sealed record ProcParam(string Name, string SqlType, int MaxLength, byte Precision, byte Scale, bool IsOutput, bool HasDefault);
 
@@ -16,7 +18,12 @@ public sealed record ProcInfo(string Schema, string Name, IReadOnlyList<ProcPara
 
 public sealed record ViewColumn(string Name, string SqlType);
 
-public sealed record ViewInfo(string Schema, string Name, IReadOnlyList<ViewColumn> Columns, bool IsAsOfFunction)
+/// <summary>
+/// SubjectColumn / SubjectFamily: the column a list read is scoped on and the family security.fReadableSubjects
+/// answers for (Node, Asset, Record, WorkRequest, Scheme, or Any for a mixed-kind column). Null: the view has no
+/// subject mapping and a read is decided on the class alone (Global only, as fHasPermission rules).
+/// </summary>
+public sealed record ViewInfo(string Schema, string Name, IReadOnlyList<ViewColumn> Columns, bool IsAsOfFunction, string? SubjectColumn, string? SubjectFamily)
 {
     public string Key => $"{Schema}.{Name}";
     public bool HasRowSeq => Columns.Any(c => c.Name.Equals("RowSeq", StringComparison.OrdinalIgnoreCase));
@@ -30,6 +37,19 @@ public sealed class Catalog
     public IReadOnlySet<string> ReadLoggedTables { get; }
     public IReadOnlyList<string> Schemas { get; }
     public DateTimeOffset LoadedAt { get; }
+
+    /// <summary>The registries whose EntityIds are subjects security.fReadableSubjects can place, by family.</summary>
+    public static readonly IReadOnlyDictionary<string, string> FamilyRegistries = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+    {
+        ["location.NodeRegistry"] = "Node", ["asset.AssetRegistry"] = "Asset", ["record.RecordRegistry"] = "Record",
+        ["work.WorkRequestRegistry"] = "WorkRequest", ["scheme.SchemeRegistry"] = "Scheme",
+    };
+    /// <summary>Subject columns a view may carry when its own rows are not subjects, in order of preference.</summary>
+    public static readonly IReadOnlyList<(string Column, string Family)> SubjectColumns =
+    [
+        ("AssetEntityId", "Asset"), ("DeviceEntityId", "Asset"), ("NodeEntityId", "Node"), ("SchemeEntityId", "Scheme"),
+        ("WorkRequestEntityId", "WorkRequest"), ("RecordEntityId", "Record"), ("SubjectEntityId", "Any"), ("MemberEntityId", "Any"),
+    ];
 
     private Catalog(Dictionary<string, ProcInfo> procs, Dictionary<string, ViewInfo> views, HashSet<string> logged, IReadOnlyList<string> schemas)
     {
@@ -50,7 +70,6 @@ public sealed class Catalog
 
         // --- procedures and their parameters
         var procs = new Dictionary<string, List<ProcParam>>(StringComparer.OrdinalIgnoreCase);
-        var order = new List<string>();
         using (var cmd = con.CreateCommand())
         {
             cmd.CommandText = $"""
@@ -67,7 +86,7 @@ public sealed class Catalog
             while (r.Read())
             {
                 var key = $"{r.GetString(0)}.{r.GetString(1)}";
-                if (!procs.TryGetValue(key, out var list)) { list = []; procs[key] = list; order.Add(key); }
+                if (!procs.TryGetValue(key, out var list)) { list = []; procs[key] = list; }
                 if (r.IsDBNull(2)) continue;
                 list.Add(new ProcParam(r.GetString(2).TrimStart('@'), r.GetString(3), r.GetInt16(4), r.GetByte(5), r.GetByte(6), r.GetBoolean(7), HasDefault: false));
             }
@@ -89,14 +108,48 @@ public sealed class Catalog
             {
                 var schema = r.GetString(0); var name = r.GetString(1);
                 var header = r.IsDBNull(2) ? "" : HeaderOf(r.GetString(2));
-                var ps = procs[$"{schema}.{name}"]
-                    .Select(p => p with { HasDefault = HasDefault(header, p.Name) })
-                    .ToList();
+                var ps = procs[$"{schema}.{name}"].Select(p => p with { HasDefault = HasDefault(header, p.Name) }).ToList();
                 withDefaults[$"{schema}.{name}"] = new ProcInfo(schema, name, ps);
             }
         }
 
-        // --- views (v*) and as-of table functions (f*AsOf) with their columns
+        // --- which base table each view (and as-of function) reads, and which registry that table's EntityId points at
+        var viewBases = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);     // "schema.view" -> ["schema.table", ...]
+        using (var cmd = con.CreateCommand())
+        {
+            cmd.CommandText = $"""
+                SELECT s.name, o.name, d.referenced_schema_name, d.referenced_entity_name
+                FROM sys.objects o
+                JOIN sys.schemas s ON s.schema_id = o.schema_id
+                JOIN sys.sql_expression_dependencies d ON d.referencing_id = o.object_id AND d.referenced_minor_id = 0 AND d.referenced_class = 1
+                WHERE s.name IN ({inList}) AND ((o.type = 'V' AND o.name LIKE 'v%') OR (o.type = 'IF' AND o.name LIKE 'f%AsOf'))
+                """;
+            BindSchemas(cmd);
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                var key = $"{r.GetString(0)}.{r.GetString(1)}";
+                if (!viewBases.TryGetValue(key, out var list)) { list = []; viewBases[key] = list; }
+                if (!r.IsDBNull(2) && !r.IsDBNull(3)) list.Add($"{r.GetString(2)}.{r.GetString(3)}");
+            }
+        }
+        var registryOf = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);        // "schema.table" -> "schema.XRegistry"
+        using (var cmd = con.CreateCommand())
+        {
+            cmd.CommandText = """
+                SELECT ps.name, pt.name, rs.name, rt.name
+                FROM sys.foreign_keys fk
+                JOIN sys.foreign_key_columns fc ON fc.constraint_object_id = fk.object_id
+                JOIN sys.columns pc ON pc.object_id = fk.parent_object_id AND pc.column_id = fc.parent_column_id
+                JOIN sys.tables pt ON pt.object_id = fk.parent_object_id JOIN sys.schemas ps ON ps.schema_id = pt.schema_id
+                JOIN sys.tables rt ON rt.object_id = fk.referenced_object_id JOIN sys.schemas rs ON rs.schema_id = rt.schema_id
+                WHERE pc.name = 'EntityId'
+                """;
+            using var r = cmd.ExecuteReader();
+            while (r.Read()) registryOf[$"{r.GetString(0)}.{r.GetString(1)}"] = $"{r.GetString(2)}.{r.GetString(3)}";
+        }
+
+        // --- views (v*) and as-of table functions (f*AsOf) with their columns and their subject mapping
         var views = new Dictionary<string, ViewInfo>(StringComparer.OrdinalIgnoreCase);
         using (var cmd = con.CreateCommand())
         {
@@ -123,7 +176,8 @@ public sealed class Catalog
             foreach (var (key, list) in cols)
             {
                 var dot = key.IndexOf('.');
-                views[key] = new ViewInfo(key[..dot], key[(dot + 1)..], list, kinds[key]);
+                var (subjectColumn, family) = SubjectOf(key, list, viewBases, registryOf);
+                views[key] = new ViewInfo(key[..dot], key[(dot + 1)..], list, kinds[key], subjectColumn, family);
             }
         }
 
@@ -137,6 +191,23 @@ public sealed class Catalog
         }
 
         return new Catalog(withDefaults, views, logged, schemas);
+    }
+
+    /// <summary>
+    /// IDENTITY.md §5: the view's own rows are subjects when a base table's EntityId points at a family registry
+    /// and the view carries EntityId; otherwise the first subject column the view carries; otherwise none.
+    /// </summary>
+    private static (string? column, string? family) SubjectOf(string viewKey, List<ViewColumn> columns,
+        Dictionary<string, List<string>> viewBases, Dictionary<string, string> registryOf)
+    {
+        var has = new HashSet<string>(columns.Select(c => c.Name), StringComparer.OrdinalIgnoreCase);
+        if (has.Contains("EntityId") && viewBases.TryGetValue(viewKey, out var bases))
+            foreach (var b in bases)
+                if (registryOf.TryGetValue(b, out var reg) && FamilyRegistries.TryGetValue(reg, out var fam)) return ("EntityId", fam);
+                else if (FamilyRegistries.TryGetValue(b, out var famDirect)) return ("EntityId", famDirect);
+        foreach (var (col, fam) in SubjectColumns)
+            if (has.Contains(col)) return (col, fam);
+        return (null, null);
     }
 
     // The parameter list precedes the first "AS" standing alone on a line.

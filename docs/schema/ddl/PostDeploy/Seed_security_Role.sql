@@ -22,11 +22,36 @@ USING (VALUES
     (N'ManagementViewer',            N'Management Viewer (predecessor)',      NULL),
     (N'Reviewer',                    N'Reviewer (predecessor)',               NULL),
     (N'PlacementOverride',           N'Placement override (device category vs position subtype, §5.7)', NULL),
-    (N'Assignee',                    N'Assigned to a Work Request (assignment role, §9.7)', N'Assignment')
+    (N'Assignee',                    N'Assigned to a Work Request (assignment role, §9.7)', N'Assignment'),
+    -- V2 W2 (decision #66; docs/design/IDENTITY.md §3): one engineer role scoped per person, one technician role,
+    -- the approver as a separate grant. The predecessor's account-type roles above are deactivated below.
+    (N'PCEngineer',                  N'P&C Engineer (scoped per person by division)', NULL),
+    (N'PCTechnician',                N'P&C Technician',                       NULL),
+    (N'PCApprover',                  N'P&C Approver (a separate grant)',      NULL)
 ) AS s ([RoleCode], [Name], [RoleKind])
 ON t.[RoleCode] = s.[RoleCode]
 WHEN MATCHED AND (t.[Name] <> s.[Name] OR ISNULL(t.[RoleKind], N'') <> ISNULL(s.[RoleKind], N''))
     THEN UPDATE SET [Name] = s.[Name], [RoleKind] = s.[RoleKind], [ModifiedBy] = @actor, [ModifiedAt] = @now
 WHEN NOT MATCHED BY TARGET THEN INSERT ([RoleCode], [Name], [RoleKind], [CreatedBy], [CreatedAt], [ModifiedBy], [ModifiedAt])
     VALUES (s.[RoleCode], s.[Name], s.[RoleKind], @actor, @now, @actor, @now);
+GO
+-- V2 W2 (decision #66): only Administrator, ReadOnly, PCEngineer, PCTechnician, PCApprover are account types;
+-- Assignee and PlacementOverride are schema mechanics and stay. The predecessor's fourteen are deactivated —
+-- soft, idempotent, reversible by a row. The MERGE above never reactivates them.
+IF OBJECT_ID(N'[security].[Role_Deactivate]') IS NOT NULL
+BEGIN
+    DECLARE @sys UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000001', @rc NVARCHAR(40);
+    DECLARE rc CURSOR LOCAL FAST_FORWARD FOR
+        SELECT [RoleCode] FROM [security].[Role] WHERE [IsActive] = 1 AND [RoleCode] IN
+            (N'Manager', N'ComplianceOfficer', N'TransmissionPncEngineer', N'DistributionPncEngineer', N'HydroGenerationEngineer',
+             N'BelleduneGenerationEngineer', N'ColesonGenerationEngineer', N'PncTechnician', N'Approver', N'SystemOperator',
+             N'TelecomEngineer', N'TelecomTechnician', N'AssetHealth', N'ManagementViewer', N'Reviewer');
+    OPEN rc; FETCH NEXT FROM rc INTO @rc;
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        EXEC [security].[Role_Deactivate] @RoleCode = @rc, @ActorId = @sys;
+        FETCH NEXT FROM rc INTO @rc;
+    END
+    CLOSE rc; DEALLOCATE rc;
+END
 GO

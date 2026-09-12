@@ -77,7 +77,10 @@ BEGIN
                JOIN [location].[Node] sn ON sn.[EntityId] = r.[ScopeNodeEntityId] AND sn.[IsDeleted] = 0 AND sn.[ValidTo] IS NULL
                JOIN @places p ON p.[NodeEntityId] IS NOT NULL
                JOIN [location].[Node] n ON n.[EntityId] = p.[NodeEntityId] AND n.[IsDeleted] = 0 AND n.[ValidTo] IS NULL
-               WHERE r.[ScopeKind] = N'NodeSubtree' AND (n.[Path] = sn.[Path] OR n.[Path] LIKE sn.[Path] + N'%')
+               -- V2 W2: a node's Path holds its ancestors' ids only (location.AddNode), so "under sn" is
+               -- sn itself or a Path that continues with sn's own id. The carried predicate (n.Path LIKE sn.Path + '%')
+               -- also matched every sibling subtree — a Transmission scope would have covered Distribution.
+               WHERE r.[ScopeKind] = N'NodeSubtree' AND (n.[EntityId] = sn.[EntityId] OR n.[Path] LIKE sn.[Path] + CONVERT(NVARCHAR(36), sn.[EntityId]) + N'/%')
                  AND (r.[ScopeAssetClassCode] IS NULL OR p.[AssetEntityId] IS NULL OR EXISTS (
                         SELECT 1 FROM [asset].[Asset] a JOIN [ref].[AssetType] t ON t.[AssetTypeCode] = a.[AssetTypeCode]
                         WHERE a.[EntityId] = p.[AssetEntityId] AND a.[IsDeleted] = 0 AND a.[ValidTo] IS NULL AND t.[AssetClassCode] = r.[ScopeAssetClassCode]))

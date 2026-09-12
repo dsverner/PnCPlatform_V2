@@ -31,9 +31,24 @@
     "document.SettingsIssuePackage": "ConfigurationFile"
   },
 
+  "_subjectKeys": "W2 (IDENTITY.md §5; API-W1-SECURITY.md #11): a body key that names the subject of a write and the ref.SubjectKind it implies. '*' = the object's class; '$SubjectKind' / '$MemberKind' = the body's own kind field. Order is preference.",
   "subjectKeys": [
-    "EntityId", "AssetEntityId", "DeviceEntityId", "NodeEntityId", "SchemeEntityId", "ConnectionEntityId",
-    "DocumentEntityId", "WorkRequestEntityId", "RecordEntityId", "PersonEntityId", "UserEntityId"
+    { "key": "EntityId",            "kind": "*" },
+    { "key": "AssetEntityId",       "kind": "Asset" },
+    { "key": "DeviceEntityId",      "kind": "Device" },
+    { "key": "NodeEntityId",        "kind": "Node" },
+    { "key": "ParentEntityId",      "kind": "Node" },
+    { "key": "ScopeNodeEntityId",   "kind": "Node" },
+    { "key": "SchemeEntityId",      "kind": "Scheme" },
+    { "key": "ConnectionEntityId",  "kind": "Connection" },
+    { "key": "DocumentEntityId",    "kind": "Document" },
+    { "key": "WorkRequestEntityId", "kind": "WorkRequest" },
+    { "key": "RecordEntityId",      "kind": "Record" },
+    { "key": "TestSheetEntityId",   "kind": "Record" },
+    { "key": "SubjectEntityId",     "kind": "$SubjectKind" },
+    { "key": "MemberEntityId",      "kind": "$MemberKind" },
+    { "key": "PersonEntityId",      "kind": "Person" },
+    { "key": "UserEntityId",        "kind": "User" }
   ],
 
   "procedures": {

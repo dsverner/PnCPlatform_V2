@@ -25,4 +25,19 @@ public sealed class AuthorizationService
             new Dictionary<string, object?> { ["@d"] = detail }, ct);
         throw new ApiException(403, "forbidden", $"{permissionCode} is not held for this subject.");
     }
+
+    /// <summary>
+    /// A list read (IDENTITY.md §5): does the user hold the permission in any scope? The rows themselves are then
+    /// scoped by security.fReadableSubjects. A refusal is logged like any other.
+    /// </summary>
+    public async Task RequireHeldAsync(SqlSession session, RequestUser user, string permissionCode, string operation, string host, CancellationToken ct)
+    {
+        var held = await session.ScalarAsync<bool>(
+            "SELECT [security].[fHoldsPermission](@u, @p, SYSDATETIMEOFFSET())",
+            new Dictionary<string, object?> { ["@u"] = user.UserEntityId, ["@p"] = permissionCode }, ct);
+        if (held) return;
+        var detail = JsonSerializer.Serialize(new { operation, permission = permissionCode, subjectKind = (string?)null, subjectEntityId = (Guid?)null, host });
+        await session.ExecAsync("EXEC [audit].[LogAction] @ActionKindCode = N'AccessRefused', @Detail = @d", new Dictionary<string, object?> { ["@d"] = detail }, ct);
+        throw new ApiException(403, "forbidden", $"{permissionCode} is not held in any scope.");
+    }
 }

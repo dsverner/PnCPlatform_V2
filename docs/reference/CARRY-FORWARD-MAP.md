@@ -119,6 +119,7 @@ subsystem:
 | `docs/schema/SCHEMA-DESIGN.md` — the predecessor's schema design, as written | The citation target of 378 DDL file headers (`-- SCHEMA-DESIGN §10.3 (145)`); carried so a table file can be followed to its reasoning (#82). Its decision numbers are the predecessor's, never V2's |
 | `docs/schema/ddl/CONVENTIONS.md` · `PROCEDURES.md` · `STEPS.md` | The project's own record of its conventions, procedures and build steps; annotated where W0 removed something, never rewritten (#77) |
 | `src/PnC.Api.Smoke` | **Rewritten in W1** (#88), not carried: 19 checks against the W1 surface, DEV-header or Windows identity, soft-delete cleanup |
+| `security.fReadableSubjects` · `security.fHoldsPermission` | **New in W2** (#94): the readable set of one subject family for a user and permission, and the any-scope gate for lists. `security.fHasPermission` is carried with **one predicate corrected** (sibling subtrees, `API-W2-SECURITY.md` #1) |
 | `src/PnC.Api` | **New in W1** (#84–#88), the predecessor's *design* consulted section by section (`docs/design/API.md` says which): generic dispatcher, catalogue from `sys.*`, `api-permissions.json`, `fHasPermission`, session-context attribution, `X-PnC-Dev-User`, `/health` · `/me` · `/catalog`, the hand-written PWA shell. One package, `Microsoft.Data.SqlClient` |
 
 Not carried: `src/PnC.Api` (the generic dispatcher, forms, definitions editor, expression checker

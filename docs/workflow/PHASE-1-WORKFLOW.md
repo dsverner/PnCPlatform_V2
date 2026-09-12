@@ -186,6 +186,21 @@ account on `vgsot.internal`. One row visible outside scope is a failure.
 
 **Depends on.** W1. **Estimate.** F: 8–14 h.
 
+**Gate record — 2026-09-12, DEV-header identities on the build laptop against `PnCPlatform_V2_DEV`.**
+- Schema: `fReadableSubjects`, `fHoldsPermission`, the `fHasPermission` predicate fix, the role and matrix
+  seeds, the division seed — `deploy.py` green, schema smoke **244 PASS** (release 0.2.0 recorded).
+- API smoke **47 PASS, 0 FAIL** as Administrator, ReadOnly and a `PCEngineer` scoped to Generation·Hydro,
+  on a fixture of two stations, buildings, panels and one placed asset under each of two divisions:
+  the Hydro engineer lists the Hydro asset, station and placement and **not** Transmission's; a single
+  read of the Transmission asset → 403; a write under the Hydro building → 200; the same under the
+  Transmission building → 403; both refusals in `audit.vActionLog`; Administrator and ReadOnly list
+  both assets; `security.vRole` holds exactly the seven active roles. Fixture soft-deleted after.
+- Scoped list reads measured at 31–33 ms (NFR-2).
+- Found and fixed on the way: the carried subtree predicate covered sibling divisions (a Hydro write
+  landed under Transmission before the fix; that row is soft-deleted). `API-W2-SECURITY.md`.
+- **Not done:** the Windows-mode run as a real `vgsot.internal` account holding a Hydro grant, and the
+  SID registration it exercises — both wait on dedicated gate accounts (W2 card, standing authorisation).
+
 ### W3 — Definitions and the `process` schema
 
 **Builds.** The `process` schema's twelve tables in the SQL project, with the four conventions and

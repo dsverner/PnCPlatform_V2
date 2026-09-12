@@ -32,3 +32,4 @@
 :r .\Seed_config_PlatformDeploymentTemplate.sql
 :r .\Seed_config_NotificationType.sql
 :r .\Seed_config_Workflow_Standard.sql
+:r .\Seed_location_Divisions.sql

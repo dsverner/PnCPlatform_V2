@@ -391,7 +391,7 @@ def main():
     check(q("SELECT COUNT(*) FROM audit.ActionLog WHERE ActionKindCode = N'FirmwareChanged' AND SubjectEntityId = ?", dev2)[0][0] == 2, "ApplyFirmware logs FirmwareChanged for the re-validation rule")
     # delegation (#34)
     per_d = q("DECLARE @e UNIQUEIDENTIFIER; EXEC personnel.Person_Add @FirstName=N'Smoke', @LastName=N'Delegate', @DisplayName=?, @EmployerEntityEntityId=?, @ActorId=?, @EntityId=@e OUTPUT; SELECT @e", W2 + " delegate", org2, SYSTEM_ACTOR)[0][0]
-    check(expect_error(cur, "DECLARE @e UNIQUEIDENTIFIER; EXEC security.Delegate @FromPersonEntityId=?, @ToPersonEntityId=?, @RoleCode=N'PncTechnician', @ActorId=?, @EntityId=@e OUTPUT", per_o, per_d, SYSTEM_ACTOR, contains="not positional"), "Delegate refuses a role that is not positional (§11.5)")
+    check(expect_error(cur, "DECLARE @e UNIQUEIDENTIFIER; EXEC security.Delegate @FromPersonEntityId=?, @ToPersonEntityId=?, @RoleCode=N'PCTechnician', @ActorId=?, @EntityId=@e OUTPUT", per_o, per_d, SYSTEM_ACTOR, contains="not positional"), "Delegate refuses a role that is not positional (§11.5)")
     dlg = q("DECLARE @e UNIQUEIDENTIFIER; EXEC security.Delegate @FromPersonEntityId=?, @ToPersonEntityId=?, @RoleCode=N'Administrator', @Reason=N'smoke', @ActorId=?, @EntityId=@e OUTPUT; SELECT @e", per_o, per_d, SYSTEM_ACTOR)[0][0]
     check(q("SELECT COUNT(*) FROM security.vDelegation WHERE EntityId = ?", dlg)[0][0] == 1, "Delegate writes a positional delegation")
     # cleanup (soft only)
@@ -1325,12 +1325,15 @@ def main():
     check(hp(usr7, "Asset.Read", "Asset", xf7) == False, "fHasPermission: deny by default (no grant)")
     check(q("SELECT COUNT(*) FROM security.vRolePermission WHERE RoleCode = N'Administrator'")[0][0] == q("SELECT COUNT(*) FROM security.vPermission WHERE IsActive = 1")[0][0]
           and q("SELECT COUNT(*) FROM security.vRolePermission WHERE RoleCode = N'ReadOnly' AND PermissionCode NOT LIKE N'%.Read'")[0][0] == 0, "seeded role permissions: Administrator holds every permission, ReadOnly only reads")
-    cur.execute("EXEC security.RolePermission_Upsert @RoleCode=N'PncTechnician', @PermissionCode=N'Asset.Read', @ActorId=?", SYSTEM_ACTOR)
-    g7 = q("DECLARE @e UNIQUEIDENTIFIER; EXEC security.Grant_Add @GranteeKind=N'User', @GranteeEntityId=?, @RoleCode=N'PncTechnician', @ScopeKind=N'NodeSubtree', @ScopeNodeEntityId=?, @GrantedByActorId=?, @ActorId=?, @EntityId=@e OUTPUT; SELECT @e", usr7, reg7, SYSTEM_ACTOR, SYSTEM_ACTOR)[0][0]
+    # V2 W2: PCTechnician holds Asset.Read by seed (IDENTITY.md §3); the upsert is idempotent and the cleanup below
+    # deactivates only what this smoke added, so a deploy's smoke never strips a seeded permission.
+    had_tech_read = q("SELECT COUNT(*) FROM security.vRolePermission WHERE RoleCode = N'PCTechnician' AND PermissionCode = N'Asset.Read'")[0][0] == 1
+    cur.execute("EXEC security.RolePermission_Upsert @RoleCode=N'PCTechnician', @PermissionCode=N'Asset.Read', @ActorId=?", SYSTEM_ACTOR)
+    g7 = q("DECLARE @e UNIQUEIDENTIFIER; EXEC security.Grant_Add @GranteeKind=N'User', @GranteeEntityId=?, @RoleCode=N'PCTechnician', @ScopeKind=N'NodeSubtree', @ScopeNodeEntityId=?, @GrantedByActorId=?, @ActorId=?, @EntityId=@e OUTPUT; SELECT @e", usr7, reg7, SYSTEM_ACTOR, SYSTEM_ACTOR)[0][0]
     check(hp(usr7, "Asset.Read", "Asset", xf7) == True and hp(usr7, "Asset.Read", "Node", st7) == True, "fHasPermission: a NodeSubtree grant covers an asset placed under the node and the node itself")
     check(hp(usr7, "Asset.Read", "Asset", host7) == False and hp(usr7, "Asset.Modify", "Asset", xf7) == False, "fHasPermission: not an asset outside the subtree, not a verb the role lacks")
-    g7c = q("DECLARE @e UNIQUEIDENTIFIER; EXEC security.Grant_Add @GranteeKind=N'User', @GranteeEntityId=?, @RoleCode=N'PncTechnician', @ScopeKind=N'NodeSubtree', @ScopeNodeEntityId=?, @ScopeAssetClassCode=N'Secondary', @GrantedByActorId=?, @ActorId=?, @EntityId=@e OUTPUT; SELECT @e", usr7, reg7, SYSTEM_ACTOR, SYSTEM_ACTOR)[0][0]
-    cur.execute("EXEC security.Grant_Revise @EntityId=?, @GranteeKind=N'User', @GranteeEntityId=?, @RoleCode=N'PncTechnician', @ScopeKind=N'Global', @GrantedByActorId=?, @RevokedByActorId=?, @RevocationReason=N'smoke', @ActorId=?", g7, usr7, SYSTEM_ACTOR, SYSTEM_ACTOR, SYSTEM_ACTOR)
+    g7c = q("DECLARE @e UNIQUEIDENTIFIER; EXEC security.Grant_Add @GranteeKind=N'User', @GranteeEntityId=?, @RoleCode=N'PCTechnician', @ScopeKind=N'NodeSubtree', @ScopeNodeEntityId=?, @ScopeAssetClassCode=N'Secondary', @GrantedByActorId=?, @ActorId=?, @EntityId=@e OUTPUT; SELECT @e", usr7, reg7, SYSTEM_ACTOR, SYSTEM_ACTOR)[0][0]
+    cur.execute("EXEC security.Grant_Revise @EntityId=?, @GranteeKind=N'User', @GranteeEntityId=?, @RoleCode=N'PCTechnician', @ScopeKind=N'Global', @GrantedByActorId=?, @RevokedByActorId=?, @RevocationReason=N'smoke', @ActorId=?", g7, usr7, SYSTEM_ACTOR, SYSTEM_ACTOR, SYSTEM_ACTOR)
     check(hp(usr7, "Asset.Read", "Asset", xf7) == False, "fHasPermission: a revoked grant no longer counts; a class-filtered grant (Secondary) does not cover a Primary asset")
     grp7 = q("DECLARE @e UNIQUEIDENTIFIER; EXEC security.Group_Add @Name=?, @ActorId=?, @EntityId=@e OUTPUT; SELECT @e", W7 + " group", SYSTEM_ACTOR)[0][0]
     cur.execute("EXEC security.GroupMember_Add @GroupEntityId=?, @UserEntityId=?, @ActorId=?", grp7, usr7, SYSTEM_ACTOR)
@@ -1348,7 +1351,8 @@ def main():
     cur.execute("EXEC security.User_SoftDelete @EntityId=?, @ActorId=?", usr7, SYSTEM_ACTOR)
     for pe_ in (per7, per7b):
         cur.execute("EXEC personnel.Person_SoftDelete @EntityId=?, @ActorId=?", pe_, SYSTEM_ACTOR)
-    cur.execute("EXEC security.RolePermission_Deactivate @RoleCode=N'PncTechnician', @PermissionCode=N'Asset.Read', @ActorId=?", SYSTEM_ACTOR)
+    if not had_tech_read:
+        cur.execute("EXEC security.RolePermission_Deactivate @RoleCode=N'PCTechnician', @PermissionCode=N'Asset.Read', @ActorId=?", SYSTEM_ACTOR)
     # cleanup (soft deletes; append-only rows stay, as designed)
     cur.execute("EXEC scheme.ProtectionOperation_SoftDelete @EntityId=?, @ActorId=?", op7, SYSTEM_ACTOR)
     cur.execute("EXEC record.Record_SoftDelete @EntityId=?, @ActorId=?", prec, SYSTEM_ACTOR)
