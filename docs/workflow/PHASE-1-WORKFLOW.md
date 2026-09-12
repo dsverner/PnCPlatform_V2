@@ -137,6 +137,16 @@ as Administrator.
   (anonymous at `/health` only) is written as `step8` and in the install script, **not yet applied**:
   the session's permission classifier began refusing the guest-agent calls. Remaining: apply step 8,
   `/health` and `/api/v1/me` from VM07, the two Windows-mode smoke runs.
+- **Observed on VM02, 2026-09-11 22:03 (VM clock), package rebuilt from 348a631.** The first package
+  failed at start under IIS (500.30): the map validation refused the two not-callable `platform.*`
+  entries because `app_execute` cannot see that schema's procedures — fixed in 348a631, the per-path
+  anonymous `/health` withdrawn (it routed to the static handler). After redeploy, from the VM itself
+  with `curl -k --negotiate`: **`/health` → 200** `{"environment":"QA","release":"0.1.0","database":"ok"}`;
+  **`/api/v1/me` as the machine account → the API's own 401** *Identity is not a platform user*, which
+  proves IIS Windows authentication, the UPN mapping path and the user lookup end to end; `/` → 200;
+  no credentials → IIS 401. The host reports environment **QA**: a machine-level
+  `ASPNETCORE_ENVIRONMENT=QA` exists on VM02 (where the predecessor set it was not recorded).
+  **Still owed:** the VM07 vantage point as VGS01 and VGS99 (browser, then the smoke).
 
 ### W2 — Identity, roles, scopes
 
