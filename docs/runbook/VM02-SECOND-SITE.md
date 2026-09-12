@@ -124,5 +124,15 @@ row the ReadOnly write check leaves in `audit.vActionLog` is what this session r
   reads the output back and deletes task, command file and output. The passwords never leave the laptop's
   `dev.local` except inside the encoded command. `Start-Process -Credential` from the agent's SYSTEM session
   is refused ("Access is denied"), which is why the task exists at all.
+- Two host facts the run depends on, found 2026-09-12 when the first runs produced nothing:
+  - **The gate accounts hold *Log on as a batch job* (`SeBatchLogonRight`)** — without it `schtasks /create`
+    warns *Batch logon privilege needs to be enabled for the task principal* and the task never starts (last
+    result 267011). Granted with `secedit /configure` from an exported `USER_RIGHTS` template that appends the
+    three SIDs (`…-1604`, `…-1605`, `…-1606`) to the existing holders (Administrators, Backup Operators,
+    Performance Log Users, IIS_IUSRS); verified by re-export. Reversible: the same template without them.
+  - **The run's command and output files are in `C:\Users\Public`**, not in `tools\smoke`: the accounts have
+    `BUILTIN\Users` read and execute on `C:\inetpub\PnCPlatform_V2`, so a redirect into it fails (exit 1, no file).
+- First full run 2026-09-12 09:42–09:45: Administrator 31 PASS, ReadOnly 9 PASS, Hydro 6 PASS (after the smoke's
+  role-list check was corrected to expect the engineer's 403); recorded in `PHASE-1-WORKFLOW.md`, W2.
 - The three gate accounts are platform users on `_V2_DEV` (Administrator Global, ReadOnly Global,
   PCEngineer on *Generation · Hydro*); `VGS01` / `VGS99` stay from W1 (#91) but are no longer gate fixtures.

@@ -211,11 +211,25 @@ account on `vgsot.internal`. One row visible outside scope is a failure.
 - **Incident on the way (#99):** the first 0.2.1 deploy was run without `--database` and went to the
   predecessor's `PnCPlatform_DEV`; the owner restored it to 08:35:00 from its backups on the incident card's
   ruling, verified by query afterwards. The tools' defaults and a refusal guard are the fix (e82688c).
-- **Not yet observed: the Windows-mode run as the three gate accounts** (and with it the SID registration of
-  #95 and the `identity_changed` refusal). The session's command classifier refuses to register the one-shot
-  scheduled task the run needs, so this is the owner's single command, from the laptop:
-  `python tools\ot\gate_runs.py` — it prints the three runs' PASS/FAIL lines and leaves nothing on VM02.
-  W2 closes when that prints three `SMOKE PASS` lines and `security.vAlternateKey` holds the three SIDs.
+- **Windows-mode run as the three gate accounts observed 2026-09-12 09:42–09:45 (VM02 clock), run by the
+  session** once the owner widened the session's standing permissions to the guest-agent path, the
+  `PnCPlatform_V2_*` databases and the gate accounts (the `autoMode` allow list in the owner's Claude settings,
+  09:36). Two obstacles on the way, both now in `gate_runs.py`'s header and the runbook: the accounts lacked
+  *Log on as a batch job* on VM02 (`schtasks` warned at create, the task never started, last result 267011)
+  — granted with `secedit`, verified by re-export; and the run's output file was redirected into
+  `tools\smoke`, where the accounts have only read and execute (exit 1, no output) — moved to `C:\Users\Public`.
+  Then: **`pnc-gate-admin` 31 PASS 0 FAIL 5 SKIP; `pnc-gate-ro` 9 PASS 0 FAIL 6 SKIP; `pnc-gate-hydro` first
+  5 PASS 1 FAIL**, the failure being the smoke's, not the platform's: its role-list check ran as whichever identity
+  the run had, and a `PCEngineer` holds no `Grant.Read`, so `security/vRole` answered 403 (the `AccessRefused`
+  row for `GET security.vRole`, permission `Grant.Read`, is attributed to the Hydro actor in `audit.vActionLog`).
+  The check now runs as Administrator or ReadOnly and, as the Hydro engineer, asserts the 403; rebuilt,
+  shipped to VM02 (`smoke-fdd.zip`, hash verified) and re-run: **`pnc-gate-hydro` 6 PASS 0 FAIL 8 SKIP.**
+  The DEV-header smoke on the laptop with the corrected check: **48 PASS, 0 FAIL** (the 47 above plus the 403).
+  `security.vAlternateKey` holds the three `ActiveDirectorySid` rows, each logged `sid-registered` (#95).
+- **W2 is done on that evidence.** Two things stay unobserved and are recorded, not assumed: the Windows-mode
+  smoke does not run the scope checks as the Hydro engineer (they need the Administrator's fixture in the same
+  process; each Windows-mode run is one identity), so *no row outside scope* stands on the DEV-header run
+  above; and the `identity_changed` refusal of the amended #95 has no re-created account to exercise it.
 - **Deployed to VGS-VM02 as 0.2.0 (package from 554b7b4), 2026-09-12**, through the guest agent: the first
   0.2.0 package failed at start because reading `sys.sql_expression_dependencies` needs VIEW DEFINITION on
   the whole database, which `app_execute` rightly lacks; the catalogue now reads each view's base tables

@@ -1,7 +1,10 @@
 """W2 card A1: the Windows-mode smoke on VGS-VM02 as each gate account. The guest agent runs as SYSTEM in session 0,
 where Start-Process -Credential is refused, so each run is a one-shot scheduled task registered with the account's
 credential, run, read back and deleted. Passwords come from the predecessor's dev.local, travel only inside the
-encoded command, and are never printed. Nothing persists on VM02 after a run (task deleted, files removed)."""
+encoded command, and are never printed. The command and output files live in C:\\Users\\Public: the gate accounts have only
+read and execute on the site folder, so a redirect into tools\\smoke fails with exit 1 and no output (found 2026-09-12).
+The accounts also need SeBatchLogonRight on VM02 (granted with secedit, 2026-09-12; without it schtasks warns at create
+and the task never starts, last result 267011). Nothing persists on VM02 after a run (task deleted, files removed)."""
 import os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import pve
@@ -17,7 +20,7 @@ for sam, key, mode in RUNS:
     pwd = env[key].replace("'", "''")
     task = f"PnC W2 gate {mode}"
     script = f"""$ErrorActionPreference = 'Continue'; $ProgressPreference = 'SilentlyContinue'
-$tools = '{TOOLS}'; $out = "$tools/run-{mode}.txt"; $cmd = "$tools/run-{mode}.cmd"
+$tools = '{TOOLS}'; $out = "C:/Users/Public/pnc-gate-{mode}.txt"; $cmd = "C:/Users/Public/pnc-gate-{mode}.cmd"
 Remove-Item $out -Force -ErrorAction SilentlyContinue
 $exe = ($tools -replace '/', [string][char]92) + [char]92 + 'PnC.Api.Smoke.exe'
 $outw = ($out -replace '/', [string][char]92)

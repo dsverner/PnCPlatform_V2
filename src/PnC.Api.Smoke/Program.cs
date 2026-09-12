@@ -287,11 +287,19 @@ if (readOnly is not null && fixtureOk)
     var ids = Ids(ab);
     Check(ast == HttpStatusCode.OK && ids.Contains(hydroAsset.ToString()!.ToLowerInvariant()) && ids.Contains(txAsset.ToString()!.ToLowerInvariant()), "as ReadOnly (Global), both assets are listed");
 }
+if (admin is not null || readOnly is not null)
 {
-    var (rs, rb) = await Get(any, "api/v1/security/vRole?take=50");
+    // Grant.Read is the Administrator's and ReadOnly's (IDENTITY.md §3); the engineer roles do not hold it.
+    var (rs, rb) = await Get((admin ?? readOnly)!, "api/v1/security/vRole?take=50");
     var roles = (rb?["rows"] as JsonArray)?.Select(r => r?["RoleCode"]?.ToString()).OrderBy(x => x).ToList() ?? [];
     var expected = new[] { "Administrator", "Assignee", "PCApprover", "PCEngineer", "PCTechnician", "PlacementOverride", "ReadOnly" }.OrderBy(x => x).ToList();
     Check(rs == HttpStatusCode.OK && roles.SequenceEqual(expected), $"security/vRole: exactly the active roles of IDENTITY.md §3 ({string.Join(", ", roles)})");
+}
+if (hydro is not null)
+{
+    // A PCEngineer holds no Grant.Read: the role list is refused, not filtered to empty (observed on VM02 2026-09-12 as pnc-gate-hydro).
+    var (rs, rb) = await Get(hydro, "api/v1/security/vRole?take=50");
+    Check(rs == HttpStatusCode.Forbidden && Code(rb) == "forbidden", $"security/vRole as the Hydro engineer → 403 forbidden (no Grant.Read) [{(int)rs} {Code(rb)}]");
 }
 
 // 7b. the refusals were logged
