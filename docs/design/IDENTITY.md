@@ -80,7 +80,7 @@ account types; they stay active and unlisted.
 | WorkRequest | Read, Modify, Report | Read, **Approve** | Read, Modify | Read |
 | Record | Read, Modify, Report | Read, **Approve** | Read, **Modify** | Read |
 | Obligation | Read, Report | Read | Read | Read |
-| Definition | Read | Read | Read | Read |
+| Definition | Read, **Modify, Approve** (W5 card F, #126; under a Global grant only — a definition has no node) | Read | Read | Read |
 | Grant | — | — | — | — |
 
 `Archive` and `Administer` stay the Administrator's everywhere. This is the proposition the W2 card

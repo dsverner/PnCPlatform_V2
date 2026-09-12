@@ -21,7 +21,7 @@ var windows = args.FirstOrDefault(a => a.StartsWith("--windows="))?["--windows="
 if (windows is not null and not ("Administrator" or "ReadOnly" or "Hydro" or "Approver" or "Technician")) { Console.Error.WriteLine("--windows must be Administrator, ReadOnly, Hydro, Approver or Technician"); return 2; }
 
 var systemActor = new Guid("00000000-0000-0000-0000-000000000001");
-var adminUpn = "smoke.admin@pnc.local"; var readUpn = "smoke.readonly@pnc.local"; var hydroUpn = "smoke.hydro@pnc.local"; var approverUpn = "smoke.approver@pnc.local"; var techUpn = "smoke.tech@pnc.local";
+var adminUpn = "smoke.admin@pnc.local"; var readUpn = "smoke.readonly@pnc.local"; var hydroUpn = "smoke.hydro@pnc.local"; var approverUpn = "smoke.approver@pnc.local"; var techUpn = "smoke.tech@pnc.local"; var engineerUpn = "smoke.engineer@pnc.local";
 const string HydroDivision = "Generation · Hydro", TransmissionDivision = "Transmission";
 int passed = 0, failed = 0, skipped = 0;
 void Check(bool ok, string what) { if (ok) { passed++; Console.WriteLine("  PASS " + what); } else { failed++; Console.WriteLine("  FAIL " + what); } }
@@ -42,6 +42,8 @@ HttpClient? hydro = windows is null || windows == "Hydro" ? Client(windows is nu
 HttpClient? approver = windows is null || windows == "Approver" ? Client(windows is null ? approverUpn : "self") : null;
 // W4: a technician (PCTechnician, Global) for the field steps
 HttpClient? tech = windows is null || windows == "Technician" ? Client(windows is null ? techUpn : "self") : null;
+// W5 card F (#126): a PCEngineer with a Global grant authors definitions (a subtree-scoped engineer holds the code but not the subject)
+HttpClient? engineer = windows is null ? Client(engineerUpn) : null;
 var anonymous = Client(null);
 var unknown = windows is null ? Client("nobody@pnc.local") : null;
 
@@ -109,6 +111,7 @@ if (windows is null)
     await Ensure(readUpn, "ReadOnly", "Reader", "Global", null);
     await Ensure(approverUpn, "Administrator", "Approver", "Global", null);
     await Ensure(techUpn, "PCTechnician", "Tech", "Global", null);
+    await Ensure(engineerUpn, "PCEngineer", "Engineer", "Global", null);
     var hydroDiv = await DivisionId(HydroDivision);
     if (hydroDiv is null) { Console.Error.WriteLine($"division '{HydroDivision}' is not seeded on this database (Seed_location_Divisions.sql)"); return 2; }
     await Ensure(hydroUpn, "PCEngineer", "Hydro", "NodeSubtree", hydroDiv);
@@ -501,15 +504,20 @@ if (readOnly is not null)
 string? drawingV2Row = null;
 if (admin is not null)
 {
-    var (ds, db) = await Post(admin, "api/v1/definitions/documents", new { document = JsonNode.Parse(Example("drawing-revision.procedure.json")), changeNote = "W5: authored in the tool" });
+    var (ds, db) = await Post(engineer ?? admin, "api/v1/definitions/documents", new { document = JsonNode.Parse(Example("drawing-revision.procedure.json")), changeNote = "W5: authored in the tool" + (engineer is null ? "" : " by a Global PCEngineer (#126)") });
     drawingV2Row = db?["versionRowId"]?.ToString();
-    Check(ds == HttpStatusCode.OK && drawingV2Row is not null, $"load DRAWING_REVISION v2 → {(int)ds} {Code(db)} (version {db?["versionNumber"]}, existing {db?["existing"]})");
+    Check(ds == HttpStatusCode.OK && drawingV2Row is not null, $"load DRAWING_REVISION (the tool-authored version) as {(engineer is null ? "the Administrator" : "a Global PCEngineer, #126")} → {(int)ds} {Code(db)} (version {db?["versionNumber"]}, existing {db?["existing"]})");
+    if (hydro is not null)
+    {
+        var (hs, hb) = await Post(hydro, "api/v1/definitions/documents", new { document = JsonNode.Parse(Example("drawing-revision.procedure.json")) });
+        Check(hs == HttpStatusCode.Forbidden, $"the subtree-scoped engineer holds Definition.Modify but not the subject (Global only) → 403 ({hb?["detail"]})");
+    }
     if (drawingV2Row is not null && approver is not null)
     {
         var (das, dab) = await Post(approver, $"api/v1/definitions/documents/{drawingV2Row}/approve", new { });
-        Check(das == HttpStatusCode.OK || AlreadyApproved(dab), $"DRAWING_REVISION v2 approved by the second Administrator → {(int)das} {Code(dab)} (projected {dab?["projectedSteps"]})");
+        Check(das == HttpStatusCode.OK || AlreadyApproved(dab), $"the tool-authored DRAWING_REVISION approved by the second Administrator → {(int)das} {Code(dab)} (projected {dab?["projectedSteps"]})");
         var (dvs, dvb) = await Get(admin, $"api/v1/config/vDefinitionVersion?RowId={drawingV2Row}");
-        Check((dvb?["rows"] as JsonArray)?.FirstOrDefault()?["Status"]?.ToString() == "Effective", "DRAWING_REVISION v2 is the Effective version");
+        Check((dvb?["rows"] as JsonArray)?.FirstOrDefault()?["Status"]?.ToString() == "Effective", "the tool-authored DRAWING_REVISION is the Effective version");
     }
 }
 else Skip("W5 DRAWING_REVISION v2 (needs the Administrator identity)");
@@ -715,7 +723,7 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
             var childCaptures = new Dictionary<string, object>
             {
                 ["IDENTIFY_DRAWINGS"] = new { drawingReferences = $"{tag} drawings: 1234-E-001 rev C, 1234-E-014 rev B", note = "fixture" },
-                ["RECORD_REVISION"] = new { documentLink = $"drawings://issue/{tag}", revisionLabel = "C", issuedOn = DateTimeOffset.Now },
+                ["RECORD_REVISION"] = new { documentLink = $"drawings://issue/{tag}", revisionLabel = "C", revisedOn = DateTimeOffset.Now },
             };
             var committed = new List<string>();
             for (var round = 0; round < 6; round++)
@@ -739,7 +747,7 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
             var childRow = (cfb2?["rows"] as JsonArray)?.FirstOrDefault();
             Must(childRow?["State"]?.ToString() == "Completed", $"the DRAWING_REVISION child run completed inside the SETTINGS_CHANGE run ({childRow?["State"]}; steps {string.Join(", ", committed)})");
             if (drawingV2Row is not null)
-                Must(string.Equals(childRow?["DefinitionVersionRowId"]?.ToString(), drawingV2Row, StringComparison.OrdinalIgnoreCase), "the child run is pinned to DRAWING_REVISION v2, the version authored in the tool");
+                Must(string.Equals(childRow?["DefinitionVersionRowId"]?.ToString(), drawingV2Row, StringComparison.OrdinalIgnoreCase), "the child run is pinned to the DRAWING_REVISION version authored in the tool (v3 shape: 14a, then 14b only when drawings are affected)");
         }
         await RunStep(admin, "BASELINE", new { outcome = "Done" });
         Must((await LifecycleState()) == "InService", "BASELINE advanced the lifecycle to InService");
@@ -849,8 +857,8 @@ else Skip("W4 run (needs the Administrator, Approver, Hydro and Technician ident
         if (drawingV2Row is not null)
         {
             var (rbs, rbb) = await Get(readOnly, $"api/v1/definitions/documents/{drawingV2Row}");
-            var pre = rbb?["document"]?["body"]?["items"]?[1]?["precondition"];
-            Check(rbs == HttpStatusCode.OK && pre is JsonValue && pre.ToString().Contains("step.outcome[id='IDENTIFY_DRAWINGS']"), $"read-back of DRAWING_REVISION v2 prints the precondition as grammar text ({pre})");
+            var pre = rbb?["document"]?["body"]?["items"]?[1]?["cases"]?[0]?["when"];
+            Check(rbs == HttpStatusCode.OK && pre is JsonValue && pre.ToString().Contains("step.outcome[id='IDENTIFY_DRAWINGS']"), $"read-back of DRAWING_REVISION prints the choice's when as grammar text ({pre})");
         }
     }
     else Skip("W5 dry run (needs the ReadOnly identity)");

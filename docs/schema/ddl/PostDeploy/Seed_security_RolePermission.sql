@@ -31,6 +31,7 @@ CROSS JOIN (VALUES (N'Read'), (N'Modify'), (N'Approve'), (N'Report')) v ([Verb])
 WHERE v.[Verb] = N'Read'
    OR (r.[RoleCode] = N'PCEngineer'   AND v.[Verb] IN (N'Modify', N'Report') AND c.[SubjectClass] NOT IN (N'Definition', N'Obligation'))
    OR (r.[RoleCode] = N'PCEngineer'   AND v.[Verb] = N'Report'  AND c.[SubjectClass] = N'Obligation')
+   OR (r.[RoleCode] = N'PCEngineer'   AND v.[Verb] IN (N'Modify', N'Approve') AND c.[SubjectClass] = N'Definition')   -- W5 card F (#126): engineers author and approve procedures; segregation still needs a second person
    OR (r.[RoleCode] = N'PCApprover'   AND v.[Verb] = N'Approve' AND c.[SubjectClass] IN (N'ConfigurationFile', N'Document', N'WorkRequest', N'Record'))
    OR (r.[RoleCode] = N'PCTechnician' AND v.[Verb] = N'Modify'  AND c.[SubjectClass] IN (N'ConfigurationFile', N'WorkRequest', N'Record'));
 DECLARE @r NVARCHAR(40), @p NVARCHAR(80);

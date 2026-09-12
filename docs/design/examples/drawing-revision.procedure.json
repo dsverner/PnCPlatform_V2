@@ -3,7 +3,7 @@
   "kind": "procedure",
   "key": "DRAWING_REVISION",
   "name": "Drawing revision",
-  "description": "v2 (W5, 2026-09-12): the first procedure authored in the tool rather than by hand. Two steps carrying exactly what the legacy documentation track recorded (LEGACY-SYSTEM.md §8: a status, a note, a date and a document link) — no more, because the owner's words on drawings stop there (FR-3.1: a distinct step; FR-5.2: the drawing system holds the file, the platform holds the depiction by drawing key). Anything richer — depiction rows by drawing key, a check step, reconciliation findings — is put to the owner on a card with this version as the example. Called by SETTINGS_CHANGE at COMPLETION over the same work request. Replaces the W4 placeholder v1 (decision #112).",
+  "description": "v3 (W5 card, 2026-09-12; decisions #123–#125): the drawings track of a settings change, authored in the definitions screen. Step 14a identifies the drawings the change touches — or records that none are affected, which the owner says is the case for most settings changes (rationale documents change, drawings often do not); only when drawings are affected does 14b record the revision. The people who revise drawings work outside the platform in the drawing system, so 14b records what they did: the link to the revised set, its revision label and the date the revision was made. Drawing references stay text for Phase 1; the pattern drawing revisions follow is to be discussed and documented later, and a check step is a document edit for a later stage. Called by SETTINGS_CHANGE at COMPLETION over the same work request. v2 (W5) carried the legacy track's fields; v1 (W4) was a placeholder.",
   "subjectKind": "WorkRequest",
   "roles": {
     "engineer": { "role": "PCEngineer" }
@@ -17,28 +17,39 @@
         "block": "step",
         "id": "IDENTIFY_DRAWINGS",
         "title": "[14a] Identify the drawings affected by the change",
-        "instruction": "List every drawing the settings change touches — schematics, wiring, setting sheets, one-lines — by its drawing number as the drawing system knows it. This is the scope the revision is checked against; a drawing left off this list is a drawing nobody revises.",
+        "instruction": "List every drawing the settings change touches — schematics, wiring, setting sheets, one-lines — by its drawing number as the drawing system knows it, and commit Done. If the change touches no drawing (the rationale document changes, the drawings do not), commit NoneAffected and this track ends here.",
         "role": "engineer",
         "capture": {
-          "drawingReferences": { "type": "text", "required": true },
+          "drawingReferences": { "type": "text" },
           "note": { "type": "text" }
         },
+        "outcomes": ["Done", "NoneAffected"],
         "record": { "kind": "ScopeDecision" }
       },
       {
-        "block": "step",
-        "id": "RECORD_REVISION",
-        "title": "[14b] Record the revised issue",
-        "instruction": "When the drawing system has issued the revised drawings, record the issue here: the link to the issued set, its revision label, the date it was issued and any note. The platform keeps the depiction reference; the drawing system keeps the file.",
-        "role": "engineer",
-        "precondition": "step.outcome[id='IDENTIFY_DRAWINGS'] = 'Done'",
-        "capture": {
-          "documentLink": { "type": "text", "required": true },
-          "revisionLabel": { "type": "text" },
-          "issuedOn": { "type": "date", "required": true },
-          "note": { "type": "text" }
-        },
-        "record": { "kind": "DrawingUpdate" }
+        "block": "choice",
+        "id": "DRAWINGS_AFFECTED",
+        "title": "Only when drawings are affected",
+        "cases": [
+          {
+            "title": "Drawings affected",
+            "when": "step.outcome[id='IDENTIFY_DRAWINGS'] = 'Done'",
+            "body": {
+              "block": "step",
+              "id": "RECORD_REVISION",
+              "title": "[14b] Record the drawing revision",
+              "instruction": "The drawing office revises the drawings in the drawing system, outside this platform. When they have, record what they did: the link to the revised set, its revision label, the date the revision was made and any note. The platform keeps this reference; the drawing system keeps the file.",
+              "role": "engineer",
+              "capture": {
+                "documentLink": { "type": "text", "required": true },
+                "revisionLabel": { "type": "text" },
+                "revisedOn": { "type": "date", "required": true },
+                "note": { "type": "text" }
+              },
+              "record": { "kind": "DrawingUpdate" }
+            }
+          }
+        ]
       }
     ]
   }

@@ -417,6 +417,13 @@ untouched; `DRAWING_REVISION` completes inside a `SETTINGS_CHANGE` run.
   predecessor's `definitions.js` / `expression.js`, which #64 did not carry — the editor is new code, 8 h against the
   8–14 estimated; the 28 half-run gate instances on DEV stay until a migration ruling or cleanup (each DEV gate run
   adds one).
+- **W5 card answered 2026-09-12 17:20Z** (A keep, B text, C no check, D external drafting, E revised, F engineers
+  author and approve): decisions #123–#126. `DRAWING_REVISION` v3 authored in the screen and Effective on DEV (14a
+  `Done` / `NoneAffected`; 14b inside a choice; `revisedOn`); the matrix seed gives PCEngineer `Definition.Modify`
+  and `Definition.Approve`, observed on `/me` for the Hydro engineer after the redeploy — who is still refused 403 because
+  their grant is a node subtree and a definition has no node (Global only, #118); a Global engineer (`smoke.engineer`)
+  authors, the second Administrator approves. The owner's note on B — the
+  pattern drawing revisions follow is to be documented later — is an open item for a later card.
 
 ### W6 — Parity screens and the FLOC view
 
