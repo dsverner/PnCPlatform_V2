@@ -1,7 +1,7 @@
 """
-Build → publish → generate → build → publish → smoke, against PnCPlatform_DEV by default.
+Build → publish → generate → build → publish → smoke, against PnCPlatform_V2_DEV by default (never the predecessor's PnCPlatform_DEV).
 
-    python tools/deploy.py [--server 10.10.70.25] [--database PnCPlatform_DEV]
+    python tools/deploy.py [--server 10.10.70.25] [--database PnCPlatform_V2_DEV]
                            [--fresh]        drop and recreate the database first
                            [--no-generate]  skip the generator pass
                            [--no-smoke]     skip tools/smoke.py
@@ -103,7 +103,8 @@ def ensure_filestream_directory(server, database, pwd):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--server", default="10.10.70.25")
-    ap.add_argument("--database", default="PnCPlatform_DEV")
+    ap.add_argument("--database", default="PnCPlatform_V2_DEV")
+    ap.add_argument("--allow-any-database", action="store_true", help="publish to a database whose name does not start with PnCPlatform_V2_ (never the predecessor's PnCPlatform_DEV / _QA)")
     ap.add_argument("--fresh", action="store_true")
     ap.add_argument("--no-generate", action="store_true")
     ap.add_argument("--no-smoke", action="store_true")
@@ -111,6 +112,10 @@ def main():
     ap.add_argument("--package", default=None, help="dist/<version> from tools/package_release.py: its release.json package hash is recorded on the release row")
     ap.add_argument("--bootstrap", action="store_true", help="first pass builds tables only (automatic when no generated files exist)")
     a = ap.parse_args()
+    # 2026-09-12 incident: this script defaulted to PnCPlatform_DEV — the predecessor's database, which V2 never
+    # touches (CLAUDE.md) — and one unqualified run published the V2 schema over it. V2 targets are named for it.
+    if not a.database.startswith("PnCPlatform_V2_") and not a.allow_any_database:
+        sys.exit(f"refusing to publish to {a.database}: V2 deploys go to PnCPlatform_V2_*; pass --allow-any-database only for a database that is yours")
     pwd = password()
     if a.fresh:
         fresh(a.server, a.database, pwd)

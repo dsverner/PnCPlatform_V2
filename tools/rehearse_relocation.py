@@ -9,7 +9,7 @@ Exit code 1 if any performed step fails.
 
 Usage (DEV, everything from the build machine):
   python tools/rehearse_relocation.py --package dist/0.10.0 --api-url http://localhost:5200 --satellite-url http://localhost:5210
-         --server 10.10.70.25 --database PnCPlatform_DEV --user smoke.admin@pnc.local
+         --server 10.10.70.25 --database PnCPlatform_V2_DEV --user smoke.admin@pnc.local
          [--expect-refused host:port]   # step 5: a Business-side connection into OT that must be refused
 
 Usage (QA/PROD, decision 256 - the evidence comes from three vantage points, because the register allows nothing else):
@@ -148,7 +148,7 @@ def main():
     ap.add_argument("--satellite-url", default="http://localhost:5210")
     ap.add_argument("--smoke-log", action="append", default=[], help="a PnC.Api.Smoke log produced on the Application VM (repeatable: one per role)")
     ap.add_argument("--server", default="10.10.70.25")
-    ap.add_argument("--database", default="PnCPlatform_DEV")
+    ap.add_argument("--database", default="PnCPlatform_V2_DEV")
     ap.add_argument("--user", default="smoke.admin@pnc.local", help="the DEV-mode principal (ignored under Windows authentication)")
     ap.add_argument("--expect-refused", default=None, help="host:port on OT that must refuse a connection from here (step 5)")
     ap.add_argument("--no-smoke", action="store_true")

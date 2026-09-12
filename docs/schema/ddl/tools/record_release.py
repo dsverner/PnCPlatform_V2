@@ -67,7 +67,7 @@ def environment(database):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--server", default="10.10.70.25")
-    ap.add_argument("--database", default="PnCPlatform_DEV")
+    ap.add_argument("--database", default="PnCPlatform_V2_DEV")
     ap.add_argument("--outcome", default="Succeeded", choices=["Succeeded", "Failed", "RolledBack"])
     ap.add_argument("--smoke-checks", type=int, default=None)
     ap.add_argument("--notes", default=None)

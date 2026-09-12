@@ -8,7 +8,7 @@ project. Files carry a GENERATED header; tools/check_generated.py fails if any d
 fresh generation.
 
 Usage:
-    python tools/generate.py [--server 10.10.70.25] [--database PnCPlatform_DEV] [--check]
+    python tools/generate.py [--server 10.10.70.25] [--database PnCPlatform_V2_DEV] [--check]
 
 --check writes nothing; exits 1 if any generated file would change (used by check_generated.py).
 """
@@ -501,7 +501,7 @@ def generate(tables, kinds, existing):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--server", default="10.10.70.25")
-    ap.add_argument("--database", default="PnCPlatform_DEV")
+    ap.add_argument("--database", default="PnCPlatform_V2_DEV")
     ap.add_argument("--check", action="store_true")
     a = ap.parse_args()
     cur = connect(a.server, a.database).cursor()

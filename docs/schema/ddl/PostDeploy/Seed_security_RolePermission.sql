@@ -39,7 +39,7 @@ OPEN m; FETCH NEXT FROM m INTO @r, @p;
 WHILE @@FETCH_STATUS = 0
 BEGIN
     IF EXISTS (SELECT 1 FROM [security].[Permission] WHERE [PermissionCode] = @p AND [IsActive] = 1)
-       AND NOT EXISTS (SELECT 1 FROM [security].[RolePermission] WHERE [RoleCode] = @r AND [PermissionCode] = @p AND [IsActive] = 1)
+       AND NOT EXISTS (SELECT 1 FROM [security].[RolePermission] WHERE [RoleCode] = @r AND [PermissionCode] = @p)   -- any row, active or not: a deactivated mapping is an Administrator's decision and survives a deploy (#96)
         EXEC [security].[RolePermission_Upsert] @RoleCode = @r, @PermissionCode = @p, @ActorId = @a;
     FETCH NEXT FROM m INTO @r, @p;
 END

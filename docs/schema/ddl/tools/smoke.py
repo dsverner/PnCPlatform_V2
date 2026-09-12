@@ -49,7 +49,7 @@ def expect_error(cur, sql, *params, contains=""):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--server", default="10.10.70.25")
-    ap.add_argument("--database", default="PnCPlatform_DEV")
+    ap.add_argument("--database", default="PnCPlatform_V2_DEV")
     a = ap.parse_args()
     con = pyodbc.connect(f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={a.server};DATABASE={a.database};UID=dev_pnc;PWD={password()};TrustServerCertificate=yes", autocommit=True, timeout=15)
     # pyodbc cannot read DATETIMEOFFSET (SQL type -155): decode it (the temporal views return it)
@@ -1110,7 +1110,7 @@ def main():
     cur.execute("EXEC config.ApproveDefinitionVersion @VersionRowId=?, @ActorId=?", bpv, APPROVER)
     eff = q("SELECT VersionRowId, PayloadText FROM config.vEffectiveBackupPolicy WHERE DefinitionKey = ?", W5)
     check(len(eff) == 1 and str(eff[0][0]).lower() == str(bpv).lower() and eff[0][1] == payload, "vEffectiveBackupPolicy returns the effective policy payload")
-    br = q("SET NOCOUNT ON; DECLARE @b BIGINT, @n DATETIMEOFFSET(7) = SYSDATETIMEOFFSET(); EXEC audit.RecordBackupRun @PolicyDefinitionVersionRowId=?, @BackupKind=N'Full', @DatabaseName=N'PnCPlatform_DEV', @StartedAt=@n, @CompletedAt=@n, @DestinationReference=N'smoke', @ChecksumVerified=1, @VerifyOnlyPassed=1, @Outcome=N'Succeeded', @BackupRunId=@b OUTPUT; SELECT @b", bpv)[0][0]
+    br = q("SET NOCOUNT ON; DECLARE @b BIGINT, @n DATETIMEOFFSET(7) = SYSDATETIMEOFFSET(); EXEC audit.RecordBackupRun @PolicyDefinitionVersionRowId=?, @BackupKind=N'Full', @DatabaseName=N'PnCPlatform_V2_DEV', @StartedAt=@n, @CompletedAt=@n, @DestinationReference=N'smoke', @ChecksumVerified=1, @VerifyOnlyPassed=1, @Outcome=N'Succeeded', @BackupRunId=@b OUTPUT; SELECT @b", bpv)[0][0]
     check(q("SELECT COUNT(*) FROM audit.vBackupRun WHERE BackupRunId = ?", br)[0][0] == 1, "RecordBackupRun appended and visible in audit.vBackupRun")
     rt = q("SET NOCOUNT ON; DECLARE @t BIGINT, @n DATETIMEOFFSET(7) = SYSDATETIMEOFFSET(); EXEC audit.RecordRestoreTest @BackupRunId=?, @RestoredToServer=N'smoke', @StartedAt=@n, @CompletedAt=@n, @IntegrityCheckPassed=1, @RowCountsMatched=1, @Outcome=N'Succeeded', @ActorId=?, @RestoreTestId=@t OUTPUT; SELECT @t", br, SYSTEM_ACTOR)[0][0]
     check(q("SELECT AchievedRtoMinutes FROM audit.vRestoreTest WHERE RestoreTestId = ?", rt)[0][0] == 0, "RecordRestoreTest appended with derived RTO")
