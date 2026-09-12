@@ -161,6 +161,9 @@ as Administrator.
   beforehand: the account was active, unlocked, password set 2026-09-07, never logged on; Guacamole's
   own throttle ("too many login errors") was the earlier obstacle, not the account. **Still owed:** one
   view read as ReadOnly, one write refused as ReadOnly and allowed as Administrator — the smoke.
+- **View read as VGS99, 2026-09-12 (owner's report, same window):** `GET /api/v1/asset/vAsset?take=5`
+  answered `{"view":"asset.vAsset","skip":0,"take":5,"rows":[]}` — 200, the empty V2 estate. **Still
+  owed:** one write refused as ReadOnly and allowed as Administrator.
 
 ### W2 — Identity, roles, scopes
 
