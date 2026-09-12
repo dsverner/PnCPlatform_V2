@@ -98,9 +98,10 @@ if (windows is null)
 
 Console.WriteLine($"PnC.Api.Smoke against {baseUrl} ({(windows is null ? "DEV header identities" : "Windows identity as " + windows)})");
 
-// 1. /health
+// 1. /health — the app ignores the identity, but in Windows mode IIS authenticates every caller first (as on the
+//    predecessor's site), so the call carries the process identity there.
 {
-    var (st, b) = await Get(anonymous, "health");
+    var (st, b) = await Get(windows is null ? anonymous : (admin ?? readOnly)!, "health");
     Check(st == HttpStatusCode.OK && b?["database"]?.ToString() == "ok", $"/health database ok (release {b?["release"]}, environment {b?["environment"]})");
     Check(b?["release"] is not null, "/health reports a release");
 }

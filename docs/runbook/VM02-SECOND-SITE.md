@@ -83,8 +83,14 @@ identity `VGSOT\svc-pncapi` carried over without its password being handled; sit
 `https *:8443` (no host header, matching the predecessor's `*:443`) with certificate `E1443DF1…B51DAE`;
 Windows auth on, anonymous off; firewall rule *PnC F1 HTTPS 8443 from Application VM (V2)*, TCP 8443 from
 10.10.70.21. HTTP.sys shows the certificate on both ports. `curl -k` from the VM reached IIS on 8443 and got
-**401.2 on `/health`** — anonymous access was off site-wide, so IIS challenged before the app saw the
-request; `/health` is allowed anonymous at that one path (`step8`, and the install script's step 4d).
+**401.2 on `/health`** — IIS authenticates every caller, as on the predecessor's site; a per-path anonymous
+location was tried and sent `/health` to the static-file handler (404.0), so it was removed. With Negotiate
+(`curl -k --negotiate -u :` as SYSTEM) the request reached the app and exposed the real fault: **500.30, the
+app failed at start** — `api-permissions.json` names `platform.Release_Append` and `platform.Deployment_Append`
+as not callable, and under `app_execute` those procedures are invisible in `sys.procedures` (no rights on the
+`platform` schema, `Roles.sql`), so the start-up validation refused a map that was correct. Fixed in code:
+only entries that make a procedure *callable* must exist; not-callable entries naming unseen procedures are
+logged. Lesson for every wave: the catalogue the app sees is the identity's, not `db_owner`'s.
 PowerShell 5.1's own web client on VM02 fails the TLS handshake to the site (the predecessor's note about
 VM02 and its own certificate); `curl.exe` with `-k` is the check that works there.
 

@@ -66,10 +66,8 @@ if (-not (Get-Website -Name $SiteName -ErrorAction SilentlyContinue)) {
 Set-WebConfigurationProperty -PSPath "IIS:\" -Location $SiteName -Filter 'system.webServer/security/authentication/anonymousAuthentication' -Name enabled -Value $false
 Set-WebConfigurationProperty -PSPath "IIS:\" -Location $SiteName -Filter 'system.webServer/security/authentication/windowsAuthentication' -Name enabled -Value $true
 Write-Host "4c. Windows authentication on, anonymous off"
-# /health carries no identity by design (API.md §7); with anonymous off site-wide IIS answers 401.2 before the app.
-# The section is locked against web.config overrides, so it is set in applicationHost.config for this one path.
-Set-WebConfigurationProperty -PSPath 'MACHINE/WEBROOT/APPHOST' -Location "$SiteName/health" -Filter 'system.webServer/security/authentication/anonymousAuthentication' -Name enabled -Value $true
-Write-Host "4d. anonymous allowed at /health only"
+# /health: IIS authenticates the caller like every other URL (a per-path anonymous location was tried on
+# 2026-09-11 and sent /health to the static-file handler, 404.0); the app ignores the identity on /health.
 
 # 5. certificate: the one already bound on :443
 $existing = Get-ChildItem IIS:\SslBindings | Where-Object { $_.Port -eq 443 } | Select-Object -First 1
@@ -95,7 +93,7 @@ Start-Sleep -Seconds 3
 $prev = [System.Net.ServicePointManager]::ServerCertificateValidationCallback
 [System.Net.ServicePointManager]::ServerCertificateValidationCallback = { $true }
 try {
-    $health = Invoke-RestMethod -Uri "https://${HostName}:$Port/health" -UseBasicParsing
+    $health = Invoke-RestMethod -Uri "https://${HostName}:$Port/health" -UseBasicParsing -UseDefaultCredentials
     Write-Host ("7. /health → environment {0}, release {1}, database {2}" -f $health.environment, $health.release, $health.database)
 } finally { [System.Net.ServicePointManager]::ServerCertificateValidationCallback = $prev }
 Write-Host "Done. Next, from VGS-VM07: PnC.Api.Smoke.exe https://${HostName}:$Port - --windows=Administrator  (and --windows=ReadOnly)"

@@ -26,7 +26,7 @@ if (authMode.Equals("Development", StringComparison.OrdinalIgnoreCase) && !build
 
 var catalog = Catalog.Load(connectionString, schemas);
 var map = PermissionMap.Load(Path.Combine(AppContext.BaseDirectory, "api-permissions.json"));
-map.Validate(catalog);
+var unseen = map.Validate(catalog);
 var authz = new AuthorizationService();
 
 if (authMode.Equals("Windows", StringComparison.OrdinalIgnoreCase))
@@ -35,6 +35,8 @@ if (authMode.Equals("Windows", StringComparison.OrdinalIgnoreCase))
 var app = builder.Build();
 app.Logger.LogInformation("PnC.Api {Env}: catalogue {Procs} procedures, {Views} views across {Schemas} schemas; auth mode {Mode}",
     app.Environment.EnvironmentName, catalog.Procedures.Count, catalog.Views.Count, catalog.Schemas.Count, authMode);
+if (unseen.Count > 0)
+    app.Logger.LogInformation("api-permissions.json: {Count} not-callable entries name procedures this identity cannot see: {Names}", unseen.Count, string.Join(", ", unseen));
 
 // 1. security headers on every response (§7): no inline anything, nothing cached under /api
 app.Use(async (context, next) =>

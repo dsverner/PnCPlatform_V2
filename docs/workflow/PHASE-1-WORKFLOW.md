@@ -128,6 +128,15 @@ as Administrator.
   the owner installs the second site by hand from `docs/runbook/VM02-SECOND-SITE.md`; `VGS01@vgsot.internal`
   (Administrator, Global) and `VGS99@vgsot.internal` (ReadOnly, Global) seeded on `_V2_DEV` as gate fixtures.
   **Still owed:** the site on VM02 and the VM07 run; W1 closes when that result is observed here.
+- **VM02 second site, 2026-09-11 (through the Proxmox guest agent as `claude-rw@pve`, after the owner
+  allowed the path).** Observed on the VM: package transferred and hash-verified; unpacked to
+  `C:\inetpub\PnCPlatform_V2`; pool `PnCPlatformV2` cloned with identity `VGSOT\svc-pncapi`; site
+  `PnCPlatform_V2` on `https *:8443` with the existing certificate; Windows auth on; firewall TCP 8443
+  from VM07; HTTP.sys carries the certificate on 8443. `curl -k` on the VM reached IIS: **401.2 on
+  `/health`** because anonymous access was off site-wide (`docs/runbook/VM02-SECOND-SITE.md`). The fix
+  (anonymous at `/health` only) is written as `step8` and in the install script, **not yet applied**:
+  the session's permission classifier began refusing the guest-agent calls. Remaining: apply step 8,
+  `/health` and `/api/v1/me` from VM07, the two Windows-mode smoke runs.
 
 ### W2 — Identity, roles, scopes
 

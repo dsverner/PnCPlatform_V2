@@ -32,15 +32,22 @@ public sealed class PermissionMap
         return new PermissionMap(f);
     }
 
-    /// <summary>The map cannot drift from the schema: every explicit entry must name a procedure that exists.</summary>
-    public void Validate(Catalog catalog)
+    /// <summary>
+    /// The map cannot drift from the schema: every entry that makes a procedure callable must name one the
+    /// catalogue holds. An entry mapped to null (not callable) may name a procedure the API's identity cannot
+    /// see — sys.procedures shows only what the login has rights on, and app_execute has none on the platform
+    /// schema's procedures (Roles.sql) — so those are reported, never fatal. Found on VGS-VM02, 2026-09-11.
+    /// </summary>
+    public IReadOnlyList<string> Validate(Catalog catalog)
     {
-        var missing = _f.Procedures.Keys.Where(k => !catalog.Procedures.ContainsKey(k)).ToList();
+        var missing = _f.Procedures.Where(kv => kv.Value is not null && !catalog.Procedures.ContainsKey(kv.Key)).Select(kv => kv.Key).ToList();
         if (missing.Count > 0)
-            throw new InvalidOperationException("api-permissions.json names procedures that are not in the catalogue: " + string.Join(", ", missing));
+            throw new InvalidOperationException("api-permissions.json makes procedures callable that are not in the catalogue: " + string.Join(", ", missing));
+        var unseen = _f.Procedures.Where(kv => kv.Value is null && !catalog.Procedures.ContainsKey(kv.Key)).Select(kv => kv.Key).ToList();
         var unknownSchemas = _f.BySchema.Keys.Where(s => !catalog.Schemas.Contains(s, StringComparer.OrdinalIgnoreCase)).ToList();
         if (unknownSchemas.Count > 0)
             throw new InvalidOperationException("api-permissions.json maps schemas that are not served: " + string.Join(", ", unknownSchemas));
+        return unseen;
     }
 
     public string? SubjectClass(string schema, string objectName)
