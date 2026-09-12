@@ -112,3 +112,17 @@ from 348a631, observed on VM02 with `curl -k --negotiate -u :` as SYSTEM: **`/he
 ping but times out on commands, so that is the owner's, on the round-3 test card. The `AccessRefused`
 row the ReadOnly write check leaves in `audit.vActionLog` is what this session reads back afterwards.
 (The API writes no sign-in rows.)
+
+## Gate tooling on VM02, 2026-09-12 (W2 card A1, decision #97)
+
+- `C:\inetpub\PnCPlatform_V2\tools\smoke\` holds the framework-dependent `PnC.Api.Smoke` of the current
+  package (`pkg\smoke-fdd.zip`, unpacked); `pkg\` keeps every package zip transferred, hash-verified.
+- The site's certificate (thumbprint `E1443DF1…B51DAE`, the same self-signed one VM07 trusts) is in
+  VM02's `LocalMachine\Root`, so the smoke on VM02 validates TLS. Reversible: remove it from that store.
+- A gate run: `python tools\ot\gate_runs.py [Administrator] [ReadOnly] [Hydro]` from the laptop registers a
+  one-shot scheduled task on VM02 as the gate account (`schtasks /ru VGSOT\pnc-gate-… /rl limited`), runs it,
+  reads the output back and deletes task, command file and output. The passwords never leave the laptop's
+  `dev.local` except inside the encoded command. `Start-Process -Credential` from the agent's SYSTEM session
+  is refused ("Access is denied"), which is why the task exists at all.
+- The three gate accounts are platform users on `_V2_DEV` (Administrator Global, ReadOnly Global,
+  PCEngineer on *Generation · Hydro*); `VGS01` / `VGS99` stay from W1 (#91) but are no longer gate fixtures.

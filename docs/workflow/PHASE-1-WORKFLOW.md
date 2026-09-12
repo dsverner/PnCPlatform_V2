@@ -198,8 +198,24 @@ account on `vgsot.internal`. One row visible outside scope is a failure.
 - Scoped list reads measured at 31–33 ms (NFR-2).
 - Found and fixed on the way: the carried subtree predicate covered sibling divisions (a Hydro write
   landed under Transmission before the fix; that row is soft-deleted). `API-W2-SECURITY.md`.
-- **Not done:** the Windows-mode run as a real `vgsot.internal` account holding a Hydro grant, and the
-  SID registration it exercises — both wait on dedicated gate accounts (W2 card, standing authorisation).
+- **W2 card answered 2026-09-12 11:08Z** (M1 accept with a condition, A1 yes, A2 yes, D1 refuse): decisions
+  #96–#98, #95 amended. The re-created-account refusal is b0cc815; the matrix seed now respects a
+  deactivated mapping (0.2.1, #96).
+- **Gate accounts exist** (#97): `pnc-gate-admin`, `pnc-gate-ro`, `pnc-gate-hydro` on the domain and as
+  platform users with their grants on `_V2_DEV`, verified by query. The framework-dependent smoke is
+  unpacked on VM02 (`tools\smoke`), VM02 trusts the site's certificate, and a run as SYSTEM answers
+  `/health` PASS with every identity check failing as it must (the machine account is no platform user).
+- **0.2.1 on `_V2_DEV`** (the seed fix of #96) — `deploy.py --database PnCPlatform_V2_DEV` green, schema smoke
+  **244 PASS, 0 FAIL**; packaged from e82688c and redeployed to VM02 through the guest agent: `/health` →
+  `{"environment":"QA","release":"0.2.1","database":"ok"} [200]`.
+- **Incident on the way (#99):** the first 0.2.1 deploy was run without `--database` and went to the
+  predecessor's `PnCPlatform_DEV`; the owner restored it to 08:35:00 from its backups on the incident card's
+  ruling, verified by query afterwards. The tools' defaults and a refusal guard are the fix (e82688c).
+- **Not yet observed: the Windows-mode run as the three gate accounts** (and with it the SID registration of
+  #95 and the `identity_changed` refusal). The session's command classifier refuses to register the one-shot
+  scheduled task the run needs, so this is the owner's single command, from the laptop:
+  `python tools\ot\gate_runs.py` — it prints the three runs' PASS/FAIL lines and leaves nothing on VM02.
+  W2 closes when that prints three `SMOKE PASS` lines and `security.vAlternateKey` holds the three SIDs.
 - **Deployed to VGS-VM02 as 0.2.0 (package from 554b7b4), 2026-09-12**, through the guest agent: the first
   0.2.0 package failed at start because reading `sys.sql_expression_dependencies` needs VIEW DEFINITION on
   the whole database, which `app_execute` rightly lacks; the catalogue now reads each view's base tables
