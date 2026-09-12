@@ -255,6 +255,12 @@ fresh `W3_GATE_APPROVAL` Draft and the Approver run (`--windows=Approver`) appro
 
 ## 9. The PWA shell
 
+**DEV sign-in (2026-09-12, after W3).** When `/health` reports environment `DEV` the shell shows an *act as* field;
+the chosen name is kept in the browser's local storage and sent as `X-PnC-Dev-User` on every request, so the owner
+can look at the built platform from the laptop at `http://127.0.0.1:5210/` while the Development host runs. In Windows
+mode the field never appears (#85: the header is refused outside DEV). Observed in Chrome 2026-09-12: signed in as
+the smoke Administrator, the catalogue lists 22 schemas, 537 procedures, 398 views.
+
 `wwwroot/`: `index.html` (no inline script or style — the CSP forbids it), `app.js`, `styles.css`,
 `manifest.webmanifest` (name *P&C Platform*, `start_url` and `scope` `/`, `display: standalone`),
 `icon.svg`, `sw.js`. The service worker caches the shell files under a versioned cache key and

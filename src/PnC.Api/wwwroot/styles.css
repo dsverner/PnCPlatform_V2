@@ -20,3 +20,10 @@ h3 { margin: 12px 0 6px; font-size: 13px; text-transform: uppercase; letter-spac
 .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .list { margin: 0; padding-left: 18px; font: 13px/1.5 Consolas, ui-monospace, monospace; max-height: 60vh; overflow: auto; }
 @media (max-width: 720px) { main, .cols { grid-template-columns: 1fr; } }
+/* DEV sign-in (shown only when /health reports DEV) */
+.dev{margin-top:.8rem;display:flex;}
+.dev[hidden]{display:none}
+.dev{flex-wrap:wrap;gap:.4rem;align-items:center;font-size:.9rem}
+.dev label{flex-basis:100%;opacity:.8}
+.dev input{flex:1 1 16rem;padding:.35rem .5rem;font:inherit}
+.dev button{padding:.35rem .8rem;font:inherit}

@@ -32,6 +32,17 @@
         <dt>Account</dt><dd id="upn">…</dd>
         <dt>Grants</dt><dd id="grants">…</dd>
       </dl>
+      <form id="dev-signin" class="dev" hidden>
+        <label for="dev-upn">DEV sign-in (Development mode only): act as</label>
+        <input id="dev-upn" name="upn" type="text" list="dev-upns" placeholder="user@pnc.local" autocomplete="off">
+        <datalist id="dev-upns">
+          <option value="smoke.admin@pnc.local">Administrator</option>
+          <option value="smoke.approver@pnc.local">Administrator (second)</option>
+          <option value="smoke.hydro@pnc.local">PCEngineer, Generation · Hydro</option>
+          <option value="smoke.readonly@pnc.local">ReadOnly</option>
+        </datalist>
+        <button type="submit">Sign in</button>
+      </form>
     </section>
     <section id="catalog" class="panel wide">
       <h2>Catalogue</h2>
