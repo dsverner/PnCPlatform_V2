@@ -588,6 +588,23 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
     var scheme = Id(scb);
     Must(scs == HttpStatusCode.OK && scheme is not null, $"fixture: a scheme ({Code(scb)} {scb?["detail"]})");
     var workType = await Definition("Program.WorkType", $"{tag}_SETTINGS_CHANGE", "Settings change (W4 fixture)", new { g = 1, workflow = "SETTINGS_CHANGE_REQUEST", requiredRecordKinds = Array.Empty<string>() });
+    // W6 fixture: one commissioned protection function (87T) under each position, all members of the scheme; a station number
+    var (afs, afb) = await Post(admin, "api/v1/ref/AnsiFunction_Upsert", new { AnsiCode = "87T", Name = "Transformer differential" });
+    Must(afs == HttpStatusCode.OK, $"fixture: ANSI function 87T ({(int)afs} {Code(afb)} {afb?["detail"]})");
+    var functionNodes = new List<Guid?>();
+    for (var i = 0; i < 3; i++)
+    {
+        var fnNode = await Node("ProtectionFunction", positions[i], $"{tag} 87T at position {i + 1}");
+        functionNodes.Add(fnNode);
+        var (cfs0, cfb0) = await Post(admin, "api/v1/scheme/CommissionedFunction_Add", new { ProtectionFunctionNodeEntityId = fnNode, AnsiCode = "87T", IsPrincipal = true });
+        if (cfs0 != HttpStatusCode.OK) Must(false, $"fixture: CommissionedFunction_Add position {i + 1} → {(int)cfs0} {Code(cfb0)} {cfb0?["detail"]}");
+        var (sms, smb) = await Post(admin, "api/v1/scheme/AddSchemeMember", new { SchemeEntityId = scheme, MemberKind = "ProtectionFunction", MemberEntityId = fnNode, MemberRoleCode = "InitiatingDevice" });
+        if (sms != HttpStatusCode.OK) Must(false, $"fixture: AddSchemeMember position {i + 1} → {(int)sms} {Code(smb)} {smb?["detail"]}");
+    }
+    Must(functionNodes.All(f => f is not null), "fixture: three 87T protection functions commissioned under the positions and in the scheme");
+    var stationNumber = "9" + tag[^6..];
+    var (aks, akb) = await Post(admin, "api/v1/location/AlternateKey_Add", new { SubjectEntityId = station, KeyKindCode = "StationNumber", KeyValue = stationNumber, IsPrimaryLabel = true });
+    Must(aks == HttpStatusCode.OK, $"fixture: station number {stationNumber} ({(int)aks} {Code(akb)} {akb?["detail"]})");
     var outageStart = DateTimeOffset.Now.AddSeconds(100);
     var (wrs, wrb) = await Post(admin, "api/v1/work/WorkRequest_Add", new { WorkTypeDefinitionVersionRowId = workType, Title = $"{tag} settings change", ScopeKind = "Node", ScopeEntityId = station, OutageRequired = true, OutageWindowStartAt = outageStart, OutageWindowEndAt = outageStart.AddHours(8) });
     var wr = Id(wrb);
@@ -806,6 +823,91 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
         var (rls, rlb) = await Post(admin, "api/v1/definitions/documents", new { document = JsonNode.Parse(Example("settings-change.procedure.json")), changeNote = "W4 gate: the example restored after the migration check" });
         var (ras, rab) = await Post(approver, $"api/v1/definitions/documents/{rlb?["versionRowId"]}/approve", new { });
         Check(rls == HttpStatusCode.OK && (ras == HttpStatusCode.OK || AlreadyApproved(rab)), $"the example document is Effective again after the migration check (version {rlb?["versionNumber"]})");
+
+        // =================================================================== W6 — the parity read models over this run (PROCEDURE-ENGINE §10)
+        Console.WriteLine("  -- W6 parity read models");
+        async Task<(HttpStatusCode, JsonArray, long)> Timed(HttpClient who, string path)
+        {
+            await Get(who, path);   // warm-up: the plan compiles once
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var (st0, b0) = await Get(who, path);
+            sw.Stop();
+            return (st0, (b0?["rows"] as JsonArray) ?? new JsonArray(), sw.ElapsedMilliseconds);
+        }
+        // §10 rows 1–3, 7: the grid — this request's three designed revisions
+        var (g1s, g1rows, g1ms) = await Timed(admin, $"api/v1/document/vSettingsRecord?WorkRequestEntityId={wr}");
+        JsonNode? Row(JsonArray rows, Guid? dev) => rows.FirstOrDefault(r => string.Equals(r?["DeviceEntityId"]?.ToString(), dev?.ToString(), StringComparison.OrdinalIgnoreCase));
+        var gSel = Row(g1rows, devSel); var gBdd = Row(g1rows, devBdd); var gCyl = Row(g1rows, devCyl);
+        Must(g1s == HttpStatusCode.OK && g1rows.Count == 3, $"vSettingsRecord: three designed revisions for the request ({g1rows.Count}, {g1ms} ms)");
+        Must(gSel?["GridState"]?.ToString() == "Active" && gBdd?["GridState"]?.ToString() == "Active", $"the SEL-421 and BDD15B rows are Active (in service) ({gSel?["GridState"]}, {gBdd?["GridState"]})");
+        Must(gCyl?["GridState"]?.ToString() == "Withdrawn" && gCyl?["VerifiedAt"] is null, $"the CYL row is Withdrawn with no verified date — its member left the change ({gCyl?["GridState"]}, {gCyl?["VerifiedAt"]})");
+        Must(gSel?["VerifiedAt"]?.ToString() == rts?["CommittedAt"]?.ToString() && gSel?["CalculatedAt"] is not null, $"VDATE is the return-to-service commit instant and CDATE is set ({gSel?["VerifiedAt"]} / {gSel?["CalculatedAt"]})");
+        Must(gSel?["Functions"]?.ToString() == "87T" && gSel?["StationName"]?.ToString() == $"{tag} station" && gSel?["PanelName"]?.ToString() == $"{tag} panel 1" && gSel?["StationNumber"]?.ToString() == stationNumber,
+            $"the grid row carries location, panel, station number and the commissioned functions ({gSel?["StationName"]} / {gSel?["PanelName"]} / {gSel?["StationNumber"]} / {gSel?["Functions"]})");
+        Must(gSel?["WorkTypeKey"]?.ToString() == $"{tag}_SETTINGS_CHANGE" && gSel?["ModelCode"]?.ToString() == "SEL-421" && gSel?["RtsStepState"]?.ToString() == "Committed", $"action type, model and the RTS step state on the row ({gSel?["WorkTypeKey"]}, {gSel?["ModelCode"]}, {gSel?["RtsStepState"]})");
+        var (ga1s, ga1b) = await Get(admin, $"api/v1/document/vSettingsRecord?GridState=Active&DeviceEntityId={devSel}");
+        Must(ga1s == HttpStatusCode.OK && (ga1b?["rows"] as JsonArray)?.Count == 1, "the Active toggle filtered to the SEL-421 → one row");
+        var (gh1s, gh1b) = await Get(hydro, $"api/v1/document/vSettingsRecord?WorkRequestEntityId={wr}");
+        var (gr1s, gr1b) = await Get(readOnly!, $"api/v1/document/vSettingsRecord?WorkRequestEntityId={wr}");
+        Must(gh1s == HttpStatusCode.OK && (gh1b?["rows"] as JsonArray)?.Count == 3 && gr1s == HttpStatusCode.OK && (gr1b?["rows"] as JsonArray)?.Count == 3, "the Hydro engineer (subtree) and ReadOnly read the same three rows (Asset family scope)");
+
+        // §10 row 2: Outstanding — drive the half-run second instance through REQUEST, SCOPE (the SEL only), STUDY and BUILD
+        inst = inst2;   // the step helpers read the tree of `inst`
+        var (r2s, r2b) = await RunStep(admin, "REQUEST", new { outcome = "Done", capture = new { trigger = "Finding", sourceReference = tag + " second" } });
+        await RunStep(admin, "SCOPE", new { outcome = "Done", capture = new { scheme = scheme, philosophy = "Slope revised", devices = new[] { devSel } } });
+        await RunStep(admin, "STUDY", new { outcome = "Done", capture = new { studyKind = "Coordination" }, evidence = new[] { File("study2.txt", "text/plain", "Coordination study — second change", "Study") } });
+        await RunStep(admin, "BUILD_SETTINGS", new { outcome = "Done", evidence = new[] { File("sel421-v2.rdb", "application/octet-stream", "SEL-421 native settings, second change", "SettingsFile") } }, devSel);
+        var (g2s, g2b) = await Get(admin, $"api/v1/document/vSettingsRecord?DeviceEntityId={devSel}&orderBy=-CalculatedAt");
+        var g2 = (g2b?["rows"] as JsonArray) ?? new JsonArray();
+        Must(g2.Count == 2 && g2.Count(r => r?["GridState"]?.ToString() == "Active") == 1 && g2.Count(r => r?["GridState"]?.ToString() == "Outstanding") == 1,
+            $"the SEL-421 now has one Active and one Outstanding record — the legacy A + M pair ({string.Join(", ", g2.Select(r => r?["GridState"]))})");
+        Must(g2.First(r => r?["GridState"]?.ToString() == "Outstanding")?["LifecycleState"]?.ToString() == "Calculated" && g2.First(r => r?["GridState"]?.ToString() == "Outstanding")?["VerifiedAt"] is null, "the Outstanding record is Calculated with no verified date yet");
+
+        // §10 rows 4–6: the change-request status — two tracks, action type, requested by
+        var (c1s, c1rows, c1ms) = await Timed(admin, $"api/v1/work/vChangeRequestStatus?WorkRequestEntityId={wr}");
+        var c1 = c1rows.FirstOrDefault();
+        Must(c1s == HttpStatusCode.OK && c1 is not null, $"vChangeRequestStatus: the closed request ({c1ms} ms)");
+        Must(c1?["RequestState"]?.ToString() == "Closed" && c1?["DocumentationStatus"]?.ToString() == "Complete" && c1?["DatabaseStatus"]?.ToString() == "Complete",
+            $"request Closed; documentation and database tracks Complete ({c1?["RequestState"]}, {c1?["DocumentationStatus"]}, {c1?["DatabaseStatus"]})");
+        Must(c1?["DocumentationLink"]?.ToString() == $"drawings://issue/{tag}" && c1?["DocumentationRevisionLabel"]?.ToString() == "C" && c1?["DatabaseAt"] is not null && c1?["DeviceCount"]?.GetValue<int>() == 3,
+            $"the documentation track carries the drawing link and label; the database track its date; three devices ({c1?["DocumentationLink"]}, {c1?["DocumentationRevisionLabel"]}, {c1?["DeviceCount"]})");
+        Must(c1?["WorkTypeKey"]?.ToString() == $"{tag}_SETTINGS_CHANGE" && c1?["RequestedByDisplayName"]?.ToString() == "Admin Smoke" && c1?["StationName"]?.ToString() == $"{tag} station",
+            $"action type, requested-by and location on the request ({c1?["WorkTypeKey"]}, {c1?["RequestedByDisplayName"]}, {c1?["StationName"]})");
+        var (c2s, c2b) = await Get(admin, $"api/v1/work/vChangeRequestStatus?WorkRequestEntityId={Id(wr2b)}");
+        var c2 = (c2b?["rows"] as JsonArray)?.FirstOrDefault();
+        Must(c2?["RequestState"]?.ToString() == "InProgress" && c2?["DocumentationStatus"]?.ToString() == "Not Started" && c2?["LifecycleState"]?.ToString() == "Calculated",
+            $"the second request is In progress with its tracks Not Started and its package Calculated ({c2?["RequestState"]}, {c2?["DocumentationStatus"]}, {c2?["LifecycleState"]})");
+        // §10 row 8: Close refused while the run is half-way; Cancel with a reason on a third request
+        var (cl2s, cl2b) = await Post(admin, $"api/v1/process/workflow-instances/{Id(sw2b, "workflowInstanceEntityId")}/transitions", new { name = "Close" });
+        Must(cl2s == HttpStatusCode.Conflict, $"Close on the half-run request → 409 in the rule's words ({Short(cl2b)})");
+        var (wr3s, wr3b) = await Post(admin, "api/v1/work/WorkRequest_Add", new { WorkTypeDefinitionVersionRowId = workType, Title = $"{tag} third change (cancelled)", ScopeKind = "Asset", ScopeEntityId = devBdd });
+        var (sw3s, sw3b) = await Post(admin, "api/v1/process/workflows/start", new { workflowKey = "SETTINGS_CHANGE_REQUEST", subjectKind = "WorkRequest", subjectEntityId = Id(wr3b) });
+        var (cn3s, cn3b) = await Post(admin, $"api/v1/process/workflow-instances/{Id(sw3b, "workflowInstanceEntityId")}/transitions", new { name = "Cancel", reason = "W6 smoke: raised in error" });
+        var (c3s, c3b) = await Get(admin, $"api/v1/work/vChangeRequestStatus?WorkRequestEntityId={Id(wr3b)}");
+        var c3 = (c3b?["rows"] as JsonArray)?.FirstOrDefault();
+        Must(cn3s == HttpStatusCode.OK && c3?["RequestState"]?.ToString() == "Cancelled" && c3?["EquipmentName"]?.ToString() == $"{tag} BDD15B" && c3?["StationName"]?.ToString() == $"{tag} station",
+            $"a third request on the BDD15B cancelled with a reason; its equipment and location resolved through the placement ({(int)cn3s} {c3?["RequestState"]}, {c3?["EquipmentName"]})");
+
+        // §10 row 10: the FLOC view
+        var (f1s, f1rows, f1ms) = await Timed(admin, $"api/v1/location/vFloc?StationNodeEntityId={station}");
+        Must(f1s == HttpStatusCode.OK && f1rows.Count == 3 && f1rows.All(r => r?["PanelName"]?.ToString() == $"{tag} panel 1" && r?["StationNumber"]?.ToString() == stationNumber && r?["Functions"]?.ToString() == "87T" && (r?["SchemeNames"]?.ToString() ?? "").Contains("87T scheme")),
+            $"vFloc by station: three positions with panel, station number, 87T and the scheme ({f1rows.Count}, {f1ms} ms)");
+        Must(f1rows.Any(r => string.Equals(r?["InstalledAssetEntityId"]?.ToString(), devSel?.ToString(), StringComparison.OrdinalIgnoreCase) && r?["ModelCode"]?.ToString() == "SEL-421"), "the SEL-421 is the device installed at position 1");
+        var (f2s, f2rows, f2ms) = await Timed(admin, $"api/v1/location/vFloc?PanelNodeEntityId={panel}");
+        Must(f2s == HttpStatusCode.OK && f2rows.Count == 3, $"vFloc by panel: three positions ({f2ms} ms)");
+        var (f3s, f3rows, f3ms) = await Timed(admin, $"api/v1/location/vFlocScheme?SchemeEntityId={scheme}");
+        Must(f3s == HttpStatusCode.OK && f3rows.Count == 3 && f3rows.All(r => r?["MemberRoleCodes"]?.ToString() == "InitiatingDevice"), $"vFlocScheme by scheme: the three positions through their functions ({f3rows.Count}, {f3ms} ms)");
+        var (f4s, f4b) = await Get(admin, $"api/v1/location/vFloc?ModelCode=SEL-421&take=500");
+        Must(f4s == HttpStatusCode.OK && (f4b?["rows"] as JsonArray)?.Any(r => string.Equals(r?["NodeEntityId"]?.ToString(), positions[0]?.ToString(), StringComparison.OrdinalIgnoreCase)) == true, "vFloc by model: position 1 is among the SEL-421 positions");
+        var (t1s, t1rows, t1ms) = await Timed(admin, $"api/v1/location/vNodeTree?ParentEntityId={panel}");
+        Must(t1s == HttpStatusCode.OK && t1rows.Count == 3 && t1rows.All(r => r?["HasChildren"]?.GetValue<bool>() == true), $"vNodeTree under the panel: three positions, each with children (the function nodes) ({t1ms} ms)");
+        var (fh1s, fh1b) = await Get(hydro, $"api/v1/location/vFloc?StationNodeEntityId={station}");
+        Must(fh1s == HttpStatusCode.OK && (fh1b?["rows"] as JsonArray)?.Count == 3, "the Hydro engineer reads the station's positions (Node family scope)");
+        // NFR-2: the list calls a screen makes, measured (warm)
+        var (n1s, n1rows, n1ms) = await Timed(admin, "api/v1/document/vSettingsRecord?GridState=Active&take=500");
+        var (n2s, n2rows, n2ms) = await Timed(admin, "api/v1/location/vNodeTree?ParentEntityId=null");
+        Console.WriteLine($"  timings (ms, warm): grid Active {n1ms} ({n1rows.Count} rows) · request status {c1ms} · floc by station {f1ms} · by panel {f2ms} · by scheme {f3ms} · tree roots {n2ms}");
+        Must(new[] { n1ms, c1ms, f1ms, f2ms, f3ms, n2ms, t1ms, g1ms }.All(ms => ms < 1000), "NFR-2: every measured list call under one second on DEV");
     }
 }
 else Skip("W4 run (needs the Administrator, Approver, Hydro and Technician identities in one process — DEV mode)");
@@ -817,17 +919,36 @@ else Skip("W4 run (needs the Administrator, Approver, Hydro and Technician ident
     var who = admin ?? readOnly ?? approver ?? hydro ?? tech;
     if (who is not null)
     {
-        foreach (var path in new[] { "", "definitions.html", "definitions.js", "pnc.js", "app.js", "styles.css", "sw.js" })
+        foreach (var path in new[] { "", "definitions.html", "definitions.js", "pnc.js", "app.js", "styles.css", "sw.js", "settings.html", "settings.js", "request.html", "request.js", "setting.html", "setting.js", "floc.html", "floc.js" })
         {
             var r = await who.GetAsync(path);
             var csp = r.Headers.TryGetValues("Content-Security-Policy", out var v) ? string.Join("", v) : "";
             var bodyText = await r.Content.ReadAsStringAsync();
             var ok = r.StatusCode == HttpStatusCode.OK && csp.Contains("script-src 'self'") && !bodyText.Contains("<script>") && !bodyText.Contains("style=\"");
-            if (path == "sw.js") ok = ok && bodyText.Contains("\"/definitions.js\"") && bodyText.Contains("\"/pnc.js\"");
+            if (path == "sw.js") ok = ok && bodyText.Contains("\"/definitions.js\"") && bodyText.Contains("\"/pnc.js\"") && bodyText.Contains("\"/floc.js\"") && bodyText.Contains("\"/settings.js\"") && bodyText.Contains("shell-3");
             Check(ok, $"GET /{path} → {(int)r.StatusCode}, CSP script-src 'self', no inline script or style{(path == "sw.js" ? ", the editor files in the shell list" : "")}");
         }
         var (ms, mb) = await Get(who, "api/v1/me");
         Check(ms == HttpStatusCode.OK && mb?["permissions"] is JsonArray, "/me carries the permission codes of the roles in force");
+        // W6: the parity read models are catalogued with the subject column that scopes them (decision #127)
+        var (cts, ctb) = await Get(who, "api/v1/catalog");
+        string? Scope(string schema, string name) => (ctb?["views"] as JsonArray)?.FirstOrDefault(v => v?["schema"]?.ToString() == schema && v?["name"]?.ToString() == name)?["scope"]?.ToString();
+        string? Perm(string schema, string name) => (ctb?["views"] as JsonArray)?.FirstOrDefault(v => v?["schema"]?.ToString() == schema && v?["name"]?.ToString() == name)?["permission"]?.ToString();
+        Check(Scope("document", "vSettingsRecord") == "DeviceEntityId as Asset" && Perm("document", "vSettingsRecord") == "ConfigurationFile.Read", $"catalog: document.vSettingsRecord scoped by device, ConfigurationFile.Read ({Scope("document", "vSettingsRecord")}, {Perm("document", "vSettingsRecord")})");
+        Check(Scope("work", "vChangeRequestStatus") == "WorkRequestEntityId as WorkRequest" && Scope("location", "vFloc") == "NodeEntityId as Node" && Scope("location", "vFlocScheme") == "NodeEntityId as Node" && Scope("document", "vParsedSettingNamed") == "DeviceEntityId as Asset",
+            "catalog: vChangeRequestStatus by work request, vFloc and vFlocScheme by node, vParsedSettingNamed by device");
+        // config.* is an unscoped class: readable under a Global grant only (IDENTITY.md §5), so the subtree-scoped Hydro engineer is refused 403 here — found by the
+        // 0.6.0 gate run on VM02 and put to the owner on the W6 card (the action-type list is empty for such an engineer)
+        var reader = admin ?? readOnly ?? approver ?? who;
+        var (wts, wtb) = await Get(reader, "api/v1/config/vDefinition?DefinitionKind=Program.WorkType&take=500");
+        if (reader == hydro) Check(wts == HttpStatusCode.Forbidden, $"the subtree-scoped engineer cannot read Program.WorkType definitions — config.* is Global-only (W6 card H) → {(int)wts}");
+        else
+        {
+            var wtKeys = (wtb?["rows"] as JsonArray)?.Select(r => r?["DefinitionKey"]?.ToString()).ToHashSet() ?? new HashSet<string?>();
+            Check(new[] { "SETTINGS_CHANGE", "SETTINGS_ADD", "SETTINGS_DELETE", "SETTINGS_VERIFY" }.All(wtKeys.Contains), "the four legacy action types are seeded as Program.WorkType definitions (#131)");
+        }
+        var (gws, gwb) = await Get(who, "api/v1/document/vSettingsRecord?GridState=Active&take=5");
+        Check(gws == HttpStatusCode.OK, $"the settings grid answers this identity ({(int)gws}, {(gwb?["rows"] as JsonArray)?.Count} of up to 5 rows)");
     }
     if (readOnly is not null)
     {

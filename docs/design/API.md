@@ -302,6 +302,29 @@ can look at the built platform from the laptop at `http://127.0.0.1:5210/` while
 mode the field never appears (#85: the header is refused outside DEV). Observed in Chrome 2026-09-12: signed in as
 the smoke Administrator, the catalogue lists 22 schemas, 537 procedures, 398 views.
 
+**The parity screens (W6, 2026-09-12; decisions #127–#133).** Four pages over the W6 read models (STEPS.md step 18),
+each one flat view per panel plus id-keyed detail calls; `pnc.js` gained `fetchAll` (a `skip` loop over the 500-row
+pages), `table`, `qs`, `me` (with the permission codes) and the date formats.
+- `settings.html` — the legacy main window: the state toggle (Active · Outstanding · Archived · Withdrawn) is
+  `?GridState=` on `document/vSettingsRecord`; *Select columns* offers the view's columns from `/api/v1/catalog` and keeps
+  the choice in this browser (the legacy columns by default); *Print* prints the grid as filtered and chosen with a header;
+  *Set verified date* on a row whose return-to-service step is Ready (claim → witness from a second session → commit or
+  check-in); *Request change* on an Active row (`work/WorkRequest_Add` scoped to the device → `process/workflows/start` →
+  transition *Start*). `?DeviceEntityId=` and `?WorkRequestEntityId=` narrow it from the other screens.
+- `request.html?id=` — the change-request window over `work/vChangeRequestStatus`: header, the two completion tracks
+  (status, date, the drawing link, revision and revised date), the software track *not modelled*, the devices in the
+  change (the grid filtered), and *Start* / *Post / Close* / *Cancel request* (a reason required) as workflow transitions.
+- `setting.html?revision=` — the setting display in the legacy's five groups from the settings record, the parsed
+  settings (`document/vParsedSettingNamed`), the revision's files and the run's evidence records (`record/vRecord` →
+  `document/vRevisionLink` → `document/vFile`, metadata only — no download endpoint exists); *not modelled* where the
+  platform has no counterpart.
+- `floc.html` — the Location / Protected Asset / Protection Function view: a lazy tree over `location/vNodeTree`
+  (arrows only where `HasChildren`), the positions grid over `location/vFloc`, browse by station or panel (a click in the
+  tree), by scheme (`location/vFlocScheme`) or by model; *New setting* raises a request on the position.
+`sw.js` shell list carries the eight files (`shell-3`). Observed in Chrome 2026-09-12 on DEV: the grid's Active toggle
+(18 rows, 449 ms cold), the request window with both tracks Complete and the drawing link, the setting display with four
+parsed BDD15B settings, the locations grid with 33 positions; no console errors under the CSP.
+
 `wwwroot/`: `index.html` (no inline script or style — the CSP forbids it), `app.js`, `styles.css`,
 `manifest.webmanifest` (name *P&C Platform*, `start_url` and `scope` `/`, `display: standalone`),
 `icon.svg`, `sw.js`. The service worker caches the shell files under a versioned cache key and

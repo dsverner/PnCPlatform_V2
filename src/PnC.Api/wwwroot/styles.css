@@ -80,3 +80,49 @@ main.defs { max-width: 1400px; grid-template-columns: 300px 1fr; align-items: st
 .grid th { font-weight: 600; color: var(--muted); font-size: 12px; }
 code { font: 12px/1.4 Consolas, ui-monospace, monospace; }
 @media (max-width: 900px) { main.defs { grid-template-columns: 1fr; } .deflist { max-height: 40vh; } }
+
+/* W6 — the parity screens (settings, request, setting display, locations). */
+main.one { max-width: 1500px; grid-template-columns: 1fr; }
+.states { display: flex; gap: 0; }
+.states .state { padding: 5px 14px; font: inherit; font-size: 13px; border: 1px solid var(--rule); background: var(--panel); color: var(--ink); cursor: pointer; margin-left: -1px; }
+.states .state:first-child { border-radius: 3px 0 0 3px; margin-left: 0; } .states .state:last-child { border-radius: 0 3px 3px 0; }
+.states .state.selected { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; }
+.inline { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; color: var(--muted); }
+.inline input, .inline select { font: inherit; font-size: 13px; padding: 4px 8px; border: 1px solid var(--rule); border-radius: 3px; background: var(--panel); color: var(--ink); }
+.chooser { display: flex; flex-wrap: wrap; gap: 4px 14px; padding: 8px 10px; margin: 6px 0 10px; border: 1px solid var(--rule); border-radius: 3px; background: var(--ground); font-size: 13px; }
+.chooser .col { display: inline-flex; gap: 4px; align-items: center; }
+.grid.rows tbody tr:hover { background: var(--selected); }
+.grid.rows td { max-width: 28rem; overflow: hidden; text-overflow: ellipsis; }
+.row-actions { display: inline-flex; gap: 6px; align-items: center; white-space: nowrap; }
+.row-link { color: var(--accent); font-size: 13px; }
+button.mini { font: inherit; font-size: 12px; padding: 2px 8px; border: 1px solid var(--rule); border-radius: 3px; background: var(--panel); color: var(--ink); cursor: pointer; }
+button.mini:disabled { opacity: .45; cursor: not-allowed; }
+.action-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.action-row button { padding: 5px 12px; font: inherit; font-size: 13px; border: 1px solid var(--rule); border-radius: 3px; background: var(--panel); color: var(--ink); cursor: pointer; }
+.action-row input, .action-row select { font: inherit; font-size: 13px; padding: 4px 8px; border: 1px solid var(--rule); border-radius: 3px; background: var(--panel); color: var(--ink); }
+.facts.three { grid-template-columns: max-content 1fr max-content 1fr max-content 1fr; }
+.tracks { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+.track { border: 1px solid var(--rule); border-radius: 4px; padding: 10px 14px; }
+.track h3 { margin: 0 0 8px; }
+.groups { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 24px; }
+.group h3 { margin: 6px 0 4px; }
+.tree { list-style: none; margin: 0; padding: 0; max-height: 75vh; overflow: auto; font-size: 13px; }
+.tree .children { list-style: none; margin: 0; padding-left: 16px; }
+.node-row { display: flex; gap: 4px; align-items: center; padding: 1px 0; }
+.tree .arrow { width: 20px; font: inherit; border: 0; background: none; color: var(--muted); cursor: pointer; }
+.tree .arrow:disabled { cursor: default; opacity: .5; }
+.tree .name { font: inherit; border: 0; background: none; color: var(--ink); cursor: pointer; text-align: left; padding: 1px 4px; border-radius: 3px; }
+.tree .name:hover { background: var(--selected); }
+.tree .Station > .node-row .name { font-weight: 600; }
+.tree .type { margin-left: 4px; }
+.print-head { display: none; }
+@media (max-width: 900px) { .tracks, .groups, .facts.three { grid-template-columns: 1fr; } }
+@media print {
+  .bar, .toolbar, .chooser, .dev, .noprint, #action, .status, nav, .row-actions { display: none !important; }
+  body { background: #fff; color: #000; font-size: 11px; }
+  main { max-width: none; padding: 0; display: block; }
+  .panel { border: 0; padding: 0; }
+  .print-head { display: block; font: 600 13px "Segoe UI", system-ui, sans-serif; margin: 0 0 8px; }
+  .grid th, .grid td { white-space: normal; border-bottom: 1px solid #999; padding: 2px 4px; }
+  .scroll { overflow: visible; }
+}

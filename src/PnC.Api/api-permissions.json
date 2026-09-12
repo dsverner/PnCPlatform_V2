@@ -30,6 +30,7 @@
     "document.ConfigurationFile":   "ConfigurationFile",
     "document.ParsedSetting":       "ConfigurationFile",
     "document.SettingsIssuePackage": "ConfigurationFile",
+    "document.SettingsRecord":       "ConfigurationFile",
     "process.Add":                  "Definition",
     "process.Approve":              "Definition",
     "process.Validate":             "Definition",

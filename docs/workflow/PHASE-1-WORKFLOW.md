@@ -442,6 +442,51 @@ drafted for W8.
 **Depends on.** W4 for data; W5 for nothing — **W6 may interleave with W7**.
 **Estimate.** D: 30–50 h · D2: 12–20 h.
 
+**Gate record — 2026-09-12, observed on `PnCPlatform_V2_DEV` in Chrome and through the API with DEV-header identities.**
+- Schema: five hand-written read models (decision #127; STEPS.md step 18) — `document.vSettingsRecord` (the grid, one
+  row per designed revision, `GridState` from the revision, #128; CDATE/VDATE, #129), `document.vParsedSettingNamed`,
+  `work.vChangeRequestStatus` (the two tracks from the run's COMPLETION branches, #130), `location.vFloc` and
+  `vFlocScheme` (the FLOC view, #57) — and the four `Program.WorkType` seeds (#131). `deploy.py` green, schema smoke
+  268 PASS, `check_generated.py` current; release **0.6.0** recorded. No API code beyond one permission-prefix line.
+- Shell: `settings`, `request`, `setting`, `floc` pages and the `pnc.js` helpers (API.md §9), `sw.js` `shell-3`;
+  hand-written under the CSP — **#119 re-tested and kept**.
+- **Every row of §10's parity table, through the API (smoke 206 PASS, 0 FAIL)**: rows 1–3 — the fixture's SEL-421 and
+  BDD15B *Active* with VDATE equal to the return-to-service commit, the CYL *Withdrawn* with none, then the second run
+  driven to BUILD so the SEL-421 shows the legacy A + M pair (one Active, one Outstanding, lifecycle Calculated); row 4 —
+  the closed request's documentation and database tracks *Complete* with the drawing link, label and dates, the half-run
+  request's *Not Started*; row 5 — the software track *not modelled*; row 6 — the action type from the work type and the
+  four seeded keys; row 7 — VDATE bound to the RTS step (`RtsStepState` Committed on the closed run); row 8 — *Close*
+  refused 409 while the run is half-way, a third request *Cancelled* with a reason (its equipment and station resolved
+  through the placement); row 10 — the FLOC view by station (three positions with panel, station number, 87T and the
+  scheme), by panel, by scheme (through the commissioned functions), by model, and the tree under the panel with
+  `HasChildren`. The Hydro engineer (subtree) and ReadOnly read the same rows (Asset and Node family scope).
+- **NFR-2, measured warm on DEV (#132)**: grid Active 65 ms (22 rows) · request status 32 · FLOC by station 51 · by
+  panel 44 · by scheme 52 · tree roots 19 — all under the one-second budget; DEV holds fixture data only (12 stations,
+  33 positions), so these are a floor to be re-measured after W7.
+- **In Chrome (`docs/workflow/evidence/W6-*.jpg`)**: the settings grid with the Active and Outstanding toggles and
+  the legacy columns; the locations screen with the tree expanded to a station and its three positions with 87T and
+  the scheme; the change-request window with both tracks Complete and the drawing link. No console errors. Row 9
+  (print): the print stylesheet and header exist and the button calls the browser's print; the preview itself was not
+  observed by this session (a dialog the automation cannot open) — for the W8 walkthrough.
+- **A reviewer walkthrough script drafted for W8**: `docs/workflow/W8-WALKTHROUGH.md`, one section per §10 row with
+  the fixture data, the screen, the expectation and a signature line.
+- Found on the way: a branch block is materialised *Pending* when the run starts, so *Pending* reads *Not Started* (the
+  first run showed *In Progress* on a request that had not reached COMPLETION); a node-scoped request's equipment name
+  picked the station's parent; the verified date must be null for a withdrawn device; `api-permissions.json` is copied
+  at build, so a prefix line needs a rebuild before the running host sees it.
+- **Windows mode on VM02 (0.6.0 through the guest agent, package `e20011fe…`, `/health` → `release 0.6.0`,
+  `/settings.html` → 200)**: **admin 70 PASS**, **approver 28 PASS**, **read-only 36 PASS**, **hydro 26 PASS**, 0 FAIL
+  — the shell files and the catalogue's scopes by every account, the grid by every account.
+- **Found by the Hydro gate run**: a subtree-scoped engineer is refused `config/vDefinition` (403 — `config` and `ref`
+  are unscoped classes, readable under a Global grant only, IDENTITY.md §5), so for such an engineer the action-type
+  list on *Request change* and the model list on *Locations* come back empty. The rule is the design's; whether
+  reference data should read class-wide is put to the owner on the W6 card (item H); the smoke asserts the refusal.
+- **Not done in W6, by design and recorded**: a file-download endpoint (the display shows file metadata; W6 card); the
+  legacy fields with no counterpart (CT/PT ratios, number of relays, class/use/responsibility, the overflow columns)
+  are shown *not modelled* and land in W7's mapping; `process.vWorkflowInstance` stays Global-only (#133); the grid
+  grain and the *Withdrawn* state, two tracks, the dropped user-administration screen and the seeded work types are
+  defaults on the owner's W6 card.
+
 ### W7 — Migration
 
 **Builds.** The importer, one rule per row of `CUTOVER-STRATEGY.md` §5: base → device; `P` →

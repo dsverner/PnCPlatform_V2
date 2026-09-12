@@ -367,6 +367,24 @@ seeds below. Schema changes: `record.Record` subject kinds and `document.Configu
 Lessons: an EXEC argument may not be a CASE expression (compute it into a variable first); an OUTPUT variable keeps
 its value across a cursor's rows (reset it, or `Definition_Add` reuses the id).
 
+## Step 18 — the parity read models ✅ (W6, 2026-09-12)
+
+Hand-written views (CONVENTIONS.md: `<schema>/Views/<Name>.sql`, `GRANT SELECT … TO [app_execute]`; the generator leaves a
+file whose first line is not its header alone). Decision #127: the dispatcher catalogues each and scopes it by its first
+subject column in `Catalog.cs`'s preference order, so every view names that column on purpose.
+
+| Object | File | Notes |
+|---|---|---|
+| `document.vSettingsRecord` | `document/Views/vSettingsRecord.sql` | the legacy grid: one row per designed configuration-file revision; `GridState` from the revision (#128); CDATE/VDATE (#129); subject `DeviceEntityId`; permission `ConfigurationFile.Read` by the `document.SettingsRecord` prefix |
+| `document.vParsedSettingNamed` | `document/Views/vParsedSettingNamed.sql` | the setting display's rows with their definitions and one `DisplayValue`; subject `DeviceEntityId` |
+| `work.vChangeRequestStatus` | `work/Views/vChangeRequestStatus.sql` | the change-request window: header, request state, the run, the two completion tracks from the branch rows and the child run's captures (#130); subject `WorkRequestEntityId` |
+| `location.vFloc`, `location.vFlocScheme` | `location/Views/vFloc.sql`, `vFlocScheme.sql` | the Location / Protected Asset / Protection Function view (#57): one row per device position with the station (ParentEntityId hops — `Path` holds ancestors only, #94), panel, installed device, functions and schemes; browse by scheme through the second view; subject `NodeEntityId`; the installed asset is `InstalledAssetEntityId` so an empty position is not dropped by the scope predicate |
+| `Seed_config_WorkTypes.sql` | `PostDeploy/*` | the four legacy action types as `Program.WorkType` (#131) |
+| `asset.vPlacedAsset`, `location.vNodeTree` | `asset/Views/`, `location/Views/` | carried in W0 (`57b213c`) and recorded here for the first time: the assets at a node with names; the tree with `HasChildren` |
+
+Lessons: a `RETURN` leaves only its batch (a guard before a `GO` guards nothing — W5's seed); a branch block is
+materialised *Pending* when the run starts, so *Pending* is *Not Started*, not *In Progress*.
+
 ## Reconciliation — every table the design names
 
 Method: every `schema.Table` token in SCHEMA-DESIGN.md steps 0–15 and Appendix B, compared with `*/Tables/*.sql` in this project (2026-09-04, after wave 5).
