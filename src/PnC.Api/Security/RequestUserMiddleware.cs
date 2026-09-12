@@ -75,6 +75,20 @@ public sealed class RequestUserMiddleware(RequestDelegate next, IConfiguration c
                     WHERE u.IsEnabled = 1 AND u.UserPrincipalName = @n
                     """, new Dictionary<string, object?> { ["@n"] = name }, ct);
                 writeSid = rows.Count > 0 && sid is not null;
+                // W2 card D1 (#95 amended): a user found by name who already carries a different SID is a re-created
+                // directory account. Refused until an Administrator confirms the person; never registered beside.
+                if (writeSid)
+                {
+                    var uid = Guid.Parse(rows[0]!["EntityId"]!.ToString());
+                    var other = await probe.ScalarAsync<int>("""
+                        SELECT COUNT(*) FROM security.vAlternateKey k WHERE k.SubjectEntityId = @u AND k.KeyKindCode = @kind AND k.KeyValue <> @sid
+                        """, new Dictionary<string, object?> { ["@u"] = uid, ["@kind"] = SidKeyKind, ["@sid"] = sid }, ct);
+                    if (other > 0)
+                    {
+                        log.LogWarning("Identity {Name} presents a SID different from the one on record; refused until an Administrator confirms", name);
+                        throw new ApiException(401, "identity_changed", "This account's directory identity has changed; an Administrator must confirm it before it can sign in.");
+                    }
+                }
             }
             if (rows.Count == 0) { log.LogWarning("Identity {Name} has no enabled security.User", name); throw new ApiException(401, "unauthenticated", "Identity is not a platform user."); }
             var r = rows[0]!;
