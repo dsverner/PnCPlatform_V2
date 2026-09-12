@@ -156,6 +156,11 @@ as Administrator.
   348a631. Gate items met from VM07: `/health` reports the release; `/me` as VGS01; `/catalog` lists the
   schemas. **Still owed:** `/me` as VGS99, one view read as ReadOnly, one write refused as ReadOnly and
   allowed as Administrator — the smoke runs.
+- **`/me` as VGS99, 2026-09-12 (owner's report, from an InPrivate window in the VGS01 desktop on VM07,
+  credentials given at the site's Windows Security prompt).** The page loaded as VGS99. Domain read
+  beforehand: the account was active, unlocked, password set 2026-09-07, never logged on; Guacamole's
+  own throttle ("too many login errors") was the earlier obstacle, not the account. **Still owed:** one
+  view read as ReadOnly, one write refused as ReadOnly and allowed as Administrator — the smoke.
 
 ### W2 — Identity, roles, scopes
 
