@@ -94,10 +94,14 @@ logged. Lesson for every wave: the catalogue the app sees is the identity's, not
 PowerShell 5.1's own web client on VM02 fails the TLS handshake to the site (the predecessor's note about
 VM02 and its own certificate); `curl.exe` with `-k` is the check that works there.
 
-## Decided
+## Outcome, 2026-09-11
 
-The owner runs steps 2–7 by hand on the VM (#91), the way the predecessor's installs were done. When
-the site answers, this session verifies from the laptop: `/health` over the Tailscale path is **not**
-expected to answer (Business → OT allows SQL only); the observation is the VM07 smoke output the owner
-pastes into the next card, and the `AccessRefused` row the ReadOnly write check leaves in
-`audit.vActionLog` on `_V2_DEV`, which this session can read. (The API writes no sign-in rows.)
+#91 was overtaken: the owner allowed the Proxmox path and this session did steps 2–7 through the
+guest agent (the by-hand script stays valid and idempotent). After the redeploy of the package built
+from 348a631, observed on VM02 with `curl -k --negotiate -u :` as SYSTEM: **`/health` → 200**
+`{"environment":"QA","release":"0.1.0","database":"ok"}`; **`/api/v1/me` → the API's own 401**
+*Identity is not a platform user* for the machine account; `/` → 200; with no credentials IIS answers
+401. Still owed for the gate: the VM07 vantage point as VGS01 and VGS99 — VM07's guest agent answers a
+ping but times out on commands, so that is the owner's, on the round-3 test card. The `AccessRefused`
+row the ReadOnly write check leaves in `audit.vActionLog` is what this session reads back afterwards.
+(The API writes no sign-in rows.)
