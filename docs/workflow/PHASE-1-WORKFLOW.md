@@ -164,6 +164,12 @@ as Administrator.
 - **View read as VGS99, 2026-09-12 (owner's report, same window):** `GET /api/v1/asset/vAsset?take=5`
   answered `{"view":"asset.vAsset","skip":0,"take":5,"rows":[]}` — 200, the empty V2 estate. **Still
   owed:** one write refused as ReadOnly and allowed as Administrator.
+- **Write refused and allowed, 2026-09-12, from the Edge console on VM07.** As VGS99: `POST
+  personnel/Person_Add` → 403 `forbidden`; read back from `audit.vActionLog`: *AccessRefused,
+  VGS99@vgsot.internal acting as Self, Grant.Modify, host 10.10.70.21*. As VGS01: the same call → 200
+  with `EntityId ff197375-…`; read back: *Gate W1, created by VGS01@vgsot.internal acting as Self*.
+  Soft-deleted afterwards as the SYSTEM actor; two history rows remain. **W1 gate: complete.** The
+  smoke's Windows-mode runs from VM07 remain useful and are not required for this record.
 
 ### W2 — Identity, roles, scopes
 
