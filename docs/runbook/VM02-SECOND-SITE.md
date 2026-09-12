@@ -74,6 +74,20 @@ to run, or the owner allows that path.
 8. **Record** — `platform.Deployment` for the V2 database (deploy.py does this on the schema side);
    the W1 gate record in `PHASE-1-WORKFLOW.md` gets the observed result.
 
+## Done through the Proxmox guest agent, 2026-09-11 (session run as claude-rw@pve)
+
+Observed on the VM, step by step: the package landed in 82 chunks and its SHA-256 matched `release.json`
+(`23d92d61…4047e`); unpacked to `C:\inetpub\PnCPlatform_V2` (31 files, no local settings shipped);
+`appsettings.Local.json` written; pool `PnCPlatformV2` cloned from the predecessor's with `appcmd` so the
+identity `VGSOT\svc-pncapi` carried over without its password being handled; site `PnCPlatform_V2` on
+`https *:8443` (no host header, matching the predecessor's `*:443`) with certificate `E1443DF1…B51DAE`;
+Windows auth on, anonymous off; firewall rule *PnC F1 HTTPS 8443 from Application VM (V2)*, TCP 8443 from
+10.10.70.21. HTTP.sys shows the certificate on both ports. `curl -k` from the VM reached IIS on 8443 and got
+**401.2 on `/health`** — anonymous access was off site-wide, so IIS challenged before the app saw the
+request; `/health` is allowed anonymous at that one path (`step8`, and the install script's step 4d).
+PowerShell 5.1's own web client on VM02 fails the TLS handshake to the site (the predecessor's note about
+VM02 and its own certificate); `curl.exe` with `-k` is the check that works there.
+
 ## Decided
 
 The owner runs steps 2–7 by hand on the VM (#91), the way the predecessor's installs were done. When

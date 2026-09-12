@@ -42,13 +42,15 @@ async Task<(HttpStatusCode status, JsonNode? body)> Get(HttpClient c, string pat
 {
     var r = await c.GetAsync(path);
     var text = await r.Content.ReadAsStringAsync();
-    return (r.StatusCode, text.Length > 0 ? JsonNode.Parse(text) : null);
+    return (r.StatusCode, ParseJson(text));
 }
+// IIS itself answers an unauthenticated request with an HTML 401 in Windows mode; only JSON bodies are parsed.
+JsonNode? ParseJson(string text) { if (text.Length == 0 || !(text.TrimStart().StartsWith('{') || text.TrimStart().StartsWith('['))) return null; try { return JsonNode.Parse(text); } catch (JsonException) { return null; } }
 async Task<(HttpStatusCode status, JsonNode? body)> Post(HttpClient c, string path, object? body)
 {
     var r = body is null ? await c.PostAsync(path, null) : await c.PostAsJsonAsync(path, body);
     var text = await r.Content.ReadAsStringAsync();
-    return (r.StatusCode, text.Length > 0 ? JsonNode.Parse(text) : null);
+    return (r.StatusCode, ParseJson(text));
 }
 string? Code(JsonNode? b) => b?["code"]?.ToString();
 
@@ -114,7 +116,8 @@ if (admin is not null)
 else Skip("/me as Administrator (other identity)");
 {
     var (st, b) = await Get(anonymous, "api/v1/me");
-    Check(st == HttpStatusCode.Unauthorized && Code(b) == "unauthenticated", "/me with no identity → 401 unauthenticated");
+    // DEV: the API's own 401 problem; Windows mode: IIS's 401 challenge arrives first, with no JSON body.
+    Check(st == HttpStatusCode.Unauthorized && (windows is not null || Code(b) == "unauthenticated"), windows is null ? "/me with no identity → 401 unauthenticated" : "/me with no identity → 401 (IIS challenge)");
 }
 if (unknown is not null)
 {

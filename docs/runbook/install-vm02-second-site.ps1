@@ -8,7 +8,7 @@ and put its path in -PackageZip below. The script:
   2. unpacks the package to C:\inetpub\PnCPlatform_V2
   3. writes appsettings.Local.json (V2 database, Windows mode, UPN suffix)
   4. creates app pool PnCPlatformV2 (No Managed Code, identity VGSOT\svc-pncapi) and site PnCPlatform_V2
-     bound https :8443 on vgs-vm02.vgsot.internal, Windows auth on, anonymous off
+     bound https *:8443 (no host header, as the predecessor's *:443), Windows auth on, anonymous off except /health
   5. reuses the certificate already bound on :443 (the predecessor's self-signed one)
   6. host firewall: allow TCP 8443 inbound from 10.10.70.21 (VGS-VM07)
   7. calls /health on the new site (certificate check skipped: VM02 does not trust its own certificate)
@@ -60,12 +60,16 @@ if (-not (Test-Path "IIS:\AppPools\$PoolName")) {
 Set-ItemProperty "IIS:\AppPools\$PoolName" -Name processModel -Value @{ userName = $cred.UserName; password = $cred.GetNetworkCredential().Password; identityType = 'SpecificUser' }
 
 if (-not (Get-Website -Name $SiteName -ErrorAction SilentlyContinue)) {
-    New-Website -Name $SiteName -PhysicalPath $PhysicalPath -ApplicationPool $PoolName -Port $Port -HostHeader $HostName -Ssl | Out-Null
+    New-Website -Name $SiteName -PhysicalPath $PhysicalPath -ApplicationPool $PoolName -Port $Port -Ssl | Out-Null
     Write-Host "4b. site $SiteName created on https :$Port $HostName"
 } else { Write-Host "4b. site $SiteName exists" }
 Set-WebConfigurationProperty -PSPath "IIS:\" -Location $SiteName -Filter 'system.webServer/security/authentication/anonymousAuthentication' -Name enabled -Value $false
 Set-WebConfigurationProperty -PSPath "IIS:\" -Location $SiteName -Filter 'system.webServer/security/authentication/windowsAuthentication' -Name enabled -Value $true
 Write-Host "4c. Windows authentication on, anonymous off"
+# /health carries no identity by design (API.md §7); with anonymous off site-wide IIS answers 401.2 before the app.
+# The section is locked against web.config overrides, so it is set in applicationHost.config for this one path.
+Set-WebConfigurationProperty -PSPath 'MACHINE/WEBROOT/APPHOST' -Location "$SiteName/health" -Filter 'system.webServer/security/authentication/anonymousAuthentication' -Name enabled -Value $true
+Write-Host "4d. anonymous allowed at /health only"
 
 # 5. certificate: the one already bound on :443
 $existing = Get-ChildItem IIS:\SslBindings | Where-Object { $_.Port -eq 443 } | Select-Object -First 1
