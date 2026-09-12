@@ -77,6 +77,59 @@ public static class DocumentCompiler
         _ => FormulaType.UnknownT,                      // file: a document.File reference, not an expression value
     };
 
+    /// <summary>One expression site of a document: the owner object, the key, the JSON path, what the expression must be
+    /// ("bool", "set", "ref", "any", "cadence"), the subject kind in scope and the site's environment (the captured value).</summary>
+    public sealed record Site(JsonObject Owner, string Key, string Path, string Expect, string? SubjectKind, IReadOnlyDictionary<string, FormulaType>? Env);
+
+    /// <summary>Every expression site of a procedure or workflow document, in document order (PROCEDURE-ENGINE §7).</summary>
+    public static IEnumerable<Site> Sites(JsonObject doc)
+    {
+        var kind = doc["kind"]?.GetValue<string>();
+        var subjectKind = doc["subjectKind"]?.GetValue<string>();
+        var sites = new List<Site>();
+        // roles: competency over person.* facts, subject Person
+        if (doc["roles"] is JsonObject roles)
+            foreach (var (alias, r) in roles) sites.Add(new((JsonObject)r!, "requires", $"$.roles.{alias}.requires", "bool", "Person", null));
+        if (doc["inputs"] is JsonObject inputs)
+            foreach (var (n, vt) in inputs) sites.Add(new((JsonObject)vt!, "validate", $"$.inputs.{n}.validate", "bool", subjectKind, new Dictionary<string, FormulaType> { ["value"] = ValueType((JsonObject)vt!) }));
+        if (kind == "procedure")
+            WalkBlocks(doc["body"], (b, path, sk) =>
+            {
+                switch (b["block"]?.GetValue<string>())
+                {
+                    case "step":
+                        sites.Add(new(b, "precondition", $"{path}.precondition", "bool", sk, null));
+                        if (b["capture"] is JsonObject cap)
+                            foreach (var (f, vt) in cap)
+                                sites.Add(new((JsonObject)vt!, "validate", $"{path}.capture.{f}.validate", "bool", sk, new Dictionary<string, FormulaType> { ["value"] = ValueType((JsonObject)vt!) }));
+                        if (b["advances"] is JsonObject adv) sites.Add(new(adv, "subject", $"{path}.advances.subject", "ref", sk, null));
+                        if (b["due"] is JsonObject due) sites.Add(new(due, "cadence", $"{path}.due.cadence", "cadence", sk, null));
+                        break;
+                    case "foreach": sites.Add(new(b, "over", $"{path}.over", "set", sk, null)); break;
+                    case "repeat": sites.Add(new(b, "until", $"{path}.until", "bool", sk, null)); break;
+                    case "hold": sites.Add(new(b, "until", $"{path}.until", "bool", sk, null)); break;
+                    case "choice":
+                        if (b["cases"] is JsonArray cases)
+                            for (var i = 0; i < cases.Count; i++) sites.Add(new((JsonObject)cases[i]!, "when", $"{path}.cases[{i}].when", "bool", sk, null));
+                        break;
+                    case "parallel":
+                        if (b["branches"] is JsonArray branches)
+                            for (var i = 0; i < branches.Count; i++) sites.Add(new((JsonObject)branches[i]!, "applies", $"{path}.branches[{i}].applies", "bool", sk, null));
+                        break;
+                    case "call":
+                        sites.Add(new(b, "subject", $"{path}.subject", "ref", sk, null));
+                        if (b["bind"] is JsonObject bind)
+                            foreach (var (n, _) in bind.ToList()) sites.Add(new(bind, n, $"{path}.bind.{n}", "any", sk, null));
+                        break;
+                }
+            }, "$.body", subjectKind);
+        else if (kind == "workflow" && doc["transitions"] is JsonArray transitions)
+            for (var i = 0; i < transitions.Count; i++)
+                if (((JsonObject)transitions[i]!)["requires"] is JsonArray reqs)
+                    for (var j = 0; j < reqs.Count; j++) sites.Add(new((JsonObject)reqs[j]!, "when", $"$.transitions[{i}].requires[{j}].when", "bool", subjectKind, null));
+        return sites;
+    }
+
     /// <summary>
     /// Compiles an authored document in place: every expression site becomes canonical AST; the result is the canonical
     /// text. Throws <see cref="CompileException"/> with every error found (schema first, then expressions).
@@ -88,7 +141,6 @@ public static class DocumentCompiler
         if (errors.Count > 0) throw new CompileException(errors);
 
         var kind = doc["kind"]!.GetValue<string>();
-        var subjectKind = doc["subjectKind"]?.GetValue<string>();
 
         // what the document declares
         var declared = new Dictionary<string, FactInfo>(StringComparer.Ordinal);
@@ -101,91 +153,52 @@ public static class DocumentCompiler
         });
         var cat = new DocumentCatalogue(live, declared);
 
-        void Site(JsonObject owner, string key, string path, string expect, string? sk, IReadOnlyDictionary<string, FormulaType>? env = null)
+        foreach (var site in Sites(doc))
         {
-            if (owner[key] is not JsonNode n) return;
+            if (site.Owner[site.Key] is not JsonNode n) continue;
+            if (site.Expect == "cadence")
+            {
+                if (n is JsonValue cv && cv.TryGetValue<string>(out var ctext))
+                {
+                    try { site.Owner[site.Key] = Canonical.Order(Parser.ParseCadence(ctext)); }
+                    catch (FormulaException e) { errors.Add(new(site.Path, e.Code, e.Message)); }
+                }
+                continue;
+            }
             JsonObject ast;
             try
             {
                 ast = n is JsonValue v && v.TryGetValue<string>(out var text) ? Parser.Parse(text) : (JsonObject)n.DeepClone();
-                var t = Checker.Check(ast, cat, env, sk);
-                var ok = expect switch
+                var t = Checker.Check(ast, cat, site.Env, site.SubjectKind);
+                var ok = site.Expect switch
                 {
                     "bool" => t.Kind is "bool" or "unknown",
                     "set" => t.Kind is "set" or "unknown",
                     "ref" => t.Kind is "ref" or "unknown",
                     _ => true,
                 };
-                if (!ok) errors.Add(new(path, ErrorCodes.ResultType, $"must be {expect}, is {t}"));
+                if (!ok) errors.Add(new(site.Path, ErrorCodes.ResultType, $"must be {site.Expect}, is {t}"));
+                // an advances.subject's kind must be the workflow's (§2: "a subject of the right kind")
+                if (site.Key == "subject" && site.Owner["workflow"]?.GetValue<string>() is { } wf && workflowSubjectKinds.TryGetValue(wf, out var wfKind)
+                    && t is { Kind: "ref" } && t.RefKind is not null && t.RefKind != wfKind)
+                    errors.Add(new(site.Path, ErrorCodes.TypeMismatch, $"names a {t.RefKind}; workflow {wf} governs a {wfKind}"));
             }
-            catch (FormulaException e) { errors.Add(new(path, e.Code, e.Message)); return; }
-            owner[key] = Canonical.Order(ast);
+            catch (FormulaException e) { errors.Add(new(site.Path, e.Code, e.Message)); continue; }
+            site.Owner[site.Key] = Canonical.Order(ast);
         }
-
-        // roles: competency over person.* facts, subject Person
-        if (doc["roles"] is JsonObject roles)
-            foreach (var (alias, r) in roles) Site((JsonObject)r!, "requires", $"$.roles.{alias}.requires", "bool", "Person");
-        if (doc["inputs"] is JsonObject inputs2)
-            foreach (var (n, vt) in inputs2) Site((JsonObject)vt!, "validate", $"$.inputs.{n}.validate", "bool", subjectKind, new Dictionary<string, FormulaType> { ["value"] = ValueType((JsonObject)vt!) });
-
-        if (kind == "procedure")
-            WalkBlocks(doc["body"], (b, path, sk) =>
-            {
-                switch (b["block"]?.GetValue<string>())
-                {
-                    case "step":
-                        Site(b, "precondition", $"{path}.precondition", "bool", sk);
-                        if (b["capture"] is JsonObject cap)
-                            foreach (var (f, vt) in cap)
-                                Site((JsonObject)vt!, "validate", $"{path}.capture.{f}.validate", "bool", sk, new Dictionary<string, FormulaType> { ["value"] = ValueType((JsonObject)vt!) });
-                        if (b["advances"] is JsonObject adv)
-                        {
-                            Site(adv, "subject", $"{path}.advances.subject", "ref", sk);
-                            // the subject's kind must be the workflow's (§2: "a subject of the right kind")
-                            var wf = adv["workflow"]?.GetValue<string>() ?? "";
-                            if (adv["subject"] is JsonObject sAst && workflowSubjectKinds.TryGetValue(wf, out var wfKind))
-                            {
-                                var t = SafeType(sAst, cat, sk);
-                                if (t is { Kind: "ref" } && t.RefKind is not null && t.RefKind != wfKind)
-                                    errors.Add(new($"{path}.advances.subject", ErrorCodes.TypeMismatch, $"names a {t.RefKind}; workflow {wf} governs a {wfKind}"));
-                            }
-                        }
-                        if (b["due"] is JsonObject due && due["cadence"] is JsonValue cv && cv.TryGetValue<string>(out var ctext))
-                        {
-                            try { due["cadence"] = Canonical.Order(Parser.ParseCadence(ctext)); }
-                            catch (FormulaException e) { errors.Add(new($"{path}.due.cadence", e.Code, e.Message)); }
-                        }
-                        break;
-                    case "foreach": Site(b, "over", $"{path}.over", "set", sk); break;
-                    case "repeat": Site(b, "until", $"{path}.until", "bool", sk); break;
-                    case "hold": Site(b, "until", $"{path}.until", "bool", sk); break;
-                    case "choice":
-                        if (b["cases"] is JsonArray cases)
-                            for (var i = 0; i < cases.Count; i++) Site((JsonObject)cases[i]!, "when", $"{path}.cases[{i}].when", "bool", sk);
-                        break;
-                    case "parallel":
-                        if (b["branches"] is JsonArray branches)
-                            for (var i = 0; i < branches.Count; i++) Site((JsonObject)branches[i]!, "applies", $"{path}.branches[{i}].applies", "bool", sk);
-                        break;
-                    case "call":
-                        Site(b, "subject", $"{path}.subject", "ref", sk);
-                        if (b["bind"] is JsonObject bind)
-                            foreach (var (n, _) in bind.ToList()) Site(bind, n, $"{path}.bind.{n}", "any", sk);
-                        break;
-                }
-            }, "$.body", subjectKind);
-        else if (kind == "workflow" && doc["transitions"] is JsonArray transitions)
-            for (var i = 0; i < transitions.Count; i++)
-                if (((JsonObject)transitions[i]!)["requires"] is JsonArray reqs)
-                    for (var j = 0; j < reqs.Count; j++) Site((JsonObject)reqs[j]!, "when", $"$.transitions[{i}].requires[{j}].when", "bool", subjectKind);
 
         if (errors.Count > 0) throw new CompileException(errors);
         return Canonical.ToCanonical(doc);
     }
 
-    private static FormulaType? SafeType(JsonObject ast, ICatalogue cat, string? sk)
+    /// <summary>The inverse for the editor (W5): every canonical AST at an expression site printed back as grammar text, in
+    /// place. A site already holding text is left as it is.</summary>
+    public static JsonObject Decompile(JsonObject doc)
     {
-        try { return Checker.Check(ast, cat, null, sk); } catch (FormulaException) { return null; }
+        foreach (var site in Sites(doc))
+            if (site.Owner[site.Key] is JsonObject ast)
+                site.Owner[site.Key] = Printer.Print(ast);
+        return doc;
     }
 
     private static void WalkBlocks(JsonNode? node, Action<JsonObject> visit) => WalkBlocks(node, (b, _, _) => visit(b), "$.body", null);

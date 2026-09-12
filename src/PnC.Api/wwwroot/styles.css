@@ -27,3 +27,56 @@ h3 { margin: 12px 0 6px; font-size: 13px; text-transform: uppercase; letter-spac
 .dev label{flex-basis:100%;opacity:.8}
 .dev input{flex:1 1 16rem;padding:.35rem .5rem;font:inherit}
 .dev button{padding:.35rem .8rem;font:inherit}
+
+/* W5 — the definitions screen (definitions.html). Tokens as above; the editor is a plain textarea. */
+:root { --good: #2e7d4f; --bad: #b3261e; --warn: #9a6700; --accent: #2b6a8f; --selected: #e3eef5; --draft: #fff4d6; --effective: #dff3e6; --superseded: #eceff1; }
+@media (prefers-color-scheme: dark) { :root { --good: #6cc59a; --bad: #ff8a80; --warn: #e0b64c; --accent: #7fb6d8; --selected: #24323c; --draft: #3a3320; --effective: #1f3a2a; --superseded: #262c30; } }
+.brand a { color: inherit; text-decoration: none; }
+.crumb, .nav { font-weight: 400; opacity: .85; margin-left: 6px; }
+.nav a { color: inherit; font-size: 13px; text-decoration: underline; }
+.small { font-size: 12px; }
+.mono { font-family: Consolas, ui-monospace, monospace; }
+main.defs { max-width: 1400px; grid-template-columns: 300px 1fr; align-items: start; }
+.deflist { list-style: none; margin: 0; padding: 0; max-height: 75vh; overflow: auto; }
+.deflist .group { margin: 10px 0 4px; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.deflist .def { padding: 6px 0; border-top: 1px solid var(--rule); }
+.def-key { font-family: Consolas, ui-monospace, monospace; font-size: 13px; }
+.versions { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px; }
+.version { font: 12px/1.3 "Segoe UI", system-ui, sans-serif; padding: 2px 7px; border: 1px solid var(--rule); border-radius: 3px; background: var(--panel); color: var(--ink); cursor: pointer; }
+.version.draft { background: var(--draft); }
+.version.effective { background: var(--effective); }
+.version.superseded, .version.retired { background: var(--superseded); color: var(--muted); }
+.version.selected { outline: 2px solid var(--accent); }
+.toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.doc-title { font-weight: 600; font-family: Consolas, ui-monospace, monospace; }
+.pill { font: 12px/1.4 "Segoe UI", system-ui, sans-serif; padding: 1px 8px; border-radius: 10px; background: var(--superseded); vertical-align: middle; }
+.pill.draft { background: var(--draft); } .pill.effective { background: var(--effective); }
+.actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.actions button, .bench button, .dev button { padding: 5px 12px; font: inherit; font-size: 13px; border: 1px solid var(--rule); border-radius: 3px; background: var(--panel); color: var(--ink); cursor: pointer; }
+.actions button:hover:not(:disabled) { border-color: var(--accent); }
+.actions button:disabled { opacity: .45; cursor: not-allowed; }
+.actions button:focus-visible, .version:focus-visible, .path:focus-visible { outline: 2px solid var(--accent); }
+.note-row { display: flex; gap: 8px; align-items: center; margin: 10px 0 6px; font-size: 13px; }
+.note-row span { color: var(--muted); white-space: nowrap; }
+.note-row input { flex: 1; padding: 4px 8px; font: inherit; font-size: 13px; border: 1px solid var(--rule); border-radius: 3px; background: var(--panel); color: var(--ink); }
+.status { margin: 4px 0 8px; font-size: 13px; }
+.status.bad { color: var(--bad); }
+.editor { width: 100%; min-height: 60vh; resize: vertical; padding: 8px 10px; font: 13px/1.45 Consolas, ui-monospace, monospace; tab-size: 2; border: 1px solid var(--rule); border-radius: 3px; background: var(--panel); color: var(--ink); white-space: pre; overflow: auto; }
+.editor:focus { outline: 2px solid var(--accent); border-color: transparent; }
+.editor-foot { display: flex; justify-content: space-between; margin-top: 4px; }
+.errors { margin: 8px 0 0; padding-left: 22px; font-size: 13px; }
+.errors .error { margin: 3px 0; }
+.errors .path { font: 12px/1.3 Consolas, ui-monospace, monospace; padding: 1px 6px; border: 1px solid var(--rule); border-radius: 3px; background: var(--panel); color: var(--accent); cursor: pointer; margin-right: 6px; }
+.errors .code { color: var(--warn); margin-right: 6px; font-size: 12px; }
+.bench { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.bench input[type=text] { flex: 1 1 24rem; padding: 5px 8px; font: 13px/1.4 Consolas, ui-monospace, monospace; border: 1px solid var(--rule); border-radius: 3px; background: var(--panel); color: var(--ink); }
+.bench label { font-size: 13px; color: var(--muted); display: flex; gap: 4px; align-items: center; }
+.bench select { font: inherit; font-size: 13px; padding: 3px 4px; background: var(--panel); color: var(--ink); border: 1px solid var(--rule); border-radius: 3px; }
+.out { margin: 8px 0 0; padding: 8px 10px; font: 13px/1.45 Consolas, ui-monospace, monospace; white-space: pre-wrap; border: 1px solid var(--rule); border-radius: 3px; background: var(--ground); }
+.out.good { color: var(--good); } .out.bad { color: var(--bad); }
+.scroll { overflow-x: auto; }
+.grid { border-collapse: collapse; width: 100%; font-size: 13px; font-variant-numeric: tabular-nums; }
+.grid th, .grid td { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--rule); white-space: nowrap; }
+.grid th { font-weight: 600; color: var(--muted); font-size: 12px; }
+code { font: 12px/1.4 Consolas, ui-monospace, monospace; }
+@media (max-width: 900px) { main.defs { grid-template-columns: 1fr; } .deflist { max-height: 40vh; } }

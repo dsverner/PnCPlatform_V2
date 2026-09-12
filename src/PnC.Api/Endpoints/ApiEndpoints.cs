@@ -50,12 +50,26 @@ public static class ApiEndpoints
                   AND StartsAt <= SYSDATETIMEOFFSET() AND (EndsAt IS NULL OR EndsAt > SYSDATETIMEOFFSET())
                 ORDER BY StartsAt
                 """, args, ct);
+            // W5: the permission codes the person's roles carry (grants and delegations in force), so a screen can say
+            // what it will refuse before the API does; the API's own check is still the one that decides.
+            var permissions = await s.RowsAsync("""
+                SELECT DISTINCT rp.PermissionCode
+                FROM security.vRolePermission rp
+                WHERE rp.RoleCode IN (
+                    SELECT g.RoleCode FROM security.fGrantAsOf(SYSDATETIMEOFFSET(), SYSUTCDATETIME()) g
+                    WHERE g.GranteeKind = N'User' AND g.GranteeEntityId = @u AND g.RevokedByActorId IS NULL AND g.IsDeleted = 0
+                    UNION SELECT dl.RoleCode FROM security.fDelegationAsOf(SYSDATETIMEOFFSET(), SYSUTCDATETIME()) dl
+                    WHERE dl.ToPersonEntityId = @p AND dl.RevokedByActorId IS NULL AND dl.IsDeleted = 0
+                      AND dl.StartsAt <= SYSDATETIMEOFFSET() AND (dl.EndsAt IS NULL OR dl.EndsAt > SYSDATETIMEOFFSET()))
+                ORDER BY rp.PermissionCode
+                """, args, ct);
             return Results.Json(new
             {
                 user = new { entityId = u.UserEntityId, userPrincipalName = u.UserPrincipalName, identityKey = u.IdentityKey },
                 person = new { entityId = u.PersonEntityId, displayName = u.DisplayName },
                 actingAs = new { delegation = u.DelegationEntityId, sponsoredPerson = u.SponsoredPersonEntityId },
-                grants, delegations
+                grants, delegations,
+                permissions = permissions.Select(r => r!["PermissionCode"]!.GetValue<string>()).ToList(),
             });
         });
 

@@ -248,9 +248,11 @@ Three fixed routes, mapped before the generic dispatcher (`src/PnC.Api/Endpoints
 | `POST /api/v1/definitions/documents` `{document, changeNote?}` | validates the authored document against `Schemas/procedure.schema.json` or `workflow.schema.json` (`SchemaCheck`, the subset the two schemas use), parses and type-checks every expression against `compliance.vFactCatalogue` plus the document's own declared names (`DocumentCompiler`), replaces text with canonical AST, calls `process.AddProcedureVersion` / `AddWorkflowVersion` → `{versionRowId, versionNumber, existing}`; **400 `document_invalid`** with `errors[{path, code, message}]`; the database's structural rules answer 409 in the rule's words | `Definition.Modify` |
 | `POST /api/v1/definitions/documents/{versionRowId}/approve` `{effectiveFrom?, overrideReason?, overrideApprovedByActorId?}` | `process.ApproveProcedureVersion` (approval + projection, one transaction) or `config.ApproveDefinitionVersion` for a workflow → `{approved, projectedSteps}` | `Definition.Approve` |
 | `POST /api/v1/formula/check` `{expression, subjectKind?, env?}` | one expression parsed and typed → `{ok, type, facts, canonical}` or `{ok:false, code, message, position}` — the live check of PROCEDURE-ENGINE §8, W5's editor reuses it | any signed-in user |
+| `POST /api/v1/definitions/documents?dryRun=true` `{document}` (W5, #120) | the same compile, then the database's structural rules (`ValidateProcedureDocument` / `ValidateWorkflowDocument`), **nothing stored** → `{ok, kind, key, canonical, canonicalLength}`; 400 `document_invalid` with `errors[{path, code, message}]` — a rule as code `rule 5012x` in its own words at path `$` | any signed-in user |
+| `GET /api/v1/definitions/documents/{versionRowId}` (W5, #120) | one stored version → `{kind, key, name, versionNumber, status, effectiveFrom, effectiveTo, approvedAt, changeNote, document, canonical}` — `document` is the payload with every expression site **printed back as grammar text** (`DocumentCompiler.Decompile`, `Printer`); `canonical` the stored text | `Definition.Read` |
 
 `PnC.Api.Smoke` extends the W2 run with the W3 section (the three example documents, the approval by a second
-person, the projection counts, the refusals) — 73 checks in DEV mode; in Windows mode the Administrator run authors a
+person, the projection counts, the refusals) — 73 checks in DEV mode (161 with W4 and W5, 2026-09-12); in Windows mode the Administrator run authors a
 fresh `W3_GATE_APPROVAL` Draft and the Approver run (`--windows=Approver`) approves it.
 
 ## 8b. The procedure engine's endpoints — W4
@@ -276,6 +278,24 @@ process and is skipped in Windows mode.
 
 ## 9. The PWA shell
 
+**The definitions screen (W5, 2026-09-12; decisions #119, #120, #122).** `/definitions.html` + `definitions.js`, with
+`pnc.js` holding what every page shares (the DEV act-as header, the JSON calls). Left: the `Program.Procedure` and
+`Program.Workflow` definitions (`config/vDefinition`) with their versions (`config/vDefinitionVersion`: number,
+status, approval date; the change note as the tooltip). Right: the document as JSON in a textarea — loaded through
+`GET definitions/documents/{versionRowId}` so expressions read as text; **checked 0.7 s after every edit** through
+`POST definitions/documents?dryRun=true`, every problem listed with its JSON path and a button that puts the caret on
+that line (a small scanner over the text, no reformatting); *Save draft* (`POST definitions/documents` with the change
+note; the answer names the version, or says the content is already stored); *Approve* (`…/approve`; the segregation
+refusal shown in the rule's words; projected steps on success). *New procedure* starts from a one-step skeleton.
+Save and Approve are disabled, with the reason, when `/me`'s permission codes lack `Definition.Modify` /
+`Definition.Approve`. Below: the expression bench (`/formula/check` with a subject kind and a `value` type) and the
+runs awaiting a version ruling (`process/vMigrationList`). No inline script or style; the service worker's shell list
+carries the new files (`shell-2`). Observed in Chrome 2026-09-12: `SETTINGS_CHANGE` v20 loaded, its description
+edited, checked (no problems), saved as v21, the author's Approve refused 409 by `security.CheckSegregation`, approved
+as the second Administrator → Effective, 15 steps projected; the bench typed `device.settings.SLOPE > 20 % and
+device.technology = 'Electromechanical'` → `bool`, two facts; 28 runs on the migration list, every earlier gate run's
+half-run instance among them, all still Running on their pinned versions.
+
 **DEV sign-in (2026-09-12, after W3).** When `/health` reports environment `DEV` the shell shows an *act as* field;
 the chosen name is kept in the browser's local storage and sent as `X-PnC-Dev-User` on every request, so the owner
 can look at the built platform from the laptop at `http://127.0.0.1:5210/` while the Development host runs. In Windows
@@ -298,7 +318,9 @@ its return is a later ruling.
 src/PnC.sln
 src/PnC.Api/            Program.cs · Data/{Catalog,SqlSession}.cs · Security/{PermissionMap,
                         AuthorizationService,RequestUserMiddleware}.cs · Endpoints/{Api,
-                        Problems}.cs · api-permissions.json · appsettings.json · wwwroot/
+                        Problems,Definition,Process}.cs · Definitions/ · Engine/ · api-permissions.json ·
+                        appsettings.json · wwwroot/{index.html,app.js,definitions.html,definitions.js,pnc.js,
+                        styles.css,sw.js}
 src/PnC.Api.Smoke/      Program.cs
 src/PnC.Formula/        (carried, W0)
 src/PnC.Formula.Conformance/

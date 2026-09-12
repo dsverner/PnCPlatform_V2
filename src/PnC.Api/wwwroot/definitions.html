@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Definitions · P&amp;C Platform</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+  <meta name="theme-color" content="#1f3a4d">
+</head>
+<body>
+  <!-- docs/design/API.md §9, PROCEDURE-ENGINE §8 (W5, decisions #119–#120): the authoring screen. A procedure or
+       workflow document is edited as JSON; every check is the API's (schema, grammar, types, the database's structural
+       rules) through POST /api/v1/definitions/documents?dryRun=true; saving stores a Draft; approval is the database's,
+       segregation included. No inline script or style — the CSP forbids both. -->
+  <header class="bar">
+    <span class="brand"><a href="/">P&amp;C Platform</a> <span class="crumb">/ Definitions</span></span>
+    <span id="who" class="who">signing in…</span>
+  </header>
+  <main class="defs">
+    <aside id="list" class="panel">
+      <h2>Procedures and workflows</h2>
+      <p class="muted small" id="list-summary">…</p>
+      <ul id="definitions" class="deflist"></ul>
+    </aside>
+    <section id="editor" class="panel">
+      <div class="toolbar">
+        <div class="doc-title"><span id="doc-key">No document loaded</span> <span id="doc-status" class="pill" hidden></span></div>
+        <div class="actions">
+          <button id="btn-new" type="button" title="Start a new procedure from a skeleton">New procedure</button>
+          <button id="btn-check" type="button" title="Schema, every expression, the structural rules — nothing stored">Check</button>
+          <button id="btn-save" type="button" title="Store as the next Draft version">Save draft</button>
+          <button id="btn-approve" type="button" title="Approve the loaded version (a second person, by the segregation rule)">Approve</button>
+        </div>
+      </div>
+      <label class="note-row" for="change-note"><span>Change note</span><input id="change-note" type="text" placeholder="what this version changes and why" autocomplete="off"></label>
+      <p id="status" class="status muted">Pick a version on the left, or start a new procedure.</p>
+      <textarea id="doc" class="editor" spellcheck="false" wrap="off" placeholder="{ &quot;kind&quot;: &quot;procedure&quot;, … }"></textarea>
+      <div class="editor-foot"><span id="caret" class="muted small">—</span><span id="check-state" class="small muted"></span></div>
+      <ol id="errors" class="errors"></ol>
+      <p id="permission-note" class="muted small" hidden></p>
+    </section>
+    <section id="bench" class="panel wide">
+      <h2>Expression bench</h2>
+      <p class="muted small">One expression, checked against the live fact catalogue exactly as a document's would be (<code>POST /api/v1/formula/check</code>).</p>
+      <form id="bench-form" class="bench">
+        <input id="bench-expr" type="text" placeholder="step.capture[id='READBACK', field='differenceCount'] > 0" autocomplete="off" spellcheck="false">
+        <label>subject <select id="bench-subject">
+          <option value="">(none)</option><option>WorkRequest</option><option>Device</option><option>Asset</option><option>Scheme</option>
+          <option>SettingsIssuePackage</option><option>ConfigurationFileRevision</option><option>Person</option><option>Station</option>
+        </select></label>
+        <label>value <select id="bench-value">
+          <option value="">(none)</option><option>num</option><option>text</option><option>bool</option><option>date</option><option>dur</option>
+        </select></label>
+        <button type="submit">Check expression</button>
+      </form>
+      <pre id="bench-out" class="out muted">—</pre>
+    </section>
+    <section id="migration" class="panel wide">
+      <h2>Runs awaiting a version ruling</h2>
+      <p class="muted small">Every running or held instance pinned to a version that a newer Effective version has since superseded (<code>process.vMigrationList</code>, decision #116). A ruling is a migration row; until then the run continues on its pinned version.</p>
+      <div class="scroll"><table id="migration-table" class="grid">
+        <thead><tr><th>Instance</th><th>Procedure</th><th>Pinned</th><th>Current</th><th>State</th><th>Started</th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+      <p id="migration-summary" class="muted small">…</p>
+    </section>
+  </main>
+  <script src="/pnc.js"></script>
+  <script src="/definitions.js"></script>
+</body>
+</html>

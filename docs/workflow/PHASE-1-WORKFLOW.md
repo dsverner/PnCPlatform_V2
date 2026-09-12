@@ -375,6 +375,49 @@ untouched; `DRAWING_REVISION` completes inside a `SETTINGS_CHANGE` run.
 
 **Depends on.** W4. **Estimate.** B7: 8–14 h · C: 8–14 h.
 
+**Gate record — 2026-09-12, observed on `PnCPlatform_V2_DEV` in Chrome and through the API with DEV-header identities.**
+- Schema: no DDL change this wave — the definitions rules of W3 and the engine of W4 were enough. `deploy.py` green,
+  schema smoke 268 PASS; release **0.5.0** recorded.
+- API: `?dryRun=true` on the document endpoint (compile + the database's structural rules, nothing stored), the
+  read-back of one version with expressions printed as text, `/me` with the permission codes of the roles in force
+  (API.md §8a, §9; decision #120). `DocumentCompiler` now walks one list of expression sites for both directions.
+- Shell: `definitions.html` / `definitions.js` / `pnc.js` (decision #119) — the list, the editor, the live check with
+  paths, save, approve, the expression bench, the migration list; `sw.js` shell list and cache key `shell-2`.
+- **The gate, in Chrome (screenshot `docs/workflow/evidence/W5-definitions-approved.jpg`)**: as `smoke.admin`,
+  `SETTINGS_CHANGE` v20 (Effective) loaded with its expressions as text; the description edited; *Check* → no
+  problems, canonical 11120 chars; *Save draft* → **v21 Draft**; *Approve* → **409** *segregation of duties — the same
+  person is performing Author and Approve of DefinitionVersion*; as `smoke.approver`, v21 → *Approve* → **Effective,
+  15 steps projected**. The migration list then showed 28 runs — every earlier gate run's half-run `SETTINGS_CHANGE`
+  instance and its `DRAWING_REVISION` callee — all still Running on their pinned versions: **the running v1 instances
+  are untouched.** No console errors under the CSP.
+- **`DRAWING_REVISION` v2** (decision #121): two steps from the legacy track's fields, authored in the screen and kept
+  as `docs/design/examples/drawing-revision.procedure.json`. **API smoke 161 PASS, 0 FAIL**: v2 loaded and approved
+  by the second Administrator before the W4 run, so the run's version set pins it; at COMPLETION the child run's
+  IDENTIFY_DRAWINGS and RECORD_REVISION committed with their required captures and **the child completed, pinned to
+  v2**, inside the SETTINGS_CHANGE run that then completed and closed. Dry run of a good document as ReadOnly → ok
+  with the canonical; a bad expression → 400 with `$.body.items[0].precondition unknown_fact`; duplicate block ids →
+  `rule 50121` in the database's words; storing as ReadOnly → 403; the version count unchanged; the read-back prints
+  `step.outcome[id='IDENTIFY_DRAWINGS'] = 'Done'`; every shell file served with `script-src 'self'` and no inline
+  script or style.
+- Both workflows live: `SETTINGS_CHANGE_REQUEST` and `SETTINGS_LIFECYCLE` unchanged since W3 and driven by the run.
+- **Found by the 0.5.0 deploy and fixed (three deploys, #121)**: the W4 seed of the `DRAWING_REVISION` placeholder
+  loaded it again as a new version and approved it whenever its v1 was no longer Effective — the first deploy retired
+  the tool-authored v2 (the VM02 Administrator run then failed 6 projection checks, the example and the placeholder
+  both re-instated as Drafts); the guard `IF EXISTS (an Effective DRAWING_REVISION) RETURN` placed before a `GO` did
+  nothing (`RETURN` leaves only its batch) and v5 appeared; in its own batch it held: v6 (the authored content)
+  stayed Effective through the third deploy. DEV shows the trail: v1 (seed), v2 (tool), v3 (seed, overturned v2),
+  v4 (tool), v5 (seed), v6 (tool, Effective). The SETTINGS_CHANGE example is Effective again as v22 after the
+  gate's v21.
+- **Windows mode on VM02 (0.5.0 through the guest agent, package `5c636e80…`, `/health` → `release 0.5.0,
+  database ok`, `/definitions.html` → 200)**: **admin 58 PASS**, **approver 16 PASS**, **read-only 24 PASS**,
+  **hydro 14 PASS**, 0 FAIL — the shell files under the CSP checked by every account, the dry run by the ReadOnly
+  account, `DRAWING_REVISION` v2 found stored (existing) by the Administrator.
+- **Not done in W5, by design and recorded**: the real content of `DRAWING_REVISION` beyond the legacy fields is the
+  owner's (card); who may author besides the Administrator is a grant row (#28, #96); the estimate's B7 assumed the
+  predecessor's `definitions.js` / `expression.js`, which #64 did not carry — the editor is new code, 8 h against the
+  8–14 estimated; the 28 half-run gate instances on DEV stay until a migration ruling or cleanup (each DEV gate run
+  adds one).
+
 ### W6 — Parity screens and the FLOC view
 
 **Builds.** The legacy functional surface (`LEGACY-SYSTEM.md` §8) as queries over `process.*` and

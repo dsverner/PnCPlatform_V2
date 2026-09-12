@@ -359,6 +359,12 @@ works to is the thing a friendlier surface will target (#46).
 - **Approval** through the existing `config.*` procedures with segregation.
 - **Projection** on approval.
 
+**W5 (2026-09-12), decisions #119–#122.** Built as `definitions.html` in the shell (API.md §9). The schema and the
+structural checks are not two mechanisms: one **dry run** of the save (`POST definitions/documents?dryRun=true`)
+answers both, live, with JSON paths, and stores nothing; the expression check stays as a bench for one expression. A
+stored version is read back with its expressions **printed as text** (`Printer`), so what is edited is what was
+written. `DRAWING_REVISION` v2 was the first procedure authored there (`examples/drawing-revision.procedure.json`).
+
 In production at NB Power, until the friendly editor exists, procedures are authored by the
 supplier at the client's request. `REQUIREMENTS.md` FR-1.5 says so, so the client reads FR-1.1
 correctly.

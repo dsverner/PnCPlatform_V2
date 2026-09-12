@@ -1,29 +1,16 @@
 // docs/design/API.md §9. The shell shows /health, /me and the catalogue. Every later screen is a
-// view over the catalogued procedures and views; nothing here knows a domain rule.
+// view over the catalogued procedures and views; nothing here knows a domain rule. Shared helpers: pnc.js.
 (function () {
   "use strict";
-  const $ = (id) => document.getElementById(id);
-  const text = (id, v) => { $(id).textContent = v == null ? "—" : String(v); };
-
-  // DEV only (API.md §2, decision #85): the host in Development mode accepts X-PnC-Dev-User; the shell offers it
-  // when /health says the environment is DEV, remembers the choice in this browser, and sends it on every request.
-  // In Windows mode the field never appears and the browser's own identity is what IIS negotiates.
-  let devUser = null;
-  try { devUser = localStorage.getItem("pnc.devUser"); } catch (e) { devUser = null; }
-  async function getJson(url) {
-    const headers = { Accept: "application/json" };
-    if (devUser) headers["X-PnC-Dev-User"] = devUser;
-    const r = await fetch(url, { headers });
-    const body = await r.json().catch(() => null);
-    if (!r.ok) throw Object.assign(new Error((body && body.detail) || r.statusText), { status: r.status, code: body && body.code });
-    return body;
-  }
+  const { $, text, getJson } = window.PnC;
 
   async function health() {
     try {
       const h = await getJson("/health");
       text("env", h.environment); text("release", h.release); text("db", h.database);
-      if (h.environment === "DEV") { $("dev-signin").hidden = false; if (devUser) $("dev-upn").value = devUser; }
+      // DEV only (API.md §2, decision #85): the host in Development mode accepts X-PnC-Dev-User; the shell offers it
+      // when /health says the environment is DEV. In Windows mode the field never appears.
+      if (h.environment === "DEV") { $("dev-signin").hidden = false; if (window.PnC.devUser()) $("dev-upn").value = window.PnC.devUser(); }
       text("loaded", h.catalogLoadedAt ? new Date(h.catalogLoadedAt).toLocaleString() : null);
     } catch (e) { text("db", "unreachable: " + e.message); }
   }
@@ -58,12 +45,10 @@
 
   $("dev-signin").addEventListener("submit", (ev) => {
     ev.preventDefault();
-    const v = $("dev-upn").value.trim();
-    try { if (v) localStorage.setItem("pnc.devUser", v); else localStorage.removeItem("pnc.devUser"); } catch (e) { /* no storage: the choice lasts the page */ }
-    devUser = v || null;
+    window.PnC.setDevUser($("dev-upn").value.trim());
     me().then((signedIn) => { if (signedIn) catalog(); else text("catalog-summary", "Sign in to see the catalogue."); });
   });
 
-  if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+  window.PnC.registerWorker();
   health().then(me).then((signedIn) => { if (signedIn) catalog(); else text("catalog-summary", "Sign in to see the catalogue."); });
 })();

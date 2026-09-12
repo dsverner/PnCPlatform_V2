@@ -14,7 +14,7 @@ using Microsoft.Data.SqlClient;
 // with X-PnC-Dev-User. Windows mode: the process's own identity; checks that need another identity are SKIPped.
 // Exit 1 on any failure, 2 on bad arguments. Soft deletes only.
 
-if (args.Length < 1) { Console.Error.WriteLine("usage: PnC.Api.Smoke <api base url> [<connection string> | -] [--windows=Administrator|ReadOnly|Hydro]"); return 2; }
+if (args.Length < 1) { Console.Error.WriteLine("usage: PnC.Api.Smoke <api base url> [<connection string> | -] [--windows=Administrator|ReadOnly|Hydro|Approver|Technician]"); return 2; }
 var baseUrl = args[0].TrimEnd('/');
 var cs = args.Length > 1 && args[1] != "-" ? args[1] : null;
 var windows = args.FirstOrDefault(a => a.StartsWith("--windows="))?["--windows=".Length..];
@@ -494,6 +494,26 @@ if (readOnly is not null)
     Check(rs2 == HttpStatusCode.Forbidden && Code(rb2) == "forbidden", "load a document as ReadOnly → 403 forbidden");
 }
 
+// ======================================================================= W5 (part 1) — DRAWING_REVISION v2, the first procedure authored in the tool
+// docs/design/examples/drawing-revision.procedure.json is the text the editor saved (decision #121). Loaded here, before the
+// W4 run, so the run's version set pins v2 and the child run below is the gate's "DRAWING_REVISION completes inside a
+// SETTINGS_CHANGE run". Idempotent as the W3 loads are.
+string? drawingV2Row = null;
+if (admin is not null)
+{
+    var (ds, db) = await Post(admin, "api/v1/definitions/documents", new { document = JsonNode.Parse(Example("drawing-revision.procedure.json")), changeNote = "W5: authored in the tool" });
+    drawingV2Row = db?["versionRowId"]?.ToString();
+    Check(ds == HttpStatusCode.OK && drawingV2Row is not null, $"load DRAWING_REVISION v2 → {(int)ds} {Code(db)} (version {db?["versionNumber"]}, existing {db?["existing"]})");
+    if (drawingV2Row is not null && approver is not null)
+    {
+        var (das, dab) = await Post(approver, $"api/v1/definitions/documents/{drawingV2Row}/approve", new { });
+        Check(das == HttpStatusCode.OK || AlreadyApproved(dab), $"DRAWING_REVISION v2 approved by the second Administrator → {(int)das} {Code(dab)} (projected {dab?["projectedSteps"]})");
+        var (dvs, dvb) = await Get(admin, $"api/v1/config/vDefinitionVersion?RowId={drawingV2Row}");
+        Check((dvb?["rows"] as JsonArray)?.FirstOrDefault()?["Status"]?.ToString() == "Effective", "DRAWING_REVISION v2 is the Effective version");
+    }
+}
+else Skip("W5 DRAWING_REVISION v2 (needs the Administrator identity)");
+
 // ======================================================================= W4 — the interpreter (PHASE-1-WORKFLOW W4 gate)
 // One SETTINGS_CHANGE run end to end over three fixture devices (SEL-421, CGE BDD15B, Westinghouse CYL): every step
 // commits; the package walks Calculated → … → InService; the CYL readback difference ends its member Superseded; the
@@ -690,11 +710,36 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
         Must(child is not null, $"the COMPLETION call started a DRAWING_REVISION child run ({child})");
         if (child is not null)
         {
-            var (ct1, cb1) = await Get(admin, $"api/v1/process/procedure-instances/{child}");
-            var childStep = Id((cb1?["readySteps"] as JsonArray)?.FirstOrDefault(), "stepEntityId");
-            await Post(admin, $"api/v1/process/step-instances/{childStep}/claim", new { });
-            var (ccs, ccb) = await Post(admin, $"api/v1/process/step-instances/{childStep}/commit", new { outcome = "Done" });
-            Must(ccs == HttpStatusCode.OK, $"the child run's UPDATE_DRAWINGS committed → {(int)ccs} {Code(ccb)} {ccb?["detail"]}");
+            // W5: the child runs DRAWING_REVISION v2 (two steps with required captures); every ready step is claimed and
+            // committed with the captures its definition requires until the run completes. v1's single step would commit too.
+            var childCaptures = new Dictionary<string, object>
+            {
+                ["IDENTIFY_DRAWINGS"] = new { drawingReferences = $"{tag} drawings: 1234-E-001 rev C, 1234-E-014 rev B", note = "fixture" },
+                ["RECORD_REVISION"] = new { documentLink = $"drawings://issue/{tag}", revisionLabel = "C", issuedOn = DateTimeOffset.Now },
+            };
+            var committed = new List<string>();
+            for (var round = 0; round < 6; round++)
+            {
+                var (ct1, cb1) = await Get(admin, $"api/v1/process/procedure-instances/{child}");
+                if (cb1?["state"]?.ToString() == "Completed") break;
+                var ready = (cb1?["readySteps"] as JsonArray)?.Where(r => r?["stepState"]?.ToString() == "Ready").ToList() ?? [];
+                if (ready.Count == 0) { await Post(admin, $"api/v1/process/procedure-instances/{child}/evaluate", new { }); continue; }
+                foreach (var r in ready)
+                {
+                    var stepId = r?["stepId"]?.ToString() ?? "";
+                    var stepEntity = Id(r, "stepEntityId");
+                    await Post(admin, $"api/v1/process/step-instances/{stepEntity}/claim", new { });
+                    object body = childCaptures.TryGetValue(stepId, out var cap) ? new { outcome = "Done", capture = cap } : new { outcome = "Done" };
+                    var (ccs, ccb) = await Post(admin, $"api/v1/process/step-instances/{stepEntity}/commit", body);
+                    Must(ccs == HttpStatusCode.OK, $"the child run's {stepId} committed → {(int)ccs} {Code(ccb)} {ccb?["detail"]}");
+                    committed.Add(stepId);
+                }
+            }
+            var (cfs2, cfb2) = await Get(admin, $"api/v1/process/vProcedureInstance?EntityId={child}");
+            var childRow = (cfb2?["rows"] as JsonArray)?.FirstOrDefault();
+            Must(childRow?["State"]?.ToString() == "Completed", $"the DRAWING_REVISION child run completed inside the SETTINGS_CHANGE run ({childRow?["State"]}; steps {string.Join(", ", committed)})");
+            if (drawingV2Row is not null)
+                Must(string.Equals(childRow?["DefinitionVersionRowId"]?.ToString(), drawingV2Row, StringComparison.OrdinalIgnoreCase), "the child run is pinned to DRAWING_REVISION v2, the version authored in the tool");
         }
         await RunStep(admin, "BASELINE", new { outcome = "Done" });
         Must((await LifecycleState()) == "InService", "BASELINE advanced the lifecycle to InService");
@@ -756,6 +801,60 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
     }
 }
 else Skip("W4 run (needs the Administrator, Approver, Hydro and Technician identities in one process — DEV mode)");
+
+// ======================================================================= W5 (part 2) — the authoring screen's surface and the dry run
+// The screen itself is observed in Chrome (the gate record); here: the files the shell serves under the CSP, the dry run
+// (schema, grammar, the database's rules — nothing stored), the read-back with expressions as text, /me's permissions.
+{
+    var who = admin ?? readOnly ?? approver ?? hydro ?? tech;
+    if (who is not null)
+    {
+        foreach (var path in new[] { "", "definitions.html", "definitions.js", "pnc.js", "app.js", "styles.css", "sw.js" })
+        {
+            var r = await who.GetAsync(path);
+            var csp = r.Headers.TryGetValues("Content-Security-Policy", out var v) ? string.Join("", v) : "";
+            var bodyText = await r.Content.ReadAsStringAsync();
+            var ok = r.StatusCode == HttpStatusCode.OK && csp.Contains("script-src 'self'") && !bodyText.Contains("<script>") && !bodyText.Contains("style=\"");
+            if (path == "sw.js") ok = ok && bodyText.Contains("\"/definitions.js\"") && bodyText.Contains("\"/pnc.js\"");
+            Check(ok, $"GET /{path} → {(int)r.StatusCode}, CSP script-src 'self', no inline script or style{(path == "sw.js" ? ", the editor files in the shell list" : "")}");
+        }
+        var (ms, mb) = await Get(who, "api/v1/me");
+        Check(ms == HttpStatusCode.OK && mb?["permissions"] is JsonArray, "/me carries the permission codes of the roles in force");
+    }
+    if (readOnly is not null)
+    {
+        var (mrs, mrb) = await Get(readOnly, "api/v1/me");
+        var perms = (mrb?["permissions"] as JsonArray)?.Select(x => x?.ToString()).ToList() ?? [];
+        Check(perms.Contains("Definition.Read") && !perms.Contains("Definition.Modify"), $"ReadOnly's /me: Definition.Read held, Definition.Modify not ({perms.Count} codes)");
+        var (vcs, vcb) = await Get(readOnly, "api/v1/config/vDefinitionVersion?take=500");
+        var before = (vcb?["rows"] as JsonArray)?.Count ?? -1;
+        var good = JsonNode.Parse(Example("drawing-revision.procedure.json"));
+        var (g1s, g1b) = await Post(readOnly, "api/v1/definitions/documents?dryRun=true", new { document = good });
+        Check(g1s == HttpStatusCode.OK && g1b?["ok"]?.GetValue<bool>() == true && g1b?["canonical"] is JsonObject, $"dry run of a good document as ReadOnly → 200 ok, canonical returned, nothing stored ({(int)g1s} {Code(g1b)})");
+        var bad = (JsonObject)JsonNode.Parse(Example("drawing-revision.procedure.json"))!;
+        ((JsonObject)((JsonArray)bad["body"]!["items"]!)[0]!)["precondition"] = "device.nonsense > 1";
+        var (b1s, b1b) = await Post(readOnly, "api/v1/definitions/documents?dryRun=true", new { document = bad });
+        var errs = b1b?["errors"] as JsonArray;
+        Check(b1s == HttpStatusCode.BadRequest && Code(b1b) == "document_invalid" && errs?.Any(e => e?["path"]?.ToString() == "$.body.items[0].precondition" && e?["code"]?.ToString() == "unknown_fact") == true,
+            $"dry run of a bad expression → 400 document_invalid with the JSON path ({errs?.FirstOrDefault()?["path"]} {errs?.FirstOrDefault()?["code"]})");
+        var dup = (JsonObject)JsonNode.Parse(Example("drawing-revision.procedure.json"))!;
+        ((JsonObject)((JsonArray)dup["body"]!["items"]!)[1]!)["id"] = "IDENTIFY_DRAWINGS";
+        var (b2s, b2b) = await Post(readOnly, "api/v1/definitions/documents?dryRun=true", new { document = dup });
+        var errs2 = b2b?["errors"] as JsonArray;
+        Check(b2s == HttpStatusCode.BadRequest && errs2?.Any(e => e?["code"]?.ToString() == "rule 50121") == true, $"dry run of duplicate block ids → the database's rule 50121 in its words ({errs2?.FirstOrDefault()?["message"]})");
+        var (s1s, s1b) = await Post(readOnly, "api/v1/definitions/documents", new { document = good });
+        Check(s1s == HttpStatusCode.Forbidden, $"storing as ReadOnly → 403 ({Code(s1b)})");
+        var (vcs2, vcb2) = await Get(readOnly, "api/v1/config/vDefinitionVersion?take=500");
+        Check(((vcb2?["rows"] as JsonArray)?.Count ?? -2) == before, $"the version count is unchanged by the dry runs and the refusal ({before})");
+        if (drawingV2Row is not null)
+        {
+            var (rbs, rbb) = await Get(readOnly, $"api/v1/definitions/documents/{drawingV2Row}");
+            var pre = rbb?["document"]?["body"]?["items"]?[1]?["precondition"];
+            Check(rbs == HttpStatusCode.OK && pre is JsonValue && pre.ToString().Contains("step.outcome[id='IDENTIFY_DRAWINGS']"), $"read-back of DRAWING_REVISION v2 prints the precondition as grammar text ({pre})");
+        }
+    }
+    else Skip("W5 dry run (needs the ReadOnly identity)");
+}
 
 Console.WriteLine($"SMOKE {(failed == 0 ? "PASS" : "FAIL")}: {passed} passed, {failed} failed, {skipped} skipped");
 return failed == 0 ? 0 : 1;
