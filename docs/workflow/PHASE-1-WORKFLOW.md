@@ -200,6 +200,12 @@ account on `vgsot.internal`. One row visible outside scope is a failure.
   landed under Transmission before the fix; that row is soft-deleted). `API-W2-SECURITY.md`.
 - **Not done:** the Windows-mode run as a real `vgsot.internal` account holding a Hydro grant, and the
   SID registration it exercises — both wait on dedicated gate accounts (W2 card, standing authorisation).
+- **Deployed to VGS-VM02 as 0.2.0 (package from 554b7b4), 2026-09-12**, through the guest agent: the first
+  0.2.0 package failed at start because reading `sys.sql_expression_dependencies` needs VIEW DEFINITION on
+  the whole database, which `app_execute` rightly lacks; the catalogue now reads each view's base tables
+  from its own definition text (554b7b4). After redeploy: `/health` → 200 `release 0.2.0, database ok`;
+  `/api/v1/me` as the machine account → the API's own 401. Second lesson of the same family as W1's:
+  **every catalogue query must work under the service account's rights, not the developer login's.**
 
 ### W3 — Definitions and the `process` schema
 
