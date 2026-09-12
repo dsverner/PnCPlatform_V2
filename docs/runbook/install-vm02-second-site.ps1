@@ -66,6 +66,11 @@ if (-not (Get-Website -Name $SiteName -ErrorAction SilentlyContinue)) {
 Set-WebConfigurationProperty -PSPath "IIS:\" -Location $SiteName -Filter 'system.webServer/security/authentication/anonymousAuthentication' -Name enabled -Value $false
 Set-WebConfigurationProperty -PSPath "IIS:\" -Location $SiteName -Filter 'system.webServer/security/authentication/windowsAuthentication' -Name enabled -Value $true
 Write-Host "4c. Windows authentication on, anonymous off"
+# Kerberos tickets for HTTP/vgs-vm02.vgsot.internal are issued to the pool identity, so kernel-mode Windows
+# authentication must decrypt them with the pool's credentials — as the predecessor's site is configured.
+# Without it every Negotiate attempt fails at IIS with 401.2 (found on VM02, 2026-09-11).
+Set-WebConfigurationProperty -PSPath 'MACHINE/WEBROOT/APPHOST' -Location $SiteName -Filter 'system.webServer/security/authentication/windowsAuthentication' -Name useAppPoolCredentials -Value $true
+Write-Host "4d. useAppPoolCredentials on (Kerberos with the service-account SPN)"
 # /health: IIS authenticates the caller like every other URL (a per-path anonymous location was tried on
 # 2026-09-11 and sent /health to the static-file handler, 404.0); the app ignores the identity on /health.
 

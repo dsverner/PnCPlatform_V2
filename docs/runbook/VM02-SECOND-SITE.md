@@ -96,6 +96,13 @@ VM02 and its own certificate); `curl.exe` with `-k` is the check that works ther
 
 ## Outcome, 2026-09-11
 
+**Browser from VM07, first try:** Edge prompted for credentials on 8443 and refused VGS01's correct
+password; the IIS log showed 401.2 three times per attempt. Cause, read from both sites' configuration:
+the predecessor's site has `useAppPoolCredentials=True`, the new one had the default `False`. Kerberos
+tickets for `HTTP/vgs-vm02.vgsot.internal` are issued to the pool identity, so kernel-mode Windows
+authentication must use the pool's credentials to decrypt them. Set on `PnCPlatform_V2`, pool restarted,
+the machine-account check still answers the API's own 401. The install script carries it as step 4d.
+
 #91 was overtaken: the owner allowed the Proxmox path and this session did steps 2–7 through the
 guest agent (the by-hand script stays valid and idempotent). After the redeploy of the package built
 from 348a631, observed on VM02 with `curl -k --negotiate -u :` as SYSTEM: **`/health` → 200**
