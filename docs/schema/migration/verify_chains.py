@@ -21,7 +21,7 @@ def main():
     tgt = common.connect(a.database); tgt.add_output_converter(-155, lambda b: b); cur = tgt.cursor()
     legacy = {}
     for oldno, cr, set1, cdate, vdate in src.execute("SELECT OLD_NO, [Change Request ID], SET1, CDATE, VDATE FROM SETTINGS WHERE LEFT(OLD_NO,1) IN ('A','M','P')").fetchall():
-        legacy[(oldno, cr)] = (hashlib.sha256((set1 or "").encode("utf-8")).hexdigest(), cdate, vdate)
+        legacy[(oldno, cr)] = (hashlib.sha256((set1 or "").strip().encode("utf-8")).hexdigest(), cdate, vdate)   # the importer strips the text (strip()) before writing
     rows = cur.execute("""SELECT p.SourceKey, f.Sha256, CONVERT(NVARCHAR(19), cf.InServiceFrom, 120), cf.InServiceFromQuality
         FROM migration.vProvenance p
         JOIN document.vConfigurationFile cf ON cf.RevisionRowId = p.TargetRowId
