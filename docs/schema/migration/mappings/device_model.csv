@@ -8,3 +8,10 @@ SEL-487E-3-3611-XXC2-X43644-XXX,SEL-487E,owner 2026-09-05: SEL-487E with its ord
 KAB,KAB,owner 2026-09-05: Westinghouse (later ABB) KAB high-impedance bus differential relay; the model is KAB with nothing more to add. Legacy MANUFACTURER = Westinghouse,WESTINGHOUSE,KAB high-impedance bus differential relay,Electromechanical
 KAB 87L=75-200 V 87H=3-48 A,KAB,owner 2026-09-05: KAB with its setting ranges appended,WESTINGHOUSE,KAB high-impedance bus differential relay,Electromechanical
 KAB 87L=75-300 V 87H=3-48 A,KAB,owner 2026-09-05: KAB with its setting ranges appended,WESTINGHOUSE,KAB high-impedance bus differential relay,Electromechanical
+"CNT 35-96","CNT 35-96","owner 2026-09-13 (W7 card D): the P&B CNT 35-96 is a solid-state timer",,,Static
+"CNT 35-96  0.1 S-9990 HR 12-240VDC 24-240 VAC/DC","CNT 35-96  0.1 S-9990 HR 12-240VDC 24-240 VAC/DC","owner 2026-09-13 (W7 card D): the P&B CNT 35-96 is a solid-state timer",,,Static
+"CNT 35-96 .1 S-9990 HR 24-240 VAC/VDC","CNT 35-96 .1 S-9990 HR 24-240 VAC/VDC","owner 2026-09-13 (W7 card D): the P&B CNT 35-96 is a solid-state timer",,,Static
+"CNT 35-96 0.1 S-9990 H 12-240 VDC 24-240 VAC","CNT 35-96 0.1 S-9990 H 12-240 VDC 24-240 VAC","owner 2026-09-13 (W7 card D): the P&B CNT 35-96 is a solid-state timer",,,Static
+"CNT 35-96 0.1-9990HR 24-240VAC/VDC","CNT 35-96 0.1-9990HR 24-240VAC/VDC","owner 2026-09-13 (W7 card D): the P&B CNT 35-96 is a solid-state timer",,,Static
+"CNT-35-96","CNT-35-96","owner 2026-09-13 (W7 card D): the P&B CNT 35-96 is a solid-state timer",,,Static
+"CNT-35-96 0.1 S-9990 H","CNT-35-96 0.1 S-9990 H","owner 2026-09-13 (W7 card D): the P&B CNT 35-96 is a solid-state timer",,,Static

@@ -1026,7 +1026,7 @@ else Skip("W4 run (needs the Administrator, Approver, Hydro and Technician ident
             Check(archived >= 5650 && archived < 5900, $"the grid's Archived rows: {archived} (the legacy P rows that carry a settings file, plus the fixtures')");
             Check(outstanding >= 340 && outstanding < 500, $"the grid's Outstanding rows: {outstanding} (the legacy M rows that carry a settings file, plus the fixtures')");
             var (fnd, fndb) = await Get(who, "api/v1/record/vFinding?FindingCategoryCode=MigrationReconciliation&take=100");
-            Check(fnd == HttpStatusCode.OK && (fndb?["rows"] as JsonArray)?.Count == 17, $"the 17 ordering violations are findings (#59) ({(fndb?["rows"] as JsonArray)?.Count})");
+            Check(fnd == HttpStatusCode.OK && (fndb?["rows"] as JsonArray)?.Count == 19, $"the 17 ordering violations and the 2 duplicate station numbers are findings (#59, card C) ({(fndb?["rows"] as JsonArray)?.Count})");
             var sw = System.Diagnostics.Stopwatch.StartNew();
             var (g1, g1b) = await Get(who, "api/v1/document/vSettingsRecord?GridState=Active&take=500");
             sw.Stop();

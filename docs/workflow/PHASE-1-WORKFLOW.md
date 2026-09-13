@@ -573,6 +573,17 @@ views.**
   runbook's route (both zips transferred hash-verified, pool stopped, `appsettings.Local.json` kept, expanded, restarted)
   — `/health` → `release 0.7.0`, `database ok`; the four gate accounts' Windows-mode smokes: Administrator 78,
   Approver 36, ReadOnly 44, Hydro 26 PASS, 0 FAIL.
+- **W7 card answered (2026-09-13, decision #148)**: H — the header, requester, SAP order and the two tracks taken from
+  the relay's own rows when the SETTINGS CR finds none, and every A or P row with a track row landed with its legacy
+  track states (then completed by the sweep and closed by `legacy_import.py --close`); C — a duplicate station number
+  is a finding for a person to correct; D — the CNT 35-96 timer is Static; A — the owner reads the tree as ownership,
+  which the source does not record: a station markup goes on the next card; E — templates first for SEL-221F, SEL-311C,
+  SEL-551 (W8). Figures of the re-run are in `MIGRATION-PLAN.md` §4 and `REHEARSAL-2026-09-13-DEV.md`: landings
+  A 2 / M 357 / P 4 760, 4 848 completed by the sweep and closed, 1 672 requests revised with their header, 19 findings;
+  second pass 0; DEV API smoke 220 PASS. Observed in Chrome (`W7-request-P0002-card-applied.jpg`): CR 2141435 now reads
+  "Add Order", Closed, procedure Completed, both tracks Complete. **Known gap, recorded honestly:** a landed track's date
+  is the migration's capture instant (2026-04-22), not the legacy row's date (P0002: 2008-07-10) — `LandMigratedInstance`
+  takes no per-track date; carrying it needs a procedure change and a re-landing, a W8 item.
 - **Not done in W7, by design and recorded**: the per-model templates (the SET1 profile is the owner's card; migrated
   text files stay NotParsed until a model has one); rationale documents (NB Power's inventory is an open ask);
   applying cutover deletes (W8); a sargable station on the read models (W8); the defaults on the W7 card (division
@@ -588,6 +599,12 @@ fixed price — functional design, integration design, document-control framewor
 training, operations, database documentation.
 
 **Exists.** The release NB Power accepts.
+
+**Carried in from W7's card (decision #148).** A station-by-station markup card: which owner — Transmission,
+Generation or Distribution — holds each of the 231 legacy stations (the source does not say; the tree is loaded under
+the `USERNAME` defaults, flagged). The first settings templates: SEL-221F, SEL-311C, SEL-551, seeded from the owner's
+marking of the profiled names. The grants screen must let one person hold scopes under all three owners (a
+transmission P&C engineer works across them — owner, card A).
 
 **Gate.** `rehearse_relocation.py` passes from all three vantage points. Reviewers sign the parity
 walkthrough. The cutover rehearsal report shows the delta applied. `package_release.py` produces

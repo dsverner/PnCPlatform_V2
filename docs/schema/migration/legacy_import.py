@@ -232,7 +232,7 @@ class Importer:
             groups[strip(loc)][u] += 1
             self.rule("LOCATIONS row → its station's USERNAME groups", loc)
         stnum = {m["legacy_location"].strip().upper(): m["asset_number"].strip() for m in read_csv("station_asset_number.csv")}
-        used = Counter()
+        used = Counter(); owner_of = {}
         for loc, asset, n in self.src_rows("SELECT LTRIM(RTRIM(LOCATION)), ASSET, COUNT(*) FROM dbo.SETTINGS WHERE LEFT(OLD_NO,1) IN ('A','M','P') GROUP BY LTRIM(RTRIM(LOCATION)), ASSET"):
             used[(strip(loc), asset)] = n
         settings_locs = {l for (l, _) in used}
@@ -264,9 +264,15 @@ class Importer:
                     try:
                         (e, r) = self.run.exec("location.AlternateKey_Add", outputs=[("EntityId", "UNIQUEIDENTIFIER"), ("RowId", "UNIQUEIDENTIFIER")], SubjectEntityId=st, KeyKindCode="StationNumber", KeyValue=number, IsPrimaryLabel=1)
                         self.run.provenance("location", "AlternateKey", key, h, entity_id=e, row_id=r)
+                        owner_of[number] = loc
                     except pyodbc.IntegrityError:
-                        # a station number is unique in the platform; two legacy locations claim the same one (e.g. the 138 and 230 kV sides of one terminal)
-                        self.run.flag("StationNumberDuplicate", f"'{loc}' station number {number} already belongs to another station; no key written — the owner's W7 card", loc)
+                        # a station number is unique in the platform; two legacy locations claim the same one. The owner (W7 card C,
+                        # 2026-09-13): "an error in the data that the user must mitigate by correcting them" — so a finding on the
+                        # station left without a number, not a silent flag (#148)
+                        self.run.flag("StationNumberDuplicate", f"'{loc}' station number {number} already belongs to '{owner_of.get(number, '?')}'; no key written; a finding raised (card C)", loc)
+                        self.station_number_finding(st, loc, number, owner_of.get(number))
+                else:
+                    owner_of.setdefault(number, loc)
             self.buildings[loc] = self.node("Building", st, "Building (unknown — legacy has no buildings)", f"Building:{loc}", notes="Placeholder: the legacy database names no building or room; positions sit under a panel named from EQUIPMENT (#139)")
             self.rule("station created / confirmed", loc)
         for loc, equip in self.src_rows("SELECT DISTINCT LTRIM(RTRIM(LOCATION)), LTRIM(RTRIM(EQUIPMENT)) FROM dbo.SETTINGS WHERE LEFT(OLD_NO,1) IN ('A','M','P')"):
@@ -275,6 +281,19 @@ class Importer:
                 continue
             self.panels[(loc, equip)] = self.node("Panel", self.buildings[loc], equip, f"Panel:{loc}|{equip}")
             self.rule("(LOCATION, EQUIPMENT) → Panel", f"{loc} | {equip}")
+
+    def station_number_finding(self, station, loc, number, other):
+        """Owner's W7 card C: a station number two legacy locations claim is a data error for a person to correct — a finding on the station left without one."""
+        key = f"Finding:StationNumber:{loc}"; h = row_hash("Finding", "StationNumber", loc, number)
+        if self.run.already_loaded("record", "Finding", key, h) or self.run.existing_entity("record", "Finding", key):
+            self.rule("duplicate station number → a finding on the station left without one (card C)", loc); return
+        desc = f"Legacy location '{loc}' carries station number {number}, which already belongs to '{other or 'another station'}'. A station number is unique in the platform; the owner ruled (W7 card C, 2026-09-13) that the duplicate is a data error to be corrected by a person. This station has no number until then."
+        (rec, rrow) = self.run.exec("record.Record_Add", outputs=[("EntityId", "UNIQUEIDENTIFIER"), ("RowId", "UNIQUEIDENTIFIER")],
+                                    RecordKindCode="Finding", SubjectKind="Node", SubjectEntityId=station, OccurredAt=capture_at(), TimeSourceQuality=4,
+                                    PerformedByActorId=self.run.actor_id, OverallResult="Informational", Summary=desc[:1000], ValidFrom=capture_at(), ValidFromQuality=2)
+        self.run.exec("record.Finding_Add", EntityId=rec, FindingCategoryCode="MigrationReconciliation", Severity="Major", Description=desc, AsFoundValue=f"station number {number} on two locations", ExpectedValue="one location per station number", ValidFrom=capture_at(), ValidFromQuality=2)
+        self.run.provenance("record", "Finding", key, h, entity_id=rec, row_id=rrow)
+        self.rule("duplicate station number → a finding on the station left without one (card C)", loc)
 
     def alt_key(self, subject, kind, value, key, h, primary=False, who=None):
         """An asset alternate key, tolerant of a value another asset already carries (unique per kind in the platform): flagged, not written."""
@@ -371,13 +390,24 @@ class Importer:
         for cr, sap, relay, notes, typ, by in self.src_rows("SELECT [Change Request ID], [SAP Work Order Numer], [Relay ID Number], [Notes], [Type], [Reqested By] FROM dbo.[Settings Management]"):
             header[cr].append((strip(sap), strip(relay), strip(notes), strip(typ), strip(by)))
         self.header = header
+        # W7 card H (owner, 2026-09-13): the SETTINGS row's Change Request ID and the header / track rows for the same Relay ID
+        # Number name different CRs for most P rows (P0002: 2141435 vs 2144042). The SETTINGS CR stays the change (the chain
+        # order is untouched); the header's type, requester and SAP order and the two tracks are taken from the relay's own
+        # rows when the CR finds none, and the disagreement is flagged (#148).
+        hrel = defaultdict(list)
+        for cr, hs in header.items():
+            for h in hs:
+                if h[1]:
+                    hrel[h[1]].append((cr, h))
+        self.header_cr = {}
         sw = defaultdict(list)
         for cr, relay, status, notes, date in self.src_rows("SELECT [Change Request ID], [Relay ID Number], [Status], [Notes], [Date] FROM dbo.[Setting Software Management]"):
             sw[(cr, strip(relay))].append((strip(status), strip(notes), date))
-        self.tracks = {}
+        self.tracks = {}; self.tracks_by_relay = defaultdict(list)
         for tbl, name in (("Relay Document Management", "doc"), ("Setting Database Management", "db")):
             for cr, relay, status, notes, date in self.src_rows(f"SELECT [Change Request ID], [Relay ID Number], [Status], [Notes], [Date] FROM dbo.[{tbl}]"):
                 self.tracks[(name, cr, strip(relay))] = (strip(status), strip(notes), date)
+                self.tracks_by_relay[(name, strip(relay))].append((cr, (strip(status), strip(notes), date)))
                 self.rule(f"{tbl} row → a completion-track state on its request", f"{cr}/{relay}")
         by_cr = defaultdict(list)
         for base, b in self.bases.items():
@@ -387,8 +417,18 @@ class Importer:
             oldnos = [r[0] for _, r in items]
             hdr = [h for h in header.get(cr, []) if h[1] in oldnos] or header.get(cr, [])
             flags = []
+            hcr = cr
             if len(header.get(cr, [])) > 1:
                 flags.append(self.run.flag("HeaderDuplicated", f"CR {cr} has {len(header[cr])} header rows; the one naming this chain (else the first) is used", cr))
+            if not hdr:
+                # card H: the relay's own header rows under another CR — the latest one at or below this CR, else the earliest above it
+                cands = sorted({c for o in oldnos for (c, _) in hrel.get(o, []) if c != cr})
+                if cands:
+                    below = [c for c in cands if c <= cr]
+                    hcr = below[-1] if below else cands[0]
+                    hdr = [h for (c, h) in hrel[oldnos[0]] if c == hcr]
+                    flags.append(self.run.flag("HeaderUnderOtherCr", f"CR {cr}/{oldnos[0]}: no header under this CR; the relay's header under CR {hcr} used ({len(cands)} candidate CR(s)) — card H", cr))
+            self.header_cr[cr] = hcr
             h0 = hdr[0] if hdr else None
             typ = h0[3] if h0 else None
             wt = WORKTYPE_OF.get(typ or "")
@@ -398,7 +438,7 @@ class Importer:
             if h0 and h0[2]:
                 notes.append(h0[2])
             for oldno in oldnos:
-                for status, text, date in sw.get((cr, oldno), []):
+                for status, text, date in (sw.get((cr, oldno)) or sw.get((hcr, oldno)) or []):
                     if status and status != "NA":
                         notes.append(f"Legacy software track ({oldno}): {status}" + (f" {date:%Y-%m-%d}" if date else "") + (f" — {text}" if text else ""))
                         self.rule("Setting Software Management non-NA row → a note on the request (#58)", f"{cr}/{oldno}")
@@ -410,15 +450,21 @@ class Importer:
                 flags.append(self.run.flag("RequestSpansDevices", f"CR {cr} names {len(items)} devices; scoped to the first", cr))
             first_asset = self.bases[items[0][0]]["asset"]
             key = f"WorkRequest:{cr}"
-            h = row_hash("WorkRequest", cr, wt, typ, requested_by, h0[0] if h0 else None, "|".join(oldnos))
+            h = row_hash("WorkRequest", cr, wt, typ, requested_by, h0[0] if h0 else None, "|".join(oldnos), *([hcr] if hcr != cr else []))   # the pre-card hash when the CR's own header serves
             done = self.run.already_loaded("work", "WorkRequest", key, h)
             wr = done[0] if done else self.run.existing_entity("work", "WorkRequest", key)
+            title = f"CR {cr} — {typ or 'settings change'} — {', '.join(oldnos[:6])}"[:200]
+            fields = dict(WorkTypeDefinitionVersionRowId=self.worktypes[wt], Title=title, ScopeKind="Asset", ScopeEntityId=first_asset,
+                          Description=(f"Requested by {requested_by}" if requested_by else None), Notes=("\n".join(notes) or None), ValidFrom=capture_at(), ValidFromQuality=2)
             if wr is None:
-                title = f"CR {cr} — {typ or 'settings change'} — {', '.join(oldnos[:6])}"[:200]
-                (wr, rr) = self.run.exec("work.WorkRequest_Add", outputs=[("EntityId", "UNIQUEIDENTIFIER"), ("RowId", "UNIQUEIDENTIFIER")],
-                                         WorkTypeDefinitionVersionRowId=self.worktypes[wt], Title=title, ScopeKind="Asset", ScopeEntityId=first_asset,
-                                         Description=(f"Requested by {requested_by}" if requested_by else None), Notes=("\n".join(notes) or None), ValidFrom=capture_at(), ValidFromQuality=2)
+                (wr, rr) = self.run.exec("work.WorkRequest_Add", outputs=[("EntityId", "UNIQUEIDENTIFIER"), ("RowId", "UNIQUEIDENTIFIER")], **fields)
                 self.run.provenance("work", "WorkRequest", key, h, entity_id=wr, row_id=rr, notes=self.run.join_flags(*flags))
+            elif not done:
+                # the rule changed under an existing request (card H: its header found by the relay number): revised in place, a new provenance row
+                (rr,) = self.run.exec("work.WorkRequest_Revise", outputs=[("RowId", "UNIQUEIDENTIFIER")], EntityId=wr, **fields)
+                self.run.provenance("work", "WorkRequest", key, h, entity_id=wr, row_id=rr, notes=self.run.join_flags(*flags))
+                self.rule("work request revised in place under a changed rule (card H)", cr)
+            if wr is not None:
                 self.work_key(wr, "LegacyChangeRequestNumber", str(cr), f"LegacyChangeRequestNumber:{cr}", row_hash("LCR", cr), primary=True, who=cr)
                 if h0 and h0[0]:
                     if self.work_key(wr, "SapWorkOrder", h0[0][:200], f"SapWorkOrder:{cr}", row_hash("SAP", cr, h0[0]), who=cr):
@@ -539,26 +585,47 @@ class Importer:
                     self.log(f"revisions: {n}")
 
     # ------------------------------------------------------------------ 8 landings (#141)
+    def track_for(self, name, cr, oldno, flags):
+        """The relay's track row: under its own CR, else under the header's CR, else the relay's latest (card H, #148)."""
+        t = self.tracks.get((name, cr, oldno))
+        if t:
+            return t
+        hcr = self.header_cr.get(cr, cr)
+        t = self.tracks.get((name, hcr, oldno)) if hcr != cr else None
+        if t is None:
+            others = [(c, x) for (c, x) in self.tracks_by_relay.get((name, oldno), []) if c != cr]
+            if others:
+                others.sort(key=lambda cx: (cx[1][2] or datetime.datetime.min, cx[0]))
+                hcr, t = others[-1]
+        if t:
+            flags.append(self.run.flag("TrackUnderOtherCr", f"{oldno}/{cr}: {name} track found under CR {hcr} (SETTINGS and the track disagree) — card H", oldno))
+        return t
+
     def landings_stage(self):
         for base, b in self.bases.items():
             for r in b["rows"]:
-                if r[0][0] != "M":
-                    continue
                 oldno, cr = r[0], r[1]
-                key = f"Landing:{oldno}"
-                doc = self.tracks.get(("doc", cr, oldno)); db = self.tracks.get(("db", cr, oldno))
-                h = row_hash("Landing", oldno, cr, doc[0] if doc else None, db[0] if db else None)
-                if self.run.already_loaded("process", "ProcedureInstance", key, h) or self.run.existing_entity("process", "ProcedureInstance", key):
-                    continue
+                # an OLD_NO repeats within a base for P rows (P0005 carries eight CRs): the landing is keyed by row, the M rows keep their W7 key
+                key = f"Landing:{oldno}" if oldno[0] == "M" else f"Landing:{oldno}/{cr}"
                 flags = []
-                if doc is None or db is None:
+                doc = self.track_for("doc", cr, oldno, flags); db = self.track_for("db", cr, oldno, flags)
+                if oldno[0] != "M" and doc is None and db is None:
+                    continue   # an A or P row with no track row anywhere: nothing to land (card H)
+                h = row_hash("Landing", oldno, cr, doc[0] if doc else None, db[0] if db else None)
+                rule_name = "M row → a SETTINGS_CHANGE run landed at COMPLETION with its two tracks (#56)" if oldno[0] == "M" else f"{oldno[0]} row with track rows → its change landed at COMPLETION with the two tracks (card H, #148)"
+                if self.run.already_loaded("process", "ProcedureInstance", key, h):
+                    self.rule(rule_name, oldno); continue
+                if self.run.existing_entity("process", "ProcedureInstance", key):
+                    self.run.flag("LandingNotRepaired", f"{oldno}/{cr}: landed earlier under other track states; a landed run is not re-shaped", oldno)
+                    continue
+                if oldno[0] == "M" and (doc is None or db is None):
                     flags.append(self.run.flag("TrackRowMissing", f"{oldno}/{cr}: {'documentation' if doc is None else ''}{' and ' if doc is None and db is None else ''}{'database' if db is None else ''} track row missing; branch left Running", oldno))
                 cd, _, _ = dto(r[1] and None)
                 (wf, pi) = self.run.exec("process.LandMigratedInstance", outputs=[("WorkflowInstanceEntityId", "UNIQUEIDENTIFIER"), ("ProcedureInstanceEntityId", "UNIQUEIDENTIFIER")],
                                          WorkRequestEntityId=self.requests[cr], DocumentationStatus=doc[0] if doc else None, DatabaseStatus=db[0] if db else None, At=capture_at())
                 self.run.provenance("process", "ProcedureInstance", key, h, entity_id=pi, notes=self.run.join_flags(*flags))
                 self.run.provenance("process", "WorkflowInstance", key, h, entity_id=wf)
-                self.rule("M row → a SETTINGS_CHANGE run landed at COMPLETION with its two tracks (#56)", oldno)
+                self.rule(rule_name, oldno)
 
     # ------------------------------------------------------------------ 9 findings (#142)
     def findings_stage(self):
@@ -651,15 +718,39 @@ def load(database, limit=None, report=None):
         return rep
 
 
+def close_landed(database):
+    """After the API's sweep has completed landed runs whose two tracks were terminal (Complete / NA), close their requests
+    (#148). A separate call, not a load stage: the sweep runs on the host's own cadence, and the rehearsal's second pass
+    must write nothing. Idempotent: a closed request is not touched again."""
+    if not database.startswith("PnCPlatform_V2_"):
+        sys.exit("refusing: the target must be a PnCPlatform_V2_* database (#99)")
+    with Run(SOURCE, CAPTURE_AT, notes="W7 card H: close the landed requests whose runs completed", target_db=database) as run:
+        rows = run.rows("""SELECT p.SourceKey, wf.EntityId FROM migration.vProvenance p JOIN migration.vRun r ON r.RunId = p.RunId
+            JOIN process.vProcedureInstance pi ON pi.EntityId = p.TargetEntityId
+            JOIN process.vWorkflowInstance wf ON wf.EntityId = pi.WorkflowInstanceEntityId
+            WHERE r.SourceSystem = ? AND p.TargetTable = 'ProcedureInstance' AND p.SourceKey LIKE 'Landing:%'
+              AND pi.State = 'Completed' AND pi.Outcome = 'Completed' AND wf.CurrentState = 'InProgress'""", SOURCE)
+        n = 0
+        for key, wf in rows:
+            oldno = key.split(":", 1)[1]; k = f"Close:{oldno}"; h = row_hash("Close", oldno)
+            if run.already_loaded("process", "WorkflowTransition", k, h) or run.existing_entity("process", "WorkflowTransition", k):
+                continue
+            (to, tid) = run.exec("process.Transition", outputs=[("ToState", "NVARCHAR(40)"), ("TransitionId", "BIGINT")], WorkflowInstanceEntityId=str(wf), TransitionName="Close", Reason="Migrated change completed in the legacy system (W7 card H)", At=capture_at())
+            run.provenance("process", "WorkflowTransition", k, h, entity_id=str(wf), notes=f"TransitionId {tid}"); n += 1
+        rep = run.report(); rep["closed"] = n
+        return rep
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--database", default=common.TARGET_DB)
     ap.add_argument("--limit", type=int, default=None, help="load only the first N base numbers (smoke)")
     ap.add_argument("--report", default=None)
+    ap.add_argument("--close", action="store_true", help="close the landed requests whose runs the sweep has completed (card H); no load")
     a = ap.parse_args()
     if not a.database.startswith("PnCPlatform_V2_"):
         sys.exit("refusing: the target must be a PnCPlatform_V2_* database (#99)")
-    rep = load(a.database, a.limit, a.report)
+    rep = close_landed(a.database) if a.close else load(a.database, a.limit, a.report)
     print(json.dumps(rep, indent=1, default=str))
 
 
