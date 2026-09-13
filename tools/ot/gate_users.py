@@ -23,11 +23,13 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--database", required=True)
     ap.add_argument("--server", default=common.SERVER)
+    ap.add_argument("--also", action="append", default=[], help="an extra domain account as <sAMAccountName>:<RoleCode> (Global) — e.g. VGS01:Administrator, the owner's VM07 account (W8, 2026-09-13)")
     a = ap.parse_args()
+    accounts = list(ACCOUNTS) + [(x.split(":")[0], x.split(":")[1], "Global", None, f"Seeded on the owner's request as a QA user for the VM07 vantage point (W8 card T2)") for x in a.also]
     if not a.database.startswith("PnCPlatform_V2_"):
         sys.exit("refusing: the target must be a PnCPlatform_V2_* database (#99)")
     con = common.connect(a.database, a.server); cur = con.cursor()
-    for sam, role, scope_kind, scope_name, note in ACCOUNTS:
+    for sam, role, scope_kind, scope_name, note in accounts:
         upn = f"{sam}@{UPN_SUFFIX}"
         row = cur.execute("SELECT TOP (1) EntityId FROM security.vUser WHERE UserPrincipalName = ? AND IsEnabled = 1", upn).fetchone()
         if row:

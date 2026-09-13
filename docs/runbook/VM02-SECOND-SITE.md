@@ -148,6 +148,9 @@ Reversible: `Remove-SmbShare pncsmoke`. The share carries only the smoke's binar
 `tools\smoke-sc`, the package's **self-contained** single-file build (`dist/<version>/tools/PnC.Api.Smoke`, 84 MB,
 zipped to 35 MB for the transfer); `tools\smoke` (framework-dependent, 5 MB) stays for the gate tasks on VM02, which
 carries the shared runtime. Nothing is installed on VM07.
+The owner's first run with it signed in as VGS01 and failed 27 checks with *Identity is not a platform user*: the fresh QA
+database held only the four gate accounts. `gate_users.py --database PnCPlatform_V2_QA --also VGS01:Administrator --also
+VGS99:ReadOnly` seeded the two VM07 accounts as QA users (verified by query: both grants Global), as W1 had on DEV.
 
 ## Gate tooling on VM02, 2026-09-12 (W2 card A1, decision #97)
 
