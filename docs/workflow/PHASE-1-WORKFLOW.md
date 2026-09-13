@@ -682,6 +682,8 @@ the release with SBOM and `release.json`.
   account on VM02 at 0.8.4). Two tries before it: *You must install .NET* (the framework-dependent build; fixed by serving
   the self-contained one) and 27 failures as *Identity is not a platform user* (VGS01 not yet a QA user; seeded). The
   relocation rehearsal now has all three vantage points: VM02 as the gate accounts, the build machine, and VM07.
+- **Round 2 answered (#155)**: T1 the move worked on QA; T2 PASS from VM07; T3 the template names stay as found; T4 the
+  documentation proceeds — database package and technical architecture first, Word from Markdown plus PDF, draw.io.
 - **The cutover delta applied on QA** (`CUTOVER-APPLY-2026-09-13.md`): the importer re-run against
   `dbRelayManagement_Legacy_Cutover` — the added station and its building, the added P9999 revision (Superseded,
   Archived, landed with its two tracks) and, because its CR exceeds the A row's, a twentieth ordering finding; the
