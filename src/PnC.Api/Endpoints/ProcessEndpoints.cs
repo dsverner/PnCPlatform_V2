@@ -54,7 +54,7 @@ public static class ProcessEndpoints
             var wf = Guid.Parse(r["EntityId"]!.GetValue<string>());
             var started = await StartedRuns(http.Session(), wf, ct);
             var interp = Interp(http);
-            foreach (var pi in started) await interp.AdvanceAsync(pi, DateTimeOffset.Now, ct);
+            foreach (var pi in started) await interp.AdvanceAsync(pi, await http.Session().NowAsync(ct), ct);
             return Results.Json(new { workflowInstanceEntityId = wf, procedureInstances = started });
         });
 
@@ -64,14 +64,14 @@ public static class ProcessEndpoints
             var name = body["name"]?.GetValue<string>() ?? throw new ApiException(400, "bad_request", "name is required.");
             var wf = await WorkflowHead(http.Session(), id, ct);
             await Require(http, "process", "Transition", "WorkRequest", wf.WorkRequest ?? (wf.SubjectKind == "WorkRequest" ? wf.Subject : null), ct);
-            var guards = GuardVerdicts(http.Session(), wf, name, DateTimeOffset.Now);
+            var guards = GuardVerdicts(http.Session(), wf, name, await http.Session().NowAsync(ct));
             var r = await Exec(http, "Transition", new JsonObject
             {
                 ["WorkflowInstanceEntityId"] = id.ToString(), ["TransitionName"] = name, ["Reason"] = body["reason"]?.DeepClone(), ["GuardEvaluation"] = guards,
                 ["OverrideReason"] = body["overrideReason"]?.DeepClone(), ["OverrideApprovedByActorId"] = body["overrideApprovedByActorId"]?.DeepClone(),
             }, ct);
             var interp = Interp(http);
-            foreach (var pi in await StartedRuns(http.Session(), id, ct)) await interp.AdvanceAsync(pi, DateTimeOffset.Now, ct);
+            foreach (var pi in await StartedRuns(http.Session(), id, ct)) await interp.AdvanceAsync(pi, await http.Session().NowAsync(ct), ct);
             return Results.Json(new { workflowInstanceEntityId = id, transition = name, toState = r["ToState"], transitionId = r["TransitionId"] });
         });
 
@@ -82,7 +82,7 @@ public static class ProcessEndpoints
             var interp = Interp(http);
             var inst = await interp.LoadAsync(id, ct);
             await authz.RequireAsync(s, u, map.ForView("process", "vProcedureInstanceTree") ?? "WorkRequest.Read", "WorkRequest", inst.WorkRequestEntityId, $"GET process.vProcedureInstanceTree", http.Connection.RemoteIpAddress?.ToString() ?? "", ct);
-            var now = DateTimeOffset.Now;
+            var now = await http.Session().NowAsync(ct);
             var docByKey = new Dictionary<(string, string), DocBlock>();
             void Index(DocBlock b) { docByKey[(b.Path, b.Kind)] = b; foreach (var c in b.Children) Index(c); }
             Index(inst.Root);
@@ -112,7 +112,7 @@ public static class ProcessEndpoints
             var interp = Interp(http);
             var inst = await interp.LoadAsync(id, ct);
             await Require(http, "process", "SetBlockState", "WorkRequest", inst.WorkRequestEntityId, ct);
-            var r = await interp.AdvanceAsync(id, DateTimeOffset.Now, ct);
+            var r = await interp.AdvanceAsync(id, await http.Session().NowAsync(ct), ct);
             return Results.Json(new { procedureInstanceEntityId = id, r.Changes, r.Completed, r.Notes });
         });
 
@@ -173,7 +173,7 @@ public static class ProcessEndpoints
             var inst = await interp.LoadAsync(instanceId, ct);
             var row = inst.Rows.First(r => r.StepEntityId == id);
             var stepDoc = FindDoc(inst.Root, row.Path, "step") ?? throw new ApiException(500, "internal", "The step is not in the pinned document.");
-            var now = DateTimeOffset.Now;
+            var now = await http.Session().NowAsync(ct);
 
             // §5.2: the technician who captured, resolved from their user principal name (identification; the pack's own attestation arrives with FR-7.1)
             Guid? capturedBy = null; Guid? capturedPerson = null; DateTimeOffset? capturedAt = null;
@@ -251,7 +251,7 @@ public static class ProcessEndpoints
                 new Dictionary<string, object?> { ["@b"] = id }, ct)).FirstOrDefault() as JsonObject ?? throw new ApiException(404, "unknown_block", "No block instance has that id.");
             await Require(http, "process", "ReleaseHold", "WorkRequest", G(head["WorkRequestEntityId"]), ct);
             await Exec(http, "ReleaseHold", new JsonObject { ["BlockInstanceEntityId"] = id.ToString(), ["ReleaseBasis"] = "Manual", ["Reason"] = body["reason"]?.DeepClone() }, ct);
-            var adv = await Interp(http).AdvanceAsync(Guid.Parse(head["ProcedureInstanceEntityId"]!.GetValue<string>()), DateTimeOffset.Now, ct);
+            var adv = await Interp(http).AdvanceAsync(Guid.Parse(head["ProcedureInstanceEntityId"]!.GetValue<string>()), await http.Session().NowAsync(ct), ct);
             return Results.Json(new { blockInstanceEntityId = id, released = true, instance = new { adv.Changes, adv.Completed } });
         });
 

@@ -30,7 +30,7 @@ public sealed class SweepService(IConfiguration config, Catalog catalog, ILogger
     public static async Task<(int instances, int changes, List<object> detail)> SweepAsync(string connectionString, Catalog catalog, ILogger log, CancellationToken ct)
     {
         await using var s = await SqlSession.OpenAsync(connectionString, null, ct);
-        var now = DateTimeOffset.Now;
+        var now = await s.NowAsync(ct);
         var ids = (await s.RowsAsync("SELECT EntityId FROM process.vProcedureInstance WHERE State IN (N'Running', N'Held') AND ParentInstanceEntityId IS NULL ORDER BY StartedAt", new Dictionary<string, object?>(), ct))
             .Select(r => Guid.Parse(r!["EntityId"]!.GetValue<string>())).ToList();
         // children first would double the work: a child's completion advances its parent through the parent's next pass

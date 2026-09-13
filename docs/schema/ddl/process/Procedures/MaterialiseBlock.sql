@@ -16,6 +16,7 @@ CREATE PROCEDURE [process].[MaterialiseBlock]
     @MemberSubjectEntityId UNIQUEIDENTIFIER = NULL,
     @IncludeRoot BIT = 1,
     @ActorId UNIQUEIDENTIFIER = NULL,
+    @MigrationRunId UNIQUEIDENTIFIER = NULL,   -- W7 (#138)
     @RootEntityId UNIQUEIDENTIFIER = NULL OUTPUT,
     @Created INT = NULL OUTPUT
 AS
@@ -47,9 +48,9 @@ BEGIN
 
     BEGIN TRANSACTION;
     INSERT [process].[BlockInstanceRegistry] ([EntityId]) SELECT EntityId FROM #m;
-    INSERT [process].[BlockInstance] ([EntityId], [CreatedBy], [CreatedAt], [ModifiedBy], [ModifiedAt],
+    INSERT [process].[BlockInstance] ([EntityId], [CreatedBy], [CreatedAt], [ModifiedBy], [ModifiedAt], [MigrationRunId],
         [ProcedureInstanceEntityId], [ParentBlockInstanceEntityId], [BlockPath], [BlockKind], [IterationKey], [Pass], [MemberSubjectKind], [MemberSubjectEntityId], [State])
-    SELECT m.EntityId, @ActorId, @now, @ActorId, @now,
+    SELECT m.EntityId, @ActorId, @now, @ActorId, @now, @MigrationRunId,
         @ProcedureInstanceEntityId, ISNULL(p.EntityId, @ParentBlockInstanceEntityId), m.BlockPath, m.Kind, @IterationKey, @Pass, @MemberSubjectKind, @MemberSubjectEntityId, N'Pending'
     FROM #m m LEFT JOIN #m p ON p.SortKey = m.ParentSort
     ORDER BY m.SortKey;
@@ -61,8 +62,8 @@ BEGIN
     WHERE m.Kind = N'step';
     IF EXISTS (SELECT 1 FROM #s WHERE RoleCode IS NULL) THROW 50145, N'process.MaterialiseBlock: a step has no projected role (the version was not projected).', 1;
     INSERT [process].[StepInstanceRegistry] ([EntityId]) SELECT StepEntityId FROM #s;
-    INSERT [process].[StepInstance] ([EntityId], [CreatedBy], [CreatedAt], [ModifiedBy], [ModifiedAt], [BlockInstanceEntityId], [StepId], [State], [AssignedRoleCode])
-    SELECT StepEntityId, @ActorId, @now, @ActorId, @now, BlockEntityId, BlockId, N'Pending', RoleCode FROM #s;
+    INSERT [process].[StepInstance] ([EntityId], [CreatedBy], [CreatedAt], [ModifiedBy], [ModifiedAt], [MigrationRunId], [BlockInstanceEntityId], [StepId], [State], [AssignedRoleCode])
+    SELECT StepEntityId, @ActorId, @now, @ActorId, @now, @MigrationRunId, BlockEntityId, BlockId, N'Pending', RoleCode FROM #s;
 
     SELECT @RootEntityId = EntityId FROM #m WHERE SortKey = @rootSort;
     SET @Created = (SELECT COUNT(*) FROM #m);

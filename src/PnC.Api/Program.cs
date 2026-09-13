@@ -63,7 +63,9 @@ app.UseDefaultFiles();
 app.UseStaticFiles();
 
 // 5. the endpoints (§6, §7)
+foreach (var v in app.Configuration.GetSection("Api:MaterialiseBeforePaging").Get<string[]>() ?? []) SqlSession.MaterialiseBeforePaging.Add(v);   // W7
 DefinitionEndpoints.Map(app, catalog, map, authz);
+FileEndpoints.Map(app, authz);                                           // W7: the file download (#144)
 ProcessEndpoints.Map(app, catalog, map, authz, connectionString);   // W4: the procedure engine   // W3: fixed routes before the generic {schema}/{procedure}
 ApiEndpoints.Map(app, catalog, map, authz, app.Environment.EnvironmentName, connectionString);
 

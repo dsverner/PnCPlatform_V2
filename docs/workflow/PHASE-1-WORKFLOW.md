@@ -512,6 +512,72 @@ reports exactly the mutations.
 **Depends on.** W4. W6 is optional for W7 but makes it visible.
 **Estimate.** E: 30–50 h.
 
+**Gate record — 2026-09-12/13, observed on `PnCPlatform_V2_DEV` through the toolkit's reports, the API and the parity
+views.**
+- **The importer** (`docs/schema/migration/legacy_import.py`, decisions #137–#143): the predecessor's machinery carried,
+  its loaders not; one rule per §5 row (MIGRATION-PLAN.md v2.0 §5). The hand-written engine procedures gained
+  `@MigrationRunId`; `process.LandMigratedInstance` lands an open change at COMPLETION (#141); a finding category
+  and `document.File` read logging seeded. `deploy.py` green, schema smoke 268 PASS (after the clock patience was
+  widened to every engine verb — the same race as #79 bit `run`, `clocks` and `preview` in turn).
+- **The full load** (`REHEARSAL-2026-09-12-V2DEV.md`, `RECONCILIATION-2026-09-12.md`): read back from
+  `migration.vRun`/`vProvenance` and the views after the runs — 231 stations, 231 placeholder buildings, 1 769 panels,
+  6 839 positions and assets (6 661 devices — the 277 control-switch rows are assets without a file), 3 006
+  commissioned functions, 11 840 work requests, 11 563 configuration-file revisions with their records, 354 open
+  changes landed, 17 findings, 32 persons, 1 531 models, 95 658 provenance rows, 14 776 flags. **The second pass wrote
+  0 rows; every migrated row has provenance; no direct writes** (the rehearsal's three checks PASS). The grid reads
+  the migrated estate as A → Active 5 529, P → Archived 5 683, M → Outstanding 350 (by legacy prefix, through
+  `vSettingsRecord`); the remainder of 14 211 are the 2 361 D rows and 2 `2440` rows (dropped, counted), 277
+  control-switch rows and the 9 rows of 3 bases with no LOCATION — the reconciliation's arithmetic.
+- **A landed instance's tree** (verified on the first 40 chains and the full load): MAIN Running; REQUEST … RETURN_TO_SERVICE
+  Skipped/`Migrated`; COMPLETION Running; the branches Completed/Done, Skipped/NotApplicable or Running from the two
+  legacy tracks. The sweep then continued them live: 98 migrated runs completed (both tracks Complete), 250 drawings
+  child runs started for Running documentation branches.
+- **The hash-diff cutover tool** (`tools/cutover_diff.py`, #32): our copy against itself → **0 rows differ**; against a
+  copy with 5 rows mutated → **exactly 5** (SETTINGS ×2, the three track tables ×3). Snapshot of all nine tables in
+  seconds.
+- **The download endpoint** (#144): the STUDY evidence file returned byte for byte with its SHA-256, named, `no-store`,
+  the open logged as a read of `document.File` (`audit.ActionLog`, verified by query).
+- **Found on the way and fixed**: three lower-case OLD_NO prefixes; a station number two locations claim; a legacy
+  record number repeated within a chain; an SAP order shared by two requests; `SetInService` refusing a period that
+  does not start after the prior (revisions sharing a VDATE — dated a second apart, flagged); a P row above the A row's
+  CR closing the A's period (the 17 violation chains — never put in service, the A re-opened); a retired device's last
+  revision keeping an open period (Archived now wins over an open period in `GridState`); the engine-written rows
+  (documents, files, blocks, steps, pins, transitions) lacking their own provenance — a provenance stage; and the
+  **performance of the read models over the real estate** (#145: 30–108 s a page → 2–3 s a whole list).
+- **NFR-2 re-measured on the migrated estate** (#132, #145; the API smoke's warm timings and curl): the grid's whole
+  Active list 1.6–2.0 s (a page of it is the whole list materialised, so the same), one station 1.3–1.4 s in the browser;
+  the FLOC view whole 2.7–2.8 s, one station 0.9 s (2.1 s in the browser with its tree), one panel 0.3 s, one scheme 0.3
+  s; the request window's status 0.5 s; the tree's roots 0.03 s; a single record 0.4 s. The one-second target holds for a
+  panel, a scheme, a request and a single entity; not for a whole-estate list or a station's grid — W8's sargable station.
+- **Two host-side defects found by the API smoke over the real estate, fixed and recorded**: the engine took the
+  laptop's clock, 1.2 s behind the server's, so a guard did not see a fact the database had just written (#146 — the
+  clock is now the database's); the Hydro engineer's scoped list of assets timed out at 30 s on a stale cached plan
+  (#147 — scoped reads recompile). DEV API smoke after both: **220 PASS, 0 FAIL**, the W7 section included (the
+  migrated estate's counts by grid state, a landed instance's tree, a finding, the download with its logged read).
+- **Observed in Chrome over the migrated estate** (`docs/workflow/evidence/W7-*.jpg`): the grid for every location
+  (5 561 Active, 3.6 s cold) and for EEL RIVER TERM 230 (299 rows, 1.3 s); the setting display of A0227 (SEL-751A,
+  CR 7032959, CDATE 2012-03-27, VDATE 2019-10-16, in service since, the legacy fields, its 0-byte SET1 file listed
+  with its SHA-256); the change-request window of a landed M row (CR 9090771 M0133: request InProgress, procedure
+  Running, both tracks In Progress, the software track as a note, "Requested by Andrew Schorn" kept as text) and of
+  an A row (CR 7032959: no instance, tracks Not Started — the source has no track rows for A0227, verified); the FLOC
+  view for the station (416 positions).
+- **Found in the source while observing, put to the owner (card item H)**: a P row's `SETTINGS.[Change Request ID]`
+  and the header/track rows for the same `Relay ID Number` name different CRs — P0002 is CR 2141435 in SETTINGS and
+  CR 2144042 ("Add Order", both tracks Complete 2008-07-10) in the header and tracks. Counted in the source: of the
+  5 850 P rows, 3 100 have a header under the SETTINGS CR, 4 765 under the OLD_NO, and for 3 770 the OLD_NO's header
+  carries another CR; 4 312 have a Complete documentation track under the OLD_NO but only 3 071 under (CR, OLD_NO).
+  The importer keys the header and tracks by CR (#140, #141), so those requests read "settings change, assumed" with
+  tracks Not Started. Which CR is the change's is the owner's; the chain order (by SETTINGS CR) is untouched until ruled.
+- **Release 0.7.0**: `dist/0.7.0` packaged (`package_release.py`), published to `PnCPlatform_V2_DEV` by
+  `deploy.py --package` with the schema smoke **268 PASS** and the release recorded with both hashes; on VM02 by the
+  runbook's route (both zips transferred hash-verified, pool stopped, `appsettings.Local.json` kept, expanded, restarted)
+  — `/health` → `release 0.7.0`, `database ok`; the four gate accounts' Windows-mode smokes: Administrator 78,
+  Approver 36, ReadOnly 44, Hydro 26 PASS, 0 FAIL.
+- **Not done in W7, by design and recorded**: the per-model templates (the SET1 profile is the owner's card; migrated
+  text files stay NotParsed until a model has one); rationale documents (NB Power's inventory is an open ask);
+  applying cutover deletes (W8); a sargable station on the read models (W8); the defaults on the W7 card (division
+  mapping, the FLOC shape, model technology, station numbers, null VDATE, multi-device requests).
+
 ### W8 — QA, rehearsal, acceptance
 
 **Builds.** `PnCPlatform_V2_QA` on VM01; the release deployed to the mimic's OT application server

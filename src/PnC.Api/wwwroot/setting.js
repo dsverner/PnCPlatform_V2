@@ -46,7 +46,7 @@
     const rows = [];
     try {
       for (const f of (await getJson("/api/v1/document/vFile?RevisionRowId=" + encodeURIComponent(revision) + "&take=100")).rows)
-        rows.push({ what: "this revision's file", kind: f.FileRole, name: f.FileName, mime: f.MimeType, size: f.SizeBytes, sha: f.Sha256, when: f.CreatedAt });
+        rows.push({ what: "this revision's file", kind: f.FileRole, name: f.FileName, mime: f.MimeType, size: f.SizeBytes, sha: f.Sha256, when: f.CreatedAt, fileRowId: f.RowId });
       if (r.WorkRequestEntityId) {
         const recs = (await getJson("/api/v1/record/vRecord?WorkRequestEntityId=" + encodeURIComponent(r.WorkRequestEntityId) + "&take=200")).rows;
         for (const rec of recs) {
@@ -57,13 +57,13 @@
             let fs = [];
             try { fs = (await getJson("/api/v1/document/vFile?RevisionRowId=" + encodeURIComponent(l.RevisionRowId) + "&take=50")).rows; } catch (e) { fs = []; }
             if (!fs.length) rows.push({ what: rec.RecordKindCode, kind: l.LinkKind, name: "(revision " + String(l.RevisionRowId).slice(0, 8) + ")", when: rec.OccurredAt });
-            for (const f of fs) rows.push({ what: rec.RecordKindCode, kind: f.FileRole || l.LinkKind, name: f.FileName, mime: f.MimeType, size: f.SizeBytes, sha: f.Sha256, when: rec.OccurredAt });
+            for (const f of fs) rows.push({ what: rec.RecordKindCode, kind: f.FileRole || l.LinkKind, name: f.FileName, mime: f.MimeType, size: f.SizeBytes, sha: f.Sha256, when: rec.OccurredAt, fileRowId: f.RowId });
           }
         }
       }
-      table($("files"), rows, [{ key: "what", label: "Record" }, { key: "kind", label: "Kind" }, { key: "name", label: "File / summary" }, { key: "mime", label: "Type" }, { key: "size", label: "Bytes" },
+      table($("files"), rows, [{ key: "what", label: "Record" }, { key: "kind", label: "Kind" }, { key: "name", label: "File / summary", render: (x) => { if (!x.fileRowId) return x.name || ""; const a = el("a", "row-link", x.name); a.href = "/api/v1/files/" + x.fileRowId; a.target = "_blank"; a.rel = "noopener"; return a; } }, { key: "mime", label: "Type" }, { key: "size", label: "Bytes" },
         { key: "sha", label: "SHA-256", render: (x) => (x.sha ? String(x.sha).slice(0, 12) + "…" : "") }, { key: "when", label: "When", render: (x) => fmtWhen(x.when) }]);
-      $("files-summary").textContent = rows.length + " file(s) and record(s) — the platform holds the bytes; a download endpoint is a later item (W6 card).";
+      $("files-summary").textContent = rows.length + " file(s) and record(s) — a file name opens the file (every open is a logged read, #144).";
     } catch (e) { $("files-summary").textContent = "Files: " + e.message; }
   }
 

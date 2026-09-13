@@ -31,3 +31,5 @@ GO
 EXEC sys.sp_addextendedproperty @name = N'PnC.TemporalClass', @value = N'ValidTime',
     @level0type = N'SCHEMA', @level0name = N'location', @level1type = N'TABLE', @level1name = N'NodeFunction';
 GO
+-- W7: the FLOC view lists a position's function labels (vFloc); the migrated positions made the lookup a scan
+CREATE INDEX [IX_NodeFunction_Node] ON [location].[NodeFunction] ([NodeEntityId]) WHERE [ValidTo] IS NULL AND [IsDeleted] = 0;

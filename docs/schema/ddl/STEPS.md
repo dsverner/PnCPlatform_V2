@@ -385,6 +385,26 @@ subject column in `Catalog.cs`'s preference order, so every view names that colu
 Lessons: a `RETURN` leaves only its batch (a guard before a `GO` guards nothing — W5's seed); a branch block is
 materialised *Pending* when the run starts, so *Pending* is *Not Started*, not *In Progress*.
 
+## Step 19 — migration (W7, 2026-09-12)
+
+| Object | File | Notes |
+|---|---|---|
+| `process.LandMigratedInstance` | `process/Procedures/LandMigratedInstance.sql` | an open legacy change landed at COMPLETION with its two tracks (#56, #141); 50175–50177 |
+| `@MigrationRunId` on `StartWorkflow`, `StartProcedure`, `MaterialiseBlock`, `WriteEvidence`, `WriteConfigurationRevision`, `Transition` | `process/Procedures/*` | passed through to the generated `_Add`s (#138); `WriteConfigurationRevision` also `@FileKindOverride`, `@Status` (#140); a migration run's `Transition` skips the person's role check |
+| `Seed_ref_FindingCategory.sql` + `MigrationReconciliation` | `PostDeploy/*` | #142 |
+| `Seed_config_ReadLoggedClass.sql` + `document.File` | `PostDeploy/*` | #144: every download a logged read |
+| `docs/schema/migration/` (the toolkit, #137), `tools/cutover_diff.py` (#32) | — | MIGRATION-PLAN.md v2.0 |
+
+Lessons: the schema smoke's obligation `run` needed the same one-second patience as `evaluate()` (VM01's clock 0.7 s
+ahead of the laptop, #79); `document.SetInService` refuses a period that does not start after the prior one (50247), so
+a chain whose revisions share a VDATE is dated one second apart, quality 2, flagged.
+
+Performance (#145): a hand-written read model must not put an `OUTER APPLY … TOP (1)` against a generated current view —
+the ROW_NUMBER inside the view is evaluated over the whole table per outer row. Read the base table with the filtered
+index's own predicate (`[ValidTo] IS NULL AND [IsDeleted] = 0`; `[IsDeleted] = 0` for the process tables), and expect
+the API to order and page the view in memory (`Api:MaterialiseBeforePaging`). New indexes: `IX_Record_SecondSubject`,
+`IX_BlockInstance_Member`, `IX_NodeFunction_Node`.
+
 ## Reconciliation — every table the design names
 
 Method: every `schema.Table` token in SCHEMA-DESIGN.md steps 0–15 and Appendix B, compared with `*/Tables/*.sql` in this project (2026-09-04, after wave 5).

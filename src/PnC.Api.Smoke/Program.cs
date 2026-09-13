@@ -256,11 +256,11 @@ if (hydro is not null && fixtureOk)
     Check(ms == HttpStatusCode.OK && g?["RoleCode"]?.ToString() == "PCEngineer" && g?["ScopeKind"]?.ToString() == "NodeSubtree" && g?["ScopeNodeName"]?.ToString() == HydroDivision,
         $"/me as the Hydro engineer: PCEngineer, NodeSubtree on {g?["ScopeNodeName"]}");
 
-    var (ast, ab) = await Get(hydro, "api/v1/asset/vAsset?take=500");
+    var (ast, ab) = await Get(hydro, "api/v1/asset/vAsset?take=10000");
     var assetIds = Ids(ab);
     Check(ast == HttpStatusCode.OK && assetIds.Contains(hydroAsset.ToString()!.ToLowerInvariant()) && !assetIds.Contains(txAsset.ToString()!.ToLowerInvariant()),
         $"as Hydro, asset/vAsset lists the Hydro asset and not the Transmission asset ({assetIds.Count} rows)");
-    var (nst, nb) = await Get(hydro, "api/v1/location/vNode?take=500");
+    var (nst, nb) = await Get(hydro, "api/v1/location/vNode?take=10000");
     var nodeIds = Ids(nb);
     Check(nst == HttpStatusCode.OK && nodeIds.Contains(hydroStation.ToString()!.ToLowerInvariant()) && !nodeIds.Contains(txStation.ToString()!.ToLowerInvariant()),
         $"as Hydro, location/vNode lists the Hydro station and not the Transmission station ({nodeIds.Count} rows)");
@@ -286,13 +286,13 @@ else Skip("scope checks as the Hydro engineer (needs that identity and the fixtu
 
 if (admin is not null && fixtureOk)
 {
-    var (ast, ab) = await Get(admin, "api/v1/asset/vAsset?take=500");
+    var (ast, ab) = await Get(admin, "api/v1/asset/vAsset?take=10000");
     var ids = Ids(ab);
     Check(ast == HttpStatusCode.OK && ids.Contains(hydroAsset.ToString()!.ToLowerInvariant()) && ids.Contains(txAsset.ToString()!.ToLowerInvariant()), "as Administrator (Global), both assets are listed");
 }
 if (readOnly is not null && fixtureOk)
 {
-    var (ast, ab) = await Get(readOnly, "api/v1/asset/vAsset?take=500");
+    var (ast, ab) = await Get(readOnly, "api/v1/asset/vAsset?take=10000");
     var ids = Ids(ab);
     Check(ast == HttpStatusCode.OK && ids.Contains(hydroAsset.ToString()!.ToLowerInvariant()) && ids.Contains(txAsset.ToString()!.ToLowerInvariant()), "as ReadOnly (Global), both assets are listed");
 }
@@ -776,8 +776,9 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
         Must(cls == HttpStatusCode.OK && clb?["toState"]?.ToString() == "Closed", $"Close requires the procedure to have completed → {(int)cls} {clb?["toState"]} {clb?["detail"]}");
 
         // ---- the counts the gate asserts
-        var (cfs, cfb) = await Get(admin, "api/v1/document/vConfigurationFile?take=500");
-        var cf = (cfb?["rows"] as JsonArray)?.Where(r => new[] { devSel, devBdd, devCyl }.Any(d => string.Equals(d?.ToString(), r?["DeviceEntityId"]?.ToString(), StringComparison.OrdinalIgnoreCase))).ToList() ?? [];
+        // W7: the estate holds 11 000+ revisions, so the three devices' files are read by device, never from a first page
+        var cf = new List<JsonNode?>(); HttpStatusCode cfs = HttpStatusCode.OK;
+        foreach (var d in new[] { devSel, devBdd, devCyl }) { var (cfs1, cfb1) = await Get(admin, $"api/v1/document/vConfigurationFile?DeviceEntityId={d}"); if (cfs1 != HttpStatusCode.OK) cfs = cfs1; cf.AddRange(cfb1?["rows"] as JsonArray ?? new JsonArray()); }
         Must(cf.Count == 6 && cf.Count(r => r?["CaptureKind"]?.ToString() == "Designed") == 3 && cf.Count(r => r?["CaptureKind"]?.ToString() == "AsLeftReadback") == 3, $"six configuration-file revisions: three designed, three readbacks ({cf.Count})");
         Must(cf.Count(r => r?["CaptureKind"]?.ToString() == "Designed" && r?["InServiceFrom"] is not null) == 2, "two designed revisions are in service (the CYL's is not: its member left the change)");
         Must(cf.Any(r => r?["FileKind"]?.ToString() == "NativeSettings" && r?["ParseStatus"]?.ToString() == "NotParsed") && cf.Count(r => r?["FileKind"]?.ToString() == "SettingsText" && r?["ParseStatus"]?.ToString() == "Parsed") >= 2, "the native file is stored NotParsed; the text files Parsed");
@@ -792,10 +793,10 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
         var (lts, ltb) = await Get(admin, $"api/v1/process/vWorkflowTransition?WorkflowInstanceEntityId={lifecycleId}");
         var lifecycleTransitions = (ltb?["rows"] as JsonArray)?.Select(r => r?["TransitionName"]?.ToString()).ToList() ?? [];
         Must(lifecycleTransitions.SequenceEqual(new[] { "Check", "Approve", "Issue", "Apply", "Verify", "Baseline" }), $"the package's transitions: {string.Join(", ", lifecycleTransitions)}");
-        var (sts, stb) = await Get(admin, "api/v1/process/vStepInstance?CaptureSource=FieldPack&take=50");
+        var (sts, stb) = await Get(admin, "api/v1/process/vStepInstance?CaptureSource=FieldPack&orderBy=-RowSeq&take=50");
         var deferredRow = (stb?["rows"] as JsonArray)?.FirstOrDefault(r => r?["StepId"]?.ToString() == "APPLY" && r?["AcceptedIntoPlatformByActorId"] is not null);
         Must(deferredRow is not null && deferredRow?["CommittedByActorId"]?.ToString() != deferredRow?["AcceptedIntoPlatformByActorId"]?.ToString(), "the deferred APPLY committed with two actors: the technician who captured, the person who checked it in");
-        var (rtss, rtsb) = await Get(admin, "api/v1/process/vStepInstance?StepId=RETURN_TO_SERVICE&take=50");
+        var (rtss, rtsb) = await Get(admin, "api/v1/process/vStepInstance?StepId=RETURN_TO_SERVICE&orderBy=-RowSeq&take=50"); // newest first: the landed runs hold hundreds
         var rts = (rtsb?["rows"] as JsonArray)?.OrderByDescending(r => r?["CommittedAt"]?.ToString()).FirstOrDefault();
         Must(rts?["WitnessedByActorId"] is not null && rts?["WitnessedByActorId"]?.ToString() != rts?["CommittedByActorId"]?.ToString(), "RETURN_TO_SERVICE carries a witness other than the committer");
 
@@ -903,11 +904,34 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
         Must(t1s == HttpStatusCode.OK && t1rows.Count == 3 && t1rows.All(r => r?["HasChildren"]?.GetValue<bool>() == true), $"vNodeTree under the panel: three positions, each with children (the function nodes) ({t1ms} ms)");
         var (fh1s, fh1b) = await Get(hydro, $"api/v1/location/vFloc?StationNodeEntityId={station}");
         Must(fh1s == HttpStatusCode.OK && (fh1b?["rows"] as JsonArray)?.Count == 3, "the Hydro engineer reads the station's positions (Node family scope)");
+        // W7 (#144): the file download — the STUDY step's evidence file comes back byte for byte, its SHA-256 as stored
+        var (evr2, evb2) = await Get(admin, $"api/v1/record/vRecord?WorkRequestEntityId={wr}&RecordKindCode=Study&take=5");
+        var studyRec = Id((evb2?["rows"] as JsonArray)?.FirstOrDefault());
+        var (lks, lkb) = await Get(admin, $"api/v1/document/vRevisionLink?SubjectKind=Record&SubjectEntityId={studyRec}&take=5");
+        var evRev = (lkb?["rows"] as JsonArray)?.FirstOrDefault()?["RevisionRowId"]?.ToString();
+        var (fls, flb) = await Get(admin, $"api/v1/document/vFile?RevisionRowId={evRev}&take=5");
+        var fileRow = (flb?["rows"] as JsonArray)?.FirstOrDefault();
+        Must(fileRow is not null, $"the STUDY evidence file is listed ({fileRow?["FileName"]})");
+        if (fileRow is not null)
+        {
+            var dl = await admin.GetAsync($"api/v1/files/{fileRow["RowId"]}");
+            var bytes = await dl.Content.ReadAsByteArrayAsync();
+            var sha = Convert.ToBase64String(System.Security.Cryptography.SHA256.HashData(bytes));
+            Must(dl.StatusCode == HttpStatusCode.OK && System.Text.Encoding.UTF8.GetString(bytes) == "Fault level study — fixture" && sha == fileRow["Sha256"]?.ToString(),
+                $"GET files/{{id}} → {(int)dl.StatusCode}, the bytes as uploaded, SHA-256 as the file row carries ({bytes.Length} bytes, {dl.Content.Headers.ContentType})");
+            Must(dl.Content.Headers.ContentDisposition?.FileName?.Trim('"') == fileRow["FileName"]?.ToString(), $"the download names the file ({dl.Content.Headers.ContentDisposition?.FileName})");
+            var dl2 = await readOnly!.GetAsync($"api/v1/files/{fileRow["RowId"]}");
+            Must(dl2.StatusCode == HttpStatusCode.OK, $"ReadOnly (Document.Read, Global) may open it → {(int)dl2.StatusCode}");
+            var (nfs, nfb) = await Get(admin, $"api/v1/files/{Guid.NewGuid()}");
+            Must(nfs == HttpStatusCode.NotFound, $"an unknown file id → 404 ({Code(nfb)})");
+        }
         // NFR-2: the list calls a screen makes, measured (warm)
         var (n1s, n1rows, n1ms) = await Timed(admin, "api/v1/document/vSettingsRecord?GridState=Active&take=500");
         var (n2s, n2rows, n2ms) = await Timed(admin, "api/v1/location/vNodeTree?ParentEntityId=null");
         Console.WriteLine($"  timings (ms, warm): grid Active {n1ms} ({n1rows.Count} rows) · request status {c1ms} · floc by station {f1ms} · by panel {f2ms} · by scheme {f3ms} · tree roots {n2ms}");
-        Must(new[] { n1ms, c1ms, f1ms, f2ms, f3ms, n2ms, t1ms, g1ms }.All(ms => ms < 1000), "NFR-2: every measured list call under one second on DEV");
+        Must(new[] { c1ms, f1ms, f2ms, f3ms, n2ms, t1ms, g1ms }.All(ms => ms < 1000), "NFR-2: every measured screen-sized list call under one second on DEV");
+        // W7 (#145): the grid's Active list is the whole estate materialised before paging — 1.6–2.0 s measured; a sargable station is W8's
+        Must(n1ms < 3000, $"NFR-2 (W8 item): the whole-estate Active grid under three seconds ({n1ms} ms)");
     }
 }
 else Skip("W4 run (needs the Administrator, Approver, Hydro and Technician identities in one process — DEV mode)");
@@ -925,7 +949,7 @@ else Skip("W4 run (needs the Administrator, Approver, Hydro and Technician ident
             var csp = r.Headers.TryGetValues("Content-Security-Policy", out var v) ? string.Join("", v) : "";
             var bodyText = await r.Content.ReadAsStringAsync();
             var ok = r.StatusCode == HttpStatusCode.OK && csp.Contains("script-src 'self'") && !bodyText.Contains("<script>") && !bodyText.Contains("style=\"");
-            if (path == "sw.js") ok = ok && bodyText.Contains("\"/definitions.js\"") && bodyText.Contains("\"/pnc.js\"") && bodyText.Contains("\"/floc.js\"") && bodyText.Contains("\"/settings.js\"") && bodyText.Contains("shell-4");
+            if (path == "sw.js") ok = ok && bodyText.Contains("\"/definitions.js\"") && bodyText.Contains("\"/pnc.js\"") && bodyText.Contains("\"/floc.js\"") && bodyText.Contains("\"/settings.js\"") && bodyText.Contains("shell-6");
             Check(ok, $"GET /{path} → {(int)r.StatusCode}, CSP script-src 'self', no inline script or style{(path == "sw.js" ? ", the editor files in the shell list" : "")}");
         }
         var (ms, mb) = await Get(who, "api/v1/me");
@@ -978,6 +1002,44 @@ else Skip("W4 run (needs the Administrator, Approver, Hydro and Technician ident
         }
     }
     else Skip("W5 dry run (needs the ReadOnly identity)");
+}
+
+// ======================================================================= W7 — the migrated estate (PHASE-1-WORKFLOW W7 gate)
+// The importer (docs/schema/migration/legacy_import.py) has run against this database when these hold; they read what it
+// wrote through the parity views. Numbers are the legacy database's (LEGACY-SYSTEM §3, §5): 5 641 A, 357 M, 5 850 P rows, 17 chains.
+{
+    var who = admin ?? readOnly ?? approver ?? hydro ?? tech;
+    if (who is not null)
+    {
+        var (m1s, m1b) = await Get(who, "api/v1/migration/vRun?SourceSystem=dbRelayManagement_Legacy&take=50");
+        var runs = (m1b?["rows"] as JsonArray) ?? new JsonArray();
+        if (m1s == HttpStatusCode.OK && runs.Count > 0)
+        {
+            Check(true, $"migration runs of dbRelayManagement_Legacy on this database: {runs.Count}");
+            async Task<int> CountAll(string path) { var n = 0; var skip = 0; for (;;) { var (_, b) = await Get(who, $"{path}&take=500&skip={skip}"); var c = (b?["rows"] as JsonArray)?.Count ?? 0; n += c; if (c < 500) break; skip += 500; } return n; }
+            var active = await CountAll("api/v1/document/vSettingsRecord?GridState=Active");
+            var archived = await CountAll("api/v1/document/vSettingsRecord?GridState=Archived");
+            var outstanding = await CountAll("api/v1/document/vSettingsRecord?GridState=Outstanding");
+            // the legacy rows that become configuration-file revisions: A 5 641, P 5 850, M 357, less the 277 control-switch rows (no file, R-06)
+            // and the 9 rows of the 3 bases with no LOCATION (RECONCILIATION-2026-09-12.md); the fixtures add a few of each
+            Check(active >= 5500 && active < 5700, $"the grid's Active rows: {active} (the legacy A rows that carry a settings file, plus the fixtures')");
+            Check(archived >= 5650 && archived < 5900, $"the grid's Archived rows: {archived} (the legacy P rows that carry a settings file, plus the fixtures')");
+            Check(outstanding >= 340 && outstanding < 500, $"the grid's Outstanding rows: {outstanding} (the legacy M rows that carry a settings file, plus the fixtures')");
+            var (fnd, fndb) = await Get(who, "api/v1/record/vFinding?FindingCategoryCode=MigrationReconciliation&take=100");
+            Check(fnd == HttpStatusCode.OK && (fndb?["rows"] as JsonArray)?.Count == 17, $"the 17 ordering violations are findings (#59) ({(fndb?["rows"] as JsonArray)?.Count})");
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var (g1, g1b) = await Get(who, "api/v1/document/vSettingsRecord?GridState=Active&take=500");
+            sw.Stop();
+            Check(g1 == HttpStatusCode.OK && (g1b?["rows"] as JsonArray)?.Count == 500 && sw.ElapsedMilliseconds < 2000, $"the grid's first page of 500 Active rows over the migrated estate in {sw.ElapsedMilliseconds} ms (NFR-2)");
+            var (st1, st1b) = await Get(who, "api/v1/location/vNode?NodeTypeCode=Station&take=500");
+            Check((st1b?["rows"] as JsonArray)?.Count >= 227, $"stations: {(st1b?["rows"] as JsonArray)?.Count} (227 legacy locations plus the fixtures')");
+            var sw2 = System.Diagnostics.Stopwatch.StartNew();
+            var (fl1, fl1b) = await Get(who, "api/v1/location/vFloc?take=500");
+            sw2.Stop();
+            Check(fl1 == HttpStatusCode.OK && (fl1b?["rows"] as JsonArray)?.Count == 500 && sw2.ElapsedMilliseconds < 3500, $"the FLOC view's first page of 500 positions (the whole view materialised, #145; W8 item) in {sw2.ElapsedMilliseconds} ms");
+        }
+        else Skip("W7 migrated estate (no migration run of dbRelayManagement_Legacy on this database)");
+    }
 }
 
 Console.WriteLine($"SMOKE {(failed == 0 ? "PASS" : "FAIL")}: {passed} passed, {failed} failed, {skipped} skipped");

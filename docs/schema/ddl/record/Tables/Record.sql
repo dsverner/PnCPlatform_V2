@@ -44,3 +44,5 @@ GO
 EXEC sys.sp_addextendedproperty @name = N'PnC.TemporalClass', @value = N'ValidTime',
     @level0type = N'SCHEMA', @level0name = N'record', @level1type = N'TABLE', @level1name = N'Record';
 GO
+-- W7: the settings grid finds a revision's record by its second subject (vSettingsRecord); 11 000 migrated revisions made the lookup a scan (30 s a page)
+CREATE INDEX [IX_Record_SecondSubject] ON [record].[Record] ([SecondSubjectKind], [SecondSubjectEntityId], [OccurredAt]) WHERE [ValidTo] IS NULL AND [IsDeleted] = 0;

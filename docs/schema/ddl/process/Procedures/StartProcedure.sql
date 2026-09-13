@@ -16,6 +16,7 @@ CREATE PROCEDURE [process].[StartProcedure]
     @ParentInstanceEntityId UNIQUEIDENTIFIER = NULL,
     @CallBlockPath NVARCHAR(400) = NULL,
     @ActorId UNIQUEIDENTIFIER = NULL,
+    @MigrationRunId UNIQUEIDENTIFIER = NULL,   -- W7 (#138)
     @EntityId UNIQUEIDENTIFIER = NULL OUTPUT,
     @DefinitionVersionRowId UNIQUEIDENTIFIER = NULL OUTPUT
 AS
@@ -74,20 +75,20 @@ BEGIN
         @WorkflowInstanceEntityId = @WorkflowInstanceEntityId, @InvokedAtState = @InvokedAtState,
         @SubjectKind = @SubjectKind, @SubjectEntityId = @SubjectEntityId, @WorkRequestEntityId = @WorkRequestEntityId,
         @Inputs = @Inputs, @Produced = N'{}', @State = N'Running', @StartedAt = @now, @StartedByActorId = @ActorId,
-        @ActorId = @ActorId, @EntityId = @EntityId OUTPUT;
+        @ActorId = @ActorId, @MigrationRunId = @MigrationRunId, @EntityId = @EntityId OUTPUT;
     DECLARE @ck NVARCHAR(100), @cv UNIQUEIDENTIFIER;
     DECLARE pc CURSOR LOCAL FAST_FORWARD FOR SELECT DISTINCT [CalleeKey], [VersionRowId] FROM @pins;
     OPEN pc; FETCH NEXT FROM pc INTO @ck, @cv;
     WHILE @@FETCH_STATUS = 0
     BEGIN
-        EXEC [process].[InstanceVersionSet_Add] @ProcedureInstanceEntityId = @EntityId, @CalleeKey = @ck, @DefinitionVersionRowId = @cv, @ActorId = @ActorId;
+        EXEC [process].[InstanceVersionSet_Add] @ProcedureInstanceEntityId = @EntityId, @CalleeKey = @ck, @DefinitionVersionRowId = @cv, @ActorId = @ActorId, @MigrationRunId = @MigrationRunId;
         FETCH NEXT FROM pc INTO @ck, @cv;
     END
     CLOSE pc; DEALLOCATE pc;
 
     DECLARE @doc NVARCHAR(MAX) = (SELECT [PayloadText] FROM [config].[DefinitionVersion] WHERE [RowId] = @DefinitionVersionRowId);
     DECLARE @rootPath NVARCHAR(400) = JSON_VALUE(@doc, '$.body.id'), @rootKind NVARCHAR(20) = JSON_VALUE(@doc, '$.body.block'), @root UNIQUEIDENTIFIER;
-    EXEC [process].[MaterialiseBlock] @ProcedureInstanceEntityId = @EntityId, @BlockPath = @rootPath, @BlockKind = @rootKind, @IncludeRoot = 1, @ActorId = @ActorId, @RootEntityId = @root OUTPUT;
+    EXEC [process].[MaterialiseBlock] @ProcedureInstanceEntityId = @EntityId, @BlockPath = @rootPath, @BlockKind = @rootKind, @IncludeRoot = 1, @ActorId = @ActorId, @MigrationRunId = @MigrationRunId, @RootEntityId = @root OUTPUT;
     UPDATE [process].[BlockInstance] SET [State] = N'Running', [StartedAt] = @now, [ModifiedBy] = @ActorId, [ModifiedAt] = @now WHERE [EntityId] = @root AND [IsDeleted] = 0;
 
     DECLARE @detail NVARCHAR(MAX) = CONCAT(N'{"action":"procedure-started","key":"', STRING_ESCAPE(@ProcedureKey, 'json'), N'","version":"', LOWER(CONVERT(NVARCHAR(36), @DefinitionVersionRowId)), N'","parent":', CASE WHEN @ParentInstanceEntityId IS NULL THEN N'null' ELSE CONCAT(N'"', LOWER(CONVERT(NVARCHAR(36), @ParentInstanceEntityId)), N'"') END, N'}');

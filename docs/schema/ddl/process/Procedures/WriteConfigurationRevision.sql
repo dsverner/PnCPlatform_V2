@@ -13,6 +13,9 @@ CREATE PROCEDURE [process].[WriteConfigurationRevision]
     @PreparedByActorId UNIQUEIDENTIFIER = NULL,
     @At DATETIMEOFFSET(7) = NULL,
     @ActorId UNIQUEIDENTIFIER = NULL,
+    @MigrationRunId UNIQUEIDENTIFIER = NULL,   -- W7 (#138): every row of a migrated revision carries its run
+    @FileKindOverride NVARCHAR(20) = NULL,     -- W7 (#140): the legacy SET1 text is SettingsText whatever the model's technology (#61)
+    @Status NVARCHAR(20) = N'Draft',           -- W7 (#140): a migrated A row is Issued, a P row Superseded; a live commit is Draft
     @RevisionRowId UNIQUEIDENTIFIER = NULL OUTPUT,
     @FileKind NVARCHAR(20) = NULL OUTPUT
 AS
@@ -26,7 +29,8 @@ BEGIN
     SELECT TOP (1) @model = a.[ModelId], @tech = m.[Technology], @name = a.[Name] FROM [asset].[vAsset] a LEFT JOIN [ref].[Model] m ON m.[ModelId] = a.[ModelId] WHERE a.[EntityId] = @DeviceEntityId;
     IF @model IS NULL THROW 50197, N'process.WriteConfigurationRevision: the device has no model; a configuration file needs one (#61).', 1;
     SELECT @fw = [CurrentFirmwareVersionId] FROM [device].[vDevice] WHERE [EntityId] = @DeviceEntityId;
-    SET @FileKind = CASE WHEN @tech IN (N'Microprocessor', N'IEC61850') THEN N'NativeSettings' ELSE N'SettingsText' END;
+    SET @FileKind = ISNULL(@FileKindOverride, CASE WHEN @tech IN (N'Microprocessor', N'IEC61850') THEN N'NativeSettings' ELSE N'SettingsText' END);
+    IF @FileKind NOT IN (N'NativeSettings', N'SettingsText') THROW 50151, N'process.WriteConfigurationRevision: FileKindOverride is NativeSettings or SettingsText.', 1;
 
     -- the device's configuration document: through any prior configuration file of the device, else created now
     DECLARE @docEntity UNIQUEIDENTIFIER;
@@ -38,16 +42,16 @@ BEGIN
         DECLARE @class UNIQUEIDENTIFIER = (SELECT [EntityId] FROM [config].[Definition] WHERE [DefinitionKind] = N'CharacteristicSchema.DocumentClass' AND [DefinitionKey] = N'DeviceConfiguration' AND [IsDeleted] = 0);
         IF @class IS NULL THROW 50198, N'process.WriteConfigurationRevision: the DeviceConfiguration document class is not seeded.', 1;
         DECLARE @title NVARCHAR(200) = LEFT(N'Configuration — ' + ISNULL(@name, LOWER(CONVERT(NVARCHAR(36), @DeviceEntityId))), 200);
-        EXEC [document].[Document_Add] @DocumentClassDefinitionEntityId = @class, @Title = @title, @ActorId = @ActorId, @EntityId = @docEntity OUTPUT;
+        EXEC [document].[Document_Add] @DocumentClassDefinitionEntityId = @class, @Title = @title, @ActorId = @ActorId, @MigrationRunId = @MigrationRunId, @EntityId = @docEntity OUTPUT;
     END
     DECLARE @label NVARCHAR(20) = CONVERT(NVARCHAR(20), 1 + (SELECT COUNT(*) FROM [document].[Revision] WHERE [DocumentEntityId] = @docEntity AND [IsDeleted] = 0 AND [ValidTo] IS NULL));
-    EXEC [document].[Revision_Add] @DocumentEntityId = @docEntity, @RevisionLabel = @label, @Status = N'Draft', @PreparedByActorId = @PreparedByActorId, @PreparedAt = @now, @ActorId = @ActorId, @RowId = @RevisionRowId OUTPUT;
+    EXEC [document].[Revision_Add] @DocumentEntityId = @docEntity, @RevisionLabel = @label, @Status = @Status, @PreparedByActorId = @PreparedByActorId, @PreparedAt = @now, @ActorId = @ActorId, @MigrationRunId = @MigrationRunId, @RowId = @RevisionRowId OUTPUT;
     DECLARE @captured BIT = CASE WHEN @CaptureKind = N'AsLeftReadback' THEN 1 ELSE 0 END;
     EXEC [document].[ConfigurationFile_Add] @RevisionRowId = @RevisionRowId, @DeviceEntityId = @DeviceEntityId, @FileKind = @FileKind, @ModelId = @model, @FirmwareVersionId = @fw,
-         @CaptureKind = @CaptureKind, @ParseStatus = N'NotParsed', @ActorId = @ActorId;
+         @CaptureKind = @CaptureKind, @ParseStatus = N'NotParsed', @ActorId = @ActorId, @MigrationRunId = @MigrationRunId;
     DECLARE @fsid UNIQUEIDENTIFIER, @fe UNIQUEIDENTIFIER, @fr UNIQUEIDENTIFIER;
     EXEC [document].[File_Write] @RevisionRowId = @RevisionRowId, @FileName = @FileName, @MimeType = @MimeType, @Content = @Content, @FileRole = N'Native',
-         @IsCapturedFromDevice = @captured, @ActorId = @ActorId, @FileStreamId = @fsid OUTPUT, @EntityId = @fe OUTPUT, @RowId = @fr OUTPUT;
+         @IsCapturedFromDevice = @captured, @ActorId = @ActorId, @MigrationRunId = @MigrationRunId, @FileStreamId = @fsid OUTPUT, @EntityId = @fe OUTPUT, @RowId = @fr OUTPUT;
     IF @FileKind = N'SettingsText' AND @TextContent IS NOT NULL
     BEGIN
         DECLARE @pm INT, @pu INT;

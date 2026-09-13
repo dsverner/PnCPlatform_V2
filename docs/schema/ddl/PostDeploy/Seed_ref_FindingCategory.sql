@@ -10,7 +10,8 @@ USING (VALUES
     (N'SettingsDiscrepancy',  N'Settings discrepancy'),
     (N'ConsistencyMismatch',  N'Consistency mismatch'),
     (N'AuditFinding',         N'Audit finding'),
-    (N'Observation',          N'Observation')
+    (N'Observation',          N'Observation'),
+    (N'MigrationReconciliation', N'Migration reconciliation')   -- W7 (#142): a legacy chain the letters and the numbers disagree on (#59)
 ) AS s ([FindingCategoryCode], [Name])
 ON t.[FindingCategoryCode] = s.[FindingCategoryCode]
 WHEN MATCHED AND t.[Name] <> s.[Name] THEN UPDATE SET [Name] = s.[Name], [ModifiedBy] = @actor, [ModifiedAt] = @now

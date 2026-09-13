@@ -22,9 +22,9 @@
   const $ = (id) => document.getElementById(id);
   const el = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
 
-  // every row of a view: the dispatcher answers at most 500 per call (Api:MaxTake), so the page loops on skip
+  // every row of a view: the dispatcher answers at most Api:MaxTake per call (10 000 since W7), so the page loops on skip
   async function fetchAll(url, max) {
-    const rows = []; const take = 500; let skip = 0;
+    const rows = []; const take = 5000; let skip = 0;
     for (;;) {
       const page = await call("GET", url + (url.includes("?") ? "&" : "?") + "take=" + take + "&skip=" + skip);
       for (const r of page.rows) rows.push(r);

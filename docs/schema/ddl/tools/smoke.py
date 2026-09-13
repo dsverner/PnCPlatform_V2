@@ -11,6 +11,10 @@ Checks:
   - the applies-to resolver: default, specific match, overlay, tie → error
 """
 import argparse, os, shutil, subprocess, sys, uuid, datetime, json, random, time
+# the messages carry arrows and ellipses; a redirected stdout on Windows defaults to cp1252 and would abort the run (found 2026-09-13)
+for _stream in (sys.stdout, sys.stderr):
+    try: _stream.reconfigure(encoding='utf-8', errors='replace')
+    except Exception: pass
 import pyodbc
 
 DOTNET = shutil.which("dotnet") or r"C:\Program Files\dotnet\dotnet.exe"
@@ -72,6 +76,9 @@ def main():
     ENGINE_DIR = os.environ.get("PNC_ENGINE_DIR") or os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "..", "src", "PnC.Engine.Cli"))
 
     def engine(verb, argument, *rest):
+        # W7 (2026-09-12): the same clock race as evaluate() (VM01 0.7 s ahead of the laptop, #79) bit an obligation run —
+        # "No effective obligation rule with that key" for a rule written in the same second. One second of patience.
+        time.sleep(1.0)   # every verb: run, clocks and preview each read a rule written in the same second
         """One engine call. Returns the parsed JSON; raises with the engine's own words on refusal."""
         r = subprocess.run([DOTNET, "run", "--project", ENGINE_DIR, "-c", "Release", "--no-build", "--",
                             ENGINE_CS, verb, str(argument), *rest],

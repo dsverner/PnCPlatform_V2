@@ -16,6 +16,7 @@ CREATE PROCEDURE [process].[Transition]
     @OverrideApprovedByActorId UNIQUEIDENTIFIER = NULL,
     @At DATETIMEOFFSET(7) = NULL,
     @ActorId UNIQUEIDENTIFIER = NULL,
+    @MigrationRunId UNIQUEIDENTIFIER = NULL,   -- W7 (#141): the importer's transition — no person's role to check; the run stamped on the transition row
     @ToState NVARCHAR(40) = NULL OUTPUT,
     @TransitionId BIGINT = NULL OUTPUT
 AS
@@ -52,7 +53,7 @@ BEGIN
     IF JSON_VALUE(@t, '$.requiresReason') = 'true' AND NULLIF(LTRIM(RTRIM(@Reason)), N'') IS NULL THROW 50155, N'process.Transition: this transition requires a reason.', 1;
 
     -- roles (a person's transition): the transition's roles, else the from-state's; none listed → anyone signed in
-    IF @FiredByStepInstanceEntityId IS NULL
+    IF @FiredByStepInstanceEntityId IS NULL AND @MigrationRunId IS NULL
     BEGIN
         DECLARE @roles NVARCHAR(MAX) = ISNULL(JSON_QUERY(@t, '$.roles'), JSON_QUERY(@fromJson, '$.roles'));
         IF @roles IS NOT NULL AND (SELECT COUNT(*) FROM OPENJSON(@roles)) > 0
@@ -124,7 +125,7 @@ BEGIN
          @DefinitionVersionRowId = @version, @ActorId = @ActorId, @Detail = @detail, @OccurredAt = @now, @ActionLogId = @logId OUTPUT;
     EXEC [process].[WorkflowTransition_Append] @WorkflowInstanceEntityId = @WorkflowInstanceEntityId, @OccurredAt = @now, @FromState = @from, @ToState = @ToState,
          @TransitionName = @TransitionName, @ActorId = @ActorId, @Reason = @Reason, @FiredByStepInstanceEntityId = @FiredByStepInstanceEntityId,
-         @GuardEvaluation = @guards, @ActionLogId = @logId, @TransitionId = @TransitionId OUTPUT;
+         @GuardEvaluation = @guards, @ActionLogId = @logId, @MigrationRunId = @MigrationRunId, @TransitionId = @TransitionId OUTPUT;
     DECLARE @terminal BIT = CASE WHEN JSON_VALUE(@toJson, '$.terminal') = 'true' THEN 1 ELSE 0 END, @cancel BIT = CASE WHEN JSON_VALUE(@toJson, '$.cancellation') = 'true' THEN 1 ELSE 0 END;
     DECLARE @doneAt DATETIMEOFFSET(7) = CASE WHEN @terminal = 1 THEN @now ELSE NULL END;
     EXEC [process].[WorkflowInstance_Update] @RowId = @row, @WorkflowDefinitionVersionRowId = @version, @SubjectKind = @subjectKind, @SubjectEntityId = @subject,
@@ -136,7 +137,7 @@ BEGIN
     WHILE @@FETCH_STATUS = 0
     BEGIN
         EXEC [process].[StartProcedure] @ProcedureKey = @proc, @SubjectKind = @subjectKind, @SubjectEntityId = @subject,
-             @WorkflowInstanceEntityId = @WorkflowInstanceEntityId, @InvokedAtState = @ToState, @ActorId = @ActorId, @EntityId = @pi OUTPUT;
+             @WorkflowInstanceEntityId = @WorkflowInstanceEntityId, @InvokedAtState = @ToState, @ActorId = @ActorId, @EntityId = @pi OUTPUT, @MigrationRunId = @MigrationRunId;
         FETCH NEXT FROM ef INTO @proc;
     END
     CLOSE ef; DEALLOCATE ef;

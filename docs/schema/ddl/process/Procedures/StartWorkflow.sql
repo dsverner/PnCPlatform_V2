@@ -8,6 +8,7 @@ CREATE PROCEDURE [process].[StartWorkflow]
     @WorkRequestEntityId UNIQUEIDENTIFIER = NULL,
     @Inputs NVARCHAR(MAX) = NULL,
     @ActorId UNIQUEIDENTIFIER = NULL,
+    @MigrationRunId UNIQUEIDENTIFIER = NULL,   -- W7 (#138): a migrated instance carries its run
     @EntityId UNIQUEIDENTIFIER = NULL OUTPUT,
     @ProcedureInstanceEntityId UNIQUEIDENTIFIER = NULL OUTPUT
 AS
@@ -35,7 +36,7 @@ BEGIN
 
     BEGIN TRANSACTION;
     EXEC [process].[WorkflowInstance_Add] @WorkflowDefinitionVersionRowId = @version, @SubjectKind = @SubjectKind, @SubjectEntityId = @SubjectEntityId,
-         @CurrentState = @initial, @StartedAt = @now, @StartedByActorId = @ActorId, @ActorId = @ActorId, @EntityId = @EntityId OUTPUT;
+         @CurrentState = @initial, @StartedAt = @now, @StartedByActorId = @ActorId, @ActorId = @ActorId, @MigrationRunId = @MigrationRunId, @EntityId = @EntityId OUTPUT;
     DECLARE @detail NVARCHAR(MAX) = CONCAT(N'{"action":"workflow-started","key":"', STRING_ESCAPE(@WorkflowKey, 'json'), N'","state":"', STRING_ESCAPE(@initial, 'json'), N'"}');
     EXEC [audit].[LogAction] @ActionKindCode = N'Administrative', @SubjectSchema = N'process', @SubjectTable = N'WorkflowInstance',
          @SubjectEntityId = @EntityId, @DefinitionVersionRowId = @version, @ActorId = @ActorId, @Detail = @detail;
@@ -47,7 +48,7 @@ BEGIN
     BEGIN
         EXEC [process].[StartProcedure] @ProcedureKey = @proc, @SubjectKind = @SubjectKind, @SubjectEntityId = @SubjectEntityId,
              @WorkflowInstanceEntityId = @EntityId, @InvokedAtState = @initial, @WorkRequestEntityId = @WorkRequestEntityId, @Inputs = @Inputs,
-             @ActorId = @ActorId, @EntityId = @ProcedureInstanceEntityId OUTPUT;
+             @ActorId = @ActorId, @MigrationRunId = @MigrationRunId, @EntityId = @ProcedureInstanceEntityId OUTPUT;
         FETCH NEXT FROM ef INTO @proc;
     END
     CLOSE ef; DEALLOCATE ef;

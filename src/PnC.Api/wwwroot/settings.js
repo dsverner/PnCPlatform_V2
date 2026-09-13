@@ -21,6 +21,16 @@
   if (!state.chosen.length) state.chosen = DEFAULT_COLUMNS.slice();
   const q = qs();
   if (q.GridState) state.gridState = q.GridState;
+  // the legacy main window had an active location (LEGACY-SYSTEM §8); a station narrows the read to what the optimizer can serve fast
+  state.station = q.StationNodeEntityId || "";
+  try { if (!state.station) state.station = localStorage.getItem("pnc.settings.station") || ""; } catch (e) { /* none */ }
+  async function loadStations() {
+    try {
+      const rows = await fetchAll("/api/v1/location/vNode?NodeTypeCode=Station&orderBy=Name");
+      for (const s of rows) { const o = el("option", null, s.Name); o.value = s.EntityId; if (s.EntityId.toLowerCase() === state.station.toLowerCase()) o.selected = true; $("station").appendChild(o); }
+    } catch (e) { /* the list stays empty */ }
+  }
+  $("station").addEventListener("change", (ev) => { state.station = ev.target.value; try { localStorage.setItem("pnc.settings.station", state.station); } catch (e) { /* */ } load(); });
 
   async function loadColumns() {
     const c = await getJson("/api/v1/catalog");
@@ -31,12 +41,13 @@
   async function load() {
     setStatus("status", "Loading " + state.gridState + " settings…");
     const filters = "GridState=" + encodeURIComponent(state.gridState) + (q.DeviceEntityId ? "&DeviceEntityId=" + encodeURIComponent(q.DeviceEntityId) : "")
-      + (q.WorkRequestEntityId ? "&WorkRequestEntityId=" + encodeURIComponent(q.WorkRequestEntityId) : "");
+      + (q.WorkRequestEntityId ? "&WorkRequestEntityId=" + encodeURIComponent(q.WorkRequestEntityId) : "")
+      + (state.station && !q.DeviceEntityId && !q.WorkRequestEntityId ? "&StationNodeEntityId=" + encodeURIComponent(state.station) : "");
     const t0 = performance.now();
     try {
       state.rows = await fetchAll(VIEW + "?" + filters + "&orderBy=-CalculatedAt");
       const ms = Math.round(performance.now() - t0);
-      setStatus("status", state.rows.length + " " + state.gridState.toLowerCase() + " settings record(s) · " + ms + " ms" + (q.DeviceEntityId ? " · one device" : "") + (q.WorkRequestEntityId ? " · one change request" : ""));
+      setStatus("status", state.rows.length + " " + state.gridState.toLowerCase() + " settings record(s) · " + ms + " ms" + (q.DeviceEntityId ? " · one device" : "") + (q.WorkRequestEntityId ? " · one change request" : "") + (state.station ? " · one location" : " · every location"));
     } catch (e) { state.rows = []; setStatus("status", "Could not load: " + (e.status || "") + " " + e.message, true); }
     render();
   }
@@ -157,5 +168,5 @@
   $("filter").addEventListener("input", (ev) => { state.filter = ev.target.value; render(); });
 
   window.PnC.registerWorker();
-  me().then((m) => { state.user = m; return loadColumns(); }).then(load).catch(() => setStatus("status", "Sign in on the home page first.", true));
+  me().then((m) => { state.user = m; return Promise.all([loadColumns(), loadStations()]); }).then(load).catch(() => setStatus("status", "Sign in on the home page first.", true));
 })();

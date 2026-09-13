@@ -178,6 +178,17 @@ connection reuse across identities, so a session context can never leak between 
 
 ---
 
+**Paging of the read models (W7, decision #145).** `Api:MaterialiseBeforePaging` lists views the dispatcher reads whole
+with a plain `SELECT` (the optimizer's parallel plan) and orders and pages in memory — the parity screens' five views —
+because `ORDER BY … OFFSET`, `TOP` or `SELECT INTO` over them cost 10–120 s on the migrated estate where the plain read
+costs 1–6 s. `Api:MaxTake` is 10 000 so such a screen reads its list in one call; ordering follows SQL's (nulls first,
+numbers and instants by value, text ordinal-ignore-case, `RowSeq` the tiebreaker).
+
+**Two rules from the W7 smoke over the real estate.** The engine's instants (guard evaluation, step commits, the sweep)
+are the database's `SYSDATETIMEOFFSET()`, read through `SqlSession.NowAsync` — never the host's clock (decision #146). A
+scoped list read (joined to `security.fReadableSubjects`) carries `OPTION (RECOMPILE)` so a plan cached for one grant's
+readable set never serves another's (#147).
+
 ## 7. Fixed endpoints, headers, configuration
 
 | Endpoint | Identity | Returns |
@@ -275,6 +286,16 @@ permissions are the map's for that procedure, decided on the work request the ru
 
 `PnC.Api.Smoke`'s W4 section runs the whole fixture (139 checks in DEV mode, 2026-09-12); it needs four identities in one
 process and is skipped in Windows mode.
+
+## 8c. The file download — W7
+
+`src/PnC.Api/Endpoints/FileEndpoints.cs` (decision #144; the W6 card's item F, #136). The one route that returns bytes:
+
+| Route | Does | Permission |
+|---|---|---|
+| `GET /api/v1/files/{fileRowId}` | the file row and its revision's document; the bytes from `document.FileStore` by the file's stream id; the row's SHA-256 compared before anything is sent (500 `integrity` on mismatch); `RedactionStatus` other than None → 403 `redacted`; an archive-tier file (no stream id) → 404 `not_here`; **the open is a logged read** (`audit.LogRead` on `document.File`, in `config.ReadLoggedClass`); answered as an attachment with the stored name and MIME type, `Cache-Control: no-store`, `X-Content-Type-Options: nosniff` | `Document.Read` on the file's document (decided by the database) |
+
+The setting display (§9) links every file name to it.
 
 ## 9. The PWA shell
 

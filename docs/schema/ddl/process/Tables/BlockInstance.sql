@@ -38,3 +38,5 @@ GO
 EXEC sys.sp_addextendedproperty @name = N'PnC.TemporalClass', @value = N'Versioned',
     @level0type = N'SCHEMA', @level0name = N'process', @level1type = N'TABLE', @level1name = N'BlockInstance';
 GO
+-- W7: the settings grid asks whether a device's member branch left the change (vSettingsRecord GridState Withdrawn)
+CREATE INDEX [IX_BlockInstance_Member] ON [process].[BlockInstance] ([ProcedureInstanceEntityId], [MemberSubjectEntityId]) WHERE [IsDeleted] = 0;

@@ -10,6 +10,7 @@ CREATE PROCEDURE [process].[WriteEvidence]
     @PreparedByActorId UNIQUEIDENTIFIER = NULL,
     @At DATETIMEOFFSET(7) = NULL,
     @ActorId UNIQUEIDENTIFIER = NULL,
+    @MigrationRunId UNIQUEIDENTIFIER = NULL,   -- W7 (#138)
     @RevisionRowId UNIQUEIDENTIFIER = NULL OUTPUT,
     @Files INT = NULL OUTPUT
 AS
@@ -25,7 +26,7 @@ BEGIN
     BEGIN TRANSACTION;
     DECLARE @docEntity UNIQUEIDENTIFIER;
     DECLARE @title NVARCHAR(200) = LEFT(N'Evidence — ' + @StepId + N' — ' + LOWER(CONVERT(NVARCHAR(36), @RecordEntityId)), 200);
-    EXEC [document].[Document_Add] @DocumentClassDefinitionEntityId = @class, @Title = @title, @ActorId = @ActorId, @EntityId = @docEntity OUTPUT;
+    EXEC [document].[Document_Add] @DocumentClassDefinitionEntityId = @class, @Title = @title, @ActorId = @ActorId, @MigrationRunId = @MigrationRunId, @EntityId = @docEntity OUTPUT;
     EXEC [document].[Revision_Add] @DocumentEntityId = @docEntity, @RevisionLabel = N'1', @Status = N'Issued', @PreparedByActorId = @PreparedByActorId, @PreparedAt = @now, @IssuedAt = @now, @ActorId = @ActorId, @RowId = @RevisionRowId OUTPUT;
     DECLARE @name NVARCHAR(255), @mime NVARCHAR(100), @b64 NVARCHAR(MAX), @bin VARBINARY(MAX), @fsid UNIQUEIDENTIFIER, @fe UNIQUEIDENTIFIER, @fr UNIQUEIDENTIFIER;
     DECLARE c CURSOR LOCAL FAST_FORWARD FOR SELECT JSON_VALUE(e.[value], '$.name'), ISNULL(JSON_VALUE(e.[value], '$.mimeType'), N'application/octet-stream'), JSON_VALUE(e.[value], '$.contentBase64') FROM OPENJSON(@Evidence) e;

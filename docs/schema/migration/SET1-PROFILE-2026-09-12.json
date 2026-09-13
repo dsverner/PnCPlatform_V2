@@ -1,0 +1,1889 @@
+[
+ {
+  "manufacturer": "SEL",
+  "device": "SEL-2440",
+  "rows": 229,
+  "with_text": 219,
+  "names": [
+   [
+    "ZONE_1",
+    2
+   ],
+   [
+    "ZONE_3",
+    2
+   ],
+   [
+    "ZONE_2",
+    2
+   ],
+   [
+    "XT",
+    1
+   ],
+   [
+    "IS",
+    1
+   ],
+   [
+    "INST",
+    1
+   ],
+   [
+    "CURVE",
+    1
+   ]
+  ],
+  "samples": [
+   "*** SEE SETTINGS DOCUMENT FOR DETAILS ***",
+   "*** SEE SETTINGS DOCUMENT FOR DETAILS ***"
+  ]
+ },
+ {
+  "manufacturer": "SEL",
+  "device": "SEL-551",
+  "rows": 211,
+  "with_text": 211,
+  "names": [
+   [
+    "TID",
+    199
+   ],
+   [
+    "CTR",
+    198
+   ],
+   [
+    "RID",
+    197
+   ],
+   [
+    "TDURD",
+    194
+   ],
+   [
+    "CTRN",
+    191
+   ],
+   [
+    "50P1P",
+    161
+   ],
+   [
+    "OUT1",
+    161
+   ],
+   [
+    "ULTR",
+    160
+   ],
+   [
+    "TR",
+    158
+   ],
+   [
+    "50G1P",
+    153
+   ],
+   [
+    "ER1",
+    151
+   ],
+   [
+    "SV5",
+    126
+   ],
+   [
+    "SV5PU",
+    126
+   ],
+   [
+    "51P1P",
+    106
+   ],
+   [
+    "SV5DO",
+    98
+   ],
+   [
+    "51P1C",
+    96
+   ],
+   [
+    "51P1TD",
+    96
+   ],
+   [
+    "51P1RS",
+    92
+   ],
+   [
+    "50P2P",
+    55
+   ],
+   [
+    "51P1TC",
+    52
+   ],
+   [
+    "51N1P",
+    43
+   ],
+   [
+    "SER1",
+    43
+   ],
+   [
+    "51P2P",
+    42
+   ],
+   [
+    "50ABCP",
+    34
+   ],
+   [
+    "50N1P",
+    34
+   ],
+   [
+    "OUT2",
+    34
+   ],
+   [
+    "DATE_F",
+    33
+   ],
+   [
+    "50P3P",
+    29
+   ],
+   [
+    "50N2P",
+    26
+   ],
+   [
+    "50P4P",
+    26
+   ]
+  ],
+  "samples": [
+   "RID=2004089101, TID=CC1AIDFEED, CTR=80, CTRN=80, TDURD=12.00, 50 P1P=OFF, 50P2P=OFF, 50P3P=OFF, 50P4P=OFF, 50P5P=OFF, 50",
+   "RID=2004006117, TID=CC1AIDDRIVE, CTR=120, CTRN=120, TDURD=12.00, 50 P1P=OFF, 50P2P=OFF, 50P3P=OFF, 50P4P=OFF, 50P5P=OFF,"
+  ]
+ },
+ {
+  "manufacturer": "UNKNOWN",
+  "device": "CONTROL SWITCH",
+  "rows": 108,
+  "with_text": 108,
+  "names": [
+   [
+    "STATUS",
+    108
+   ]
+  ],
+  "samples": [
+   "STATUS = IN SERVICE",
+   "STATUS = IN SERVICE"
+  ]
+ },
+ {
+  "manufacturer": "ABB",
+  "device": "RXKE-1 .02-99 S",
+  "rows": 95,
+  "with_text": 95,
+  "names": [
+   [
+    "TDPU",
+    60
+   ],
+   [
+    "TIME",
+    30
+   ],
+   [
+    "ZONE_2",
+    2
+   ],
+   [
+    "T2",
+    2
+   ],
+   [
+    "RECLOSE",
+    1
+   ]
+  ],
+  "samples": [
+   "TIME=0.2 SECONDS",
+   "TIME=0.2 SECONDS"
+  ]
+ },
+ {
+  "manufacturer": "Omron",
+  "device": "OMRON H3CA .1 S-9990 HR 12-240 VDC 24-240 VAC",
+  "rows": 90,
+  "with_text": 90,
+  "names": [
+   [
+    "MODE",
+    88
+   ],
+   [
+    "TDPU",
+    77
+   ],
+   [
+    "TDDO",
+    11
+   ],
+   [
+    "TD",
+    1
+   ]
+  ],
+  "samples": [
+   "MODE=A, TDPU=0.1 SECOND",
+   "MODE=A, TDPU=60.0 SECONDS"
+  ]
+ },
+ {
+  "manufacturer": "GE",
+  "device": "GE-C30",
+  "rows": 90,
+  "with_text": 83,
+  "names": [],
+  "samples": [
+   "*** SEE SETTINGS DOCUMENT FOR DETAILS ***",
+   "*** SEE SETTINGS DOCUMENT FOR DETAILS ***"
+  ]
+ },
+ {
+  "manufacturer": "P&B",
+  "device": "CNT 35-96 .1 S-9990 HR 24-240 VAC/VDC",
+  "rows": 77,
+  "with_text": 77,
+  "names": [
+   [
+    "MODE",
+    77
+   ],
+   [
+    "TDPU",
+    51
+   ],
+   [
+    "TDDO",
+    26
+   ]
+  ],
+  "samples": [
+   "MODE=B, TDDO=5.0 SECONDS",
+   "MODE=B, TDDO=5.0 SECONDS"
+  ]
+ },
+ {
+  "manufacturer": "SEL",
+  "device": "SEL-751A",
+  "rows": 74,
+  "with_text": 55,
+  "names": [
+   [
+    "RID",
+    10
+   ],
+   [
+    "OUT302",
+    10
+   ],
+   [
+    "TR",
+    10
+   ],
+   [
+    "ULTR",
+    10
+   ],
+   [
+    "CTRN",
+    10
+   ],
+   [
+    "OUT301",
+    10
+   ],
+   [
+    "OUT103",
+    10
+   ],
+   [
+    "TID",
+    10
+   ],
+   [
+    "CTR",
+    10
+   ],
+   [
+    "OUT101",
+    10
+   ],
+   [
+    "OUT102",
+    9
+   ],
+   [
+    "OUT103FS",
+    8
+   ],
+   [
+    "P/N",
+    5
+   ],
+   [
+    "50P1P",
+    2
+   ]
+  ],
+  "samples": [
+   "RID = 3131050095, TID = SS LIGHTING, CTR = 60, CTRN = 60, ULTR = NOT (50P1P OR 51P1P), OUT101 = TRIP, OUT103 = HALARM OR",
+   "RID = SERIAL NO., TID = SWYD SERVICES A, CTR = 40, CTRN = 40, ULTR = NOT (51G1P OR 51P1P), OUT101 = TRIP, OUT102 = LT01,"
+  ]
+ },
+ {
+  "manufacturer": "Beckwith",
+  "device": "M-0389 O/V=110-140V U/V=90-120 V DL/DB=0-60 V",
+  "rows": 72,
+  "with_text": 72,
+  "names": [
+   [
+    "UPPER_LIMIT",
+    71
+   ],
+   [
+    "LOWER_LIMIT",
+    70
+   ],
+   [
+    "DEAD_LINE/BUS_LIMIT",
+    70
+   ],
+   [
+    "ENABLE_DB",
+    6
+   ],
+   [
+    "ENABLE_RELAY",
+    5
+   ],
+   [
+    "ENABLE_DL",
+    3
+   ],
+   [
+    "DEAD_LINE/BUS",
+    2
+   ],
+   [
+    "LOWER_VOLTS",
+    2
+   ],
+   [
+    "DB",
+    1
+   ],
+   [
+    "ENABLE_DL_TB3-7_TO_TB3-8",
+    1
+   ],
+   [
+    "ENABLE_DB_TB3-5_TO_TB3-6",
+    1
+   ]
+  ],
+  "samples": [
+   "UPPER LIMIT=127 VOLTS, LOWER LIMIT=97 VOLTS, DEAD LINE/BUS LIMIT=60 VOLTS, DEAD BUS NOT ENABLED , DEAD LINE NOT ENABLED,",
+   "UPPER LIMIT=125 VOLTS, LOWER LIMIT=105 VOLTS, DEAD LINE/BUS LIMIT=60 VOLTS, DEAD BUS NOT ENABLED, DEAD LINE NOT ENABLED"
+  ]
+ },
+ {
+  "manufacturer": "Beckwith",
+  "device": "M-0388 0-90 DEG 0-15 S",
+  "rows": 71,
+  "with_text": 71,
+  "names": [
+   [
+    "ANGLE",
+    71
+   ],
+   [
+    "ENABLE",
+    71
+   ],
+   [
+    "TIME_DELAY",
+    69
+   ],
+   [
+    "TIME",
+    1
+   ],
+   [
+    "LOWER_LIMIT",
+    1
+   ],
+   [
+    "DEAD_LINE/BUS_LIMIT",
+    1
+   ],
+   [
+    "UPPER_LIMIT",
+    1
+   ],
+   [
+    "TD",
+    1
+   ]
+  ],
+  "samples": [
+   "ANGLE=+-40 DEGREES, TIME DELAY=4.0 SECONDS, ENABLE=SHORT TB2-4 TO TB2-5",
+   "ANGLE=+-40 DEGREES, TIME DELAY=2.0 SECONDS, ENABLE=SHORT TB2-4 TO TB2-5"
+  ]
+ },
+ {
+  "manufacturer": "P&B",
+  "device": "CNT .1 S-9990 HR 12-240 VDC 24-240 VAC",
+  "rows": 65,
+  "with_text": 65,
+  "names": [
+   [
+    "MODE",
+    65
+   ],
+   [
+    "TDDO",
+    44
+   ],
+   [
+    "TDPU",
+    21
+   ]
+  ],
+  "samples": [
+   "MODE=B, TDDO=5.0 SECONDS",
+   "MODE=B, TDDO=5.0 SECONDS"
+  ]
+ },
+ {
+  "manufacturer": "SEL",
+  "device": "SEL-701",
+  "rows": 55,
+  "with_text": 55,
+  "names": [
+   [
+    "INTAP",
+    55
+   ],
+   [
+    "ITAP",
+    55
+   ],
+   [
+    "PHROT",
+    55
+   ],
+   [
+    "DATE_F",
+    55
+   ],
+   [
+    "CTRN",
+    55
+   ],
+   [
+    "CTR",
+    55
+   ],
+   [
+    "SF",
+    55
+   ],
+   [
+    "FLA",
+    55
+   ],
+   [
+    "FNOM",
+    55
+   ],
+   [
+    "SETMETH",
+    54
+   ],
+   [
+    "TID",
+    54
+   ],
+   [
+    "LRA",
+    47
+   ],
+   [
+    "TCAPU",
+    46
+   ],
+   [
+    "LRTCOLD",
+    46
+   ],
+   [
+    "LRTHOT",
+    46
+   ],
+   [
+    "TD",
+    45
+   ],
+   [
+    "DMTC",
+    42
+   ],
+   [
+    "TCLRNEN",
+    36
+   ],
+   [
+    "TCSTART",
+    36
+   ],
+   [
+    "RID",
+    35
+   ],
+   [
+    "COOLTIME",
+    30
+   ],
+   [
+    "COOLEN",
+    18
+   ],
+   [
+    "CURVE",
+    16
+   ],
+   [
+    "DELTA_Y",
+    14
+   ],
+   [
+    "SINGLEV",
+    14
+   ],
+   [
+    "PTR",
+    14
+   ],
+   [
+    "DTMC",
+    13
+   ],
+   [
+    "50P1P",
+    8
+   ],
+   [
+    "TTT120",
+    4
+   ],
+   [
+    "TTT130",
+    4
+   ]
+  ],
+  "samples": [
+   "RID=2003283234, TID=VACUUM PUMP 9-1, CTR=40, ITAP=5, CTRN=40, INTAP=5, PHROT=ABC, FNOM=60, DATE_F=YMD, DTMC=60, PTR=60, ",
+   "RID=2003316245, TID=MOTOR ABSORBER 9A1, CTR=40, ITAP=5, CTRN=40, INTAP=5, PHROT=ABC, FNOM=60, DATE_F=YMD, DTMC=60, PTR=6"
+  ]
+ },
+ {
+  "manufacturer": "Federal Pioneer",
+  "device": "MGFR-20-Z 1-20 A",
+  "rows": 51,
+  "with_text": 51,
+  "names": [
+   [
+    "CURVE",
+    51
+   ],
+   [
+    "PICKUP",
+    47
+   ],
+   [
+    "TD",
+    41
+   ],
+   [
+    "TIME_DELAY",
+    10
+   ],
+   [
+    "PU",
+    4
+   ]
+  ],
+  "samples": [
+   "PICKUP=3.0 AMPS, TD=INSTANTANEOUS, CURVE=DMT",
+   "PICKUP=3 AMPS, TD=INST, CURVE=DMT"
+  ]
+ },
+ {
+  "manufacturer": "SEL",
+  "device": "SEL-311C",
+  "rows": 49,
+  "with_text": 48,
+  "names": [
+   [
+    "Z1MAG",
+    46
+   ],
+   [
+    "LL",
+    45
+   ],
+   [
+    "Z1ANG",
+    44
+   ],
+   [
+    "CTR",
+    43
+   ],
+   [
+    "PTR",
+    43
+   ],
+   [
+    "TID",
+    42
+   ],
+   [
+    "Z0ANG",
+    39
+   ],
+   [
+    "Z0MAG",
+    39
+   ],
+   [
+    "PTRS",
+    35
+   ],
+   [
+    "E21P",
+    28
+   ],
+   [
+    "E21MG",
+    28
+   ],
+   [
+    "RID",
+    27
+   ],
+   [
+    "Z1MG",
+    24
+   ],
+   [
+    "Z1P",
+    24
+   ],
+   [
+    "CTRP",
+    24
+   ],
+   [
+    "Z2MG",
+    22
+   ],
+   [
+    "Z2P",
+    22
+   ],
+   [
+    "K0M1",
+    21
+   ],
+   [
+    "K0A1",
+    20
+   ],
+   [
+    "E50G",
+    20
+   ],
+   [
+    "E50P",
+    19
+   ],
+   [
+    "E21XG",
+    19
+   ],
+   [
+    "APP",
+    18
+   ],
+   [
+    "ELOP",
+    17
+   ],
+   [
+    "Z2D",
+    15
+   ],
+   [
+    "E51G",
+    15
+   ],
+   [
+    "E51P",
+    14
+   ],
+   [
+    "E50Q",
+    14
+   ],
+   [
+    "E51Q",
+    13
+   ],
+   [
+    "50G1P",
+    12
+   ]
+  ],
+  "samples": [
+   "RID=2002207045, TID=BATHURST L1106 B, CTR=160, PTR=1200, PTRS=700,  Z1MAG=4.19, Z1ANG=77.76, Z0MAG=13.18, Z0ANG=73.77, L",
+   "(SET A) RID=200314019, TID=BEECHWOOD L1111, CTR=120, CTRP=120, PTR=1200, PTRS=700, Z1MAG=2.98, Z1ANG=78.07, ZOMAG=8.87, "
+  ]
+ },
+ {
+  "manufacturer": "SEL",
+  "device": "SEL-221F Z1-3=.125-64 OHMS",
+  "rows": 48,
+  "with_text": 48,
+  "names": [
+   [
+    "79OI",
+    48
+   ],
+   [
+    "PSVC",
+    48
+   ],
+   [
+    "Z3D",
+    48
+   ],
+   [
+    "Z2DG",
+    48
+   ],
+   [
+    "25T",
+    48
+   ],
+   [
+    "79RS",
+    48
+   ],
+   [
+    "LL",
+    48
+   ],
+   [
+    "MTA",
+    48
+   ],
+   [
+    "SPTR",
+    48
+   ],
+   [
+    "CTR",
+    48
+   ],
+   [
+    "VCT",
+    48
+   ],
+   [
+    "X1",
+    48
+   ],
+   [
+    "25DV",
+    48
+   ],
+   [
+    "PTR",
+    48
+   ],
+   [
+    "R1",
+    48
+   ],
+   [
+    "59VHI",
+    48
+   ],
+   [
+    "Z2DP",
+    48
+   ],
+   [
+    "R0",
+    47
+   ],
+   [
+    "X0",
+    47
+   ],
+   [
+    "A1TD",
+    47
+   ],
+   [
+    "SYNCP",
+    47
+   ],
+   [
+    "A1TP",
+    47
+   ],
+   [
+    "27VLO",
+    46
+   ],
+   [
+    "50NG",
+    42
+   ],
+   [
+    "TDUR",
+    33
+   ],
+   [
+    "50P",
+    15
+   ],
+   [
+    "Z1",
+    11
+   ],
+   [
+    "Z2",
+    11
+   ],
+   [
+    "Z3",
+    10
+   ],
+   [
+    "50H",
+    3
+   ]
+  ],
+  "samples": [
+   "R1=2.31, X1=6.60, R0=4.85, X0=25.63, LL=9.21, CTR=160, PTR=600, SPTR=350, MTA=70.7, 79OI=180, 79RS=900, PSVC=P, 27VLO=20",
+   "R1=0.87, X1=3.56, R0=2.28, X0=14.16, LL=5.12, CTR=160, PTR=600, SPTR=600, MTA=76.3 , 79OI=360, 79RS=900, PSVC=N, 27VLO=2"
+  ]
+ },
+ {
+  "manufacturer": "Westinghouse",
+  "device": "10 40 60 80 100% TAPS",
+  "rows": 48,
+  "with_text": 48,
+  "names": [
+   [
+    "PARALLEL_LINE_SIDE",
+    45
+   ],
+   [
+    "PROTECTED_LINE_SIDE",
+    44
+   ],
+   [
+    "PROTECTED_LINE",
+    4
+   ],
+   [
+    "PARALLEL_LINE",
+    3
+   ]
+  ],
+  "samples": [
+   "PROTECTED LINE SIDE=70 %, PARALLEL LINE SIDE=OPEN",
+   "PROTECTED LINE SIDE=60 %, PARALLEL LINE SIDE=OPEN"
+  ]
+ },
+ {
+  "manufacturer": "CGE",
+  "device": "PJC32D78A 20-80 A",
+  "rows": 46,
+  "with_text": 46,
+  "names": [
+   [
+    "PICKUP",
+    29
+   ],
+   [
+    "P.U.",
+    8
+   ],
+   [
+    "INST",
+    6
+   ],
+   [
+    "PU",
+    2
+   ],
+   [
+    "PICK-UP",
+    1
+   ]
+  ],
+  "samples": [
+   "PICKUP=37.0 AMPS",
+   "PICKUP=75 AMPS, NOT IN SERVICE"
+  ]
+ },
+ {
+  "manufacturer": "SEL",
+  "device": "SEL-2407",
+  "rows": 42,
+  "with_text": 37,
+  "names": [],
+  "samples": [
+   "SEE WORD DOCUMENT",
+   "SEE WORD DOCUMENT"
+  ]
+ },
+ {
+  "manufacturer": "Startco",
+  "device": "MPU-16A SEE MANUAL",
+  "rows": 41,
+  "with_text": 41,
+  "names": [
+   [
+    "ALARM",
+    41
+   ],
+   [
+    "TRIP",
+    41
+   ],
+   [
+    "ALARM_T",
+    1
+   ]
+  ],
+  "samples": [
+   "MODE 0: I SQRD T LIMIT, TRIP=9.0, ALARM=8.0, MODE 1: O/C, TRIP=200%,  ALARM=150%, MODE 2: U/C, TRIP=2DDD, ALARM=2DDD, MO",
+   "MODE 0:I SQRD T LIMIT, TRIP=10.0, ALARM=9.0, MODE 1: O/C, TRIP=200%, ALARM=150%,  MODE 2: U/C, TRIP=2DDD, ALARM=2DDD, MO"
+  ]
+ },
+ {
+  "manufacturer": "Federal Pioneer",
+  "device": "iGard Sentri",
+  "rows": 41,
+  "with_text": 41,
+  "names": [
+   [
+    "FILTER",
+    41
+   ],
+   [
+    "PRETRIP_LEVEL",
+    41
+   ],
+   [
+    "RESET",
+    41
+   ],
+   [
+    "PRETRIP_DELAY",
+    41
+   ],
+   [
+    "CURVE",
+    40
+   ],
+   [
+    "DELAY",
+    40
+   ],
+   [
+    "PICKUP",
+    39
+   ],
+   [
+    "PICK_UP",
+    2
+   ],
+   [
+    "CURE",
+    1
+   ]
+  ],
+  "samples": [
+   "PICK UP=7 AMPS, Delay:60s, Curve=Definite, Pretrip level=7A, Pretrip Delay=0s, Filter = OFF, Reset=Manual",
+   "PICKUP=5 AMPS, Delay=32s, Curve=Definite, Pretrip level=5A, Pretrip delay=0s, Filter=OFF, Reset=Manual"
+  ]
+ },
+ {
+  "manufacturer": "UNKNOWN",
+  "device": "CNT 35-96 .1 S-9990 HR 24-240 VAC/VDC",
+  "rows": 39,
+  "with_text": 39,
+  "names": [
+   [
+    "MODE",
+    39
+   ],
+   [
+    "TDPU",
+    20
+   ],
+   [
+    "TDDO",
+    18
+   ]
+  ],
+  "samples": [
+   "MODE=A, TDPU=1.0 SECOND",
+   "MODE=A, TDPU=0.5 SECONDS"
+  ]
+ },
+ {
+  "manufacturer": "Agastat",
+  "device": "AGASTAT 7012PA .1-1 S",
+  "rows": 38,
+  "with_text": 38,
+  "names": [
+   [
+    "TDPU",
+    38
+   ]
+  ],
+  "samples": [
+   "TDPU=1.0 SECOND",
+   "TDPU=1.0 SECOND"
+  ]
+ },
+ {
+  "manufacturer": "SEL",
+  "device": "SEL-387",
+  "rows": 37,
+  "with_text": 37,
+  "names": [
+   [
+    "E87W4",
+    36
+   ],
+   [
+    "CTR2",
+    36
+   ],
+   [
+    "CTR1",
+    36
+   ],
+   [
+    "W2CT",
+    36
+   ],
+   [
+    "E87W1",
+    36
+   ],
+   [
+    "E87W3",
+    36
+   ],
+   [
+    "TID",
+    36
+   ],
+   [
+    "W1CT",
+    34
+   ],
+   [
+    "ICOM",
+    33
+   ],
+   [
+    "CTR3",
+    33
+   ],
+   [
+    "MVA",
+    33
+   ],
+   [
+    "W3CT",
+    33
+   ],
+   [
+    "W1CTC",
+    32
+   ],
+   [
+    "W4CT",
+    31
+   ],
+   [
+    "W2CTC",
+    30
+   ],
+   [
+    "RID",
+    29
+   ],
+   [
+    "E87W2",
+    28
+   ],
+   [
+    "CTR4",
+    21
+   ],
+   [
+    "EOC1",
+    20
+   ],
+   [
+    "EOC2",
+    20
+   ],
+   [
+    "ESLS1",
+    20
+   ],
+   [
+    "W3CTC",
+    19
+   ],
+   [
+    "ESLS2",
+    18
+   ],
+   [
+    "ESLS3",
+    18
+   ],
+   [
+    "EOC3",
+    17
+   ],
+   [
+    "EOC4",
+    17
+   ],
+   [
+    "TAP1",
+    17
+   ],
+   [
+    "EOCC",
+    15
+   ],
+   [
+    "TAP2",
+    15
+   ],
+   [
+    "TAP3",
+    13
+   ]
+  ],
+  "samples": [
+   "RID=2002364050, TID=C. COVE 34.5 BU-501-405, E87W1=Y, E87W2=Y, E87W3=Y, E87W4=N, EOC1=Y, EOC2=Y, ESLS1=Y, WICT=Y, W2CT=Y",
+   "RID=TU6 CONN DIFF, TID=C.BAY, E87W1=Y, E87W2=Y, E87W3=Y, E87W4=N, EOC1=N, EOC2=N, EOC3=Y, EOC4=N, EOCC=N, ESLS1=N, ESLS2"
+  ]
+ },
+ {
+  "manufacturer": "STARTCO",
+  "device": "MPU-32",
+  "rows": 36,
+  "with_text": 36,
+  "names": [
+   [
+    "EF-CT_PRIMARY",
+    14
+   ],
+   [
+    "FREQUENCY",
+    14
+   ],
+   [
+    "FULL-LOAD_RATING_#1",
+    14
+   ],
+   [
+    "RUN-MODE_DELAY",
+    14
+   ],
+   [
+    "CT_PRIMARY",
+    14
+   ],
+   [
+    "EARTH_FAULT_CT_SOURCE",
+    14
+   ],
+   [
+    "SERVICE_FACTOR",
+    14
+   ]
+  ],
+  "samples": [
+   "GENERAL SETTINGS:\nSYSTEM NAME=FGD VACUUM PUMP CB9E, EARTH FAULT CT SOURCE=MEASURED (ICT), CT PRIMARY=400.00, EF-CT PRIMA",
+   "GENERAL SETTINGS:\nSYSTEM NAME=BOOM CONVEYOR CB8C, EARTH FAULT CT SOURCE=MEASURED (ICT), CT PRIMARY=200.00, EF-CT PRIMARY"
+  ]
+ },
+ {
+  "manufacturer": "Agastat",
+  "device": "AGASTAT 7022PB .5-5 S",
+  "rows": 35,
+  "with_text": 35,
+  "names": [
+   [
+    "TDDO",
+    35
+   ]
+  ],
+  "samples": [
+   "TDDO=1.5 SECONDS",
+   "TDDO=5.0 SECONDS"
+  ]
+ },
+ {
+  "manufacturer": "SEL",
+  "device": "SEL-2411",
+  "rows": 35,
+  "with_text": 32,
+  "names": [],
+  "samples": [
+   "*** SEE SETTINGS DOCUMENT FOR DETAILS ***",
+   "*** SEE SETTINGS DOCUMENT FOR DETAILS ***"
+  ]
+ },
+ {
+  "manufacturer": "UNKNOWN",
+  "device": "CNT .1 S-9990 HR 12-240VDC 24-240 VAC",
+  "rows": 33,
+  "with_text": 33,
+  "names": [
+   [
+    "MODE",
+    33
+   ],
+   [
+    "TDDO",
+    32
+   ],
+   [
+    "TDPU",
+    1
+   ]
+  ],
+  "samples": [
+   "MODE=B, TDDO=5.0 SECONDS",
+   "MODE=B, TDDO=5.0 SECONDS"
+  ]
+ },
+ {
+  "manufacturer": "SEL",
+  "device": "SEL-487B",
+  "rows": 32,
+  "with_text": 13,
+  "names": [
+   [
+    "52A02",
+    4
+   ],
+   [
+    "EDRSTC",
+    4
+   ],
+   [
+    "TGR",
+    4
+   ],
+   [
+    "EICIS",
+    4
+   ],
+   [
+    "SS5",
+    4
+   ],
+   [
+    "GINPU",
+    4
+   ],
+   [
+    "RID",
+    4
+   ],
+   [
+    "52A01",
+    4
+   ],
+   [
+    "NFREQ",
+    4
+   ],
+   [
+    "EDCMON",
+    4
+   ],
+   [
+    "SS3",
+    4
+   ],
+   [
+    "NUMDS",
+    4
+   ],
+   [
+    "SS2",
+    4
+   ],
+   [
+    "DATE_F",
+    4
+   ],
+   [
+    "SS1",
+    4
+   ],
+   [
+    "GINDO",
+    4
+   ],
+   [
+    "SS4",
+    4
+   ],
+   [
+    "NUMBK",
+    4
+   ],
+   [
+    "SS6",
+    4
+   ]
+  ],
+  "samples": [
+   "GENERAL GLOBAL SETTINGS (SHO G):\n\nSID=\"COURTENAY BAY - BUS 11 A PROT\", RID=2008156378, NUMBK=4, NUMDS=N, NFREQ=60, DATE_",
+   "*** SEE SETTING DOCUMENTATION ***\nRELAY: SEL-487B-R123-V0-Z008004-D20130220      CID=0XA70D \nCOMMUNICATIONS CARD 1 :SEL-"
+  ]
+ },
+ {
+  "manufacturer": "GE",
+  "device": "GE-D60",
+  "rows": 32,
+  "with_text": 31,
+  "names": [
+   [
+    "TRIP_AND_ALARMS_LEDS_TRIP_LED_INPUT",
+    1
+   ],
+   [
+    "ALARM_LED_INPUT",
+    1
+   ]
+  ],
+  "samples": [
+   "*** SEE SETTINGS DOCUMENT FOR DETAILS ***",
+   "*** SEE SETTINGS DOCUMENT FOR DETAILS ***"
+  ]
+ },
+ {
+  "manufacturer": "Westinghouse",
+  "device": "TD-5 .05-1 S",
+  "rows": 31,
+  "with_text": 31,
+  "names": [
+   [
+    "TDPU",
+    28
+   ],
+   [
+    "Z2",
+    1
+   ],
+   [
+    "ZONE_2",
+    1
+   ],
+   [
+    "TIME",
+    1
+   ]
+  ],
+  "samples": [
+   "Z2=0.3 SECONDS",
+   "TDPU=0.9 SECONDS"
+  ]
+ },
+ {
+  "manufacturer": "SEL",
+  "device": "SEL-587",
+  "rows": 31,
+  "with_text": 31,
+  "names": [
+   [
+    "O87P",
+    28
+   ],
+   [
+    "CTR2",
+    28
+   ],
+   [
+    "SLP2",
+    28
+   ],
+   [
+    "CTR1",
+    28
+   ],
+   [
+    "TRCON",
+    28
+   ],
+   [
+    "SLP1",
+    28
+   ],
+   [
+    "TID",
+    28
+   ],
+   [
+    "CTCON",
+    27
+   ],
+   [
+    "RID",
+    27
+   ],
+   [
+    "DATC",
+    27
+   ],
+   [
+    "MVA",
+    27
+   ],
+   [
+    "IN2",
+    26
+   ],
+   [
+    "IN1",
+    26
+   ],
+   [
+    "IRS1",
+    25
+   ],
+   [
+    "U87P",
+    25
+   ],
+   [
+    "VWDG1",
+    24
+   ],
+   [
+    "VWDG2",
+    24
+   ],
+   [
+    "PCT2",
+    24
+   ],
+   [
+    "PCT5",
+    20
+   ],
+   [
+    "TH5",
+    20
+   ],
+   [
+    "TH5D",
+    20
+   ],
+   [
+    "TAP1",
+    17
+   ],
+   [
+    "TAP2",
+    17
+   ],
+   [
+    "PDEM",
+    5
+   ],
+   [
+    "NDEM",
+    5
+   ],
+   [
+    "QDEM",
+    5
+   ],
+   [
+    "MTU1",
+    2
+   ],
+   [
+    "IHBL",
+    2
+   ],
+   [
+    "OUT3",
+    2
+   ],
+   [
+    "PCT4",
+    2
+   ]
+  ],
+  "samples": [
+   "RID=SERIAL #, TID=DALHOUSIE T1, MVA=39.58, VWDG1=138, VWDG2=12.47, TRCON=DABY, CTCON=YY, CTR1=30, CTR2=400, DATC=OFF, PD",
+   "RID= 2004085217, TID=BOURQUE T2, MVA=39.6, VWDG1=138, VWDG2=12.47, TRCON=DABY, CTCON=YY, CTR1=30, CTR2=400, DATC=OFF, IN"
+  ]
+ },
+ {
+  "manufacturer": "Kyle",
+  "device": "FORM 6 RECLOSER CONTROL",
+  "rows": 31,
+  "with_text": 31,
+  "names": [
+   [
+    "U/V_TRIP_CUTOFF",
+    31
+   ],
+   [
+    "STAGE_1_TIME_DELAY",
+    31
+   ],
+   [
+    "STAGE_1_PICKUP",
+    31
+   ],
+   [
+    "UNDERFREQUENCY",
+    30
+   ],
+   [
+    "RESTORATION_FREQUENCY",
+    26
+   ],
+   [
+    "FREQRESTORE_ENABLE",
+    5
+   ],
+   [
+    "U/V_RESTORE_CUTOFF",
+    1
+   ]
+  ],
+  "samples": [
+   "STAGE 1 PICKUP=58.8 HZ, STAGE 1 TIME DELAY=0.3 SECONDS, SCHEDULE TIME (RESTORE TIME)=750 SECONDS (12.5 MINUTES), RESTORA",
+   "STAGE 1 PICKUP=58.3 HZ, STAGE 1 TIME DELAY=0.3 SECONDS, SCHEDULE TIME (RESTORE TIME)=450 SECONDS (7.5 MINUTES), RESTORAT"
+  ]
+ },
+ {
+  "manufacturer": "CGE",
+  "device": "BDD15B11A 2.9-8.7 A SL=15/25/40%",
+  "rows": 30,
+  "with_text": 30,
+  "names": [
+   [
+    "HARMONIC_RESTRAINT",
+    30
+   ],
+   [
+    "SLOPE",
+    30
+   ],
+   [
+    "WDG1",
+    25
+   ],
+   [
+    "WDG2",
+    25
+   ],
+   [
+    "12.47_KV",
+    3
+   ],
+   [
+    "138_KV",
+    2
+   ],
+   [
+    "138",
+    2
+   ],
+   [
+    "12.47",
+    2
+   ],
+   [
+    "138KV",
+    1
+   ]
+  ],
+  "samples": [
+   "WDG1=4.2, WDG2=4.2, SLOPE=25 %, HARMONIC RESTRAINT = 20%",
+   "WDG1=4.6, WDG2=4.6, SLOPE=25 %, HARMONIC RESTRAINT = 20%"
+  ]
+ },
+ {
+  "manufacturer": "Basler",
+  "device": "BE1-851",
+  "rows": 30,
+  "with_text": 30,
+  "names": [
+   [
+    "RESTORE_TIME",
+    30
+   ]
+  ],
+  "samples": [
+   "RESTORE TIME=9 MINUTES",
+   "RESTORE TIME=9 MINUTES"
+  ]
+ },
+ {
+  "manufacturer": "CGE",
+  "device": "SAM11A15A .1-3 S 125 VDC",
+  "rows": 29,
+  "with_text": 29,
+  "names": [],
+  "samples": [
+   "1.0 SECOND",
+   "1.0 SECOND"
+  ]
+ },
+ {
+  "manufacturer": "SEL",
+  "device": "SEL-2488",
+  "rows": 29,
+  "with_text": 27,
+  "names": [],
+  "samples": [
+   "SEE WORD DOCUMENT",
+   "SEE WORD DOCUMENT"
+  ]
+ },
+ {
+  "manufacturer": "APT",
+  "device": "L-PRO",
+  "rows": 28,
+  "with_text": 27,
+  "names": [
+   [
+    "Z1_MAGNITUDE",
+    14
+   ],
+   [
+    "OUTPUT_14",
+    12
+   ],
+   [
+    "Z0_MAGNITUDE",
+    11
+   ],
+   [
+    "Z1_ANGLE",
+    11
+   ],
+   [
+    "2",
+    9
+   ],
+   [
+    "Z0_ANGLE",
+    9
+   ],
+   [
+    "OUTPUT_13",
+    8
+   ],
+   [
+    "3",
+    8
+   ],
+   [
+    "LL",
+    4
+   ],
+   [
+    "MAIN_PT_TURNS_RATIO",
+    4
+   ],
+   [
+    "Z1ANG",
+    4
+   ],
+   [
+    "Z0MAG",
+    4
+   ],
+   [
+    "MAIN_CT_TURNS_RATIO",
+    4
+   ],
+   [
+    "Z1MAG",
+    4
+   ],
+   [
+    "OUTPUT_14_STRETCH_TIMER",
+    3
+   ],
+   [
+    "4",
+    3
+   ],
+   [
+    "OUTPUT14",
+    3
+   ],
+   [
+    "ZOANG",
+    3
+   ],
+   [
+    "OUTPUT_12",
+    2
+   ],
+   [
+    "SERIAL_#",
+    2
+   ],
+   [
+    "FREQ",
+    2
+   ],
+   [
+    "OUTPUT_2_STRETCH_TIMER",
+    2
+   ],
+   [
+    "5",
+    2
+   ],
+   [
+    "OUTPUT_2",
+    2
+   ],
+   [
+    "OUTPUT14_DELAY_TIMER",
+    2
+   ],
+   [
+    "INPUT_1",
+    2
+   ],
+   [
+    "INPUT_2",
+    2
+   ],
+   [
+    "OUTPUT9",
+    2
+   ],
+   [
+    "INPUT_3",
+    2
+   ],
+   [
+    "OUT9",
+    2
+   ]
+  ],
+  "samples": [
+   "EXTERNAL INPUT NAMES: 1=52A, 3=PT, OUTPUT CONTACT NAMES: OUTPUT 1=\"B\" SWITCH KEY, OUTPUT1 DROPOUT DELAY=0.0,  OUTPUT 13=",
+   "EXTERNAL INPUT NAMES: 1=52A, OUTPUT CONTACT NAMES: OUTPUT 14=TRIP,"
+  ]
+ },
+ {
+  "manufacturer": "LITTELFUSE STARTCO",
+  "device": "SE-701",
+  "rows": 28,
+  "with_text": 0,
+  "names": [],
+  "samples": []
+ },
+ {
+  "manufacturer": "GEC",
+  "device": "MCGG22 IN=5 IS=.05-2.4*IN INST=1-31*IS XT=.025-1.1",
+  "rows": 27,
+  "with_text": 27,
+  "names": [
+   [
+    "XT",
+    27
+   ],
+   [
+    "IS",
+    27
+   ],
+   [
+    "INST",
+    27
+   ],
+   [
+    "CURVE",
+    27
+   ]
+  ],
+  "samples": [
+   "IS=2.0*IN=10.0 AMPS, XT=0.6, CURVE=EI, INST=INFINITY",
+   "IS=0.8*IN=4.0 AMPS, XT=0.1, CURVE=SI, INST=INFINITY"
+  ]
+ },
+ {
+  "manufacturer": "ABB",
+  "device": "RXKF-1 .2-3 S",
+  "rows": 27,
+  "with_text": 27,
+  "names": [
+   [
+    "TDPU",
+    27
+   ]
+  ],
+  "samples": [
+   "TDPU=2.0 SECONDS",
+   "TDPU=1.0 SECOND"
+  ]
+ }
+]

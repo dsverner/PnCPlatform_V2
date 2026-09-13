@@ -50,6 +50,8 @@ public sealed class SqlSession : IAsyncDisposable
     // ------------------------------------------------------------------ procedures
 
     private static readonly HashSet<string> NeverBound = new(StringComparer.OrdinalIgnoreCase) { "ActorId", "MigrationRunId" };
+    /// <summary>Views materialised whole before ordering and paging (W7; Api:MaterialiseBeforePaging).</summary>
+    public static HashSet<string> MaterialiseBeforePaging { get; } = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
     /// Binds the body to the procedure's catalogued parameters (never the other way round), runs it,
@@ -168,6 +170,10 @@ public sealed class SqlSession : IAsyncDisposable
             }
             where.Add(inScope);
         }
+        // W7: a scoped read is compiled for its own grant. A plan cached for one readable set (the whole registry under a
+        // Global grant, 55 assets under a subtree) served another for 30 s on DEV until the cache was cleared; the
+        // recompile costs ~0.1 s on the migrated estate, measured.
+        var hint = scope is not null ? " OPTION (RECOMPILE)" : "";
 
         // Stable ordering: RowSeq is always the tiebreaker, so paging never repeats or skips a row.
         var order = new List<string>();
@@ -184,8 +190,36 @@ public sealed class SqlSession : IAsyncDisposable
 
         cmd.Parameters.Add("@skip", SqlDbType.Int).Value = skip;
         cmd.Parameters.Add("@take", SqlDbType.Int).Value = take;
-        cmd.CommandText = $"SELECT {select} FROM {source}" + (where.Count > 0 ? " WHERE " + string.Join(" AND ", where) : "")
-                          + " ORDER BY " + string.Join(", ", order) + " OFFSET @skip ROWS FETCH NEXT @take ROWS ONLY";
+        var body = $"SELECT {select} FROM {source}" + (where.Count > 0 ? " WHERE " + string.Join(" AND ", where) : "");
+        var paging = " ORDER BY " + string.Join(", ", order) + " OFFSET @skip ROWS FETCH NEXT @take ROWS ONLY";
+        // W7: a hand-written read model whose rows are correlated lookups (the parity screens' views) is materialised whole
+        // before it is ordered and paged — the optimizer otherwise re-evaluates the lookups per candidate row (a page at
+        // offset 5 000 measured 108 s on the migrated estate; the whole view 3 s). The list is Api:MaterialiseBeforePaging.
+        // Measured on the migrated estate (W7): the plain SELECT of the whole view runs with a parallel plan in 1–6 s; the same
+        // SELECT with ORDER BY / OFFSET, TOP, or SELECT INTO a temp table takes 10–120 s. So a listed view is read whole,
+        // plain, and ordered and paged here in memory — its whole set is what its screen wants anyway.
+        if (MaterialiseBeforePaging.Contains(view.Key))
+        {
+            cmd.CommandText = body + hint;
+            var all = new List<JsonObject>();
+            await using (var rr = await cmd.ExecuteReaderAsync(ct))
+                while (await rr.ReadAsync(ct)) all.Add(RowToJson(rr));
+            var keys = order.Select(o => (name: o.Split(' ')[0].Trim('[', ']'), desc: o.EndsWith(" DESC"))).ToList();
+            var types = view.Columns.ToDictionary(c => c.Name, c => c.SqlType, StringComparer.OrdinalIgnoreCase);
+            all.Sort((x, y) =>
+            {
+                foreach (var (name, desc) in keys)
+                {
+                    var c = CompareJson(x[name], y[name], types.GetValueOrDefault(name) ?? "");
+                    if (c != 0) return desc ? -c : c;
+                }
+                return 0;
+            });
+            var page = new JsonArray();
+            foreach (var row in all.Skip(skip).Take(take)) page.Add(row);
+            return page;
+        }
+        cmd.CommandText = body + paging + hint;
 
         var rows = new JsonArray();
         await using var r = await cmd.ExecuteReaderAsync(ct);
@@ -194,6 +228,15 @@ public sealed class SqlSession : IAsyncDisposable
     }
 
     // ------------------------------------------------------------------ helpers
+
+    /// <summary>The engine's clock is the database's (W7): the host's clock ran 1.2 s behind the server's on DEV, and a fact
+    /// the database had just written was invisible to a guard evaluated "now" by the host (the API-side twin of #79).</summary>
+    public async Task<DateTimeOffset> NowAsync(CancellationToken ct)
+    {
+        await using var cmd = _con.CreateCommand();
+        cmd.CommandText = "SELECT SYSDATETIMEOFFSET()";
+        return (DateTimeOffset)(await cmd.ExecuteScalarAsync(ct))!;
+    }
 
     public async Task<T?> ScalarAsync<T>(string sql, IReadOnlyDictionary<string, object?> args, CancellationToken ct)
     {
@@ -221,6 +264,21 @@ public sealed class SqlSession : IAsyncDisposable
         cmd.CommandText = sql;
         foreach (var (k, v) in args) cmd.Parameters.AddWithValue(k, v ?? DBNull.Value);
         await cmd.ExecuteNonQueryAsync(ct);
+    }
+
+    /// <summary>SQL ordering semantics over the JSON a row was rendered to: nulls first, numbers and instants by value, text ordinal-ignore-case.</summary>
+    private static int CompareJson(JsonNode? a, JsonNode? b, string sqlType)
+    {
+        if (a is null && b is null) return 0;
+        if (a is null) return -1;
+        if (b is null) return 1;
+        var t = sqlType.ToLowerInvariant();
+        if (t is "int" or "bigint" or "smallint" or "tinyint" or "decimal" or "numeric" or "float" or "real" or "money")
+            return Convert.ToDecimal(a.GetValue<object>()).CompareTo(Convert.ToDecimal(b.GetValue<object>()));
+        if (t.StartsWith("datetime") || t == "date" || t == "time")
+            return DateTimeOffset.Parse(a.ToString()).CompareTo(DateTimeOffset.Parse(b.ToString()));
+        if (t == "bit") return (a.GetValue<bool>() ? 1 : 0).CompareTo(b.GetValue<bool>() ? 1 : 0);
+        return string.Compare(a.ToString(), b.ToString(), StringComparison.OrdinalIgnoreCase);
     }
 
     private static JsonObject RowToJson(SqlDataReader r)

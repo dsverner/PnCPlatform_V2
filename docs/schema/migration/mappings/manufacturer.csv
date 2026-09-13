@@ -1,0 +1,42 @@
+legacy_manufacturer,manufacturer_short_code,manufacturer_name,basis
+SEL,SEL,,identical code
+SCHWEITZER ENGINEERING LAB,SEL,,predecessor vendor name "Schweitzer Engineering Laboratories"
+GE,GE,,identical code
+GE MULTILIN,GE,,predecessor vendor GE (Multilin is a GE product line named in the predecessor model codes)
+ABB,ABB,,identical code
+ERL PHASE,ERLPHASE,,predecessor vendor "ERLPhase"
+LITTELFUSE STARTCO,LITTELFUSE,,predecessor vendor "Littelfuse"
+I-Gard,IGARD,,predecessor vendor "IGard"
+Westinghouse,WESTINGHOUSE,Westinghouse,owner decision 2026-09-04 (Q3); new manufacturer created by the loader
+Westingouse,WESTINGHOUSE,Westinghouse,owner decision 2026-09-04 (Q3); misspelling of Westinghouse
+Basler,BASLER,Basler Electric,owner decision 2026-09-04 (Q3); new manufacturer created by the loader
+BASLER,BASLER,Basler Electric,owner decision 2026-09-04 (Q3); case variant
+Agastat,AGASTAT,Agastat,owner decision 2026-09-04 (Q3); new manufacturer created by the loader
+Omron,OMRON,Omron,owner decision 2026-09-04 (Q3); new manufacturer created by the loader
+CGE,CGE,Canadian General Electric,owner decision 2026-09-04 (Q3); kept distinct from GE until the owner says otherwise
+STARTCO,LITTELFUSE,,owner decision 2026-09-04 (Q3); Startco is the Littelfuse predecessor vendor already seeded
+Startco,LITTELFUSE,,owner decision 2026-09-04 (Q3); case variant
+APT,ERLPHASE,,owner decision 2026-09-05 (Q18): APT is the predecessor company of NxtPhase, now ERLPhase; folded to the seeded ERLPhase manufacturer
+NxtPhase,ERLPHASE,,owner decision 2026-09-05 (Q18): NxtPhase is now ERLPhase
+NXTPHASE,ERLPHASE,,owner decision 2026-09-05 (Q18): case variant of NxtPhase
+Schleicher,SCHLEICHER,Schleicher,owner decision 2026-09-05 (Q18); new manufacturer created by the loader (timers on 345 kV breakers, Salisbury)
+BBC,BBC,Brown Boveri,owner decision 2026-09-05 (Q18); name from the legacy DEVICE text 'B.BOVERI'; new manufacturer created by the loader
+BENDER,BENDER,Bender,owner decision 2026-09-05 (Q18); new manufacturer created by the loader (IRDH insulation monitors)
+Beckwith,BECKWITH,Beckwith,owner decision 2026-09-05 (Q18): spelling kept as the name; new manufacturer created by the loader
+BECKWITH,BECKWITH,Beckwith,owner decision 2026-09-05 (Q18): case variant
+Alstom,ALSTOM,Alstom,owner decision 2026-09-05 (Q18): spelling kept as the name; kept separate from GEC and AREVA (Q3); new manufacturer created by the loader
+ALSTOM,ALSTOM,Alstom,owner decision 2026-09-05 (Q18): case variant
+GEC,GEC,GEC,owner decision 2026-09-05 (Q18): spelling kept as the name; new manufacturer created by the loader
+P&B,P&B,P&B,owner decision 2026-09-05 (Q18): spelling kept as the name; new manufacturer created by the loader
+Federal Pioneer,FEDERALPIONEER,Federal Pioneer,owner decision 2026-09-05 (Q18): spelling kept as the name; new manufacturer created by the loader
+ITE,ITE,ITE,owner decision 2026-09-05 (Q18): spelling kept as the name; new manufacturer created by the loader
+Kyle,KYLE,Kyle,owner decision 2026-09-05 (Q18): spelling kept as the name; new manufacturer created by the loader
+S&C,S&C,S&C,owner decision 2026-09-05 (Q18): spelling kept as the name; new manufacturer created by the loader
+BITRONICS,BITRONICS,BITRONICS,owner decision 2026-09-05 (Q18): spelling kept as the name; new manufacturer created by the loader
+TRUE TIME,TRUETIME,TRUE TIME,owner decision 2026-09-05 (Q18): spelling kept as the name; new manufacturer created by the loader
+AREVA,AREVA,AREVA,owner decision 2026-09-05 (Q18): spelling kept as the name; new manufacturer created by the loader
+Hathaway,HATHAWAY,Hathaway,owner decision 2026-09-05 (Q18): spelling kept as the name; new manufacturer created by the loader
+AVO,AVO,AVO,owner decision 2026-09-05 (Q18): spelling kept as the name; new manufacturer created by the loader
+Allis-Chalmers,ALLISCHALMERS,Allis-Chalmers,owner decision 2026-09-05 (Q18): spelling kept as the name; new manufacturer created by the loader
+Siemens,SIEMENS,Siemens,owner decision 2026-09-05 (Q18): spelling kept as the name; new manufacturer created by the loader
+ARBITER,ARBITER,ARBITER,owner decision 2026-09-05 (Q18): spelling kept as the name; new manufacturer created by the loader

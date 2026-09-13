@@ -1,0 +1,10 @@
+legacy_device,model_code,basis,manufacturer_short_code,model_name,technology
+SEL-411L-1,SEL-411L,owner 2026-09-05: SEL line current differential relay, version 1 (suffix = version)
+SEL-487B-1,SEL-487B,owner 2026-09-05: SEL bus differential relay, version 1 (suffix = version)
+SEL-487E-3,SEL-487E,owner 2026-09-05: SEL transformer differential relay (seeded model name), version 3
+487E-3,SEL-487E,owner 2026-09-05: as SEL-487E-3 without the maker prefix
+SEL-487E-3-3611-XXC2-X43644-XXX,SEL-487E,owner 2026-09-05: SEL-487E with its ordering code appended
+2440,SEL-2440,owner 2026-09-05: SEL-2440 without the maker prefix (seeded model 'Logic Controller')
+KAB,KAB,owner 2026-09-05: Westinghouse (later ABB) KAB high-impedance bus differential relay; the model is KAB with nothing more to add. Legacy MANUFACTURER = Westinghouse,WESTINGHOUSE,KAB high-impedance bus differential relay,Electromechanical
+KAB 87L=75-200 V 87H=3-48 A,KAB,owner 2026-09-05: KAB with its setting ranges appended,WESTINGHOUSE,KAB high-impedance bus differential relay,Electromechanical
+KAB 87L=75-300 V 87H=3-48 A,KAB,owner 2026-09-05: KAB with its setting ranges appended,WESTINGHOUSE,KAB high-impedance bus differential relay,Electromechanical
