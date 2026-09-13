@@ -28,7 +28,7 @@
       catch (e) { arrow.textContent = "!"; arrow.title = e.message; }
     });
     name.addEventListener("click", () => {
-      if (n.NodeTypeCode === "Station") browse("StationNodeEntityId", n.EntityId, "Station " + n.Name);
+      if (n.NodeTypeCode === "Station") { browse("StationNodeEntityId", n.EntityId, "Station " + n.Name); moveOffer(n); }
       else if (n.NodeTypeCode === "Panel") browse("PanelNodeEntityId", n.EntityId, "Panel " + n.Name);
       else if (POSITION_TYPES.has(n.NodeTypeCode)) browse("NodeEntityId", n.EntityId, "Position " + n.Name);
       else browse("Path", null, n.Name + " (" + n.NodeTypeCode + ": pick a station, panel or position beneath it)");
@@ -41,6 +41,48 @@
       $("tree").textContent = ""; for (const r of roots) $("tree").appendChild(node(r));
       $("tree-summary").textContent = roots.length + " root(s) · expand to browse; click a station, panel or position";
     } catch (e) { $("tree-summary").textContent = e.message; }
+  }
+
+  // ---- W8 (owner's card A, decision #153): a person with Node.Modify moves a station under another division — the owner
+  // asked whether the tree can be corrected in the application; a division under NB Power or a merchant owner is the target
+  async function moveOffer(n) {
+    if (!state.user || !state.user.can("Node.Modify")) return;
+    const body = $("action-body"); body.textContent = "";
+    $("action").hidden = false; $("action-title").textContent = "Move " + n.Name + " to another owner or division";
+    setStatus("action-status", "The station and everything beneath it moves; read scope follows the tree (IDENTITY §4). The move is recorded with who did it.");
+    const owners = (await children(null)).filter((o) => o.NodeTypeCode === "Owner");
+    const sel = el("select"); sel.id = "move-target";
+    for (const o of owners) {
+      for (const d of await children(o.EntityId)) {
+        if (d.NodeTypeCode !== "Division" || d.EntityId.toLowerCase() === String(n.ParentEntityId).toLowerCase()) continue;
+        const opt = el("option", null, o.Name + " › " + d.Name); opt.value = d.EntityId; sel.appendChild(opt);
+      }
+    }
+    const row = el("div", "action-row");
+    row.appendChild(el("label", "inline", "To ")); row.lastChild.appendChild(sel);
+    const btn = el("button", null, "Move"); btn.type = "button";
+    btn.addEventListener("click", async () => {
+      if (!sel.value) return;
+      btn.disabled = true; setStatus("action-status", "Moving…");
+      try {
+        await postJson("/api/v1/location/MoveNode", { EntityId: n.EntityId, NewParentEntityId: sel.value });
+        setStatus("action-status", n.Name + " moved to " + sel.selectedOptions[0].textContent + ". The tree reloads.");
+        await tree();
+      } catch (e) { setStatus("action-status", "Refused: " + (e.status || "") + " " + e.message, true); btn.disabled = false; }
+    });
+    row.appendChild(btn); body.appendChild(row);
+    const add = el("div", "action-row");
+    const owner = el("select"); owner.id = "new-division-owner"; for (const o of owners) { const opt = el("option", null, o.Name); opt.value = o.EntityId; owner.appendChild(opt); }
+    const name = el("input"); name.type = "text"; name.placeholder = "new division name (e.g. Industrial)"; name.id = "new-division-name";
+    const addBtn = el("button", null, "Add division"); addBtn.type = "button";
+    addBtn.addEventListener("click", async () => {
+      if (!name.value.trim()) return;
+      try {
+        const r = await postJson("/api/v1/location/AddNode", { NodeTypeCode: "Division", ParentEntityId: owner.value, Name: name.value.trim() });
+        setStatus("action-status", "Division " + name.value.trim() + " added under " + owner.selectedOptions[0].textContent + "."); await tree(); moveOffer(n);
+      } catch (e) { setStatus("action-status", "Refused: " + (e.status || "") + " " + e.message, true); }
+    });
+    add.appendChild(el("label", "inline", "New division under ")); add.lastChild.appendChild(owner); add.appendChild(name); add.appendChild(addBtn); body.appendChild(add);
   }
 
   // ---- the grid

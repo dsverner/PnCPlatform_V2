@@ -195,6 +195,11 @@ class Importer:
             tech = (m.get("technology") if m else None) or ("Microprocessor" if short.upper() in MICRO else "Electromechanical")
             k = (short.upper(), code.upper())
             self.model_of[(mfr.upper(), label.upper())] = (k, is_switch)
+            if k not in self.models:
+                # W8 (#153): a model the platform already carries — seeded with its template before the load — is reused, never duplicated
+                r = self.run.rows("SELECT TOP (1) m.ModelId FROM ref.vModel m JOIN ref.vManufacturer mf ON mf.ManufacturerId = m.ManufacturerId WHERE mf.ShortCode = ? AND m.ModelCode = ?", short, code)
+                if r:
+                    self.models[k] = str(r[0][0])
             if k in self.models:
                 self.rule("DEVICE → ref.Model (existing)", label); continue
             key = f"Model:{short}:{code}"
@@ -232,6 +237,10 @@ class Importer:
             groups[strip(loc)][u] += 1
             self.rule("LOCATIONS row → its station's USERNAME groups", loc)
         stnum = {m["legacy_location"].strip().upper(): m["asset_number"].strip() for m in read_csv("station_asset_number.csv")}
+        # W8 card A (owner, 2026-09-13; #153): the owner of each station — Transmission / Generation / Distribution (and later
+        # Industrial or a merchant owner) — is the owner's markup, not the USERNAME group; a division the mapping names that
+        # the tree lacks is created under NB Power
+        owner_of_station = {m["legacy_location"].strip().upper(): m["owner"].strip() for m in read_csv("station_owner.csv") if m.get("owner")}
         used = Counter(); owner_of = {}
         for loc, asset, n in self.src_rows("SELECT LTRIM(RTRIM(LOCATION)), ASSET, COUNT(*) FROM dbo.SETTINGS WHERE LEFT(OLD_NO,1) IN ('A','M','P') GROUP BY LTRIM(RTRIM(LOCATION)), ASSET"):
             used[(strip(loc), asset)] = n
@@ -250,6 +259,13 @@ class Importer:
             division = DIVISION_OF.get(user)
             if division is None:
                 division = "Transmission"; flags.append(self.run.flag("StationGroupUnknown", f"'{loc}' group '{user}' has no division mapping; placed under Transmission", loc))
+            marked = owner_of_station.get(loc.upper())
+            if marked:
+                division = marked; flags = [f for f in flags if "StationGroupConflict" not in f]
+                if division not in self.divisions:
+                    owner = self.run.rows("SELECT TOP (1) EntityId FROM location.vNode WHERE NodeTypeCode = N'Owner' AND Name = N'NB Power'")[0][0]
+                    self.divisions[division] = self.node("Division", str(owner), division, f"Division:{division}", notes="Created for the owner's station markup (W8 card A, #153)")
+                self.rule("station placed under the owner's marked division (card A)", loc)
             # the station's asset number: the owner's mapping, else the dominant SETTINGS.ASSET (flagged)
             number = stnum.get(loc.upper())
             if number is None:

@@ -403,6 +403,12 @@ Step 20 (W8, #149): `process.LandMigratedInstance` takes `@DocumentationAt` / `@
 `Date` — and a Complete branch runs and completes at that instant (NA and Running branches stay at the landing's `@At`);
 the importer passes them. Landings made before this step (DEV, 2026-09-13) keep the capture instant and are not re-shaped.
 
+Step 21 (W8, #153): the first three SEL templates seeded as found (`Seed_config_SettingsTemplates_SEL.sql`, generated from
+the legacy SET1 profile: SEL-551 73 names, SEL-311C 116, SEL-221F 32; Decimal where every value was a number, else Text);
+`process.ParseSettingsText` falls back to the model's template when a device names no firmware (every migrated relay);
+`Seed_location_Divisions.sql` adds the owners NB Power names — Generation and Industrial divisions, the merchant owners
+Caribou Wind Farm and TransAlta — and `mappings/station_owner.csv` places a station by the owner's markup (R-04a).
+
 Performance (#145): a hand-written read model must not put an `OUTER APPLY … TOP (1)` against a generated current view —
 the ROW_NUMBER inside the view is evaluated over the whole table per outer row. Read the base table with the filtered
 index's own predicate (`[ValidTo] IS NULL AND [IsDeleted] = 0`; `[IsDeleted] = 0` for the process tables), and expect

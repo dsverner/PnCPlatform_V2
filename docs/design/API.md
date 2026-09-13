@@ -184,6 +184,10 @@ because `ORDER BY … OFFSET`, `TOP` or `SELECT INTO` over them cost 10–120 s 
 costs 1–6 s. `Api:MaxTake` is 10 000 so such a screen reads its list in one call; ordering follows SQL's (nulls first,
 numbers and instants by value, text ordinal-ignore-case, `RowSeq` the tiebreaker).
 
+**W8 (decision #154).** A view in `Api:MaterialiseBeforePaging` is read with its scope only; the query string's equality
+filters are applied to the materialised rows in memory (a state predicate pushed into SQL measured 42–54 s on QA against
+0.6–1.7 s for the whole view).
+
 **W8 (decision #150).** `GET /api/v1/me` also returns `actorId` — the session's own actor as `personnel.ResolveActor`
 resolves it from the session context — so a page can name who granted a grant (`security.Grant_Add @GrantedByActorId`)
 without inventing an id. The grants screen (`/grants.html`) reads `security/vUser`, `personnel/vPerson`, `security/vRole`,

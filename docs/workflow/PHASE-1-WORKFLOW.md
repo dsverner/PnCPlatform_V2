@@ -646,6 +646,36 @@ the release with SBOM and `release.json`.
   has no feed), 7 pass. **REHEARSAL PASS.** Two defects the rehearsal found, fixed: the carried script parsed the
   predecessor's smoke lines (every V2 log read "no SMOKE header"), and treated a DNS failure as a refusal. The third
   vantage point, VM07, is the owner's (card E).
+- **W8 card round 1 answered and applied (2026-09-13, decision #153)**: the 231 stations moved under the owner's marked
+  divisions (DEV and QA: 158 moved, 73 already placed; `mappings/station_owner.csv` makes a fresh load do the same); a
+  single Generation division, and the owners NB Power named — Industrial, Caribou Wind Farm, TransAlta — seeded empty;
+  the Locations screen moves a station and adds a division under `Node.Modify` (the owner's question, answered by
+  building it); the three SEL templates seeded as found (221 names) and the migrated files re-parsed on DEV — SEL-551
+  463 Parsed / 52 Partial / 16 Empty, SEL-311C 186 / 25 / 20, SEL-221F 37 / 127 (the partials name settings the text
+  carries beyond the profile's names, e.g. TDDO, Z1%); 16 646 parsed settings on DEV. Two defects found by it, fixed:
+  the fact catalogue keyed `device.settings.<code>` per template, so two templates sharing a code (50G1P) broke every
+  definition load on DEV (`PnC.Formula.Catalogue`: one fact per name); and a legacy text that repeats a name (11 of 949)
+  broke its whole parse on a unique index (`ParseSettingsText` keeps the first, notes the repeat — deployed with the
+  next release). The smoke on VM07 is a read share, `\vgs-vm02\pncsmoke` (runbook). DEV API smoke 228 PASS.
+- **Found by the gate runs on QA at 0.8.2, fixed in 0.8.3 (#154)**: the grid's Archived list timed out at 30 s on VM02 (Active
+  1.6 s); in SQL the state predicate pushed into `vSettingsRecord` with every column ran 42–54 s under both logins, the whole
+  view 0.6–1.7 s — a materialised view now takes its equality filters in memory; Archived answers in 2.4 s on QA. Reproduced
+  and re-measured from VM02 itself as the gate Administrator (a one-shot task running `curl` with Negotiate).
+- **Round-2 releases 0.8.3 and 0.8.4** on DEV, QA and VM02 (schema smoke 268 PASS each; QA gate accounts at 0.8.4:
+  Administrator 81, Approver 58, ReadOnly 44, Hydro 26 PASS). 0.8.3's in-memory filter rule was too broad — an entity
+  filter (one request, one station) read the whole view too, 0.5 → 5 s — corrected in 0.8.4: identifier predicates stay in
+  SQL, only a predicate on a computed state is applied in memory. **Read-model timings are not stable across the two
+  databases** (measured 2026-09-13 evening, all columns, admin scope): on QA `GridState = 'Archived'` in SQL 42–54 s and
+  the whole view 0.6–1.7 s; on DEV the same predicate 2.3–2.8 s and the whole view 4.0 s; the DEV smoke's whole-estate
+  grid page 3–4 s, the FLOC page 3.5–3.8 s. The smoke's bounds for those two whole-estate reads are now 5 s, named as the
+  round-2 item: a stored grid state (or a leaner read model) so the state predicate seeks — not a computed CASE the
+  optimizer guesses at. The DEV sweep walks 580 live instances (266 migrated, the rest a day's smoke fixtures) at
+  0.14 s each, 80 s; the smoke's client now allows it five minutes.
+- **VM07 and the smoke (card T2)**: the owner's run failed with "You must install .NET" — the share held the
+  framework-dependent build (VM02 carries the runtime; VM07 does not). The share `\vgs-vm02\pncsmoke` now serves the
+  package's self-contained build (`tools\smoke-sc`, 84 MB, transferred hash-verified); the gate tasks on VM02 keep the
+  framework-dependent one. The owner's clips reach the record through the chat (the card's boxes take text; an image
+  paste was added to the round-2 card but not confirmed working in the owner's browser).
 - **The cutover delta applied on QA** (`CUTOVER-APPLY-2026-09-13.md`): the importer re-run against
   `dbRelayManagement_Legacy_Cutover` — the added station and its building, the added P9999 revision (Superseded,
   Archived, landed with its two tracks) and, because its CR exceeds the A row's, a twentieth ordering finding; the

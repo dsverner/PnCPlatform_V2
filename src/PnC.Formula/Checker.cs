@@ -33,7 +33,9 @@ public interface ICatalogue
 public sealed class Catalogue : ICatalogue
 {
     readonly Dictionary<string, FactInfo> _facts;
-    public Catalogue(IEnumerable<FactInfo> facts) { _facts = facts.ToDictionary(f => f.Name, StringComparer.Ordinal); }
+    // a fact name is one fact: device.settings.<code> is catalogued once per setting code however many models carry the code
+    // (W8, #153 — two SEL templates share 50G1P and the like); the first row wins, so the catalogue's own order decides the type
+    public Catalogue(IEnumerable<FactInfo> facts) { _facts = facts.GroupBy(f => f.Name, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal); }
     public FactInfo? Lookup(string name, string? subjectKind = null) => _facts.GetValueOrDefault(name);
 }
 

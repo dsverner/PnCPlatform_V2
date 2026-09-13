@@ -131,6 +131,24 @@ row the ReadOnly write check leaves in `audit.vActionLog` is what this session r
 - VM02 and VM07 were **not** rebuilt for QA (the workflow's §4 assumption, overturned: a VM rebuild is infrastructure
   this session cannot perform); the predecessor's site on 443 still stands beside the V2 site on 8443. On the W8 card.
 
+## The smoke as a share for VM07, 2026-09-13 (W8 card E, #153)
+
+The owner's first try from VM07 used the administrative share (`\vgs-vm02\C$\…`) and got *network path not found*
+as VGS01. `C:\inetpub\PnCPlatform_V2	ools\smoke` is now the read-only SMB share **`\vgs-vm02\pncsmoke`** (VGSOT\Domain
+Users, READ), so from VM07:
+
+```
+\vgs-vm02\pncsmoke\PnC.Api.Smoke.exe https://vgs-vm02.vgsot.internal:8443 - --windows=Administrator > %USERPROFILE%\smoke-vm07.log
+```
+
+Reversible: `Remove-SmbShare pncsmoke`. The share carries only the smoke's binaries; the site folder's own permissions are unchanged.
+
+**Found on the first run from VM07 (2026-09-13 evening):** *You must install .NET to run this application* — VM07 has no
+.NET runtime, so the framework-dependent build the share first held cannot run there. The share now points at
+`tools\smoke-sc`, the package's **self-contained** single-file build (`dist/<version>/tools/PnC.Api.Smoke`, 84 MB,
+zipped to 35 MB for the transfer); `tools\smoke` (framework-dependent, 5 MB) stays for the gate tasks on VM02, which
+carries the shared runtime. Nothing is installed on VM07.
+
 ## Gate tooling on VM02, 2026-09-12 (W2 card A1, decision #97)
 
 - `C:\inetpub\PnCPlatform_V2\tools\smoke\` holds the framework-dependent `PnC.Api.Smoke` of the current

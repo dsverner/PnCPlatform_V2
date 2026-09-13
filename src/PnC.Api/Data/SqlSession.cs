@@ -141,10 +141,18 @@ public sealed class SqlSession : IAsyncDisposable
 
         var where = new List<string>();
         var i = 0;
+        // W8 (#145 addendum): a materialised read model takes its equality filters in memory too — a state predicate pushed into
+        // the SQL of vSettingsRecord (GridState = 'Archived') measured 42–54 s on QA against 0.6–1.7 s for the whole view; only
+        // the read scope stays in SQL, where it belongs (IDENTITY §5)
+        var materialise = MaterialiseBeforePaging.Contains(view.Key);
+        var memFilters = new List<(string Column, string Value, string SqlType)>();
         foreach (var (name, value) in filters)
         {
             var col = view.Columns.FirstOrDefault(c => c.Name.Equals(name, StringComparison.OrdinalIgnoreCase))
                       ?? throw new ApiException(400, "unknown_column", $"'{name}' is not a column of {view.Key}.");
+            // an identifier predicate seeks and stays in SQL (one request, one station: 0.4–0.9 s); a predicate on a computed
+            // state (GridState) is the one the optimizer mishandles, so it is applied in memory
+            if (materialise && !col.SqlType.Equals("uniqueidentifier", StringComparison.OrdinalIgnoreCase)) { if (value != "null") ConvertScalar(value, col.SqlType); memFilters.Add((col.Name, value, col.SqlType)); continue; }
             if (value == "null") { where.Add($"{Q(col.Name)} IS NULL"); continue; }
             var pn = $"@f{i++}";
             var sp = new SqlParameter(pn, SqlDbTypeOf(col.SqlType)) { Value = ConvertScalar(value, col.SqlType) };
@@ -203,7 +211,7 @@ public sealed class SqlSession : IAsyncDisposable
             cmd.CommandText = body + hint;
             var all = new List<JsonObject>();
             await using (var rr = await cmd.ExecuteReaderAsync(ct))
-                while (await rr.ReadAsync(ct)) all.Add(RowToJson(rr));
+                while (await rr.ReadAsync(ct)) { var row = RowToJson(rr); if (memFilters.All(f => MatchesFilter(row[f.Column], f.Value, f.SqlType))) all.Add(row); }
             var keys = order.Select(o => (name: o.Split(' ')[0].Trim('[', ']'), desc: o.EndsWith(" DESC"))).ToList();
             var types = view.Columns.ToDictionary(c => c.Name, c => c.SqlType, StringComparer.OrdinalIgnoreCase);
             all.Sort((x, y) =>
@@ -267,6 +275,19 @@ public sealed class SqlSession : IAsyncDisposable
     }
 
     /// <summary>SQL ordering semantics over the JSON a row was rendered to: nulls first, numbers and instants by value, text ordinal-ignore-case.</summary>
+    /// <summary>An equality filter applied to a materialised row: "null" matches a null; text and identifiers compare ordinal-ignore-case; numbers by value; bits by 0/1/true/false.</summary>
+    private static bool MatchesFilter(JsonNode? v, string value, string sqlType)
+    {
+        if (value == "null") return v is null;
+        if (v is null) return false;
+        var t = sqlType.ToLowerInvariant();
+        var text = v is JsonValue jv && jv.TryGetValue<string>(out var sv) ? sv : v.ToJsonString().Trim('"');
+        if (t is "bit") return (text is "true" or "1") == (value is "true" or "1" or "True");
+        if (t is "int" or "bigint" or "smallint" or "tinyint" or "decimal" or "numeric" or "float" or "real" or "money")
+            return decimal.TryParse(text, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var a) && decimal.TryParse(value, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var b) && a == b;
+        return string.Equals(text, value, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static int CompareJson(JsonNode? a, JsonNode? b, string sqlType)
     {
         if (a is null && b is null) return 0;

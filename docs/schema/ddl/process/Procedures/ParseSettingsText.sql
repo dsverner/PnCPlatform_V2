@@ -24,6 +24,13 @@ BEGIN
     -- the template: the parse transform bound to the file's firmware (or the device's current firmware)
     DECLARE @tdef UNIQUEIDENTIFIER;
     SELECT @tdef = [ParseTransformDefinitionEntityId] FROM [ref].[FirmwareVersion] WHERE [FirmwareVersionId] = ISNULL(@fw, (SELECT [CurrentFirmwareVersionId] FROM [device].[vDevice] WHERE [EntityId] = @device));
+    -- W8 (#153): a device that names no firmware (every migrated relay: the legacy database has no firmware column that
+    -- maps) takes its model's template — the one firmware row of the model that carries a Transform.SettingsParse binding
+    IF @tdef IS NULL
+        SELECT TOP (1) @tdef = fv.[ParseTransformDefinitionEntityId]
+        FROM [ref].[FirmwareVersion] fv JOIN [asset].[vAsset] a ON a.[ModelId] = fv.[ModelId]
+        WHERE a.[EntityId] = @device AND fv.[ParseTransformDefinitionEntityId] IS NOT NULL AND fv.[IsActive] = 1
+        ORDER BY CASE WHEN fv.[VersionString] = N'n/a' THEN 0 ELSE 1 END, fv.[FirmwareVersionId];
     IF @tdef IS NULL THROW 50181, N'process.ParseSettingsText: the device''s firmware names no settings template (Transform.SettingsParse).', 1;
     DECLARE @tver UNIQUEIDENTIFIER;
     SELECT TOP (1) @tver = dv.[RowId] FROM [config].[DefinitionVersion] dv
@@ -48,7 +55,10 @@ BEGIN
 
     BEGIN TRANSACTION;
     DECLARE @n INT, @def UNIQUEIDENTIFIER, @dt NVARCHAR(20), @num DECIMAL(28,10), @raw NVARCHAR(4000), @min DECIMAL(28,10), @max DECIMAL(28,10);
-    DECLARE c CURSOR LOCAL FAST_FORWARD FOR SELECT n, DefRowId, DataType, Number, RawValue, MinValue, MaxValue FROM #m WHERE DefRowId IS NOT NULL ORDER BY n;
+    -- W8 (#153): a legacy text can name a setting twice (11 of 949 migrated SEL files repeat a name, e.g. 50N2P); the first
+    -- occurrence is the value, the repeat is noted — a second row would break UX_ParsedSetting_Current and lose the whole file
+    DECLARE c CURSOR LOCAL FAST_FORWARD FOR SELECT n, DefRowId, DataType, Number, RawValue, MinValue, MaxValue FROM #m m
+        WHERE DefRowId IS NOT NULL AND n = (SELECT MIN(x.n) FROM #m x WHERE x.DefRowId = m.DefRowId) ORDER BY n;
     OPEN c; FETCH NEXT FROM c INTO @n, @def, @dt, @num, @raw, @min, @max;
     WHILE @@FETCH_STATUS = 0
     BEGIN
@@ -70,6 +80,8 @@ BEGIN
     SET @Unmatched = (SELECT COUNT(*) FROM #m WHERE DefRowId IS NULL);
     DECLARE @status NVARCHAR(20) = CASE WHEN @Matched = 0 AND @Unmatched = 0 THEN N'Empty' WHEN @Unmatched = 0 THEN N'Parsed' ELSE N'Partial' END;
     DECLARE @err NVARCHAR(MAX) = CASE WHEN @Unmatched = 0 THEN NULL ELSE N'not in the template: ' + (SELECT STRING_AGG(Name, N', ') FROM #m WHERE DefRowId IS NULL) END;
+    DECLARE @dups NVARCHAR(MAX) = (SELECT STRING_AGG(Name, N', ') FROM (SELECT Name FROM #m WHERE DefRowId IS NOT NULL GROUP BY Name HAVING COUNT(*) > 1) d);
+    IF @dups IS NOT NULL SET @err = CONCAT(ISNULL(@err + N'; ', N''), N'repeated in the text (first value kept): ', @dups);
     UPDATE [document].[ConfigurationFile] SET [ParseStatus] = @status, [ParseError] = @err, [ModifiedBy] = @ActorId, [ModifiedAt] = @now
     WHERE [RevisionRowId] = @ConfigurationFileRevisionRowId AND [IsDeleted] = 0;
     COMMIT TRANSACTION;
