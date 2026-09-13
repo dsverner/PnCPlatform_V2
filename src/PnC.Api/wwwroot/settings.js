@@ -1,6 +1,7 @@
 // W6 (decisions #127–#129). The legacy main window as one screen over document.vSettingsRecord: the state toggle is an
 // equality filter on GridState; the column chooser reads the view's columns from /api/v1/catalog and keeps the choice in
-// this browser; the print is the grid as shown; the two actions are the engine's own calls (Set Verified Date = the
+// this browser; the print is the grid as shown (a device whose member left its change — GridState Withdrawn — is not
+// offered by the toggle, as the legacy did: owner, W6 card A); the two actions are the engine's own calls (Set Verified Date = the
 // RETURN_TO_SERVICE step: claim, witness by a second person, commit or check-in; Request Change = a work request on the
 // device, its workflow started). Nothing here knows a rule: the API refuses in its own words and the screen shows them.
 (function () {

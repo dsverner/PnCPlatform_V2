@@ -5,7 +5,8 @@
 -- the asset-class / device-category filters when the subject is an asset); WorkRequest (the subject is that
 -- request, or a record or asset scoped to it); OwnershipRelation (an OwnershipLink of the scope role to the scope
 -- entity on the subject). Subjects with no node mapping (Document, Definition, Obligation, Grant, Platform, or a
--- null subject) are covered only by Global. Reads are decided as strictly as writes (decision 59).
+-- null subject) are covered only by Global — except Definition.Read, held class-wide by any scope (W6 card H, #134).
+-- Reads are decided as strictly as writes (decision 59).
 CREATE FUNCTION [security].[fHasPermission]
     (@userEntityId UNIQUEIDENTIFIER, @permissionCode NVARCHAR(80), @subjectKind NVARCHAR(40), @subjectEntityId UNIQUEIDENTIFIER, @at DATETIMEOFFSET(7))
 RETURNS BIT
@@ -35,6 +36,10 @@ BEGIN
     DELETE @roles WHERE [RoleCode] NOT IN (SELECT rp.[RoleCode] FROM [security].[RolePermission] rp WHERE rp.[PermissionCode] = @permissionCode AND rp.[IsActive] = 1);
     IF NOT EXISTS (SELECT 1 FROM @roles) RETURN 0;
     IF EXISTS (SELECT 1 FROM @roles WHERE [ScopeKind] = N'Global') RETURN 1;
+    -- W6 card H (decision #134): definitions and reference data (config.*, ref.* — class Definition) are read class-wide by
+    -- any role that carries Definition.Read, whatever the grant's scope: they have no place in the tree and every screen
+    -- needs them (work types, models, procedures). Writes and approvals of definitions stay Global-only.
+    IF @permissionCode = N'Definition.Read' AND (@subjectKind IS NULL OR @subjectKind IN (N'Definition', N'DefinitionVersion')) RETURN 1;
     IF @subjectEntityId IS NULL RETURN 0;
 
     -- the subject's places: (node entity, asset entity) pairs the scopes are tested against

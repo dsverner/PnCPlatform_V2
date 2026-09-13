@@ -481,6 +481,9 @@ drafted for W8.
   are unscoped classes, readable under a Global grant only, IDENTITY.md §5), so for such an engineer the action-type
   list on *Request change* and the model list on *Locations* come back empty. The rule is the design's; whether
   reference data should read class-wide is put to the owner on the W6 card (item H); the smoke asserts the refusal.
+- **W6 card answered 2026-09-13 00:26Z** (A hide, B drop the card, C a grants screen in W8, D keep, E Complete, F download
+  in W7, G keep, H class-wide): decisions #134–#136; `fHasPermission` amended for `Definition.Read`; the Withdrawn
+  toggle and the software card removed (`shell-4`); the download endpoint is a W7 item, the grants screen a W8 item.
 - **Not done in W6, by design and recorded**: a file-download endpoint (the display shows file metadata; W6 card); the
   legacy fields with no counterpart (CT/PT ratios, number of relays, class/use/responsibility, the overflow columns)
   are shown *not modelled* and land in W7's mapping; `process.vWorkflowInstance` stays Global-only (#133); the grid

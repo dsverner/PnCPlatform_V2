@@ -123,8 +123,10 @@ an **inline** table function returning `SubjectEntityId`. It walks the same gran
 walks, but forwards: Global → every subject of the kind; NodeSubtree → the nodes under the scope
 paths, and the assets placed under them (with the asset-class and device-category filters), and the
 records and work requests whose subject is one of those; WorkRequest and OwnershipRelation scopes
-likewise. Subject kinds with no node mapping (Definition, Document, Obligation, Grant) are readable
-under Global only, as `fHasPermission` already rules. The dispatcher adds one clause to a list read:
+likewise. Subject kinds with no node mapping (Document, Obligation, Grant) are readable under Global
+only, as `fHasPermission` already rules; **Definition (config, ref) reads are class-wide for any role that carries
+`Definition.Read`, whatever the grant's scope** (owner, W6 card H, 2026-09-12, decision #134 — a division-scoped
+engineer needs the work types, models and procedures to act at all); definition writes and approvals stay Global-only. The dispatcher adds one clause to a list read:
 `WHERE <subject column> IN (SELECT SubjectEntityId FROM security.fReadableSubjects(…))`. The rule is
 the database's; the API knows only *which column of this view is the subject and of what kind*.
 

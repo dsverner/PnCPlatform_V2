@@ -12,7 +12,8 @@
 <body>
   <!-- W6 (decisions #127, #130; LEGACY-SYSTEM §8 change request / status window; PROCEDURE-ENGINE §10 rows 4–6, 8): one work
        request over work.vChangeRequestStatus — the header, the two completion tracks, the devices in the change, and the
-       request's own transitions (Start, Close, Cancel with a reason). No inline script or style. -->
+       request's own transitions (Start, Close, Cancel with a reason). The legacy software track has no card (owner, W6
+       card B; #58: its rows migrate as notes on the request). No inline script or style. -->
   <header class="bar">
     <span class="brand"><a href="/">P&amp;C Platform</a> <span class="crumb">/ <a href="/settings.html">Settings</a> / Change request</span></span>
     <span id="who" class="who">signing in…</span>
@@ -36,7 +37,6 @@
       <div class="tracks">
         <div class="track" id="track-doc"><h3>Relay setting documentation</h3><dl class="facts"></dl></div>
         <div class="track" id="track-db"><h3>Relay setting database</h3><dl class="facts"></dl></div>
-        <div class="track muted" id="track-sw"><h3>Relay setting software</h3><p class="small">Not modelled (decision #58): the legacy software track's rows migrate as notes on this request. See <em>Notes</em> above.</p></div>
       </div>
     </section>
     <section class="panel wide">

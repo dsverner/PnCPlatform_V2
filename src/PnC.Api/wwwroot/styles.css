@@ -101,7 +101,7 @@ button.mini:disabled { opacity: .45; cursor: not-allowed; }
 .action-row button { padding: 5px 12px; font: inherit; font-size: 13px; border: 1px solid var(--rule); border-radius: 3px; background: var(--panel); color: var(--ink); cursor: pointer; }
 .action-row input, .action-row select { font: inherit; font-size: 13px; padding: 4px 8px; border: 1px solid var(--rule); border-radius: 3px; background: var(--panel); color: var(--ink); }
 .facts.three { grid-template-columns: max-content 1fr max-content 1fr max-content 1fr; }
-.tracks { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+.tracks { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .track { border: 1px solid var(--rule); border-radius: 4px; padding: 10px 14px; }
 .track h3 { margin: 0 0 8px; }
 .groups { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 24px; }

@@ -925,7 +925,7 @@ else Skip("W4 run (needs the Administrator, Approver, Hydro and Technician ident
             var csp = r.Headers.TryGetValues("Content-Security-Policy", out var v) ? string.Join("", v) : "";
             var bodyText = await r.Content.ReadAsStringAsync();
             var ok = r.StatusCode == HttpStatusCode.OK && csp.Contains("script-src 'self'") && !bodyText.Contains("<script>") && !bodyText.Contains("style=\"");
-            if (path == "sw.js") ok = ok && bodyText.Contains("\"/definitions.js\"") && bodyText.Contains("\"/pnc.js\"") && bodyText.Contains("\"/floc.js\"") && bodyText.Contains("\"/settings.js\"") && bodyText.Contains("shell-3");
+            if (path == "sw.js") ok = ok && bodyText.Contains("\"/definitions.js\"") && bodyText.Contains("\"/pnc.js\"") && bodyText.Contains("\"/floc.js\"") && bodyText.Contains("\"/settings.js\"") && bodyText.Contains("shell-4");
             Check(ok, $"GET /{path} → {(int)r.StatusCode}, CSP script-src 'self', no inline script or style{(path == "sw.js" ? ", the editor files in the shell list" : "")}");
         }
         var (ms, mb) = await Get(who, "api/v1/me");
@@ -937,16 +937,11 @@ else Skip("W4 run (needs the Administrator, Approver, Hydro and Technician ident
         Check(Scope("document", "vSettingsRecord") == "DeviceEntityId as Asset" && Perm("document", "vSettingsRecord") == "ConfigurationFile.Read", $"catalog: document.vSettingsRecord scoped by device, ConfigurationFile.Read ({Scope("document", "vSettingsRecord")}, {Perm("document", "vSettingsRecord")})");
         Check(Scope("work", "vChangeRequestStatus") == "WorkRequestEntityId as WorkRequest" && Scope("location", "vFloc") == "NodeEntityId as Node" && Scope("location", "vFlocScheme") == "NodeEntityId as Node" && Scope("document", "vParsedSettingNamed") == "DeviceEntityId as Asset",
             "catalog: vChangeRequestStatus by work request, vFloc and vFlocScheme by node, vParsedSettingNamed by device");
-        // config.* is an unscoped class: readable under a Global grant only (IDENTITY.md §5), so the subtree-scoped Hydro engineer is refused 403 here — found by the
-        // 0.6.0 gate run on VM02 and put to the owner on the W6 card (the action-type list is empty for such an engineer)
-        var reader = admin ?? readOnly ?? approver ?? who;
-        var (wts, wtb) = await Get(reader, "api/v1/config/vDefinition?DefinitionKind=Program.WorkType&take=500");
-        if (reader == hydro) Check(wts == HttpStatusCode.Forbidden, $"the subtree-scoped engineer cannot read Program.WorkType definitions — config.* is Global-only (W6 card H) → {(int)wts}");
-        else
-        {
-            var wtKeys = (wtb?["rows"] as JsonArray)?.Select(r => r?["DefinitionKey"]?.ToString()).ToHashSet() ?? new HashSet<string?>();
-            Check(new[] { "SETTINGS_CHANGE", "SETTINGS_ADD", "SETTINGS_DELETE", "SETTINGS_VERIFY" }.All(wtKeys.Contains), "the four legacy action types are seeded as Program.WorkType definitions (#131)");
-        }
+        // definitions and reference data read class-wide by any role carrying Definition.Read, whatever the grant's scope (owner, W6 card H, #134):
+        // the subtree-scoped Hydro engineer was refused 403 here by the 0.6.0 gate run, and the action-type list was empty for them
+        var (wts, wtb) = await Get(who, "api/v1/config/vDefinition?DefinitionKind=Program.WorkType&take=500");
+        var wtKeys = (wtb?["rows"] as JsonArray)?.Select(r => r?["DefinitionKey"]?.ToString()).ToHashSet() ?? new HashSet<string?>();
+        Check(wts == HttpStatusCode.OK && new[] { "SETTINGS_CHANGE", "SETTINGS_ADD", "SETTINGS_DELETE", "SETTINGS_VERIFY" }.All(wtKeys.Contains), $"the four legacy action types are seeded as Program.WorkType definitions and readable by this identity whatever its scope (#131, #134) → {(int)wts}");
         var (gws, gwb) = await Get(who, "api/v1/document/vSettingsRecord?GridState=Active&take=5");
         Check(gws == HttpStatusCode.OK, $"the settings grid answers this identity ({(int)gws}, {(gwb?["rows"] as JsonArray)?.Count} of up to 5 rows)");
     }
