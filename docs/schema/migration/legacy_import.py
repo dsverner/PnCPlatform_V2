@@ -508,13 +508,15 @@ class Importer:
             rows = sorted(b["rows"], key=lambda r: r[1])
             if b["switch"]:
                 self.rule("CONTROL SWITCH row: asset only, no configuration file (mappings/asset_type.csv)", base, n=len(rows)); continue
-            detail = {r[0]: d for d, r in zip(self.src_rows(
+            # keyed by (OLD_NO, CR): a base's P rows share one OLD_NO (1 265 bases, 3 579 rows), and a dict keyed by OLD_NO alone gave
+            # every superseded revision the last row's text and dates (found 2026-09-13 on the review rows; #156)
+            detail = {(r[0], r[1]): d for d, r in zip(self.src_rows(
                 "SELECT SET1, SETTINGS2, DESC1, DESC2, DESC3, DESC4, REMARKS1, REMARKS2, REMARKS3, REMARKS4, REMARKS5, CT_MAIN1, CT_MAIN2, CT_MAIN3, CT_MAIN4, PT_MAIN, CT_AUX1, CT_AUX2, CT_AUX3, CT_AUX4, PT_AUX, CLASS, [USE], RESPONSIBILITY, Bulk_Power_Element, Protection_Group, ELEMENT, LINE_TYPE, [NUMBER OF RELAYS], CDATE, VDATE, [Change Request ID], OLD_NO FROM dbo.SETTINGS WHERE SUBSTRING(OLD_NO,2,4) = ? AND LEFT(OLD_NO,1) IN ('A','M','P') ORDER BY [Change Request ID]", base), rows)}
             prev_in_service = None
             a_cr = next((r[1] for r in rows if r[0][0] == "A"), None)
             for r in rows:
                 oldno, cr = r[0], r[1]
-                d = detail[oldno]
+                d = detail[(oldno, cr)]
                 above_a = a_cr is not None and r[0][0] == "P" and cr > a_cr   # an archived CR above the active one: the finding's chain (#59)
                 set1, set2 = d[0], d[1]
                 cdate, vdate = d[29], d[30]
