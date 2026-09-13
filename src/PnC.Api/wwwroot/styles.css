@@ -126,3 +126,8 @@ button.mini:disabled { opacity: .45; cursor: not-allowed; }
   .grid th, .grid td { white-space: normal; border-bottom: 1px solid #999; padding: 2px 4px; }
   .scroll { overflow: visible; }
 }
+
+/* W8: a short form of labelled controls (the grants screen) */
+.form { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 8px 16px; margin: 8px 0; }
+.form label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
+.form select, .form input { font: inherit; padding: 4px 6px; }

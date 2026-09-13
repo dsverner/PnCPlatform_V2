@@ -284,6 +284,39 @@ if (hydro is not null && fixtureOk)
 }
 else Skip("scope checks as the Hydro engineer (needs that identity and the fixture)");
 
+// ---- W8 (decision #136, #149): the grants screen's mechanism — a second grant widens a person's read scope, its revocation narrows it
+if (admin is not null && hydro is not null && fixtureOk)
+{
+    var (hm, hmb) = await Get(hydro, "api/v1/me");
+    var hydroUserId = hmb?["user"]?["entityId"]?.ToString();
+    var (am, amb) = await Get(admin, "api/v1/me");
+    var adminActor = amb?["actorId"]?.ToString();
+    Check(am == HttpStatusCode.OK && !string.IsNullOrEmpty(adminActor), $"/me carries the session's own actor id (W8: who a grant is granted by) ({adminActor})");
+    var (gls, glb) = await Get(admin, "api/v1/security/vGrant?take=10000");
+    Check(gls == HttpStatusCode.OK && (glb?["rows"] as JsonArray)?.Any(r => string.Equals(r?["GranteeEntityId"]?.ToString(), hydroUserId, StringComparison.OrdinalIgnoreCase)) == true, "security/vGrant as the Administrator lists the Hydro engineer's grant");
+    var (gls2, glb2) = await Get(hydro, "api/v1/security/vGrant?take=5");
+    Check(gls2 == HttpStatusCode.Forbidden, $"security/vGrant as the Hydro engineer → 403 (Grant.Read is the Administrator's) [{(int)gls2}]");
+    var (gas, gab) = await Post(admin, "api/v1/security/Grant_Add", new { GranteeKind = "User", GranteeEntityId = hydroUserId, RoleCode = "PCEngineer", ScopeKind = "NodeSubtree", ScopeNodeEntityId = txStation, GrantedByActorId = adminActor });
+    var newGrant = gab?["EntityId"]?.ToString();
+    Check(gas == HttpStatusCode.OK && newGrant is not null, $"Grant_Add: a second PCEngineer grant for the Hydro engineer, scoped to the Transmission station → 200 ({(int)gas} {gab?["detail"]})");
+    var (wst, wb) = await Get(hydro, "api/v1/asset/vAsset?take=10000");
+    var widened = Ids(wb);
+    Check(wst == HttpStatusCode.OK && widened.Contains(txAsset.ToString()!.ToLowerInvariant()) && widened.Contains(hydroAsset.ToString()!.ToLowerInvariant()), $"with the second grant the Hydro engineer reads the Transmission asset too ({widened.Count} rows)");
+    if (newGrant is not null)
+    {
+        var row = (await Get(admin, $"api/v1/security/vGrant?EntityId={newGrant}")).Item2?["rows"]?[0];
+        var (rvs, rvb) = await Post(admin, "api/v1/security/Grant_Revise", new { EntityId = newGrant, GranteeKind = "User", GranteeEntityId = hydroUserId, RoleCode = "PCEngineer", ScopeKind = "NodeSubtree", ScopeNodeEntityId = txStation,
+            GrantedByActorId = row?["GrantedByActorId"]?.ToString(), RevokedByActorId = adminActor, RevocationReason = "smoke: the grant was for the check" });
+        Check(rvs == HttpStatusCode.OK, $"Grant_Revise revokes it with who and why → 200 ({(int)rvs} {rvb?["detail"]})");
+        var (nst, nb) = await Get(hydro, "api/v1/asset/vAsset?take=10000");
+        var narrowed = Ids(nb);
+        Check(nst == HttpStatusCode.OK && !narrowed.Contains(txAsset.ToString()!.ToLowerInvariant()) && narrowed.Contains(hydroAsset.ToString()!.ToLowerInvariant()), $"revoked, the Hydro engineer no longer reads the Transmission asset ({narrowed.Count} rows)");
+        var kept = (await Get(admin, $"api/v1/security/vGrant?EntityId={newGrant}")).Item2?["rows"]?[0];
+        Check(kept?["RevokedByActorId"] is not null && kept?["RevocationReason"]?.ToString() == "smoke: the grant was for the check", "the revoked grant stays on the record with its reason (no hard delete)");
+    }
+}
+else Skip("W8 grants (needs the Administrator and Hydro identities and the fixture)");
+
 if (admin is not null && fixtureOk)
 {
     var (ast, ab) = await Get(admin, "api/v1/asset/vAsset?take=10000");
@@ -365,10 +398,13 @@ string Example(string name)
 }
 string Short(JsonNode? b) { var d = b?["detail"]?.ToString() ?? ""; return d.Length > 80 ? d[..80] : d; }
 bool AlreadyApproved(JsonNode? b) => b?["sqlNumber"]?.GetValue<int>() == 50031;
-if (admin is not null)
+// W8 (#149): in Windows mode each gate pass is one identity, so the Approver pass also loads (existing) and approves what the
+// Administrator pass authored, and either pass approves as itself — refused for its own author, else approved; two passes converge
+var author = admin ?? approver;
+if (author is not null)
 {
     async Task<(HttpStatusCode, JsonNode?)> Load(string file) =>
-        await Post(admin, "api/v1/definitions/documents", new { document = JsonNode.Parse(Example(file)), changeNote = "W3 gate" });
+        await Post(author!, "api/v1/definitions/documents", new { document = JsonNode.Parse(Example(file)), changeNote = "W3 gate" });
     async Task<(HttpStatusCode, JsonNode?)> Approve(HttpClient who, string rowId) => await Post(who, $"api/v1/definitions/documents/{rowId}/approve", new { });
     string Errors(JsonNode? b) => b?["errors"] is JsonArray ea ? string.Join(" | ", ea.Select(x => x?["path"] + ": " + x?["message"])) : "";
 
@@ -378,8 +414,8 @@ if (admin is not null)
     string? lifecycleRow = lb?["versionRowId"]?.ToString();
     if (lifecycleRow is not null)
     {
-        var (as1, ab1) = await Approve(admin, lifecycleRow);
-        Check(as1 == HttpStatusCode.Conflict, $"approve SETTINGS_LIFECYCLE as its author → 409 ({Short(ab1)})");
+        var (as1, ab1) = await Approve(author!, lifecycleRow);
+        Check(as1 == HttpStatusCode.Conflict || as1 == HttpStatusCode.OK || AlreadyApproved(ab1), $"approve SETTINGS_LIFECYCLE as this pass's identity → refused for its own author, else approved ({(int)as1} {Short(ab1)})");
         if (approver is not null)
         {
             var (as2, ab2) = await Approve(approver, lifecycleRow);
@@ -394,16 +430,16 @@ if (admin is not null)
 
     var (rs, rb) = await Load("settings-change.workflow.json");
     Check(rs == HttpStatusCode.OK && rb?["versionRowId"] is not null, $"load SETTINGS_CHANGE_REQUEST workflow → {(int)rs} {Code(rb)} {Errors(rb)} {Short(rb)} (version {rb?["versionNumber"]}, existing {rb?["existing"]})");
-    if (rb?["versionRowId"]?.ToString() is { } reqRow && approver is not null)
+    if (rb?["versionRowId"]?.ToString() is { } reqRow)
     {
-        var (as3, ab3) = await Approve(approver, reqRow);
-        Check(as3 == HttpStatusCode.OK || AlreadyApproved(ab3), $"approve SETTINGS_CHANGE_REQUEST as the second Administrator → {(int)as3} {Code(ab3)}");
+        var (as3, ab3) = await Approve(approver ?? author!, reqRow);
+        Check(as3 == HttpStatusCode.OK || as3 == HttpStatusCode.Conflict || AlreadyApproved(ab3), $"approve SETTINGS_CHANGE_REQUEST as the second Administrator (or refused for its own author) → {(int)as3} {Code(ab3)}");
     }
 
     if (procRow is not null)
     {
-        var (as4, ab4) = await Approve(admin, procRow);
-        Check(as4 == HttpStatusCode.Conflict, $"approve SETTINGS_CHANGE as its author → 409 ({Short(ab4)})");
+        var (as4, ab4) = await Approve(author!, procRow);
+        Check(as4 == HttpStatusCode.Conflict || as4 == HttpStatusCode.OK || AlreadyApproved(ab4), $"approve SETTINGS_CHANGE as this pass's identity → refused for its own author, else approved ({(int)as4} {Short(ab4)})");
         if (approver is not null)
         {
             var (as5, ab5) = await Approve(approver, procRow);
@@ -411,7 +447,7 @@ if (admin is not null)
         }
         else Skip("approve SETTINGS_CHANGE (needs the Approver identity)");
         // the projection — the design verification's counts: 14 steps, 4 advances, 1 call
-        var (ss, sb) = await Get(admin, $"api/v1/process/vProcedureStep?DefinitionVersionRowId={procRow}&take=100");
+        var (ss, sb) = await Get(author!, $"api/v1/process/vProcedureStep?DefinitionVersionRowId={procRow}&take=100");
         var steps = (sb?["rows"] as JsonArray) ?? new JsonArray();
         // FR-3.1's fourteen numbered steps are fifteen step blocks plus one call: [4] has two variants (BUILD_SETTINGS /
         // RECORD_SETTINGS, the electromechanical fork), RESOLVE_DIFFERENCE is unnumbered, and [14] is the call block.
@@ -421,32 +457,32 @@ if (admin is not null)
         var advancing = steps.Count(r => r?["AdvancesTransition"] is not null);
         Check(advancing == 6, $"6 steps advance the lifecycle workflow: CHECK, APPROVE, ISSUE, APPLY, RETURN_TO_SERVICE, BASELINE ({advancing})");
         Check(steps.Count(r => r?["RequiresWitness"]?.GetValue<bool>() == true) == 1 && steps.Any(r => r?["StepId"]?.ToString() == "RETURN_TO_SERVICE" && r?["RequiresWitness"]?.GetValue<bool>() == true), "RETURN_TO_SERVICE is the one witnessed step");
-        var (cs1, cb1) = await Get(admin, $"api/v1/process/vProcedureCall?DefinitionVersionRowId={procRow}");
+        var (cs1, cb1) = await Get(author!, $"api/v1/process/vProcedureCall?DefinitionVersionRowId={procRow}");
         var calls = (cb1?["rows"] as JsonArray) ?? new JsonArray();
         Check(cs1 == HttpStatusCode.OK && calls.Count == 1 && calls[0]?["CalleeKey"]?.ToString() == "DRAWING_REVISION", $"process/vProcedureCall: 1 call, to DRAWING_REVISION ({calls.Count})");
-        var (fs, fb) = await Get(admin, $"api/v1/process/vProcedureFactUse?DefinitionVersionRowId={procRow}&take=200");
+        var (fs, fb) = await Get(author!, $"api/v1/process/vProcedureFactUse?DefinitionVersionRowId={procRow}&take=200");
         var facts = ((fb?["rows"] as JsonArray) ?? new JsonArray()).Select(r => r?["FactName"]?.ToString()).Distinct().OrderBy(x => x).ToList();
         Check(fs == HttpStatusCode.OK && facts.Contains("device.technology") && facts.Contains("step.outcome") && facts.Contains("work.outage_required") && facts.Contains("person.training_current"),
               $"process/vProcedureFactUse indexes the facts the document reads ({string.Join(", ", facts)})");
-        var (rls, rlb) = await Get(admin, "api/v1/process/vProcedureStepRole?RoleCode=PCTechnician&take=100");
+        var (rls, rlb) = await Get(author!, "api/v1/process/vProcedureStepRole?RoleCode=PCTechnician&take=100");
         Check(rls == HttpStatusCode.OK && ((rlb?["rows"] as JsonArray) ?? new JsonArray()).Any(r => r?["RequiresAst"] is not null), "process/vProcedureStepRole carries the technician's competency expression as canonical AST");
     }
 
     // a document the grammar refuses is refused with its path; one the structure refuses, in the rule's words
     var bad = (JsonObject)JsonNode.Parse(Example("settings-change.procedure.json"))!;
     bad["key"] = "SMOKE_BAD"; ((JsonObject)bad["roles"]!["technician"]!)["requires"] = "person.training_current = 'yes'";
-    var (bs, bb) = await Post(admin, "api/v1/definitions/documents", new { document = bad });
+    var (bs, bb) = await Post(author!, "api/v1/definitions/documents", new { document = bad });
     Check(bs == HttpStatusCode.BadRequest && Code(bb) == "document_invalid" && (bb?["errors"] as JsonArray)?.Any(e => e?["path"]?.ToString() == "$.roles.technician.requires") == true,
           $"a document whose expression fails the type check → 400 document_invalid at $.roles.technician.requires ({(bb?["errors"] as JsonArray)?[0]?["message"]})");
     var bad2 = (JsonObject)JsonNode.Parse(Example("settings-change.procedure.json"))!;
     bad2["key"] = "SMOKE_BAD2"; ((JsonObject)((JsonArray)bad2["body"]!["items"]!)[1]!)["id"] = "REQUEST";
-    var (b2s, b2b) = await Post(admin, "api/v1/definitions/documents", new { document = bad2 });
+    var (b2s, b2b) = await Post(author!, "api/v1/definitions/documents", new { document = bad2 });
     Check(b2s == HttpStatusCode.Conflict && b2b?["sqlNumber"]?.GetValue<int>() == 50121, $"a document with a duplicate block id → 409 in the rule's words ({Short(b2b)})");
 
     // the live expression check
-    var (fcs, fcb) = await Post(admin, "api/v1/formula/check", new { expression = "value >= 0", env = new { value = new { type = "num" } } });
+    var (fcs, fcb) = await Post(author!, "api/v1/formula/check", new { expression = "value >= 0", env = new { value = new { type = "num" } } });
     Check(fcs == HttpStatusCode.OK && fcb?["ok"]?.GetValue<bool>() == true && fcb?["type"]?.ToString() == "bool", $"formula/check: value >= 0 → {fcb?["type"]}");
-    var (fes, feb) = await Post(admin, "api/v1/formula/check", new { expression = "device.no_such_fact = 1" });
+    var (fes, feb) = await Post(author!, "api/v1/formula/check", new { expression = "device.no_such_fact = 1" });
     Check(fes == HttpStatusCode.OK && feb?["ok"]?.GetValue<bool>() == false && feb?["code"]?.ToString() == "unknown_fact", $"formula/check: an unknown fact → {feb?["code"]}");
 }
 else Skip("W3 definitions (needs the Administrator identity)");
@@ -466,11 +502,11 @@ if (admin is not null)
             new { block = "step", id = "ONE", title = "[1] one", role = "eng", record = new { kind = "Finding" } },
             new { block = "step", id = "TWO", title = "[2] two", role = "eng", record = new { kind = "Finding" }, precondition = "step.outcome[id='ONE'] = 'Done'" } } }
     };
-    var (gs, gb) = await Post(admin, "api/v1/definitions/documents", new { document = gateDoc, changeNote = "W3 gate" });
+    var (gs, gb) = await Post(author!, "api/v1/definitions/documents", new { document = gateDoc, changeNote = "W3 gate" });
     Check(gs == HttpStatusCode.OK && gb?["existing"]?.GetValue<bool>() == false, $"author a fresh {GateKey} Draft as the Administrator → {(int)gs} (version {gb?["versionNumber"]})");
     if (gb?["versionRowId"]?.ToString() is { } gRow)
     {
-        var (gas, gab) = await Post(admin, $"api/v1/definitions/documents/{gRow}/approve", new { });
+        var (gas, gab) = await Post(author!, $"api/v1/definitions/documents/{gRow}/approve", new { });
         Check(gas == HttpStatusCode.Conflict && (gab?["detail"]?.ToString().Contains("segregation", StringComparison.OrdinalIgnoreCase) ?? false), $"the author cannot approve it → 409 segregation");
     }
 }
@@ -502,9 +538,9 @@ if (readOnly is not null)
 // W4 run, so the run's version set pins v2 and the child run below is the gate's "DRAWING_REVISION completes inside a
 // SETTINGS_CHANGE run". Idempotent as the W3 loads are.
 string? drawingV2Row = null;
-if (admin is not null)
+if (author is not null)
 {
-    var (ds, db) = await Post(engineer ?? admin, "api/v1/definitions/documents", new { document = JsonNode.Parse(Example("drawing-revision.procedure.json")), changeNote = "W5: authored in the tool" + (engineer is null ? "" : " by a Global PCEngineer (#126)") });
+    var (ds, db) = await Post(engineer ?? author!, "api/v1/definitions/documents", new { document = JsonNode.Parse(Example("drawing-revision.procedure.json")), changeNote = "W5: authored in the tool" + (engineer is null ? "" : " by a Global PCEngineer (#126)") });
     drawingV2Row = db?["versionRowId"]?.ToString();
     Check(ds == HttpStatusCode.OK && drawingV2Row is not null, $"load DRAWING_REVISION (the tool-authored version) as {(engineer is null ? "the Administrator" : "a Global PCEngineer, #126")} → {(int)ds} {Code(db)} (version {db?["versionNumber"]}, existing {db?["existing"]})");
     if (hydro is not null)
@@ -512,12 +548,12 @@ if (admin is not null)
         var (hs, hb) = await Post(hydro, "api/v1/definitions/documents", new { document = JsonNode.Parse(Example("drawing-revision.procedure.json")) });
         Check(hs == HttpStatusCode.Forbidden, $"the subtree-scoped engineer holds Definition.Modify but not the subject (Global only) → 403 ({hb?["detail"]})");
     }
-    if (drawingV2Row is not null && approver is not null)
+    if (drawingV2Row is not null)
     {
-        var (das, dab) = await Post(approver, $"api/v1/definitions/documents/{drawingV2Row}/approve", new { });
-        Check(das == HttpStatusCode.OK || AlreadyApproved(dab), $"the tool-authored DRAWING_REVISION approved by the second Administrator → {(int)das} {Code(dab)} (projected {dab?["projectedSteps"]})");
-        var (dvs, dvb) = await Get(admin, $"api/v1/config/vDefinitionVersion?RowId={drawingV2Row}");
-        Check((dvb?["rows"] as JsonArray)?.FirstOrDefault()?["Status"]?.ToString() == "Effective", "the tool-authored DRAWING_REVISION is the Effective version");
+        var (das, dab) = await Post(approver ?? author!, $"api/v1/definitions/documents/{drawingV2Row}/approve", new { });
+        Check(das == HttpStatusCode.OK || das == HttpStatusCode.Conflict || AlreadyApproved(dab), $"the tool-authored DRAWING_REVISION approved by the second Administrator → {(int)das} {Code(dab)} (projected {dab?["projectedSteps"]})");
+        var (dvs, dvb) = await Get(author!, $"api/v1/config/vDefinitionVersion?RowId={drawingV2Row}");
+        if (das == HttpStatusCode.OK || AlreadyApproved(dab)) Check((dvb?["rows"] as JsonArray)?.FirstOrDefault()?["Status"]?.ToString() == "Effective", "the tool-authored DRAWING_REVISION is the Effective version");
     }
 }
 else Skip("W5 DRAWING_REVISION v2 (needs the Administrator identity)");
@@ -949,7 +985,7 @@ else Skip("W4 run (needs the Administrator, Approver, Hydro and Technician ident
             var csp = r.Headers.TryGetValues("Content-Security-Policy", out var v) ? string.Join("", v) : "";
             var bodyText = await r.Content.ReadAsStringAsync();
             var ok = r.StatusCode == HttpStatusCode.OK && csp.Contains("script-src 'self'") && !bodyText.Contains("<script>") && !bodyText.Contains("style=\"");
-            if (path == "sw.js") ok = ok && bodyText.Contains("\"/definitions.js\"") && bodyText.Contains("\"/pnc.js\"") && bodyText.Contains("\"/floc.js\"") && bodyText.Contains("\"/settings.js\"") && bodyText.Contains("shell-6");
+            if (path == "sw.js") ok = ok && bodyText.Contains("\"/definitions.js\"") && bodyText.Contains("\"/pnc.js\"") && bodyText.Contains("\"/floc.js\"") && bodyText.Contains("\"/settings.js\"") && bodyText.Contains("shell-7");
             Check(ok, $"GET /{path} → {(int)r.StatusCode}, CSP script-src 'self', no inline script or style{(path == "sw.js" ? ", the editor files in the shell list" : "")}");
         }
         var (ms, mb) = await Get(who, "api/v1/me");

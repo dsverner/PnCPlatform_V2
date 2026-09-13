@@ -399,6 +399,10 @@ Lessons: the schema smoke's obligation `run` needed the same one-second patience
 ahead of the laptop, #79); `document.SetInService` refuses a period that does not start after the prior one (50247), so
 a chain whose revisions share a VDATE is dated one second apart, quality 2, flagged.
 
+Step 20 (W8, #149): `process.LandMigratedInstance` takes `@DocumentationAt` / `@DatabaseAt` — the legacy track row's
+`Date` — and a Complete branch runs and completes at that instant (NA and Running branches stay at the landing's `@At`);
+the importer passes them. Landings made before this step (DEV, 2026-09-13) keep the capture instant and are not re-shaped.
+
 Performance (#145): a hand-written read model must not put an `OUTER APPLY … TOP (1)` against a generated current view —
 the ROW_NUMBER inside the view is evaluated over the whole table per outer row. Read the base table with the filtered
 index's own predicate (`[ValidTo] IS NULL AND [IsDeleted] = 0`; `[IsDeleted] = 0` for the process tables), and expect

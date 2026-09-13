@@ -610,6 +610,52 @@ transmission P&C engineer works across them — owner, card A).
 walkthrough. The cutover rehearsal report shows the delta applied. `package_release.py` produces
 the release with SBOM and `release.json`.
 
+**Round 1 record — 2026-09-13 (decisions #149–#152), observed on VM01, VM02 and DEV.**
+- **Found in planning**: the SOW's geographic map (§5.7, acceptance criterion 7) is in no requirement, wave, design
+  document or decision, and the legacy source has no coordinates — on the card, not built silently (#152).
+- **QA**: `PnCPlatform_V2_QA` created fresh on VM01 by `deploy.py --fresh --package dist/0.8.0`, schema smoke PASS;
+  DEV republished from the same package (268 PASS). The four gate accounts became QA users through the new
+  `tools/ot/gate_users.py`. VM02's site repointed to QA (0.8.0, then 0.8.1 with the grants screen) — its first start
+  answered 500.30 because a fresh database has no user for the pool identity; `CREATE USER … FROM LOGIN` and
+  `app_execute` membership fixed it, recorded in the runbook for PROD. VM02 and VM07 were reused, not rebuilt (card D).
+- **The cutover rehearsal's second copy**: `dbRelayManagement_Legacy_Cutover` from `make_cutover_copy.py` — the eight
+  tables copied, fifteen mutations planted (one added, changed, deleted per keyed table); `cutover_diff.py` reports
+  exactly them (`CUTOVER-DIFF-2026-09-13.md`). Found and fixed on the way: duplicate natural keys suffixed in row order
+  made 300 unchanged track rows read as changed on a permuted copy — now suffixed in hash order.
+- **The grants screen** (`/grants.html`, #150) observed in Chrome (`evidence/W8-grants-hydro.jpg`): the fifteen accounts,
+  Hydro Smoke's one grant in force, *Add a grant* and *Revoke*; `/me` carries the session's actor id. DEV API smoke
+  with the new section (a second PCEngineer grant scoped to the Transmission station widens the Hydro engineer's asset
+  list, its revocation narrows it, the revoked row stays with its reason): 228 PASS; a later run under a concurrent deploy
+  and the QA load read one timing check at 2 011 ms against a 2 000 ms bound (227 PASS, 1 FAIL — load, not a change).
+- **The landed track date** (#151): `LandMigratedInstance` takes the two track dates; QA's load carries them.
+- **In Windows mode a fresh database needs three Administrator → Approver gate passes** before the definitions are
+  Effective (each pass is one identity); the smoke now lets either pass load and approve, refused only for its own
+  author, so two passes converge (runbook).
+- **QA's full legacy load** (`REHEARSAL-2026-09-13-QA.md`): a first attempt stopped at the landings because the request
+  workflow was not yet Effective on a Windows-only database (above); the resumed run wrote 151 335 rows, the second pass
+  0, provenance complete, no direct writes; the same reconciliation as DEV (landings A 2 / M 357 / P 4 760; 19 findings;
+  grid Active 5 530 / Archived 5 683 / Outstanding 350); VM02's own sweep completed 4 853 landed runs and `--close`
+  closed their requests; the landed tracks carry the legacy dates here (#151). 0.8.1 published to QA and DEV (schema
+  smoke 268 PASS each); VM02 on 0.8.1 against QA — `/health` `environment QA, release 0.8.1, database ok`.
+- **Gate accounts on VM02 against QA at 0.8.1**: Administrator 81, Approver 58, ReadOnly 44, Hydro 26 PASS, 0 FAIL.
+- **The relocation rehearsal** (`evidence/W8-RELOCATION-REHEARSAL-2026-09-13.md`, record F185FDCA…): from the build
+  machine with the Administrator and ReadOnly logs — steps 1, 2 observed (Windows identities on VM02), 3 pass (the
+  package's DACPAC and zip hashes equal `platform.Release` 0.8.1's and `/health`'s release), 4 not applicable, 5 pass
+  (10.10.70.20:8443 timed out from Business — filtered by VM02's host firewall, which allows VM07 only; a name that does
+  not resolve is now reported as no evidence, not a pass), 6 pass (both journeys), the feed pull not applicable (Phase 1
+  has no feed), 7 pass. **REHEARSAL PASS.** Two defects the rehearsal found, fixed: the carried script parsed the
+  predecessor's smoke lines (every V2 log read "no SMOKE header"), and treated a DNS failure as a refusal. The third
+  vantage point, VM07, is the owner's (card E).
+- **The cutover delta applied on QA** (`CUTOVER-APPLY-2026-09-13.md`): the importer re-run against
+  `dbRelayManagement_Legacy_Cutover` — the added station and its building, the added P9999 revision (Superseded,
+  Archived, landed with its two tracks) and, because its CR exceeds the A row's, a twentieth ordering finding; the
+  header's SAP key; deletes reported only (Q8, card G). Found and fixed: the header's duplicate rows came back in no fixed
+  order, so a permuted copy revised 334 requests for nothing — sorted now (one-time churn of 609 on QA); a third pass
+  writes 0. **Known gap, recorded**: a header *note* change alone is not applied — the request's hash omits Notes; and a
+  changed SET1 text or a changed track state on an already-landed row is reported, not re-shaped (#148). Widening the
+  hash is free on a fresh PROD load and costs a full re-revision on DEV and QA — round 2 decides.
+
+
 **Depends on.** W5, W6, W7. **Estimate.** H: 24–40 h · G: 63–100 h.
 
 ---

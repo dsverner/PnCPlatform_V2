@@ -63,10 +63,14 @@ public static class ApiEndpoints
                       AND dl.StartsAt <= SYSDATETIMEOFFSET() AND (dl.EndsAt IS NULL OR dl.EndsAt > SYSDATETIMEOFFSET()))
                 ORDER BY rp.PermissionCode
                 """, args, ct);
+            // W8 (#149, the grants screen): the session's own actor, resolved by the database (personnel.ResolveActor from the
+            // session context) — a grant names who granted it (@GrantedByActorId), and that is this id, never one the page picks
+            var actorId = await s.ScalarAsync<Guid?>("SET NOCOUNT ON; DECLARE @a UNIQUEIDENTIFIER; EXEC personnel.ResolveActor @ActorId = @a OUTPUT; SELECT @a", new Dictionary<string, object?>(), ct);
             return Results.Json(new
             {
                 user = new { entityId = u.UserEntityId, userPrincipalName = u.UserPrincipalName, identityKey = u.IdentityKey },
                 person = new { entityId = u.PersonEntityId, displayName = u.DisplayName },
+                actorId,
                 actingAs = new { delegation = u.DelegationEntityId, sponsoredPerson = u.SponsoredPersonEntityId },
                 grants, delegations,
                 permissions = permissions.Select(r => r!["PermissionCode"]!.GetValue<string>()).ToList(),

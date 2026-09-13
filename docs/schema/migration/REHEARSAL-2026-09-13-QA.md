@@ -1,0 +1,62 @@
+# Rehearsal 2026-09-13 — `PnCPlatform_V2_QA`
+
+Started 2026-09-13T13:32:01; loaders: legacy_import.
+
+## Outcome
+
+- First pass wrote **151,335** target rows across 1 run(s); **151,335** provenance rows.
+- Second pass (idempotence): **0** rows written — PASS.
+- Rows tagged with these runs but lacking provenance: **0** PASS.
+- Direct table writes in loaders (grep): **0** PASS.
+
+## dbRelayManagement_Legacy — run `98C607B1-B58B-4B0A-858B-E43EBB7956C2`
+
+Actor `7521DC8F-EF7D-4043-A7E5-9324BB186D8E`; 156,498 procedure calls in 2376.8s.
+
+| Target | Written | Skipped (already loaded) |
+|---|---|---|
+| `asset.Asset` | 0 | 4 |
+| `document.ConfigurationFile` | 0 | 11,563 |
+| `document.Document` | 6,661 | 0 |
+| `document.File` | 11,563 | 0 |
+| `location.AlternateKey` | 0 | 225 |
+| `location.Node` | 0 | 9,070 |
+| `personnel.Person` | 0 | 32 |
+| `process.BlockInstance` | 76,785 | 0 |
+| `process.InstanceVersionSet` | 10,238 | 0 |
+| `process.ProcedureInstance` | 5,119 | 0 |
+| `process.StepInstance` | 30,714 | 0 |
+| `process.WorkflowInstance` | 5,119 | 0 |
+| `process.WorkflowTransition` | 5,119 | 0 |
+| `record.Finding` | 17 | 2 |
+| `work.AlternateKey` | 0 | 11,881 |
+| `work.WorkRequest` | 0 | 11,840 |
+
+| Flag | Count | Examples |
+|---|---|---|
+| `RequestNoHeader` | 5,599 | 3 CR 3: no Settings Management row; work type SETTINGS_CHANGE assumed; 7268134 CR 7268134: no Settings Management row; work type SETTINGS_CHANGE assumed; 7759879 CR 7759879: no Settings Management row; work type SETTINGS |
+| `TrackUnderOtherCr` | 3,398 | P0002 P0002/2141435: doc track found under CR 2144042 (SETTINGS and the track disagree) — card H; P0002 P0002/2141435: db track found under CR 2144042 (SETTINGS and the track disagree) — card H; P0004 P0004/3196082: doc  |
+| `RequesterNotAUser` | 1,686 | 4193909 CR 4193909: requested by 'David LeBlanc', not in Users; 4198934 CR 4198934: requested by 'David LeBlanc', not in Users; 8074893 CR 8074893: requested by 'David LeBlanc', not in Users |
+| `HeaderUnderOtherCr` | 1,672 | 2141435 CR 2141435/P0002: no header under this CR; the relay's header under CR 2144042 used (1 candidate CR(s)) — card H; 3196082 CR 3196082/P0004: no header under this CR; the relay's header under CR 3380710 used (2 can |
+| `ChainLocationVaries` | 1,572 | 0002 base 0002: its rows name more than one (LOCATION, EQUIPMENT); the A0002 row's is used; 0003 base 0003: its rows name more than one (LOCATION, EQUIPMENT); the M0003 row's is used; 0004 base 0004: its rows name more t |
+| `HeaderDuplicated` | 760 | 6161412 CR 6161412 has 2 header rows; the one naming this chain (else the first) is used; 3212819 CR 3212819 has 2 header rows; the one naming this chain (else the first) is used; 3212924 CR 3212924 has 2 header rows; th |
+| `StationNumberAssumed` | 214 | ABERDEEN STREET 'ABERDEEN STREET' station number 6100 from the dominant SETTINGS.ASSET (19 rows); ADEX MINERALS 'ADEX MINERALS' station number 5216 from the dominant SETTINGS.ASSET (2 rows); ALLARDVILLE SS 'ALLARDVILLE S |
+| `StationGroupConflict` | 187 | ABERDEEN STREET 'ABERDEEN STREET' is listed under {'Eng': 1, 'Dist': 1}; the most frequent group placed it; ADEX MINERALS 'ADEX MINERALS' is listed under {'Eng': 1, 'Dist': 1}; the most frequent group placed it; ATLANTIC |
+| `RequestTypeUnknown` | 32 | 9177900 CR 9177900: type None; work type SETTINGS_CHANGE assumed; 7992075 CR 7992075: type None; work type SETTINGS_CHANGE assumed; 8840935 CR 8840935: type None; work type SETTINGS_CHANGE assumed |
+| `PrefixLowerCase` | 9 | a0193 a0193/686: the state prefix is lower case; read as A; a0547 a0547/953: the state prefix is lower case; read as A; a0566 a0566/1027: the state prefix is lower case; read as A |
+| `SapWorkOrderDuplicate` | 7 | 8825579 CR 8825579: SapWorkOrder '000000' already belongs to another request; no key written; 911 CR 911: SapWorkOrder '3000040109' already belongs to another request; no key written; 8233397 CR 8233397: SapWorkOrder '30 |
+| `StationNumberDuplicate` | 2 | MOBILE 35MVA 'MOBILE 35MVA' station number 6160 already belongs to 'MOBILE 15MVA'; no key written; a finding raised (card C); NEGUAC 'NEGUAC' station number 6100 already belongs to 'ABERDEEN STREET'; no key written; a fi |
+| `TrackRowMissing` | 1 | M7043 M7043/2307330: documentation and database track row missing; branch left Running |
+
+## Rows in the target tagged with these runs
+
+| Table | Rows |
+|---|---|
+| `record.Record` | 17 |
+| `record.Finding` | 17 |
+| `process.WorkflowInstance` | 5,119 |
+| `process.ProcedureInstance` | 5,119 |
+| `process.InstanceVersionSet` | 10,238 |
+| `process.BlockInstance` | 76,785 |
+| `process.StepInstance` | 30,714 |
+| `process.WorkflowTransition` | 5,119 |

@@ -66,10 +66,10 @@ def read_csv(name):
 
 
 class Importer:
-    def __init__(self, run, limit=None):
+    def __init__(self, run, limit=None, source_db=None):
         self.run = run
         self.limit = limit
-        self.src = common.connect(SOURCE).cursor()
+        self.src = common.connect(source_db or SOURCE).cursor()   # W8: the cutover rehearsal reads the client's copy; provenance still names SOURCE
         self.rules = Counter()               # reconciliation: rule → rows
         self.examples = defaultdict(list)
         self.persons = {}                    # display name → person entity
@@ -389,6 +389,10 @@ class Importer:
         header = defaultdict(list)
         for cr, sap, relay, notes, typ, by in self.src_rows("SELECT [Change Request ID], [SAP Work Order Numer], [Relay ID Number], [Notes], [Type], [Reqested By] FROM dbo.[Settings Management]"):
             header[cr].append((strip(sap), strip(relay), strip(notes), strip(typ), strip(by)))
+        # the header's duplicate rows (894 CRs) come back in no fixed order: sort them so "the first" is the same row on every
+        # copy of the source (the cutover rehearsal's copy returned them permuted and 334 requests were revised for nothing)
+        for cr in header:
+            header[cr].sort(key=lambda h: tuple(x or "" for x in h))
         self.header = header
         # W7 card H (owner, 2026-09-13): the SETTINGS row's Change Request ID and the header / track rows for the same Relay ID
         # Number name different CRs for most P rows (P0002: 2141435 vs 2144042). The SETTINGS CR stays the change (the chain
@@ -401,7 +405,7 @@ class Importer:
                     hrel[h[1]].append((cr, h))
         self.header_cr = {}
         sw = defaultdict(list)
-        for cr, relay, status, notes, date in self.src_rows("SELECT [Change Request ID], [Relay ID Number], [Status], [Notes], [Date] FROM dbo.[Setting Software Management]"):
+        for cr, relay, status, notes, date in self.src_rows("SELECT [Change Request ID], [Relay ID Number], [Status], [Notes], [Date] FROM dbo.[Setting Software Management] ORDER BY [Change Request ID], [Relay ID Number], [Date], [Status], [Notes]"):
             sw[(cr, strip(relay))].append((strip(status), strip(notes), date))
         self.tracks = {}; self.tracks_by_relay = defaultdict(list)
         for tbl, name in (("Relay Document Management", "doc"), ("Setting Database Management", "db")):
@@ -622,7 +626,8 @@ class Importer:
                     flags.append(self.run.flag("TrackRowMissing", f"{oldno}/{cr}: {'documentation' if doc is None else ''}{' and ' if doc is None and db is None else ''}{'database' if db is None else ''} track row missing; branch left Running", oldno))
                 cd, _, _ = dto(r[1] and None)
                 (wf, pi) = self.run.exec("process.LandMigratedInstance", outputs=[("WorkflowInstanceEntityId", "UNIQUEIDENTIFIER"), ("ProcedureInstanceEntityId", "UNIQUEIDENTIFIER")],
-                                         WorkRequestEntityId=self.requests[cr], DocumentationStatus=doc[0] if doc else None, DatabaseStatus=db[0] if db else None, At=capture_at())
+                                         WorkRequestEntityId=self.requests[cr], DocumentationStatus=doc[0] if doc else None, DatabaseStatus=db[0] if db else None,
+                                         DocumentationAt=dto(doc[2])[0] if doc and doc[2] else None, DatabaseAt=dto(db[2])[0] if db and db[2] else None, At=capture_at())   # W8 (#149): the track's own date
                 self.run.provenance("process", "ProcedureInstance", key, h, entity_id=pi, notes=self.run.join_flags(*flags))
                 self.run.provenance("process", "WorkflowInstance", key, h, entity_id=wf)
                 self.rule(rule_name, oldno)
@@ -704,12 +709,12 @@ class Importer:
         return src_totals
 
 
-def load(database, limit=None, report=None):
+def load(database, limit=None, report=None, source_db=None):
     """The rehearsal runner's entry (run_rehearsal.py): one run, the reconciliation written, the run's report returned."""
     if not database.startswith("PnCPlatform_V2_"):
         sys.exit("refusing: the target must be a PnCPlatform_V2_* database (#99)")
     with Run(SOURCE, CAPTURE_AT, notes=f"W7 legacy import (CUTOVER-STRATEGY §5); limit {limit}", target_db=database) as run:
-        imp = Importer(run, limit)
+        imp = Importer(run, limit, source_db)
         for stage in ("prepare", "persons_stage", "manufacturers_stage", "models_stage", "locations_stage", "devices_stage", "requests_stage", "revisions_stage", "landings_stage", "findings_stage", "provenance_stage", "dropped_counts"):
             imp.log(stage); getattr(imp, stage)()
         path = report or os.path.join(HERE, f"RECONCILIATION-{datetime.date.today().isoformat()}.md")
@@ -747,10 +752,11 @@ def main():
     ap.add_argument("--limit", type=int, default=None, help="load only the first N base numbers (smoke)")
     ap.add_argument("--report", default=None)
     ap.add_argument("--close", action="store_true", help="close the landed requests whose runs the sweep has completed (card H); no load")
+    ap.add_argument("--source-db", default=None, help="read the legacy tables from this database instead of dbRelayManagement_Legacy (the cutover rehearsal's second copy, W8)")
     a = ap.parse_args()
     if not a.database.startswith("PnCPlatform_V2_"):
         sys.exit("refusing: the target must be a PnCPlatform_V2_* database (#99)")
-    rep = close_landed(a.database) if a.close else load(a.database, a.limit, a.report)
+    rep = close_landed(a.database) if a.close else load(a.database, a.limit, a.report, a.source_db)
     print(json.dumps(rep, indent=1, default=str))
 
 

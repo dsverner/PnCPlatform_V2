@@ -113,6 +113,24 @@ ping but times out on commands, so that is the owner's, on the round-3 test card
 row the ReadOnly write check leaves in `audit.vActionLog` is what this session reads back afterwards.
 (The API writes no sign-in rows.)
 
+## W8, 2026-09-13 — the site repointed to `PnCPlatform_V2_QA` (decision #149)
+
+- `PnCPlatform_V2_QA` was created fresh on VM01 by `deploy.py --database PnCPlatform_V2_QA --fresh --package dist/0.8.0`
+  (schema smoke PASS); the four gate accounts became its users through `tools/ot/gate_users.py`; the site's
+  `appsettings.Local.json` now names the QA database (the DEV copy is kept as `pkgppsettings.Local.json.dev-0.7.0`).
+- **Found on the first start against QA: 500.30.** A fresh database has no user for the pool identity — `deploy.py`
+  keeps users, logins and role membership on a republish, but a `--fresh` database starts with none, and the owner's
+  2026-09-11 grant of `app_execute` to `VGSOT\svc-pncapi` was on `_V2_DEV` only. Fixed by `CREATE USER [VGSOT\svc-pncapi]
+  FROM LOGIN …` and `ALTER ROLE app_execute ADD MEMBER` on QA (the login already exists on the server); `/health` then
+  answered `environment QA, release 0.8.0, database ok`. Every fresh V2 database needs this step; `gate_users.py` does
+  not do it (it is a server-login mapping, not platform data) — recorded here so PROD's first start does not repeat it.
+- In Windows mode the definitions arrive over several gate passes: the Administrator run loads the lifecycle workflow
+  (Draft), the Approver run approves it, the next Administrator run loads the procedure and the request workflow, the
+  next Approver approves them. A fresh database therefore takes three Administrator → Approver passes before every
+  gate check can pass (the DEV-mode smoke does it in one process with both identities).
+- VM02 and VM07 were **not** rebuilt for QA (the workflow's §4 assumption, overturned: a VM rebuild is infrastructure
+  this session cannot perform); the predecessor's site on 443 still stands beside the V2 site on 8443. On the W8 card.
+
 ## Gate tooling on VM02, 2026-09-12 (W2 card A1, decision #97)
 
 - `C:\inetpub\PnCPlatform_V2\tools\smoke\` holds the framework-dependent `PnC.Api.Smoke` of the current

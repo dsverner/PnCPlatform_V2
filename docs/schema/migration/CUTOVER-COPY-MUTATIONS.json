@@ -1,0 +1,100 @@
+{
+ "copy": "dbRelayManagement_Legacy_Cutover",
+ "before": {
+  "SETTINGS": 14211,
+  "Settings Management": 8409,
+  "Relay Document Management": 8409,
+  "Setting Database Management": 8408,
+  "Setting Software Management": 8408,
+  "Setting Software Data": 4,
+  "LOCATIONS": 825,
+  "Users": 32
+ },
+ "after": {
+  "SETTINGS": 14211,
+  "Settings Management": 8409,
+  "Relay Document Management": 8409,
+  "Setting Database Management": 8408,
+  "Setting Software Management": 8408,
+  "Setting Software Data": 4,
+  "LOCATIONS": 825,
+  "Users": 32
+ },
+ "mutations": [
+  [
+   "SETTINGS",
+   "added",
+   "P9999 / CR 99999901 (a superseded record for base 0227)"
+  ],
+  [
+   "SETTINGS",
+   "changed",
+   "A0227: SET1 gained a line CUTOVER=CHANGED"
+  ],
+  [
+   "SETTINGS",
+   "deleted",
+   "D0002 / CR 4 (a D row)"
+  ],
+  [
+   "Settings Management",
+   "added",
+   "CR 99999901 / P9999"
+  ],
+  [
+   "Settings Management",
+   "changed",
+   "CR 2144042 / P0002: Notes"
+  ],
+  [
+   "Settings Management",
+   "deleted",
+   "CR 9617912 / P6955"
+  ],
+  [
+   "Relay Document Management",
+   "added",
+   "CR 99999901 / P9999 Complete 2026-09-01"
+  ],
+  [
+   "Relay Document Management",
+   "changed",
+   "CR 2144042 / P0002: Date 2008-07-10 \u2192 2008-07-11"
+  ],
+  [
+   "Relay Document Management",
+   "deleted",
+   "CR 9617912 / P6955"
+  ],
+  [
+   "Setting Database Management",
+   "added",
+   "CR 99999901 / P9999 Complete 2026-09-01"
+  ],
+  [
+   "Setting Database Management",
+   "changed",
+   "CR 2144042 / P0002: Date 2008-07-10 \u2192 2008-07-11"
+  ],
+  [
+   "Setting Database Management",
+   "deleted",
+   "CR 9617912 / P6955"
+  ],
+  [
+   "LOCATIONS",
+   "added",
+   "CUTOVER TEST TERMINAL / Eng"
+  ],
+  [
+   "LOCATIONS",
+   "changed",
+   "NEGUAC: Eng \u2192 Dist"
+  ],
+  [
+   "LOCATIONS",
+   "deleted",
+   "one of BELLEDUNE PLANT's Eng rows"
+  ]
+ ]
+}

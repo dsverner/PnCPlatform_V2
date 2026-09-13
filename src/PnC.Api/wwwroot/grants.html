@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Grants · P&amp;C Platform</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+  <meta name="theme-color" content="#1f3a4d">
+</head>
+<body>
+  <!-- W8 (decision #136 amending #130; IDENTITY.md §3–§5): the grants screen — people with their roles and scopes, add and
+       revoke. Accounts are the directory's (security.vUser); a role is held under a scope (security.vGrant: Global, or a
+       NodeSubtree picked from the tree); one person may hold several grants, under all three owners (W7 card A). Writes go
+       through security.Grant_Add and security.Grant_Revise (a revoke keeps the row, names who revoked and why). Reading
+       needs Grant.Read, changing Grant.Modify — the Administrator's alone (IDENTITY §3). No inline script or style. -->
+  <header class="bar">
+    <span class="brand"><a href="/">P&amp;C Platform</a> <span class="crumb">/ Grants</span>
+      <nav class="nav"><a href="/settings.html">Settings</a> <a href="/floc.html">Locations</a> <a href="/definitions.html">Definitions</a></nav></span>
+    <span id="who" class="who">signing in…</span>
+  </header>
+  <main class="defs">
+    <aside class="panel">
+      <h2>People</h2>
+      <label class="inline">Find <input id="find" type="search" placeholder="name or account" autocomplete="off"></label>
+      <p class="muted small" id="people-summary">…</p>
+      <ul id="people" class="tree"></ul>
+    </aside>
+    <section class="panel">
+      <div class="toolbar">
+        <div class="doc-title" id="person-title">Pick a person</div>
+        <div class="actions"><button id="btn-add" type="button" hidden>Add a grant</button></div>
+      </div>
+      <p id="status" class="status muted">…</p>
+      <div class="scroll"><table id="grants" class="grid rows"><thead></thead><tbody></tbody></table></div>
+      <p class="muted small">A revoked grant stays on the record with who revoked it and why (IDENTITY §4). A person may hold several grants — one per owner where their work spans Transmission, Generation and Distribution.</p>
+    </section>
+    <section id="add" class="panel wide" hidden>
+      <h2>Add a grant</h2>
+      <div class="form">
+        <label>Role <select id="add-role"></select></label>
+        <label>Scope <select id="add-scope"><option value="Global">Global — every subject of the family</option><option value="NodeSubtree">NodeSubtree — a node and everything beneath it</option></select></label>
+        <label id="add-node-row">Node <select id="add-node"><option value="">(pick a division or a station)</option></select></label>
+        <label>Asset class (optional) <input id="add-class" type="text" placeholder="e.g. Secondary" autocomplete="off"></label>
+        <label>Device category (optional) <input id="add-category" type="text" placeholder="e.g. Relay" autocomplete="off"></label>
+      </div>
+      <div class="actions"><button id="btn-save" type="button">Save grant</button> <button id="btn-cancel" type="button">Cancel</button></div>
+      <p id="add-status" class="status muted"></p>
+    </section>
+    <section id="revoke" class="panel wide" hidden>
+      <h2>Revoke a grant</h2>
+      <p id="revoke-what" class="muted"></p>
+      <div class="form"><label>Reason (required) <input id="revoke-reason" type="text" autocomplete="off"></label></div>
+      <div class="actions"><button id="btn-revoke" type="button">Revoke</button> <button id="btn-revoke-cancel" type="button">Cancel</button></div>
+      <p id="revoke-status" class="status muted"></p>
+    </section>
+  </main>
+  <script src="/pnc.js"></script>
+  <script src="/grants.js"></script>
+</body>
+</html>

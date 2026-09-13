@@ -18,7 +18,7 @@ Usage (QA/PROD, decision 256 - the evidence comes from three vantage points, bec
         PnC.Api.Smoke.exe https://<application server>/ - - --windows=ReadOnly       > smoke-readonly.log
   2. on the build machine (Business), which has the release package, the database path for the release row, and is the
      right place to prove the temporary rule is closed:
-        python tools/rehearse_relocation.py --package dist/<version> --server <sql> --database PnCPlatform_QA
+        python tools/rehearse_relocation.py --package dist/<version> --server <sql> --database PnCPlatform_V2_QA
                --smoke-log smoke-admin.log --smoke-log smoke-readonly.log --expect-refused <application server>:443
      With --smoke-log and no --api-url the API is not called from here (there is no path, by design): steps 1, 2 and 6 are
      read from the logs' SMOKE header and outcome lines, and the step-7 record is written through the same procedures the
@@ -90,12 +90,29 @@ def parse_smoke_log(path):
     """The smoke's output: a SMOKE header line (api, environment, release, mode, host, user, at), PASS/FAIL/SKIP lines, and the
     API SMOKE PASS/FAIL summary. Returns what the rehearsal needs from it."""
     head = {}; fails = []; feed = []; passed = False; summary = ""; health_ok = False
+    import re
     for line in open(path, encoding="utf-8", errors="replace"):
         line = line.rstrip("\n")
-        if line.startswith("SMOKE "):
-            head = dict(kv.split("=", 1) for kv in line[6:].split(" ") if "=" in kv)
-        elif line.startswith("FAIL "):
-            fails.append(line[5:])
+        # W8 (#149): the V2 smoke's own lines (PnC.Api.Smoke, W1-W8); the predecessor's SMOKE header format is still read below
+        m = re.match(r"PnC\.Api\.Smoke against (\S+) \((Windows identity as (\w+)|DEV header identities)\)", line)
+        if m:
+            head = {"api": m.group(1), "host": m.group(1).split("//")[-1].split("/")[0], "mode": f"Windows/{m.group(3)}" if m.group(3) else "Development",
+                    "at": datetime.fromtimestamp(os.path.getmtime(path), timezone.utc).isoformat(timespec="seconds")}
+            continue
+        t = line.strip()
+        m = re.match(r"PASS /health database ok \(release ([^,]+), environment (\w+)\)", t)
+        if m:
+            head["release"], head["environment"] = m.group(1), m.group(2); health_ok = True
+        m = re.match(r"PASS /me signed in as (\S+)", t)
+        if m and "user" not in head:
+            head["user"] = m.group(1)
+        if t.startswith("FAIL "):
+            fails.append(t[5:])
+        if t.startswith("SMOKE PASS") or t.startswith("SMOKE FAIL"):
+            summary = t; passed = t.startswith("SMOKE PASS")
+        # the predecessor's format (kept so an old log still reads)
+        if line.startswith("SMOKE ") and "=" in line:
+            head.update(dict(kv.split("=", 1) for kv in line[6:].split(" ") if "=" in kv))
         elif line.startswith("PASS health:"):
             health_ok = True
         if line.startswith(("PASS feed:", "FAIL feed:", "SKIP feed:")):
@@ -241,8 +258,10 @@ def main():
                 run.add(5, "Temporary Business -> OT rule closed", "fail", f"{a.expect_refused} accepted a connection from this host")
                 refused = False
         except OSError as e:
-            run.add(5, "Temporary Business -> OT rule closed", "pass", f"{a.expect_refused} refused: {type(e).__name__}")
-            refused = True
+            how = {"ConnectionRefusedError": "refused", "TimeoutError": "timed out (filtered — no route or a host firewall without an allow for this source)"}.get(type(e).__name__, type(e).__name__)
+            run.add(5, "Temporary Business -> OT rule closed", "pass" if type(e).__name__ != "gaierror" else "fail",
+                    f"{a.expect_refused}: {how}" if type(e).__name__ != "gaierror" else f"{a.expect_refused}: name not resolved from this host — no evidence either way; give an address")
+            refused = type(e).__name__ != "gaierror"
     else:
         run.add(5, "Temporary Business -> OT rule closed", "not-applicable", "no --expect-refused given (on DEV the rule is open by design)")
         refused = None
@@ -257,7 +276,9 @@ def main():
                     "pass" if l["passed"] else "fail", l["summary"] + (f"; FAIL lines: {' | '.join(l['fails'][:3])}" if l["fails"] else ""))
         feed_lines = [x for l in logs for x in l["feed"]]
         feed_ok = bool(feed_lines) and all(x.startswith("PASS") for x in feed_lines)
-        run.add(6, "Feed pull (F3) completes", "pass" if feed_ok else "fail", "; ".join(x[5:] for x in feed_lines)[:400] or "no feed line in the logs")
+        # Phase 1 has no feed (F3 is the integration phase's; the V2 /health carries none): reported, not failed
+        run.add(6, "Feed pull (F3) completes", "pass" if feed_ok else ("not-applicable" if not feed_lines else "fail"),
+                "; ".join(x[5:] for x in feed_lines)[:400] or "no feed in Phase 1 (F3 arrives with the integration phase); nothing to pull")
     else:
         pwd = password()
         cs = f"Server={a.server};Database={a.database};" + (f"User ID=dev_pnc;Password={pwd};" if pwd else "Integrated Security=true;") + "TrustServerCertificate=true;Encrypt=true"
@@ -273,7 +294,7 @@ def main():
             feed_ok = f.get("lastGoodPull") is not None and (f.get("ageSeconds") or 10**9) < 600
             run.add(6, "Feed pull (F3) completes", "pass" if feed_ok else "fail", f"{f.get('name')}: age {f.get('ageSeconds')} s, landed {f.get('landed')}, error {f.get('lastError')}")
         else:
-            run.add(6, "Feed pull (F3) completes", "fail", "no feed configured")
+            run.add(6, "Feed pull (F3) completes", "not-applicable", "no feed in Phase 1 (F3 arrives with the integration phase)")
 
     # ---- step 7: the record and the report
     reached = 7 if not run.failed else max([s for s, _, o, _ in run.rows if o == "pass"] + [0])

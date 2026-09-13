@@ -12,6 +12,8 @@ CREATE PROCEDURE [process].[LandMigratedInstance]
     @WorkRequestEntityId UNIQUEIDENTIFIER,
     @DocumentationStatus NVARCHAR(50) = NULL,      -- the legacy Relay Document Management status
     @DatabaseStatus NVARCHAR(50) = NULL,           -- the legacy Setting Database Management status
+    @DocumentationAt DATETIMEOFFSET(7) = NULL,     -- W8 (#149): the legacy track row's Date — a Complete / NA branch completes then, not at the capture instant
+    @DatabaseAt DATETIMEOFFSET(7) = NULL,
     @At DATETIMEOFFSET(7) = NULL,
     @ActorId UNIQUEIDENTIFIER = NULL,
     @MigrationRunId UNIQUEIDENTIFIER,
@@ -70,9 +72,10 @@ BEGIN
 
     -- COMPLETION Running; each branch from its legacy track
     EXEC [process].[SetBlockState] @EntityId = @completion, @State = N'Running', @At = @now, @ActorId = @ActorId;
-    DECLARE @branchPath NVARCHAR(400), @status NVARCHAR(50), @branch UNIQUEIDENTIFIER, @inner UNIQUEIDENTIFIER;
-    DECLARE br CURSOR LOCAL FAST_FORWARD FOR SELECT * FROM (VALUES (N'MAIN/COMPLETION/DOCUMENTATION', @DocumentationStatus), (N'MAIN/COMPLETION/DATABASE', @DatabaseStatus)) v ([Path], [Status]);
-    OPEN br; FETCH NEXT FROM br INTO @branchPath, @status;
+    DECLARE @branchPath NVARCHAR(400), @status NVARCHAR(50), @branch UNIQUEIDENTIFIER, @inner UNIQUEIDENTIFIER, @trackAt DATETIMEOFFSET(7);
+    DECLARE br CURSOR LOCAL FAST_FORWARD FOR SELECT * FROM (VALUES (N'MAIN/COMPLETION/DOCUMENTATION', @DocumentationStatus, @DocumentationAt), (N'MAIN/COMPLETION/DATABASE', @DatabaseStatus, @DatabaseAt)) v ([Path], [Status], [At]);
+    OPEN br; FETCH NEXT FROM br INTO @branchPath, @status, @trackAt;
+    SET @trackAt = ISNULL(@trackAt, @now);
     WHILE @@FETCH_STATUS = 0
     BEGIN
         SELECT TOP (1) @branch = [EntityId] FROM [process].[BlockInstance] WHERE [ProcedureInstanceEntityId] = @ProcedureInstanceEntityId AND [BlockPath] = @branchPath AND [BlockKind] = N'branch' AND [IsDeleted] = 0;
@@ -92,8 +95,8 @@ BEGIN
                 OPEN cb; FETCH NEXT FROM cb INTO @inner;
                 WHILE @@FETCH_STATUS = 0 BEGIN EXEC [process].[SetBlockState] @EntityId = @inner, @State = N'Skipped', @Outcome = N'Migrated', @At = @now, @ActorId = @ActorId; FETCH NEXT FROM cb INTO @inner; END
                 CLOSE cb; DEALLOCATE cb;
-                EXEC [process].[SetBlockState] @EntityId = @branch, @State = N'Running', @At = @now, @ActorId = @ActorId;
-                EXEC [process].[SetBlockState] @EntityId = @branch, @State = N'Completed', @Outcome = N'Done', @At = @now, @ActorId = @ActorId;
+                EXEC [process].[SetBlockState] @EntityId = @branch, @State = N'Running', @At = @trackAt, @ActorId = @ActorId;
+                EXEC [process].[SetBlockState] @EntityId = @branch, @State = N'Completed', @Outcome = N'Done', @At = @trackAt, @ActorId = @ActorId;
             END
             ELSE IF @status = N'NA'
             BEGIN
@@ -113,7 +116,7 @@ BEGIN
             ELSE
                 EXEC [process].[SetBlockState] @EntityId = @branch, @State = N'Running', @At = @now, @ActorId = @ActorId;   -- Change In Progress, or unknown: the platform continues it
         END
-        FETCH NEXT FROM br INTO @branchPath, @status;
+        FETCH NEXT FROM br INTO @branchPath, @status, @trackAt; SET @trackAt = ISNULL(@trackAt, @now);
     END
     CLOSE br; DEALLOCATE br;
     DECLARE @detail NVARCHAR(MAX) = CONCAT(N'{"action":"migrated-landed","documentation":"', ISNULL(STRING_ESCAPE(@DocumentationStatus, 'json'), N''), N'","database":"', ISNULL(STRING_ESCAPE(@DatabaseStatus, 'json'), N''), N'"}');

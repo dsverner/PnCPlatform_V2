@@ -56,10 +56,13 @@ def hash_table(cur, table):
             k = "|".join(canon(row[cols.index(c)]) for c in keycols)
         else:
             k = h
-        n = seen.get(k, 0) + 1; seen[k] = n
-        if n > 1:
-            k = f"{k}#{n}"        # a duplicate natural key (the header's 894): kept as a set, never collapsed
-        out[k] = h
+        seen.setdefault(k, []).append(h)
+    # a duplicate natural key (the header's 894): kept as a set, never collapsed — and suffixed in hash order, so the same
+    # set reads the same on both sides whatever order the rows came back in (found 2026-09-13: a SELECT INTO copy returned
+    # the duplicates permuted and 300 unchanged track rows read as "changed")
+    for k, hs in seen.items():
+        for i, h in enumerate(sorted(hs), 1):
+            out[k if i == 1 else f"{k}#{i}"] = h
     return cols, out
 
 
