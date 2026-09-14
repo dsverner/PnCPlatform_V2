@@ -271,8 +271,14 @@ class Importer:
             if marked:
                 division = marked; flags = [f for f in flags if "StationGroupConflict" not in f]
                 if division not in self.divisions:
-                    owner = self.run.rows("SELECT TOP (1) EntityId FROM location.vNode WHERE NodeTypeCode = N'Owner' AND Name = N'NB Power'")[0][0]
-                    self.divisions[division] = self.node("Division", str(owner), division, f"Division:{division}", notes="Created for the owner's station markup (W8 card A, #153)")
+                    # a merchant owner named in the markup (TransAlta, Caribou Wind Farm — Owner nodes seeded W8) places the station under
+                    # that owner's Generation division; any other name is a division under NB Power, created if the tree lacks it
+                    merchant = self.run.rows("SELECT TOP (1) d.EntityId FROM location.vNode o JOIN location.vNode d ON d.ParentEntityId = o.EntityId AND d.NodeTypeCode = N'Division' AND d.Name = N'Generation' WHERE o.NodeTypeCode = N'Owner' AND o.Name = ?", division)
+                    if merchant:
+                        self.divisions[division] = str(merchant[0][0])
+                    else:
+                        owner = self.run.rows("SELECT TOP (1) EntityId FROM location.vNode WHERE NodeTypeCode = N'Owner' AND Name = N'NB Power'")[0][0]
+                        self.divisions[division] = self.node("Division", str(owner), division, f"Division:{division}", notes="Created for the owner's station markup (W8 card A, #153)")
                 self.rule("station placed under the owner's marked division (card A)", loc)
             # the station's asset number: the owner's mapping, else the dominant SETTINGS.ASSET (flagged)
             number = stnum.get(loc.upper())

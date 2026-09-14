@@ -29,8 +29,11 @@ def main():
             target = mapping.get(name.strip().upper())
             if not target:
                 unmapped += 1; continue
-            if target == division:
+            if target == division or (target in divisions and divisions[target] == str(run.rows("SELECT ParentEntityId FROM location.vNode WHERE EntityId = ?", sid)[0][0])):
                 skipped += 1; continue
+            if target not in divisions:
+                merchant = run.rows("SELECT TOP (1) d.EntityId FROM location.vNode o JOIN location.vNode d ON d.ParentEntityId = o.EntityId AND d.NodeTypeCode = N'Division' AND d.Name = N'Generation' WHERE o.NodeTypeCode = N'Owner' AND o.Name = ?", target)
+                if merchant: divisions[target] = str(merchant[0][0])
             if target not in divisions:
                 (e, r) = run.exec("location.AddNode", outputs=[("EntityId", "UNIQUEIDENTIFIER"), ("RowId", "UNIQUEIDENTIFIER")], NodeTypeCode="Division", ParentEntityId=str(owner), Name=target,
                                   Notes="Created for the owner's station markup (W8 card A, #153)")

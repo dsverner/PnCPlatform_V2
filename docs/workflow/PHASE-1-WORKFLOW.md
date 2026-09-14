@@ -684,6 +684,15 @@ the release with SBOM and `release.json`.
   relocation rehearsal now has all three vantage points: VM02 as the gate accounts, the build machine, and VM07.
 - **Round 2 answered (#155)**: T1 the move worked on QA; T2 PASS from VM07; T3 the template names stay as found; T4 the
   documentation proceeds — database package and technical architecture first, Word from Markdown plus PDF, draw.io.
+- **Round 3 — the migration defect and the fresh QA (2026-09-13 evening, #156)**: while choosing the records for the
+  owner's review card, a chain's superseded revisions all read the same date; the importer had keyed a base's row detail by
+  OLD_NO alone, so the P rows of 1 265 bases carried the last row's text and dates (on DEV: 1 552 revisions with another
+  row's text, 970 with another row's in-service start). Fixed; `verify_chains.py` now compares every revision's text and
+  in-service start with the source. **QA recreated fresh and reloaded**: first pass 246 264 rows, second 0; text 11 554
+  equal / 0 differ; in-service starts 10 893 equal, 296 adjusted by the chain rule, 0 differ; 5 119 runs landed, swept
+  (15 071 changes) and 4 853 requests closed; 949 SEL files re-parsed, 0 failed (the repeated-name fix); the four gate
+  accounts 81 / 58 / 44 / 26 PASS. Provenance found missing since W7 for node-function labels, ANSI codes and manufacturer
+  entities — written and backfilled. DEV reloaded the same way afterwards.
 - **The cutover delta applied on QA** (`CUTOVER-APPLY-2026-09-13.md`): the importer re-run against
   `dbRelayManagement_Legacy_Cutover` — the added station and its building, the added P9999 revision (Superseded,
   Archived, landed with its two tracks) and, because its CR exceeds the A row's, a twentieth ordering finding; the
