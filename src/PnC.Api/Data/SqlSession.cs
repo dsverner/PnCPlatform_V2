@@ -162,21 +162,30 @@ public sealed class SqlSession : IAsyncDisposable
 
         // IDENTITY.md §5: read scope is as strict as write scope. The set of readable subjects is the database's
         // (security.fReadableSubjects); the API contributes only the subject column and family.
+        var scopeJoin = "";
         if (scope is not null)
         {
             cmd.Parameters.Add("@su", SqlDbType.UniqueIdentifier).Value = scope.UserEntityId;
             cmd.Parameters.Add("@sp", SqlDbType.NVarChar, 80).Value = scope.PermissionCode;
             var families = scope.Family == "Any" ? new[] { "Node", "Asset", "Record", "WorkRequest", "Scheme" } : new[] { scope.Family };
             var sets = families.Select(f => $"SELECT [SubjectEntityId] FROM [security].[fReadableSubjects](@su, @sp, N'{f}', SYSDATETIMEOFFSET())");
-            var inScope = $"{Q(scope.Column)} IN ({string.Join(" UNION ", sets)})";
             if (scope.Family == "Any")
             {
                 // W4 (decision #118): a subject of a kind outside the five scoped families (a settings-issue package, a
                 // procedure instance…) has no node to scope by; its rows are readable under a Global grant only (IDENTITY.md §5)
+                var inScope = $"{Q(scope.Column)} IN ({string.Join(" UNION ", sets)})";
                 var outside = scope.KindColumn is null ? "1 = 1" : $"{Q(scope.KindColumn)} NOT IN (N'Node', N'Station', N'Panel', N'DevicePosition', N'ProtectionFunction', N'Asset', N'Device', N'Record', N'WorkRequest', N'Scheme')";
-                inScope = $"({inScope} OR ({outside} AND [security].[fHasPermission](@su, @sp, NULL, NULL, SYSDATETIMEOFFSET()) = 1))";
+                where.Add($"({inScope} OR ({outside} AND [security].[fHasPermission](@su, @sp, NULL, NULL, SYSDATETIMEOFFSET()) = 1))");
             }
-            where.Add(inScope);
+            else
+            {
+                // W8 (0.9.0, #158): the readable set as a distinct derived table joined to the view, not an IN (subquery) predicate.
+                // On the fully loaded DEV estate the IN form took the whole settings book from 1.9 s to 100–170 s once the
+                // migration's landings filled the process tables (the optimizer pushed the set into the view's correlated
+                // lookups); the join form measured 1.9 s on the same data (2026-09-14, typed parameters). The derived
+                // table's one column is named so no view column can be ambiguous.
+                scopeJoin = $" JOIN (SELECT DISTINCT [SubjectEntityId] AS [__ScopeId] FROM ({string.Join(" UNION ", sets)}) __s) __scope ON __scope.[__ScopeId] = {Q(scope.Column)}";
+            }
         }
         // W7: a scoped read is compiled for its own grant. A plan cached for one readable set (the whole registry under a
         // Global grant, 55 assets under a subtree) served another for 30 s on DEV until the cache was cleared; the
@@ -198,7 +207,7 @@ public sealed class SqlSession : IAsyncDisposable
 
         cmd.Parameters.Add("@skip", SqlDbType.Int).Value = skip;
         cmd.Parameters.Add("@take", SqlDbType.Int).Value = take;
-        var body = $"SELECT {select} FROM {source}" + (where.Count > 0 ? " WHERE " + string.Join(" AND ", where) : "");
+        var body = $"SELECT {select} FROM {source}{scopeJoin}" + (where.Count > 0 ? " WHERE " + string.Join(" AND ", where) : "");
         var paging = " ORDER BY " + string.Join(", ", order) + " OFFSET @skip ROWS FETCH NEXT @take ROWS ONLY";
         // W7: a hand-written read model whose rows are correlated lookups (the parity screens' views) is materialised whole
         // before it is ordered and paged — the optimizer otherwise re-evaluates the lookups per candidate row (a page at

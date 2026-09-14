@@ -60,7 +60,8 @@ SELECT r.[RowSeq],
        st.[StationEntityId]         AS [StationNodeEntityId],
        st.[StationName],
        stno.[KeyValue]              AS [StationNumber],
-       fn.[Functions]
+       fn.[Functions],
+       sch.[SchemeEntityId], sch.[SchemeName]          -- W8 (#158): the functional scheme the device belongs to — the grid's group
 FROM [document].[vConfigurationFile] cf
 JOIN [document].[vRevision] r ON r.[RowId] = cf.[RevisionRowId]
 LEFT JOIN [document].[vSettingsIssuePackageItem] it ON it.[ConfigurationFileRevisionRowId] = cf.[RevisionRowId]
@@ -102,6 +103,20 @@ OUTER APPLY (SELECT TOP (1) k.[KeyValue] FROM [location].[AlternateKey] k WHERE 
 OUTER APPLY (SELECT STRING_AGG(f.[AnsiCode], N', ') WITHIN GROUP (ORDER BY f.[IsPrincipal] DESC, f.[AnsiCode]) AS [Functions]
              FROM [location].[Node] pf JOIN [scheme].[CommissionedFunction] f ON f.[ProtectionFunctionNodeEntityId] = pf.[EntityId]
              WHERE pf.[ValidTo] IS NULL AND pf.[IsDeleted] = 0 AND f.[ValidTo] IS NULL AND f.[IsDeleted] = 0 AND pf.[ParentEntityId] = dp.[EntityId] AND pf.[NodeTypeCode] = N'ProtectionFunction') fn
+-- W8 (#158): the scheme through the asset's own membership first (the migration's equipment group), else through a
+-- protection function under the position. Three seeks on the base tables in the filtered indexes' own form
+-- (IX_SchemeMember_Member on (MemberKind, MemberEntityId)); one combined OR/EXISTS apply measured 28 s for the whole
+-- estate against 1.8 s without it (2026-09-14, typed parameters as the API binds them), these three 1.9 s.
+OUTER APPLY (SELECT TOP (1) sm.[SchemeEntityId] FROM [scheme].[SchemeMember] sm
+             WHERE sm.[ValidTo] IS NULL AND sm.[IsDeleted] = 0 AND sm.[MemberKind] = N'Asset' AND sm.[MemberEntityId] = a.[EntityId]
+             ORDER BY sm.[RowSeq]) sma
+OUTER APPLY (SELECT TOP (1) sm.[SchemeEntityId] FROM [location].[Node] pf
+             JOIN [scheme].[SchemeMember] sm ON sm.[MemberKind] = N'ProtectionFunction' AND sm.[MemberEntityId] = pf.[EntityId] AND sm.[ValidTo] IS NULL AND sm.[IsDeleted] = 0
+             WHERE sma.[SchemeEntityId] IS NULL AND pf.[ParentEntityId] = dp.[EntityId] AND pf.[NodeTypeCode] = N'ProtectionFunction' AND pf.[ValidTo] IS NULL AND pf.[IsDeleted] = 0
+             ORDER BY sm.[RowSeq]) smf
+OUTER APPLY (SELECT TOP (1) s.[EntityId] AS [SchemeEntityId], s.[Name] AS [SchemeName] FROM [scheme].[Scheme] s
+             WHERE s.[EntityId] = COALESCE(sma.[SchemeEntityId], smf.[SchemeEntityId]) AND s.[ValidTo] IS NULL AND s.[IsDeleted] = 0
+             ORDER BY s.[ValidFrom] DESC, s.[RowSeq] DESC) sch
 LEFT JOIN [personnel].[vActor] ca ON ca.[ActorId] = r.[PreparedByActorId]
 LEFT JOIN [personnel].[vPerson] cp ON cp.[EntityId] = ca.[PersonEntityId]
 WHERE cf.[CaptureKind] = N'Designed' AND cf.[FileKind] IN (N'NativeSettings', N'SettingsText');

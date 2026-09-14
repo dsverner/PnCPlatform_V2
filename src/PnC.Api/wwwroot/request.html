@@ -3,19 +3,21 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
   <title>Change Request · P&amp;C Platform</title>
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/styles.css">
-  <meta name="theme-color" content="#1f3a4d">
+  <meta name="theme-color" content="#1f3a4d" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f1d27" media="(prefers-color-scheme: dark)">
 </head>
 <body>
-  <!-- W6 (decisions #127, #130; LEGACY-SYSTEM §8 change request / status window; PROCEDURE-ENGINE §10 rows 4–6, 8): one work
-       request over work.vChangeRequestStatus — the header, the two completion tracks, the devices in the change, and the
-       request's own transitions (Start, Close, Cancel with a reason). The legacy software track has no card (owner, W6
-       card B; #58: its rows migrate as notes on the request). No inline script or style. -->
+  <!-- W8 (decisions #157–#158; round 4 B, round 5 B5): one work request over work.vChangeRequestStatus — the stage bar read
+       from the request workflow's Effective definition, the header in the legacy order, the notes block, the three completion
+       tracks side by side (documentation, database, software — the third not modelled, #58), Post Request / Close, Go to
+       Settings, Go to Document, and the devices in the change. No inline script or style. -->
   <header class="bar">
-    <span class="brand"><a href="/">P&amp;C Platform</a> <span class="crumb">/ <a href="/settings.html">Settings</a> / Change request</span></span>
+    <span class="brand"><a href="/">P&amp;C Platform</a> <span class="crumb">/ <a href="/requests.html">Requests</a> / Change request</span></span>
     <span id="who" class="who">signing in…</span>
   </header>
   <main class="one">
@@ -24,19 +26,27 @@
         <h2 id="title">Change request</h2>
         <div class="actions">
           <button id="btn-start" type="button" title="Raised → In progress: starts the settings-change procedure">Start</button>
-          <button id="btn-close" type="button" title="Post / close: allowed once the procedure has completed">Post / Close</button>
+          <button id="btn-close" type="button" title="Post Request / Close: allowed once the procedure has completed">Post request / Close</button>
+          <a id="btn-settings" class="row-link" title="The devices of this request in the settings book">Go to settings</a>
+          <a id="btn-doc" class="row-link" hidden target="_blank" rel="noopener">Go to document</a>
           <label class="inline">Reason <input id="cancel-reason" type="text" placeholder="required to cancel" autocomplete="off"></label>
           <button id="btn-cancel" type="button">Cancel request</button>
         </div>
       </div>
       <p id="status" class="status muted">…</p>
+      <ol id="stages" class="stages" aria-label="Request stage"></ol>
       <dl id="header" class="facts three"></dl>
     </section>
     <section class="panel wide">
+      <h2>Notes</h2>
+      <dl id="notes" class="facts"></dl>
+    </section>
+    <section class="panel wide">
       <h2>Completion tracks</h2>
-      <div class="tracks">
-        <div class="track" id="track-doc"><h3>Relay setting documentation</h3><dl class="facts"></dl></div>
-        <div class="track" id="track-db"><h3>Relay setting database</h3><dl class="facts"></dl></div>
+      <div class="tracks three">
+        <div class="track" id="track-doc"><h3>Relay setting documentation</h3><div class="radios" role="group" aria-label="Documentation status"></div><dl class="facts"></dl></div>
+        <div class="track" id="track-db"><h3>Relay setting database</h3><div class="radios" role="group" aria-label="Database status"></div><dl class="facts"></dl></div>
+        <div class="track" id="track-sw"><h3>Relay setting software</h3><div class="radios" role="group" aria-label="Software status"></div><dl class="facts"></dl></div>
       </div>
     </section>
     <section class="panel wide">

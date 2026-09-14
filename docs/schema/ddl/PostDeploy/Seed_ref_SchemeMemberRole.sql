@@ -16,7 +16,8 @@ USING (VALUES
     (N'IntertripSend',    N'Intertrip send'),
     (N'TripCircuit',      N'Trip circuit'),
     (N'LockoutRelay',     N'Lockout relay'),
-    (N'AuxiliaryTrip',    N'Auxiliary trip')
+    (N'AuxiliaryTrip',    N'Auxiliary trip'),
+    (N'Member',           N'Member')                    -- W8 (#158): the role of a migrated position in its equipment group, until curation names a better one
 ) AS s ([MemberRoleCode], [Name])
 ON t.[MemberRoleCode] = s.[MemberRoleCode]
 WHEN MATCHED AND t.[Name] <> s.[Name] THEN UPDATE SET [Name] = s.[Name], [ModifiedBy] = @actor, [ModifiedAt] = @now

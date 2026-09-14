@@ -855,10 +855,13 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
         var (l2s, l2b) = await Post(admin, "api/v1/definitions/documents", new { document = v2, changeNote = "W4 gate: v2" });
         var (a2s, a2b) = await Post(approver, $"api/v1/definitions/documents/{l2b?["versionRowId"]}/approve", new { });
         Must(l2s == HttpStatusCode.OK && a2s == HttpStatusCode.OK, $"a new SETTINGS_CHANGE version approved ({l2b?["versionNumber"]} → {(int)a2s} {Code(a2b)})");
-        var (mls, mlb) = await Get(admin, "api/v1/process/vMigrationList?take=500");
+        // W8 (0.9.0): read the list for each instance by its id — on the migrated estate the whole list runs past a page (527 rows on DEV,
+        // 2026-09-14: every migrated running instance pinned to an earlier SETTINGS_CHANGE version once a newer one is approved)
+        var (mls, mlb) = await Get(admin, $"api/v1/process/vMigrationList?ProcedureInstanceEntityId={inst2}&take=500");
         var ml = (mlb?["rows"] as JsonArray) ?? new JsonArray();
         Must(ml.Any(r => string.Equals(r?["ProcedureInstanceEntityId"]?.ToString(), inst2.ToString(), StringComparison.OrdinalIgnoreCase) && r?["IsRootProcedure"]?.GetValue<bool>() == true), "the running instance is on the migration list, awaiting a ruling");
-        Must(!ml.Any(r => string.Equals(r?["ProcedureInstanceEntityId"]?.ToString(), inst.ToString(), StringComparison.OrdinalIgnoreCase)), "the completed instance is not");
+        var (mlcs, mlcb) = await Get(admin, $"api/v1/process/vMigrationList?ProcedureInstanceEntityId={inst}&take=500");
+        Must(mlcs == HttpStatusCode.OK && ((mlcb?["rows"] as JsonArray) ?? new JsonArray()).Count == 0, "the completed instance is not");
         var (pv2s, pv2b) = await Get(admin, $"api/v1/process/vInstanceVersionSet?ProcedureInstanceEntityId={inst2}&CalleeKey=SETTINGS_CHANGE");
         var (pv1s, pv1b) = await Get(admin, $"api/v1/process/vInstanceVersionSet?ProcedureInstanceEntityId={inst}&CalleeKey=SETTINGS_CHANGE");
         Must(string.Equals((pv2b?["rows"] as JsonArray)?[0]?["DefinitionVersionRowId"]?.ToString(), (pv1b?["rows"] as JsonArray)?[0]?["DefinitionVersionRowId"]?.ToString(), StringComparison.OrdinalIgnoreCase)
@@ -889,6 +892,8 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
         Must(gSel?["Functions"]?.ToString() == "87T" && gSel?["StationName"]?.ToString() == $"{tag} station" && gSel?["PanelName"]?.ToString() == $"{tag} panel 1" && gSel?["StationNumber"]?.ToString() == stationNumber,
             $"the grid row carries location, panel, station number and the commissioned functions ({gSel?["StationName"]} / {gSel?["PanelName"]} / {gSel?["StationNumber"]} / {gSel?["Functions"]})");
         Must(gSel?["WorkTypeKey"]?.ToString() == $"{tag}_SETTINGS_CHANGE" && gSel?["ModelCode"]?.ToString() == "SEL-421" && gSel?["RtsStepState"]?.ToString() == "Committed", $"action type, model and the RTS step state on the row ({gSel?["WorkTypeKey"]}, {gSel?["ModelCode"]}, {gSel?["RtsStepState"]})");
+        // W8 (#158): the grid row carries the scheme its device belongs to — through the function member here (the migration adds the asset member)
+        Must(gSel?["SchemeName"]?.ToString() == $"{tag} 87T scheme" && string.Equals(gSel?["SchemeEntityId"]?.ToString(), scheme?.ToString(), StringComparison.OrdinalIgnoreCase), $"the grid row names its scheme — the settings book's group ({gSel?["SchemeName"]})");
         var (ga1s, ga1b) = await Get(admin, $"api/v1/document/vSettingsRecord?GridState=Active&DeviceEntityId={devSel}");
         Must(ga1s == HttpStatusCode.OK && (ga1b?["rows"] as JsonArray)?.Count == 1, "the Active toggle filtered to the SEL-421 → one row");
         var (gh1s, gh1b) = await Get(hydro, $"api/v1/document/vSettingsRecord?WorkRequestEntityId={wr}");
@@ -992,7 +997,7 @@ else Skip("W4 run (needs the Administrator, Approver, Hydro and Technician ident
             var csp = r.Headers.TryGetValues("Content-Security-Policy", out var v) ? string.Join("", v) : "";
             var bodyText = await r.Content.ReadAsStringAsync();
             var ok = r.StatusCode == HttpStatusCode.OK && csp.Contains("script-src 'self'") && !bodyText.Contains("<script>") && !bodyText.Contains("style=\"");
-            if (path == "sw.js") ok = ok && bodyText.Contains("\"/definitions.js\"") && bodyText.Contains("\"/pnc.js\"") && bodyText.Contains("\"/floc.js\"") && bodyText.Contains("\"/settings.js\"") && bodyText.Contains("shell-8");
+            if (path == "sw.js") ok = ok && bodyText.Contains("\"/definitions.js\"") && bodyText.Contains("\"/pnc.js\"") && bodyText.Contains("\"/floc.js\"") && bodyText.Contains("\"/settings.js\"") && bodyText.Contains("shell-9");
             Check(ok, $"GET /{path} → {(int)r.StatusCode}, CSP script-src 'self', no inline script or style{(path == "sw.js" ? ", the editor files in the shell list" : "")}");
         }
         var (ms, mb) = await Get(who, "api/v1/me");

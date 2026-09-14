@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Schemes · P&amp;C Platform</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+  <meta name="theme-color" content="#1f3a4d" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f1d27" media="(prefers-color-scheme: dark)">
+</head>
+<body>
+  <!-- W8 (decision #158; round 5 B11, after Dev_Final's P&C Settings Management): a station's functional schemes and
+       their members, the positions not yet in any scheme, and the curation commands — rename, move a position to another
+       scheme, merge one scheme into another, a new scheme. Every command is an existing procedure (scheme.Scheme_Add /
+       _Revise, scheme.AddSchemeMember, scheme.SchemeMember_Revise); nothing is hard-deleted — an emptied scheme is
+       retired. No inline script or style. -->
+  <header class="bar">
+    <span class="brand"><a href="/">P&amp;C Platform</a> <span class="crumb">/ Schemes</span>
+      <nav class="nav"><a href="/settings.html">Settings</a> <a href="/requests.html">Requests</a> <a href="/floc.html">Locations</a> <a href="/grants.html">Grants</a> <a href="/definitions.html">Definitions</a></nav></span>
+    <span id="who" class="who">signing in…</span>
+  </header>
+  <main class="defs">
+    <aside class="panel">
+      <h2>Locations</h2>
+      <input id="station-filter" type="search" placeholder="type to find a location" autocomplete="off" class="wide-input" aria-label="Find a location">
+      <p class="muted small" id="station-summary">…</p>
+      <ul id="stations" class="stations"></ul>
+    </aside>
+    <section class="panel">
+      <div class="toolbar">
+        <h2 id="title">Schemes</h2>
+        <div class="actions">
+          <button id="btn-new" type="button">New scheme</button>
+          <button id="btn-refresh" type="button">Refresh</button>
+        </div>
+      </div>
+      <p id="status" class="status muted">…</p>
+      <div id="schemes" class="scheme-list"></div>
+      <h3>Not in any scheme</h3>
+      <p id="unplaced-summary" class="muted small">…</p>
+      <div class="scroll"><table id="unplaced" class="grid rows"><thead></thead><tbody></tbody></table></div>
+    </section>
+    <section id="action" class="panel wide" hidden>
+      <h2 id="action-title">Action</h2>
+      <div id="action-body"></div>
+      <p id="action-status" class="status muted"></p>
+    </section>
+  </main>
+  <script src="/pnc.js"></script>
+  <script src="/schemes.js"></script>
+</body>
+</html>

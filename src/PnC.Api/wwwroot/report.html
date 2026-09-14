@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Location Report · P&amp;C Platform</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+  <meta name="theme-color" content="#1f3a4d" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f1d27" media="(prefers-color-scheme: dark)">
+</head>
+<body>
+  <!-- W8 (decision #157; round 4 A): the legacy location report as a page — the page is the preview, Print is the browser's
+       print. Header: station and number, state, date; a section per scheme; per relay the device, model, functions, dates,
+       revision, and its settings text as filed. Reads document.vSettingsRecord for the station and state, then each
+       revision's file. No inline script or style. -->
+  <header class="bar noprint">
+    <span class="brand"><a href="/">P&amp;C Platform</a> <span class="crumb">/ <a href="/settings.html">Settings</a> / Location report</span></span>
+    <span id="who" class="who">signing in…</span>
+  </header>
+  <main class="one report">
+    <section class="panel wide">
+      <div class="toolbar noprint">
+        <h2 id="title">Location report</h2>
+        <div class="actions">
+          <label class="inline"><input id="with-text" type="checkbox" checked> settings text</label>
+          <button id="btn-print" type="button">Print</button>
+        </div>
+      </div>
+      <p id="status" class="status muted noprint">…</p>
+      <div class="report-head" id="head"></div>
+      <div id="body"></div>
+    </section>
+  </main>
+  <script src="/pnc.js"></script>
+  <script src="/report.js"></script>
+</body>
+</html>

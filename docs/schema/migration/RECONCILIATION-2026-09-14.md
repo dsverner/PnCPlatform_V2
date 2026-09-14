@@ -1,6 +1,6 @@
-# Reconciliation — dbRelayManagement_Legacy → PnCPlatform_V2_DEV — 2026-09-13
+# Reconciliation — dbRelayManagement_Legacy → PnCPlatform_V2_DEV — 2026-09-14
 
-Run `FF9A901A-4DF3-436D-91EA-E705740703FA` · 10 procedure calls · 107 s · limit none
+Run `CFB3417A-3BDA-4BC3-AAC2-6E2D46CD0232` · 10 procedure calls · 256 s · limit none
 
 ## Source totals
 
@@ -21,6 +21,7 @@ Sum: 48,702 (the gate: 14 211 + 8 409 + 8 409 + 8 408 + 8 408 + 825 + 32 = 48 70
 | Rule | Rows |
 |---|---:|
 | (LOCATION, EQUIPMENT) → Panel | 1,769 |
+| (LOCATION, EQUIPMENT) → Scheme (equipment group) | 1,769 |
 | A row with track rows → its change landed at COMPLETION with the two tracks (card H, #148) | 2 |
 | A row → the current revision, in service now | 5,530 |
 | CONTROL SWITCH row: asset only, no configuration file (mappings/asset_type.csv) | 277 |
@@ -47,6 +48,7 @@ Sum: 48,702 (the gate: 14 211 + 8 409 + 8 409 + 8 408 + 8 408 + 825 + 32 = 48 70
 | Settings Management row → the request's type, requester, notes | 6,241 |
 | Users → personnel.Person | 32 |
 | base number → DevicePosition + Asset (+ Device, Installed) | 6,839 |
+| base number → member of its equipment group (asset + protection functions) | 6,839 |
 | chain where an archived CR exceeds the active CR → a finding (#59) | 17 |
 | duplicate station number → a finding on the station left without one (card C) | 2 |
 | row keyed '2…' (2440): dropped, counted (#60) | 2 |
@@ -69,6 +71,8 @@ A 5,530 + M 350 + P 5,683 + control-switch rows 277 + D 2,361 + 2440 2 + no-pane
 | `personnel.Person` | 0 | 32 |
 | `process.ProcedureInstance` | 0 | 5,119 |
 | `record.Finding` | 0 | 19 |
+| `scheme.Scheme` | 0 | 1,769 |
+| `scheme.SchemeMember` | 0 | 9,846 |
 | `work.AlternateKey` | 0 | 11,880 |
 | `work.WorkRequest` | 0 | 11,840 |
 

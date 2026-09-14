@@ -12,7 +12,7 @@ from common import connect, HERE
 
 LOADERS = [("legacy", "legacy_import")]
 TARGETS = ["location.Node", "location.NodeFunction", "location.AlternateKey", "asset.Asset", "device.Device", "asset.Placement", "asset.AlternateKey",
-           "scheme.CommissionedFunction", "work.WorkRequest", "work.AlternateKey", "document.Document", "document.Revision", "document.ConfigurationFile", "document.File",
+           "scheme.CommissionedFunction", "scheme.Scheme", "scheme.SchemeMember", "work.WorkRequest", "work.AlternateKey", "document.Document", "document.Revision", "document.ConfigurationFile", "document.File",
            "record.Record", "record.Finding", "ref.AssetType", "ref.AnsiFunction", "ref.Model", "ref.Manufacturer", "party.Entity", "personnel.Person",
            "process.WorkflowInstance", "process.ProcedureInstance", "process.InstanceVersionSet", "process.BlockInstance", "process.StepInstance", "process.WorkflowTransition"]
 

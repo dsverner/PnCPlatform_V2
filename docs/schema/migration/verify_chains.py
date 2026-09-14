@@ -17,7 +17,7 @@ def main():
     a = ap.parse_args()
     if not a.database.startswith("PnCPlatform_V2_"):
         sys.exit("refusing: the target must be a PnCPlatform_V2_* database (#99)")
-    src = common.connect("dbRelayManagement_Legacy").cursor()
+    src = common.connect("dbRelay").cursor()   # the legacy copy, renamed by the owner 2026-09-14 (legacy_import.SOURCE_DB)
     tgt = common.connect(a.database); tgt.add_output_converter(-155, lambda b: b); cur = tgt.cursor()
     legacy = {}
     for oldno, cr, set1, cdate, vdate in src.execute("SELECT OLD_NO, [Change Request ID], SET1, CDATE, VDATE FROM SETTINGS WHERE LEFT(OLD_NO,1) IN ('A','M','P')").fetchall():

@@ -3,40 +3,58 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Setting Display · P&amp;C Platform</title>
+  <meta name="color-scheme" content="light dark">
+  <title>Settings Record · P&amp;C Platform</title>
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/styles.css">
-  <meta name="theme-color" content="#1f3a4d">
+  <meta name="theme-color" content="#1f3a4d" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f1d27" media="(prefers-color-scheme: dark)">
 </head>
 <body>
-  <!-- W6 (decision #127; LEGACY-SYSTEM §8 setting display, §2 fields): one designed configuration-file revision shown in the
-       legacy's five groups — General · System Info · M/P Information · Aux CT/PT Info · Documentation — over
-       document.vSettingsRecord, document.vParsedSettingNamed, document.vFile and the run's records. A legacy field with no
-       platform counterpart is shown as "not modelled" so the walkthrough can point at it. No inline script or style. -->
+  <!-- W8 (decisions #157–#158; round 4 C, round 5 B4): one designed configuration-file revision — the record's facts, the
+       parsed settings, the settings text as filed, the notes, the files — with Close and Documentation at the top as the
+       legacy window had, and Compare with another revision of the same device. No legacy field names on screen (owner,
+       2026-09-14). Over document.vSettingsRecord, vParsedSettingNamed, vFile, the run's records. No inline script or style. -->
   <header class="bar">
-    <span class="brand"><a href="/">P&amp;C Platform</a> <span class="crumb">/ <a href="/settings.html">Settings</a> / Display</span></span>
+    <span class="brand"><a href="/">P&amp;C Platform</a> <span class="crumb">/ <a href="/settings.html">Settings</a> / Record</span></span>
     <span id="who" class="who">signing in…</span>
   </header>
   <main class="one">
     <section class="panel wide">
-      <div class="toolbar"><h2 id="title">Setting display</h2><div class="actions"><span id="state-pill" class="pill" hidden></span><a id="req-link" class="row-link" hidden>Change request</a></div></div>
+      <div class="toolbar">
+        <h2 id="title">Settings record</h2>
+        <div class="actions">
+          <span id="state-pill" class="pill" hidden></span>
+          <button id="btn-close" type="button" title="Back to the settings book">Close</button>
+          <button id="btn-docs" type="button" title="The files filed with this record">Documentation</button>
+          <button id="btn-compare" type="button" title="Put another revision of this device beside this one">Compare…</button>
+          <a id="req-link" class="row-link" hidden>Change request</a>
+        </div>
+      </div>
       <p id="status" class="status muted">…</p>
       <div class="groups">
-        <div class="group"><h3>General</h3><dl id="g-general" class="facts"></dl></div>
-        <div class="group"><h3>System info</h3><dl id="g-system" class="facts"></dl></div>
-        <div class="group"><h3>M/P information</h3><dl id="g-mp" class="facts"></dl></div>
-        <div class="group"><h3>Aux CT/PT info</h3><dl id="g-aux" class="facts"></dl></div>
-        <div class="group"><h3>Documentation</h3><dl id="g-doc" class="facts"></dl></div>
+        <div class="group"><h3>Device</h3><dl id="g-device" class="facts"></dl></div>
+        <div class="group"><h3>Where</h3><dl id="g-where" class="facts"></dl></div>
+        <div class="group"><h3>Dates and state</h3><dl id="g-dates" class="facts"></dl></div>
+        <div class="group"><h3>Classification and instrument transformers</h3><dl id="g-mp" class="facts"></dl></div>
+        <div class="group"><h3>Notes</h3><dl id="g-notes" class="facts"></dl></div>
       </div>
     </section>
-    <section class="panel wide">
-      <h2>Settings (SET1)</h2>
-      <p id="settings-summary" class="muted small">…</p>
-      <div class="scroll"><table id="settings" class="grid rows"><thead></thead><tbody></tbody></table></div>
+    <section id="compare" class="panel wide" hidden>
+      <div class="toolbar"><h2>Compare</h2><div class="actions"><label class="inline">With <select id="compare-with"></select></label><button id="btn-compare-close" type="button">Hide</button></div></div>
+      <p id="compare-summary" class="muted small">…</p>
+      <div class="scroll"><table id="compare-table" class="grid rows"><thead></thead><tbody></tbody></table></div>
     </section>
     <section class="panel wide">
-      <h2>Files and evidence</h2>
+      <h2>Settings</h2>
+      <p id="settings-summary" class="muted small">…</p>
+      <div class="scroll"><table id="settings" class="grid rows"><thead></thead><tbody></tbody></table></div>
+      <h3 id="text-head">Settings text as filed</h3>
+      <pre id="settings-text" class="settings-text">…</pre>
+    </section>
+    <section id="files-panel" class="panel wide">
+      <h2>Documentation — files and evidence</h2>
       <p id="files-summary" class="muted small">…</p>
       <div class="scroll"><table id="files" class="grid rows"><thead></thead><tbody></tbody></table></div>
     </section>

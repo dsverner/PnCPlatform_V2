@@ -65,7 +65,9 @@ OUTER APPLY (SELECT STRING_AGG(s.[Name], N'; ') WITHIN GROUP (ORDER BY s.[Name])
              FROM (SELECT DISTINCT sm.[SchemeEntityId]
                    FROM [location].[Node] pf JOIN [scheme].[SchemeMember] sm ON sm.[MemberKind] = N'ProtectionFunction' AND sm.[MemberEntityId] = pf.[EntityId]
                    WHERE pf.[ValidTo] IS NULL AND pf.[IsDeleted] = 0 AND sm.[ValidTo] IS NULL AND sm.[IsDeleted] = 0 AND pf.[ParentEntityId] = dp.[EntityId] AND pf.[NodeTypeCode] = N'ProtectionFunction') x
-             JOIN [scheme].[vScheme] s ON s.[EntityId] = x.[SchemeEntityId]) sch
+             -- W8 (#158): the base table with the current-row predicate, not the windowed vScheme — evaluated per position, the
+             -- windowed view took the whole read from ~1 s to 11 s once the migration raised 1 769 schemes (2026-09-14)
+             JOIN [scheme].[Scheme] s ON s.[EntityId] = x.[SchemeEntityId] AND s.[ValidTo] IS NULL AND s.[IsDeleted] = 0) sch
 OUTER APPLY (SELECT STRING_AGG(nf.[FunctionLabel], N'; ') AS [NodeFunctionLabels] FROM [location].[NodeFunction] nf WHERE nf.[ValidTo] IS NULL AND nf.[IsDeleted] = 0 AND nf.[NodeEntityId] = dp.[EntityId]) nfl
 WHERE dp.[NodeTypeCode] IN (N'DevicePosition', N'MeteringPosition', N'NetworkSwitchPosition');
 GO

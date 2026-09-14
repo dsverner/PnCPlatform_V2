@@ -28,7 +28,8 @@ import pyodbc
 import common
 from common import Run, row_hash, s as strip
 
-SOURCE = "dbRelayManagement_Legacy"
+SOURCE = "dbRelayManagement_Legacy"                    # the provenance name (migration.Run.SourceSystem) — unchanged, so earlier runs still match
+SOURCE_DB = "dbRelay"                                  # the database the legacy tables are read from: the owner renamed the copy on 2026-09-14 (memory: reference apps)
 CAPTURE_AT = datetime.datetime(2026, 4, 22)          # dbRelayManagement_legacy.bak on Z:\Reference\SqlBackup (MIGRATION-PLAN §2)
 SENTINEL = datetime.datetime(1899, 12, 30)           # the empty-date sentinel (#62)
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -69,7 +70,7 @@ class Importer:
     def __init__(self, run, limit=None, source_db=None):
         self.run = run
         self.limit = limit
-        self.src = common.connect(source_db or SOURCE).cursor()   # W8: the cutover rehearsal reads the client's copy; provenance still names SOURCE
+        self.src = common.connect(source_db or SOURCE_DB).cursor()   # W8: the cutover rehearsal reads the client's copy; provenance still names SOURCE
         self.rules = Counter()               # reconciliation: rule → rows
         self.examples = defaultdict(list)
         self.persons = {}                    # display name → person entity
@@ -410,6 +411,49 @@ class Importer:
             self.rule("base number → DevicePosition + Asset (+ Device, Installed)", base)
             if len(self.bases) % 500 == 0:
                 self.log(f"devices: {len(self.bases)} bases")
+
+    # ------------------------------------------------------------------ 5b schemes (W8, #158: the owner's round-5 ruling B10)
+    def schemes_stage(self):
+        """The legacy EQUIPMENT text as a functional scheme: one scheme.Scheme per (LOCATION, EQUIPMENT) — the same key the
+        panel was raised on — typed LEGACY_EQUIPMENT_GROUP; every migrated position a member through its protection-function
+        nodes, and through its installed asset so a position whose FUNCTIONS carried no ANSI code belongs too. The panel
+        stays as the physical placeholder (#139); the scheme is what the settings screen groups by."""
+        row = self.run.rows("""SELECT TOP (1) v.RowId FROM config.vDefinitionVersion v JOIN config.vDefinition d ON d.EntityId = v.DefinitionEntityId
+            WHERE d.DefinitionKind = 'Program.SchemeType' AND d.DefinitionKey = 'LEGACY_EQUIPMENT_GROUP' AND v.Status = 'Effective' ORDER BY v.VersionNumber DESC""")
+        if not row:
+            sys.exit("refusing: no Effective Program.SchemeType LEGACY_EQUIPMENT_GROUP — deploy PostDeploy/Seed_config_SchemeType_Legacy.sql first (#158)")
+        stype = str(row[0][0])
+        fnodes = {}
+        for parent, eid in self.run.rows("SELECT ParentEntityId, EntityId FROM location.vNode WHERE NodeTypeCode = 'ProtectionFunction'"):
+            fnodes.setdefault(str(parent).upper(), []).append(str(eid))
+        schemes = {}
+        for (loc, equip), panel in self.panels.items():
+            key = f"Scheme:{loc}|{equip}"; h = row_hash("Scheme", loc, equip)
+            done = self.run.already_loaded("scheme", "Scheme", key, h)
+            sid = done[0] if done else self.run.existing_entity("scheme", "Scheme", key)
+            if sid is None:
+                (sid, srow) = self.run.exec("scheme.Scheme_Add", outputs=[("EntityId", "UNIQUEIDENTIFIER"), ("RowId", "UNIQUEIDENTIFIER")],
+                                            SchemeTypeDefinitionVersionRowId=stype, Name=equip[:200], Status="InService",
+                                            Notes=f"Migrated from the legacy EQUIPMENT text at {loc}", ValidFrom=capture_at(), ValidFromQuality=2)
+                self.run.provenance("scheme", "Scheme", key, h, entity_id=sid, row_id=srow)
+            schemes[(loc, equip)] = sid
+            self.rule("(LOCATION, EQUIPMENT) → Scheme (equipment group)", f"{loc} | {equip}")
+        n = 0
+        for base, b in self.bases.items():
+            rep = b["rep"]; loc = strip(rep[2]); equip = strip(rep[4]) or "(no equipment)"
+            sid = schemes.get((loc, equip))
+            if sid is None:
+                continue
+            members = [("Asset", b["asset"], f"SchemeMember:{base}:asset")] + [("ProtectionFunction", f, f"SchemeMember:{base}:fn:{f[:8]}") for f in fnodes.get(str(b["position"]).upper(), [])]
+            for kind, member, key in members:
+                h = row_hash("SchemeMember", sid, kind, member)
+                if self.run.already_loaded("scheme", "SchemeMember", key, h) or self.run.existing_entity("scheme", "SchemeMember", key):
+                    continue
+                (me_, mrow) = self.run.exec("scheme.AddSchemeMember", outputs=[("EntityId", "UNIQUEIDENTIFIER"), ("RowId", "UNIQUEIDENTIFIER")],
+                                            SchemeEntityId=sid, MemberKind=kind, MemberEntityId=member, MemberRoleCode="Member", IsInService=1, ValidFrom=capture_at(), ValidFromQuality=2)
+                self.run.provenance("scheme", "SchemeMember", key, h, entity_id=me_, row_id=mrow); n += 1
+            self.rule("base number → member of its equipment group (asset + protection functions)", base)
+        self.log(f"schemes: {len(schemes)} groups, {n} memberships written")
 
     def work_key(self, subject, kind, value, key, h, primary=False, who=None):
         """A work-request alternate key, tolerant of a value another request already carries (one SAP order over several CRs): flagged, not written."""
@@ -769,7 +813,7 @@ def load(database, limit=None, report=None, source_db=None):
         sys.exit("refusing: the target must be a PnCPlatform_V2_* database (#99)")
     with Run(SOURCE, CAPTURE_AT, notes=f"W7 legacy import (CUTOVER-STRATEGY §5); limit {limit}", target_db=database) as run:
         imp = Importer(run, limit, source_db)
-        for stage in ("prepare", "persons_stage", "manufacturers_stage", "models_stage", "locations_stage", "devices_stage", "requests_stage", "revisions_stage", "landings_stage", "findings_stage", "provenance_stage", "dropped_counts"):
+        for stage in ("prepare", "persons_stage", "manufacturers_stage", "models_stage", "locations_stage", "devices_stage", "schemes_stage", "requests_stage", "revisions_stage", "landings_stage", "findings_stage", "provenance_stage", "dropped_counts"):
             imp.log(stage); getattr(imp, stage)()
         path = report or os.path.join(HERE, f"RECONCILIATION-{datetime.date.today().isoformat()}.md")
         totals = imp.report(path)

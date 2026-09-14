@@ -1,47 +1,39 @@
-# Rehearsal 2026-09-13 — `PnCPlatform_V2_DEV`
+# Rehearsal 2026-09-14 — `PnCPlatform_V2_DEV`
 
-Started 2026-09-13T22:41:55; loaders: legacy_import.
+Started 2026-09-14T18:23:26; loaders: legacy_import.
 
 ## Outcome
 
-- First pass wrote **251,009** target rows across 1 run(s); **251,009** provenance rows.
+- First pass wrote **151,336** target rows across 1 run(s); **151,336** provenance rows.
 - Second pass (idempotence): **0** rows written — PASS.
-- Rows tagged with these runs but lacking provenance: **3007** ({'scheme.CommissionedFunction': 3007}).
+- Rows tagged with these runs but lacking provenance: **0** PASS.
 - Direct table writes in loaders (grep): **0** PASS.
 
-## dbRelayManagement_Legacy — run `A5785E02-607D-460D-99DB-671C7F1AC3D4`
+## dbRelayManagement_Legacy — run `5BF931B5-721B-4FE6-9EF9-69D7448979A6`
 
-Actor `294A2A7F-8FB7-4962-AE5E-FD0895C6C9D2`; 367,658 procedure calls in 3326.1s.
+Actor `C9E8B1A8-E13E-4B12-88AB-293B002F5EFE`; 156,499 procedure calls in 6043.6s.
 
 | Target | Written | Skipped (already loaded) |
 |---|---|---|
-| `asset.AlternateKey` | 10,836 | 0 |
-| `asset.Asset` | 6,839 | 0 |
-| `asset.Placement` | 6,839 | 0 |
-| `device.Device` | 6,661 | 0 |
-| `document.ConfigurationFile` | 11,563 | 0 |
+| `asset.Asset` | 0 | 331 |
+| `document.ConfigurationFile` | 0 | 11,563 |
 | `document.Document` | 6,661 | 0 |
 | `document.File` | 11,563 | 0 |
-| `location.AlternateKey` | 225 | 0 |
-| `location.Node` | 12,077 | 0 |
-| `location.NodeFunction` | 3,894 | 0 |
-| `party.Entity` | 37 | 0 |
-| `personnel.Person` | 32 | 0 |
+| `location.AlternateKey` | 0 | 225 |
+| `location.Node` | 0 | 9,070 |
+| `party.Entity` | 1 | 0 |
+| `personnel.Person` | 0 | 32 |
 | `process.BlockInstance` | 76,785 | 0 |
 | `process.InstanceVersionSet` | 10,238 | 0 |
 | `process.ProcedureInstance` | 5,119 | 0 |
 | `process.StepInstance` | 30,714 | 0 |
 | `process.WorkflowInstance` | 5,119 | 0 |
 | `process.WorkflowTransition` | 5,119 | 0 |
-| `record.Finding` | 19 | 0 |
-| `record.Record` | 11,563 | 0 |
-| `ref.AnsiFunction` | 813 | 0 |
-| `ref.AssetType` | 1 | 0 |
-| `ref.Manufacturer` | 37 | 0 |
-| `ref.Model` | 1,528 | 0 |
-| `scheme.CommissionedFunction` | 3,007 | 0 |
-| `work.AlternateKey` | 11,880 | 0 |
-| `work.WorkRequest` | 11,840 | 0 |
+| `record.Finding` | 17 | 2 |
+| `scheme.Scheme` | 0 | 1,769 |
+| `scheme.SchemeMember` | 0 | 9,846 |
+| `work.AlternateKey` | 0 | 11,880 |
+| `work.WorkRequest` | 0 | 11,840 |
 
 | Flag | Count | Examples |
 |---|---|---|
@@ -50,18 +42,10 @@ Actor `294A2A7F-8FB7-4962-AE5E-FD0895C6C9D2`; 367,658 procedure calls in 3326.1s
 | `RequesterNotAUser` | 1,705 | 4193909 CR 4193909: requested by 'David LeBlanc', not in Users; 4198934 CR 4198934: requested by 'David LeBlanc', not in Users; 8074893 CR 8074893: requested by 'David LeBlanc', not in Users |
 | `HeaderUnderOtherCr` | 1,672 | 2141435 CR 2141435/P0002: no header under this CR; the relay's header under CR 2144042 used (1 candidate CR(s)) — card H; 3196082 CR 3196082/P0004: no header under this CR; the relay's header under CR 3380710 used (2 can |
 | `ChainLocationVaries` | 1,572 | 0002 base 0002: its rows name more than one (LOCATION, EQUIPMENT); the A0002 row's is used; 0003 base 0003: its rows name more than one (LOCATION, EQUIPMENT); the M0003 row's is used; 0004 base 0004: its rows name more t |
-| `TechnologyAssumed` | 1,517 | ???? '????' (UNKNOWN) technology Electromechanical assumed from the manufacturer; the owner's W7 card decides; 10 40 60 80 100% TAPS '10 40 60 80 100% TAPS' (UNKNOWN) technology Electromechanical assumed from the manufac |
-| `InServiceDateAdjusted` | 1,201 | P0005 P0005/3403318: VDATE 2010-10-25 is not after the prior revision's 2010-10-25; in service from 2010-10-25 00:00:01, quality 2; P0005 P0005/3430004: VDATE 2010-10-25 is not after the prior revision's 2010-10-25; in s |
-| `CalculatedDateUnknown` | 919 | P0012 P0012/4190057: CDATE DateNull; VDATE used; P0021 P0021/9447944: CDATE DateNull; VDATE used; P0021 P0021/9606942: CDATE DateSentinel; VDATE used |
-| `VerifiedDateUnknown` | 904 | A0018 A0018/9606963: VDATE DateNull; in service from the calculated date, quality 2; P0028 P0028/7213070: VDATE DateNull; in service from the calculated date, quality 2; P0032 P0032/1105133: VDATE DateNull; in service fr |
 | `HeaderDuplicated` | 760 | 6161412 CR 6161412 has 2 header rows; the one naming this chain (else the first) is used; 3212819 CR 3212819 has 2 header rows; the one naming this chain (else the first) is used; 3212924 CR 3212924 has 2 header rows; th |
-| `SerialNumberDuplicate` | 598 | 0063 0063: SerialNumber 'N/A' already belongs to another asset; no key written; 0067 0067: SerialNumber 'xxx' already belongs to another asset; no key written; 0109 0109: SerialNumber 'N/A' already belongs to another ass |
-| `NoSettingsText` | 405 | A0011 A0011/108636: SET1 is empty; an empty settings file was written; P0025 P0025/9606944: SET1 is empty; an empty settings file was written; A0025 A0025/9617664: SET1 is empty; an empty settings file was written |
 | `StationNumberAssumed` | 214 | ABERDEEN STREET 'ABERDEEN STREET' station number 6100 from the dominant SETTINGS.ASSET (19 rows); ADEX MINERALS 'ADEX MINERALS' station number 5216 from the dominant SETTINGS.ASSET (2 rows); ALLARDVILLE SS 'ALLARDVILLE S |
 | `StationGroupConflict` | 187 | ABERDEEN STREET 'ABERDEEN STREET' is listed under {'Eng': 1, 'Dist': 1}; the most frequent group placed it; ADEX MINERALS 'ADEX MINERALS' is listed under {'Eng': 1, 'Dist': 1}; the most frequent group placed it; ATLANTIC |
 | `RequestTypeUnknown` | 32 | 9177900 CR 9177900: type None; work type SETTINGS_CHANGE assumed; 7992075 CR 7992075: type None; work type SETTINGS_CHANGE assumed; 8840935 CR 8840935: type None; work type SETTINGS_CHANGE assumed |
-| `InServiceViolationChain` | 17 | P0011 P0011/7268077: archived row above the active row's CR 108636; left without an in-service period (the finding rules); P0069 P0069/9617585: archived row above the active row's CR 9607008; left without an in-service p |
-| `ManufacturerFromLabel` | 9 | CADMI 'CADMI' is not in mappings/manufacturer.csv; created as found; Crompton 'Crompton' is not in mappings/manufacturer.csv; created as found; DATUM 'DATUM' is not in mappings/manufacturer.csv; created as found |
 | `PrefixLowerCase` | 9 | a0193 a0193/686: the state prefix is lower case; read as A; a0547 a0547/953: the state prefix is lower case; read as A; a0566 a0566/1027: the state prefix is lower case; read as A |
 | `SapWorkOrderDuplicate` | 7 | 8825579 CR 8825579: SapWorkOrder '000000' already belongs to another request; no key written; 911 CR 911: SapWorkOrder '3000040109' already belongs to another request; no key written; 8233397 CR 8233397: SapWorkOrder '30 |
 | `StationNumberDuplicate` | 2 | MOBILE 35MVA 'MOBILE 35MVA' station number 6160 already belongs to 'MOBILE 15MVA'; no key written; a finding raised (card C); NEGUAC 'NEGUAC' station number 6100 already belongs to 'ABERDEEN STREET'; no key written; a fi |
@@ -71,28 +55,8 @@ Actor `294A2A7F-8FB7-4962-AE5E-FD0895C6C9D2`; 367,658 procedure calls in 3326.1s
 
 | Table | Rows |
 |---|---|
-| `location.Node` | 12,077 |
-| `location.NodeFunction` | 3,894 |
-| `location.AlternateKey` | 225 |
-| `asset.Asset` | 6,839 |
-| `device.Device` | 6,661 |
-| `asset.Placement` | 6,839 |
-| `asset.AlternateKey` | 10,836 |
-| `scheme.CommissionedFunction` | 3,007 |
-| `work.WorkRequest` | 11,840 |
-| `work.AlternateKey` | 11,880 |
-| `document.Document` | 6,661 |
-| `document.Revision` | 11,563 |
-| `document.ConfigurationFile` | 11,563 |
-| `document.File` | 11,563 |
-| `record.Record` | 11,582 |
-| `record.Finding` | 19 |
-| `ref.AssetType` | 1 |
-| `ref.AnsiFunction` | 813 |
-| `ref.Model` | 1,528 |
-| `ref.Manufacturer` | 37 |
-| `party.Entity` | 37 |
-| `personnel.Person` | 32 |
+| `record.Record` | 17 |
+| `record.Finding` | 17 |
 | `process.WorkflowInstance` | 5,119 |
 | `process.ProcedureInstance` | 5,119 |
 | `process.InstanceVersionSet` | 10,238 |

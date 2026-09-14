@@ -39,4 +39,5 @@
 :r .\Seed_ref_Model_SEL421.sql
 :r .\Seed_config_Procedure_DrawingRevision.sql
 :r .\Seed_config_WorkTypes.sql
+:r .\Seed_config_SchemeType_Legacy.sql
 :r .\Seed_location_Divisions.sql

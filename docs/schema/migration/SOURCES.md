@@ -362,4 +362,4 @@ Full catalogue: `docs/reference/dbPCPlatform_DEV-schema.md`. Tables by schema:
 
 ## `PNC_Dev`, `PNC_Training`, `PNC_Production`
 
-Same predecessor schema as `dbPCPlatform_DEV` plus a few tables (209 tables), the C++Builder application's Dev/Training/Production copies. Not migration sources; listed so the question in the 2026-09-04 checkpoint is closed.
+Same predecessor schema as `dbPCPlatform_DEV` plus a few tables (209 tables). Corrected 2026-09-14 (W8): these are the environments of **pnc-platform** (`Z:\Repos\pnc-platform.git`, C++/CMake API + React) and of **Dev_Final** (`pilot/hardening-2026-06-12`, C++Builder console server + React), not of the legacy C++Builder settings program (that program's database is `dbRelayManagement_Legacy`, renamed `dbRelay` on the server by the owner on 2026-09-14). Training = Production; Dev holds the activity. Not migration sources — reference applications for UX and the function inventory (decision #158); listed so the question in the 2026-09-04 checkpoint is closed.
