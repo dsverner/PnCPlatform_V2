@@ -659,7 +659,7 @@ the release with SBOM and `release.json`.
   next release). The smoke on VM07 is a read share, `\vgs-vm02\pncsmoke` (runbook). DEV API smoke 228 PASS.
 - **Found by the gate runs on QA at 0.8.2, fixed in 0.8.3 (#154)**: the grid's Archived list timed out at 30 s on VM02 (Active
   1.6 s); in SQL the state predicate pushed into `vSettingsRecord` with every column ran 42–54 s under both logins, the whole
-  view 0.6–1.7 s — a materialised view now takes its equality filters in memory; Archived answers in 2.4 s on QA. Reproduced
+  view 0.6–1.7 s — a materialised view now takes its equality filters in memory; Archived answers in 2.4 s on the local host (that host read DEV, not QA — its override lost to `appsettings.Local.json`; corrected later the same evening). Reproduced
   and re-measured from VM02 itself as the gate Administrator (a one-shot task running `curl` with Negotiate).
 - **Round-2 releases 0.8.3 and 0.8.4** on DEV, QA and VM02 (schema smoke 268 PASS each; QA gate accounts at 0.8.4:
   Administrator 81, Approver 58, ReadOnly 44, Hydro 26 PASS). 0.8.3's in-memory filter rule was too broad — an entity

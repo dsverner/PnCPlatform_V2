@@ -14,6 +14,10 @@ var builder = WebApplication.CreateBuilder(new WebApplicationOptions
     EnvironmentName = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Production",
 });
 builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: false);
+// W8 (#156): a second host on the build laptop pointed at another V2 database (a probe or a sweep of QA) — an explicit
+// environment override that outranks appsettings.Local.json, which otherwise wins over every environment variable
+if (Environment.GetEnvironmentVariable("PNC_CONNECTION") is { Length: > 0 } pncConnection)
+    builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?> { ["Database:ConnectionString"] = pncConnection });
 if (OperatingSystem.IsWindows()) builder.Logging.AddEventLog();
 
 var connectionString = builder.Configuration["Database:ConnectionString"]
