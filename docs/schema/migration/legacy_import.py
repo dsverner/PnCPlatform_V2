@@ -121,6 +121,8 @@ class Importer:
         if r.one("SELECT COUNT(*) FROM ref.vAssetType WHERE AssetTypeCode = N'ProtectiveRelay'") == 0:
             sys.exit("asset type ProtectiveRelay is not seeded")
         r.exec("ref.AssetType_Upsert", AssetTypeCode="CONTROL_SWITCH", Name="Control switch", Description="Legacy DEVICE = CONTROL SWITCH (mappings/asset_type.csv)", AssetClassCode="Secondary", IsDevice=0)
+        if ("ref", "AssetType", "AssetType:CONTROL_SWITCH") not in r._existing:
+            r.provenance("ref", "AssetType", "AssetType:CONTROL_SWITCH", row_hash("AssetType", "CONTROL_SWITCH"))
 
     # ------------------------------------------------------------------ 1 persons (#143)
     def persons_stage(self):
@@ -160,9 +162,15 @@ class Importer:
                 self.rule("MANUFACTURER → ref.Manufacturer (existing)", label); continue
             key = f"Manufacturer:{short}"
             h = row_hash("Manufacturer", short, name)
+            ekey = f"Entity:Manufacturer:{short}"
             if self.run.already_loaded("ref", "Manufacturer", key, h):
-                self.manufacturers[short.upper()] = self.run.existing_entity("ref", "Manufacturer", key); continue
-            (entity, _) = self.run.exec("party.Entity_Add", outputs=[("EntityId", "UNIQUEIDENTIFIER"), ("RowId", "UNIQUEIDENTIFIER")], Name=name[:200], ShortName=short[:40], EntityKind="Manufacturer")
+                mid = self.run.existing_entity("ref", "Manufacturer", key); self.manufacturers[short.upper()] = mid
+                if ("party", "Entity", ekey) not in self.run._existing:   # W8 (#156): the entity written without provenance by an earlier run
+                    r = self.run.rows("SELECT e.EntityId, e.RowId FROM ref.vManufacturer m JOIN party.vEntity e ON e.EntityId = m.EntityEntityId WHERE m.ManufacturerId = ?", mid)
+                    if r: self.run.provenance("party", "Entity", ekey, row_hash("Entity", short, name), entity_id=str(r[0][0]), row_id=str(r[0][1]))
+                continue
+            (entity, erow) = self.run.exec("party.Entity_Add", outputs=[("EntityId", "UNIQUEIDENTIFIER"), ("RowId", "UNIQUEIDENTIFIER")], Name=name[:200], ShortName=short[:40], EntityKind="Manufacturer")
+            self.run.provenance("party", "Entity", ekey, row_hash("Entity", short, name), entity_id=entity, row_id=erow)
             mid = str(__import__("uuid").uuid4())
             self.run.exec("ref.Manufacturer_Upsert", ManufacturerId=mid, EntityEntityId=entity, ShortCode=short[:20])
             self.run.provenance("ref", "Manufacturer", key, h, entity_id=mid, notes=None if m else self.run.flag("ManufacturerFromLabel", f"'{label}' is not in mappings/manufacturer.csv; created as found", label))
@@ -376,12 +384,21 @@ class Importer:
                     for code in dict.fromkeys(codes):
                         if code not in self.ansi:
                             self.run.exec("ref.AnsiFunction_Upsert", AnsiCode=code[:10], Name=(functions or code)[:200]); self.ansi.add(code)
+                            if ("ref", "AnsiFunction", f"AnsiFunction:{code[:10]}") not in self.run._existing:
+                                self.run.provenance("ref", "AnsiFunction", f"AnsiFunction:{code[:10]}", row_hash("Ansi", code[:10]))
                         fnode = self.node("ProtectionFunction", position, code, f"Function:{base}:{code}")
                         self.run.exec("scheme.CommissionedFunction_Add", ProtectionFunctionNodeEntityId=fnode, AnsiCode=code[:10], IsPrincipal=1 if code == codes[0] else 0, ValidFrom=capture_at(), ValidFromQuality=2)
                         self.run.provenance("scheme", "CommissionedFunction", f"Function:{base}:{code}", row_hash("CF", base, code), entity_id=fnode)
                     self.rule("FUNCTIONS with an ANSI code → ProtectionFunction + CommissionedFunction", base)
                 elif functions:
-                    self.run.exec("location.NodeFunction_Add", NodeEntityId=position, FunctionLabel=functions[:200], ValidFrom=capture_at(), ValidFromQuality=2)
+                    nk = f"NodeFunction:{base}"; nh = row_hash("NodeFunction", base, functions[:200])
+                    if not self.run.already_loaded("location", "NodeFunction", nk, nh) and self.run.existing_entity("location", "NodeFunction", nk) is None:
+                        r = self.run.rows("SELECT TOP (1) EntityId, RowId FROM location.vNodeFunction WHERE NodeEntityId = ? AND FunctionLabel = ?", position, functions[:200])
+                        if r:   # written by a run before W8 (#156) without its provenance row
+                            self.run.provenance("location", "NodeFunction", nk, nh, entity_id=str(r[0][0]), row_id=str(r[0][1]))
+                        else:
+                            (ne, nr) = self.run.exec("location.NodeFunction_Add", outputs=[("EntityId", "UNIQUEIDENTIFIER"), ("RowId", "UNIQUEIDENTIFIER")], NodeEntityId=position, FunctionLabel=functions[:200], ValidFrom=capture_at(), ValidFromQuality=2)
+                            self.run.provenance("location", "NodeFunction", nk, nh, entity_id=ne, row_id=nr)
                     self.rule("FUNCTIONS without an ANSI code → NodeFunction label", base)
             self.bases[base] = {"asset": asset, "position": position, "rep": rep, "rows": rs, "switch": is_switch}
             self.rule("base number → DevicePosition + Asset (+ Device, Installed)", base)
@@ -695,6 +712,19 @@ class Importer:
                 if ("process", table, k) in self.run._existing:
                     continue
                 self.run.provenance("process", table, k, row_hash(table, key, tag), entity_id=str(eid) if eid else None, row_id=str(rid) if rid else None); n += 1
+        # W8 (#156): rows an earlier run wrote without provenance — node-function labels, ANSI codes, manufacturer entities
+        for key, eid, rid in self.run.rows("""SELECT CONCAT(N'NodeFunction:', SUBSTRING(p.SourceKey, CHARINDEX(N':', p.SourceKey) + 1, 200)), nf.EntityId, nf.RowId
+            FROM location.vNodeFunction nf JOIN migration.vProvenance p ON p.TargetEntityId = nf.NodeEntityId AND p.TargetTable = 'Node' AND p.SourceKey LIKE 'Position:%'
+            WHERE nf.MigrationRunId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM migration.vProvenance q WHERE q.TargetTable = 'NodeFunction' AND q.TargetEntityId = nf.EntityId)"""):
+            self.run.provenance("location", "NodeFunction", key, row_hash("NodeFunction", key), entity_id=str(eid), row_id=str(rid)); n += 1
+        for (code,) in self.run.rows("SELECT AnsiCode FROM ref.vAnsiFunction WHERE MigrationRunId IS NOT NULL"):
+            k = f"AnsiFunction:{code}"
+            if ("ref", "AnsiFunction", k) not in self.run._existing:
+                self.run.provenance("ref", "AnsiFunction", k, row_hash("Ansi", code)); n += 1
+        for short, eid, rid in self.run.rows("SELECT m.ShortCode, e.EntityId, e.RowId FROM ref.vManufacturer m JOIN party.vEntity e ON e.EntityId = m.EntityEntityId WHERE e.MigrationRunId IS NOT NULL"):
+            k = f"Entity:Manufacturer:{short}"
+            if ("party", "Entity", k) not in self.run._existing:
+                self.run.provenance("party", "Entity", k, row_hash("Entity", short), entity_id=str(eid), row_id=str(rid)); n += 1
         self.log(f"provenance for engine-written rows: {n}")
 
     # ------------------------------------------------------------------ 10 the reconciliation

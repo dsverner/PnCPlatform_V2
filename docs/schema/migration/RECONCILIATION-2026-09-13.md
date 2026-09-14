@@ -1,6 +1,6 @@
 # Reconciliation — dbRelayManagement_Legacy → PnCPlatform_V2_DEV — 2026-09-13
 
-Run `9A123A79-7CE7-4E0D-BA2D-2C07FC41AE88` · 10 procedure calls · 184 s · limit none
+Run `59788435-5AE2-42E5-AC6F-6885E96C7E52` · 10 procedure calls · 115 s · limit none
 
 ## Source totals
 
@@ -35,7 +35,7 @@ Sum: 48,702 (the gate: 14 211 + 8 409 + 8 409 + 8 408 + 8 408 + 825 + 32 = 48 70
 | P row → a superseded revision with its in-service period | 5,683 |
 | Relay Document Management row of a dropped or unknown chain: counted, not written | 4,237 |
 | Relay Document Management row → a completion-track state on its request | 4,172 |
-| SAP Work Order Numer → SapWorkOrder key | 41 |
+| SAP Work Order Numer → SapWorkOrder key | 40 |
 | Setting Database Management row of a dropped or unknown chain: counted, not written | 4,236 |
 | Setting Database Management row → a completion-track state on its request | 4,172 |
 | Setting Software Management non-NA row → a note on the request (#58) | 1,729 |
@@ -52,6 +52,7 @@ Sum: 48,702 (the gate: 14 211 + 8 409 + 8 409 + 8 408 + 8 408 + 825 + 32 = 48 70
 | row keyed '2…' (2440): dropped, counted (#60) | 2 |
 | row of a base with no LOCATION/EQUIPMENT panel: counted, not written | 8 |
 | station created / confirmed | 231 |
+| station placed under the owner's marked division (card A) | 231 |
 
 ### SETTINGS arithmetic
 
@@ -61,14 +62,14 @@ A 5,530 + M 350 + P 5,683 + control-switch rows 277 + D 2,361 + 2440 2 + no-pane
 
 | Target | Written | Skipped |
 |---|---:|---:|
-| `asset.Asset` | 0 | 4 |
+| `asset.Asset` | 0 | 331 |
 | `document.ConfigurationFile` | 0 | 11,563 |
 | `location.AlternateKey` | 0 | 225 |
 | `location.Node` | 0 | 9,070 |
 | `personnel.Person` | 0 | 32 |
 | `process.ProcedureInstance` | 0 | 5,119 |
 | `record.Finding` | 0 | 19 |
-| `work.AlternateKey` | 0 | 11,881 |
+| `work.AlternateKey` | 0 | 11,880 |
 | `work.WorkRequest` | 0 | 11,840 |
 
 ## Flags
@@ -81,7 +82,7 @@ A 5,530 + M 350 + P 5,683 + control-switch rows 277 + D 2,361 + 2440 2 + no-pane
 | `PrefixLowerCase` | 9 | a0193 a0193/686: the state prefix is lower case; read as A; a0547 a0547/953: the state prefix is lower case; read as A; a0566 a0566/1027: the state prefix is lower case; read as A; a0635 a0635/6594: the state prefix is lower case; read as A; a1236 a1236/5466: the state prefix is lower case; read as  |
 | `RequestNoHeader` | 5,599 | 3 CR 3: no Settings Management row; work type SETTINGS_CHANGE assumed; 7268134 CR 7268134: no Settings Management row; work type SETTINGS_CHANGE assumed; 7759879 CR 7759879: no Settings Management row; work type SETTINGS_CHANGE assumed; 6793753 CR 6793753: no Settings Management row; work type SETTI |
 | `RequestTypeUnknown` | 32 | 9177900 CR 9177900: type None; work type SETTINGS_CHANGE assumed; 7992075 CR 7992075: type None; work type SETTINGS_CHANGE assumed; 8840935 CR 8840935: type None; work type SETTINGS_CHANGE assumed; 5834222 CR 5834222: type 'add Order'; work type SETTINGS_CHANGE assumed; 6228376 CR 6228376: type 'add |
-| `RequesterNotAUser` | 1,686 | 4193909 CR 4193909: requested by 'David LeBlanc', not in Users; 4198934 CR 4198934: requested by 'David LeBlanc', not in Users; 8074893 CR 8074893: requested by 'David LeBlanc', not in Users; 8078994 CR 8078994: requested by 'David LeBlanc', not in Users; 8074836 CR 8074836: requested by 'David LeBl |
+| `RequesterNotAUser` | 1,705 | 4193909 CR 4193909: requested by 'David LeBlanc', not in Users; 4198934 CR 4198934: requested by 'David LeBlanc', not in Users; 8074893 CR 8074893: requested by 'David LeBlanc', not in Users; 8078994 CR 8078994: requested by 'David LeBlanc', not in Users; 8078592 CR 8078592: requested by 'David LeBl |
 | `SapWorkOrderDuplicate` | 7 | 8825579 CR 8825579: SapWorkOrder '000000' already belongs to another request; no key written; 911 CR 911: SapWorkOrder '3000040109' already belongs to another request; no key written; 8233397 CR 8233397: SapWorkOrder '3000019301' already belongs to another request; no key written; 3440 CR 3440: SapW |
 | `StationGroupConflict` | 187 | ABERDEEN STREET 'ABERDEEN STREET' is listed under {'Eng': 1, 'Dist': 1}; the most frequent group placed it; ADEX MINERALS 'ADEX MINERALS' is listed under {'Eng': 1, 'Dist': 1}; the most frequent group placed it; ATLANTIC WALLBOARD 'ATLANTIC WALLBOARD' is listed under {'Eng': 1, 'Dist': 1}; the most  |
 | `StationNumberAssumed` | 214 | ABERDEEN STREET 'ABERDEEN STREET' station number 6100 from the dominant SETTINGS.ASSET (19 rows); ADEX MINERALS 'ADEX MINERALS' station number 5216 from the dominant SETTINGS.ASSET (2 rows); ALLARDVILLE SS 'ALLARDVILLE SS' station number 4498 from the dominant SETTINGS.ASSET (11 rows); ATLANTIC WALL |
