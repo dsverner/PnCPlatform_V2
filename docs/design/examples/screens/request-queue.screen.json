@@ -37,6 +37,6 @@
       { "label": "Cancelled", "when": { "RequestState": "Cancelled" } },
       { "label": "Not started", "when": { "RequestState": null } }
     ],
-    "rowOpen": { "label": "Open the request", "action": "url", "url": "/request.html?id={WorkRequestEntityId}" }
+    "rowOpen": { "label": "Open the request", "action": "openScreen", "screen": "WORK_ITEM", "param": "WorkRequestEntityId" }
   }
 }

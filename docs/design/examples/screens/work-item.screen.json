@@ -1,0 +1,45 @@
+{
+  "g": 1, "kind": "screen", "key": "WORK_ITEM", "name": "Change request",
+  "description": "One change request as the legacy change-request window showed it: the stage bar over the request workflow, the header, the notes, the completion tracks side by side (the parallel branches of the procedure's completion block), the settings records in the change, the transitions as buttons (#157, #165).",
+  "permission": "WorkRequest.Read",
+  "screenKind": "workItem",
+  "params": {
+    "headerView": "work.vChangeRequestStatus",
+    "headerKey": "WorkRequestEntityId",
+    "title": "Title",
+    "headerFacts": [
+      { "key": "EquipmentName", "label": "Relay", "format": "legacyFree", "fallback": "ScopeName" },
+      { "key": "WorkTypeName", "label": "Action type", "fallback": "WorkTypeKey" },
+      { "key": "RequestedByDisplayName", "label": "Requested by" },
+      { "key": "RequestedAt", "label": "Requested", "format": "when" },
+      { "key": "StationName", "label": "Location" },
+      { "key": "ScopeName", "label": "Scope", "format": "legacyFree" },
+      { "key": "DeviceCount", "label": "Devices", "format": "number" },
+      { "key": "PriorityCode", "label": "Priority" },
+      { "key": "OutageWindowStartAt", "label": "Outage window from", "format": "when" },
+      { "key": "OutageWindowEndAt", "label": "Outage window to", "format": "when" },
+      { "key": "ReturnToServiceAt", "label": "Return to service", "format": "when" },
+      { "key": "RequestStartedAt", "label": "Started", "format": "when" },
+      { "key": "RequestCompletedAt", "label": "Completed", "format": "when" },
+      { "key": "LifecycleState", "label": "Package", "format": "state" }
+    ],
+    "notes": [ { "key": "Description", "label": "Description" }, { "key": "SpecialInstructions", "label": "Special instructions" }, { "key": "Notes", "label": "Notes" } ],
+    "tracks": "branches",
+    "showSteps": "all",
+    "produced": [ { "name": "package", "label": "Settings issue package" } ],
+    "items": {
+      "view": "document.vSettingsRecord",
+      "key": "WorkRequestEntityId",
+      "columns": [
+        { "key": "DeviceName", "label": "Device", "format": "legacyFree" }, { "key": "GridState", "label": "State", "format": "state" }, { "key": "SchemeName", "label": "Scheme" }, { "key": "PanelName", "label": "Equipment" },
+        { "key": "ModelCode", "label": "Model" }, { "key": "Functions", "label": "Functions", "fallback": "PositionName" }, { "key": "RevisionLabel", "label": "Rev" }, { "key": "FileKind", "label": "File" }, { "key": "ParseStatus", "label": "Parsed" },
+        { "key": "CalculatedAt", "label": "Calculated", "format": "date" }, { "key": "VerifiedAt", "label": "Verified", "format": "date" }
+      ],
+      "rowOpen": { "label": "Open the record", "action": "url", "url": "/setting.html?revision={RevisionRowId}" }
+    },
+    "commands": [
+      { "label": "Settings book", "action": "openScreen", "screen": "SETTINGS_BOOK", "query": { "WorkRequestEntityId": "WorkRequestEntityId" } },
+      { "label": "Document", "action": "url", "url": "{DocumentationLink}", "when": { "DocumentationLink": ["*"] } }
+    ]
+  }
+}

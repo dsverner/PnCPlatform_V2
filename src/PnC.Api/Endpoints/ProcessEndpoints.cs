@@ -148,8 +148,8 @@ public static class ProcessEndpoints
                 LEFT JOIN personnel.vActor wa ON wa.ActorId = st.WitnessedByActorId LEFT JOIN personnel.vPerson wp ON wp.EntityId = wa.PersonEntityId
                 WHERE st.EntityId = @s
                 """, new Dictionary<string, object?> { ["@s"] = id }, ct)).FirstOrDefault() as JsonObject ?? throw new ApiException(404, "unknown_step", "No step instance has that id.");
-            var mine = claimant is not null && await s.ScalarAsync<bool>("SELECT CASE WHEN EXISTS (SELECT 1 FROM personnel.vActor a WHERE a.ActorId = @a AND a.PersonEntityId = @p) THEN 1 ELSE 0 END",
-                new Dictionary<string, object?> { ["@a"] = claimant, ["@p"] = u.PersonEntityId }, ct);
+            var mine = claimant is not null && await s.ScalarAsync<int>("SELECT CASE WHEN EXISTS (SELECT 1 FROM personnel.vActor a WHERE a.ActorId = @a AND a.PersonEntityId = @p) THEN 1 ELSE 0 END",
+                new Dictionary<string, object?> { ["@a"] = claimant, ["@p"] = u.PersonEntityId }, ct) == 1;   // the scalar is an int (0/1), never a bit
             if (!mine && live["Draft"] is not null)   // #68: every read of a draft by anyone other than its claimant is audit-logged
                 await s.ExecAsync("EXEC [audit].[LogRead] @SubjectSchema = N'process', @SubjectTable = N'StepInstance', @SubjectEntityId = @id", new Dictionary<string, object?> { ["@id"] = id }, ct);
             var now = await s.NowAsync(ct);
@@ -184,8 +184,8 @@ public static class ProcessEndpoints
             var u = http.User(); var s = http.Session();
             var (_, wr, claimant) = await StepHead(s, id, ct);
             await authz.RequireAsync(s, u, map.ForView("process", "vStepInstance") ?? "WorkRequest.Read", "WorkRequest", wr, "GET process.vStepInstance", http.Connection.RemoteIpAddress?.ToString() ?? "", ct);
-            var mine = claimant is not null && await s.ScalarAsync<bool>("SELECT CASE WHEN EXISTS (SELECT 1 FROM personnel.vActor a WHERE a.ActorId = @a AND a.PersonEntityId = @p) THEN 1 ELSE 0 END",
-                new Dictionary<string, object?> { ["@a"] = claimant, ["@p"] = u.PersonEntityId }, ct);
+            var mine = claimant is not null && await s.ScalarAsync<int>("SELECT CASE WHEN EXISTS (SELECT 1 FROM personnel.vActor a WHERE a.ActorId = @a AND a.PersonEntityId = @p) THEN 1 ELSE 0 END",
+                new Dictionary<string, object?> { ["@a"] = claimant, ["@p"] = u.PersonEntityId }, ct) == 1;   // the scalar is an int (0/1), never a bit
             if (!mine)   // #68: every read of a draft by anyone other than its claimant is audit-logged
                 await s.ExecAsync("EXEC [audit].[LogRead] @SubjectSchema = N'process', @SubjectTable = N'StepInstance', @SubjectEntityId = @id", new Dictionary<string, object?> { ["@id"] = id }, ct);
             var draft = await s.ScalarAsync<string>("SELECT Draft FROM process.vStepInstance WHERE EntityId = @s", new Dictionary<string, object?> { ["@s"] = id }, ct);

@@ -2,6 +2,8 @@
 // read-only context lines (location, scheme), then Raise and start → the request page.
 import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useNavigate } from 'react-router'
+import { screenPath } from '@/lib/screens'
 import { ApiError } from '@/lib/api'
 import { workTypes, raiseAndStart } from '@/lib/actions'
 import { Panel, Button, Field, inputClass, Status } from '@/components/ui/ui'
@@ -9,14 +11,14 @@ import { Panel, Button, Field, inputClass, Status } from '@/components/ui/ui'
 export interface RaiseOpts { heading: string; title: string; scopeKind: 'Asset' | 'Node'; scopeEntityId: string; defaultType: string; workflowKey?: string; before?: [string, string][]; note?: string }
 
 export function RaiseRequest({ o, onClose }: { o: RaiseOpts; onClose: () => void }) {
-  const typesQ = useQuery({ queryKey: ['workTypes'], queryFn: workTypes, staleTime: 5 * 60_000 })
+  const typesQ = useQuery({ queryKey: ['workTypes'], queryFn: workTypes, staleTime: 5 * 60_000 }); const navigate = useNavigate()
   const [title, setTitle] = useState(o.title); const [type, setType] = useState(''); const [busy, setBusy] = useState(false); const [err, setErr] = useState('')
   useEffect(() => { setTitle(o.title); setType('') }, [o])
   const types = typesQ.data ?? []
   const chosen = type || types.find((t) => t.key === o.defaultType)?.versionRowId || types[0]?.versionRowId || ''
   const go = async () => {
     setBusy(true); setErr('')
-    try { const id = await raiseAndStart({ workTypeVersionRowId: chosen, title: title.trim(), scopeKind: o.scopeKind, scopeEntityId: o.scopeEntityId, workflowKey: o.workflowKey }); location.href = '/request.html?id=' + id }
+    try { const id = await raiseAndStart({ workTypeVersionRowId: chosen, title: title.trim(), scopeKind: o.scopeKind, scopeEntityId: o.scopeEntityId, workflowKey: o.workflowKey }); navigate(screenPath('WORK_ITEM', id)) }
     catch (e) { setErr('Refused: ' + (e instanceof ApiError ? e.status + ' ' : '') + (e as Error).message); setBusy(false) }
   }
   return (

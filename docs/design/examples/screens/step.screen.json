@@ -1,0 +1,14 @@
+{
+  "g": 1, "kind": "screen", "key": "STEP", "name": "Step",
+  "description": "One step of any procedure, drawn from its definition: instruction, capture fields, evidence, outcomes, sign-off; claim, draft, witness, commit, check in (#165). The pickers for reference fields name the view to choose from.",
+  "permission": "WorkRequest.Read",
+  "screenKind": "step",
+  "params": {
+    "refViews": {
+      "Asset": { "view": "asset.vAsset", "label": "Name" },
+      "Device": { "view": "asset.vAsset", "label": "Name" },
+      "Scheme": { "view": "scheme.vScheme", "label": "Name" },
+      "Node": { "view": "location.vNode", "label": "Name" }
+    }
+  }
+}
