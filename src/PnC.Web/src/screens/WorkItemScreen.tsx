@@ -6,7 +6,7 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router'
-import { ApiError, fmtWhen, s, view, type Row } from '@/lib/api'
+import { ApiError, fmtWhen, s, view as readView, type Row } from '@/lib/api'
 import { useCan, useViewAll } from '@/lib/hooks'
 import { type WorkItemParams, type Screen, type Command, splitView, cellText, labelOf, runCommand, commandEnabled, screenPath } from '@/lib/screens'
 import { procedureInstance, evaluate, releaseHold, workflowDocumentOf, transition, type BlockNode, type ProcedureInstance } from '@/lib/process'
@@ -33,7 +33,7 @@ export default function WorkItemScreen({ screen, params: p, id }: { screen: Scre
   // the names of the members a foreach iterates (devices): from the items grid where it has them, else the asset view, one read per member
   const memberIds = useMemo(() => [...new Set((instQ.data?.blocks ?? []).map((b) => b.memberSubjectEntityId).filter((x): x is string => !!x))].sort(), [instQ.data])
   const namesQ = useQuery({ queryKey: ['memberNames', memberIds], enabled: memberIds.length > 0, staleTime: 10 * 60_000,
-    queryFn: async () => { const out: [string, string][] = []; for (const id of memberIds) { const r = (await view('asset', 'vAsset', { EntityId: id }, { take: 1 })).rows[0]; if (r) out.push([id.toLowerCase(), legacyFree(r.Name)]) } return out } })
+    queryFn: async () => { const out: [string, string][] = []; for (const id of memberIds) { const r = (await readView('asset', 'vAsset', { EntityId: id }, { take: 1 })).rows[0]; if (r) out.push([id.toLowerCase(), legacyFree(r.Name)]) } return out } })
   const memberNames = useMemo(() => { const m = new Map<string, string>(namesQ.data ?? []); for (const r of itemsQ.data ?? []) if (r.DeviceEntityId) m.set(String(r.DeviceEntityId).toLowerCase(), legacyFree(r.DeviceName)); return m }, [itemsQ.data, namesQ.data])
 
   if (!id) return <Status bad>No work item id in the address.</Status>
