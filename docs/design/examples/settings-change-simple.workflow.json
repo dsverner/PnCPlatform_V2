@@ -1,0 +1,20 @@
+{
+  "g": 1,
+  "kind": "workflow",
+  "key": "SETTINGS_CHANGE_REQUEST_SIMPLE",
+  "name": "Settings change request (simple)",
+  "description": "The lifecycle of a work request under the owner's four-step settings-change procedure (2026-09-15). Entering InProgress starts SETTINGS_CHANGE_SIMPLE; closing requires it to have completed. Program.WorkType SETTINGS_CHANGE_SIMPLE binds to this workflow.",
+  "subjectKind": "WorkRequest",
+  "states": [
+    { "code": "Raised", "name": "Raised", "initial": true, "roles": ["PCEngineer", "Administrator"] },
+    { "code": "InProgress", "name": "In progress", "roles": ["PCEngineer", "PCTechnician", "Administrator"], "onEnter": [ { "startProcedure": "SETTINGS_CHANGE_SIMPLE" } ] },
+    { "code": "Closed", "name": "Closed", "terminal": true, "roles": [] },
+    { "code": "Cancelled", "name": "Cancelled", "terminal": true, "cancellation": true, "roles": [] }
+  ],
+  "transitions": [
+    { "from": "Raised", "to": "InProgress", "name": "Start", "roles": ["PCEngineer"] },
+    { "from": "InProgress", "to": "Closed", "name": "Close", "roles": ["PCEngineer"], "requires": [ { "procedure": "SETTINGS_CHANGE_SIMPLE", "outcome": "Completed" } ] },
+    { "from": "Raised", "to": "Cancelled", "name": "Cancel", "requiresReason": true },
+    { "from": "InProgress", "to": "Cancelled", "name": "Cancel", "requiresReason": true, "roles": ["PCEngineer", "Administrator"] }
+  ]
+}

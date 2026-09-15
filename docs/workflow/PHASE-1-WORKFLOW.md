@@ -739,6 +739,19 @@ the release with SBOM and `release.json`.
   scheme groups (1.6 s), a row unfolded to its card and settings text, the context menu, the outstanding-request badges, the
   queue's counters over 11 851 requests (`evidence/W8-react-settings-bathurst.jpg`, `W8-react-requests.jpg`). The record,
   request, report, FLOC, schemes, grants and definitions pages stay as plain pages, linked from the shell, until their item.
+- **2026-09-15 (later) — screens from definitions, and the four-step proof (#164–#166).** The owner's correction of the legacy A/M/P
+  (one procedure: request change on the A makes the M; complete makes the A the P and the M the A — verified in the source database,
+  #164) and the owner's ask: the group authors the procedure *and its screens*, no code per process. Built as increments 1–3 of the
+  plan: the `Program.Screen` kind and its schema, the table-driven definitions API, `GET /api/v1/screens`, the single step read; the
+  screen kinds `settingsBook`, `list`, `workItem`, `step` in `src/PnC.Web/src/screens`; the settings book and the queue re-registered
+  as definitions; the request page replaced by the generic work item. The proof: `SETTINGS_CHANGE_SIMPLE` (the owner's four steps),
+  `SETTINGS_LIFECYCLE_SIMPLE`, `SETTINGS_CHANGE_REQUEST_SIMPLE` and the work type `SETTINGS_CHANGE_SIMPLE` authored through the
+  authoring API (dry run, save, approve — the definitions screen's own calls), then a change on Bathurst Terminal's 0063 A-PROT
+  MCGG22 run end to end through the generic screens: request (reason, the relay), rationale file and settings text file side by
+  side, the outage hold released by the engine, install checked in as the technician, baseline — revision 3 Active from 20:02, revision
+  1 Archived to 20:02, the request Closed (`evidence/W8-fourstep-*.jpg`, `W8-book-after-fourstep-*.png`). One rule relaxed on the way
+  (#166): a text settings file with no template is kept as `NoTemplate`, not refused. The hand-coded React state is tagged
+  `react-handcoded-2026-09-15`.
 
 
 **Depends on.** W5, W6, W7. **Estimate.** H: 24–40 h · G: 63–100 h.

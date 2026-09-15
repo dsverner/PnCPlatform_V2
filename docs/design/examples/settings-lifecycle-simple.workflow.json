@@ -1,0 +1,22 @@
+{
+  "g": 1,
+  "kind": "workflow",
+  "key": "SETTINGS_LIFECYCLE_SIMPLE",
+  "name": "Settings package lifecycle (simple)",
+  "description": "The lifecycle of a settings-issue package under the owner's four-step procedure (2026-09-15): calculated, applied to the relay, in service. No separate check, approval or issue state — the procedure that advances it carries whatever checks the group wants as steps. Superseded and Withdrawn keep the names the settings book reads.",
+  "subjectKind": "SettingsIssuePackage",
+  "states": [
+    { "code": "Calculated", "name": "Calculated", "initial": true },
+    { "code": "Applied", "name": "Applied to the relay" },
+    { "code": "InService", "name": "In service", "terminal": true },
+    { "code": "Superseded", "name": "Superseded", "terminal": true },
+    { "code": "Withdrawn", "name": "Withdrawn", "terminal": true, "cancellation": true }
+  ],
+  "transitions": [
+    { "from": "Calculated", "to": "Applied", "name": "Apply" },
+    { "from": "Applied", "to": "InService", "name": "Baseline" },
+    { "from": "InService", "to": "Superseded", "name": "Supersede", "roles": ["PCEngineer"] },
+    { "from": "Calculated", "to": "Withdrawn", "name": "Withdraw", "requiresReason": true },
+    { "from": "Applied", "to": "Withdrawn", "name": "Withdraw", "requiresReason": true }
+  ]
+}

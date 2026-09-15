@@ -12,8 +12,9 @@ export async function settingsText(revisionRowId: string): Promise<SettingsText 
   return { name: String(f.FileName), mime: String(f.MimeType), text: await getText('/api/v1/files/' + f.RowId) }
 }
 
-export interface WorkTypeOption { versionRowId: string; key: string; name: string }
-/** The effective work types a request may be raised under (Program.WorkType definitions with an Effective version). */
+export interface WorkTypeOption { versionRowId: string; key: string; name: string; workflowKey?: string }
+/** The effective work types a request may be raised under (Program.WorkType definitions with an Effective version), each
+ * with the workflow its payload binds (#131) — the raise starts that workflow, so a new work type needs no screen change. */
 export async function workTypes(): Promise<WorkTypeOption[]> {
   const [types, versions] = await Promise.all([
     view('config', 'vDefinition', { DefinitionKind: 'Program.WorkType' }, { take: 500 }),
@@ -22,7 +23,9 @@ export async function workTypes(): Promise<WorkTypeOption[]> {
   const out: WorkTypeOption[] = []
   for (const t of types.rows) {
     const v = versions.rows.find((x) => String(x.DefinitionEntityId).toLowerCase() === String(t.EntityId).toLowerCase()); if (!v) continue
-    out.push({ versionRowId: String(v.RowId), key: String(t.DefinitionKey), name: String(t.Name || '') })
+    let workflowKey: string | undefined
+    try { workflowKey = JSON.parse(String(v.PayloadText || '{}')).workflow || undefined } catch { /* a work type with no payload binds no workflow */ }
+    out.push({ versionRowId: String(v.RowId), key: String(t.DefinitionKey), name: String(t.Name || ''), workflowKey })
   }
   return out
 }

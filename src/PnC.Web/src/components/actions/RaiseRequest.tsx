@@ -18,7 +18,8 @@ export function RaiseRequest({ o, onClose }: { o: RaiseOpts; onClose: () => void
   const chosen = type || types.find((t) => t.key === o.defaultType)?.versionRowId || types[0]?.versionRowId || ''
   const go = async () => {
     setBusy(true); setErr('')
-    try { const id = await raiseAndStart({ workTypeVersionRowId: chosen, title: title.trim(), scopeKind: o.scopeKind, scopeEntityId: o.scopeEntityId, workflowKey: o.workflowKey }); navigate(screenPath('WORK_ITEM', id)) }
+    const wt = types.find((t) => t.versionRowId === chosen)
+    try { const id = await raiseAndStart({ workTypeVersionRowId: chosen, title: title.trim(), scopeKind: o.scopeKind, scopeEntityId: o.scopeEntityId, workflowKey: wt?.workflowKey ?? o.workflowKey }); navigate(screenPath('WORK_ITEM', id)) }
     catch (e) { setErr('Refused: ' + (e instanceof ApiError ? e.status + ' ' : '') + (e as Error).message); setBusy(false) }
   }
   return (
@@ -28,7 +29,7 @@ export function RaiseRequest({ o, onClose }: { o: RaiseOpts; onClose: () => void
         {(o.before || []).map(([k, v]) => <Field key={k} label={k}><input className={inputClass} readOnly value={v} size={Math.max(12, Math.min(40, v.length + 2))} /></Field>)}
         <Field label="Action type">
           <select className={inputClass} value={chosen} onChange={(e) => setType(e.target.value)}>
-            {types.map((t) => <option key={t.versionRowId} value={t.versionRowId}>{t.key} — {t.name}</option>)}
+            {types.map((t) => <option key={t.versionRowId} value={t.versionRowId}>{t.key} — {t.name}{t.workflowKey ? ` (${t.workflowKey})` : ''}</option>)}
           </select>
         </Field>
         <Field label="Title"><input className={inputClass} size={50} value={title} onChange={(e) => setTitle(e.target.value)} /></Field>

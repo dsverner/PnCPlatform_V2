@@ -5,7 +5,8 @@
 -- Names match case- and space-insensitively (HARMONIC RESTRAINT → HARMONIC_RESTRAINT); a numeric value is the leading
 -- number of the value text (unit words after it are ignored: "25 %", "1.4 OHMS"); anything else is text. Range is
 -- checked against the definition's MinValue/MaxValue. Unmatched names are listed in ParseError and the file's
--- ParseStatus is Partial (Parsed when every pair matched; Empty when the text held no pairs).
+-- ParseStatus is Partial (Parsed when every pair matched; Empty when the text held no pairs; NoTemplate when the model has
+-- no template yet — the text is kept, never refused, #166).
 CREATE PROCEDURE [process].[ParseSettingsText]
     @ConfigurationFileRevisionRowId UNIQUEIDENTIFIER,
     @Text NVARCHAR(MAX),
@@ -31,12 +32,24 @@ BEGIN
         FROM [ref].[FirmwareVersion] fv JOIN [asset].[vAsset] a ON a.[ModelId] = fv.[ModelId]
         WHERE a.[EntityId] = @device AND fv.[ParseTransformDefinitionEntityId] IS NOT NULL AND fv.[IsActive] = 1
         ORDER BY CASE WHEN fv.[VersionString] = N'n/a' THEN 0 ELSE 1 END, fv.[FirmwareVersionId];
-    IF @tdef IS NULL THROW 50181, N'process.ParseSettingsText: the device''s firmware names no settings template (Transform.SettingsParse).', 1;
+    -- #166 (2026-09-15): a relay whose model has no settings template yet keeps its text as filed — the legacy program's
+    -- floor — with ParseStatus NoTemplate; a template seeded later parses it on the next revision. Not a refusal.
+    IF @tdef IS NULL
+    BEGIN
+        UPDATE [document].[ConfigurationFile] SET [ParseStatus] = N'NoTemplate', [ParseError] = N'the device''s model names no settings template (Transform.SettingsParse); the text is kept as filed',
+               [ModifiedBy] = @ActorId, [ModifiedAt] = @now WHERE [RevisionRowId] = @ConfigurationFileRevisionRowId AND [IsDeleted] = 0;
+        SET @Matched = 0; SET @Unmatched = 0; RETURN;
+    END
     DECLARE @tver UNIQUEIDENTIFIER;
     SELECT TOP (1) @tver = dv.[RowId] FROM [config].[DefinitionVersion] dv
     WHERE dv.[DefinitionEntityId] = @tdef AND dv.[IsDeleted] = 0 AND dv.[Status] = N'Effective' AND dv.[EffectiveFrom] <= @now AND (dv.[EffectiveTo] IS NULL OR dv.[EffectiveTo] > @now)
     ORDER BY dv.[VersionNumber] DESC;
-    IF @tver IS NULL THROW 50182, N'process.ParseSettingsText: the settings template has no Effective version.', 1;
+    IF @tver IS NULL
+    BEGIN
+        UPDATE [document].[ConfigurationFile] SET [ParseStatus] = N'NoTemplate', [ParseError] = N'the settings template has no Effective version; the text is kept as filed',
+               [ModifiedBy] = @ActorId, [ModifiedAt] = @now WHERE [RevisionRowId] = @ConfigurationFileRevisionRowId AND [IsDeleted] = 0;
+        SET @Matched = 0; SET @Unmatched = 0; RETURN;
+    END
 
     -- the pairs
     SELECT ROW_NUMBER() OVER (ORDER BY (SELECT 1)) AS n,

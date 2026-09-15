@@ -1,0 +1,141 @@
+{
+  "g": 1,
+  "kind": "procedure",
+  "key": "SETTINGS_CHANGE_SIMPLE",
+  "name": "Relay settings change (the four-step procedure)",
+  "description": "The owner's four steps, 2026-09-15, as one authored procedure — the legacy program's A/M/P procedure as it worked: (1) an engineer raises the change against a protective relay and says why; (2) the engineer completes the rationale documentation and the settings file — two tracks, side by side; (3) when both are complete the request progresses to the field (the join, then the outage window); (4) field staff install and commission the settings, after which the work request is completed and the new revision is the in-service one — the legacy M becoming the A and the A becoming the P. The legacy's third check box (the relay software) is not a step: the platform's own record of the file is that check. Authored to prove #165: no code was written for this procedure or its screens.",
+  "subjectKind": "WorkRequest",
+  "roles": {
+    "engineer": { "role": "PCEngineer" },
+    "technician": { "role": "PCTechnician" }
+  },
+  "outcomes": ["Completed", "Cancelled"],
+  "body": {
+    "block": "sequence",
+    "id": "MAIN",
+    "items": [
+      {
+        "block": "step",
+        "id": "REQUEST",
+        "title": "[1] Request the change and say why",
+        "instruction": "Say what the change is for and which relay or relays it covers. Committing this step creates the settings-issue package the rest of the work fills.",
+        "role": "engineer",
+        "capture": {
+          "reason": { "type": "text", "required": true },
+          "devices": { "type": "set", "refKind": "Device", "required": true }
+        },
+        "produces": { "kind": "SettingsIssuePackage", "as": "package" },
+        "record": { "kind": "RequestConfirmation" }
+      },
+      {
+        "block": "parallel",
+        "id": "PREPARE",
+        "title": "[2] Rationale and settings — both before the field",
+        "join": "all",
+        "branches": [
+          {
+            "id": "RATIONALE",
+            "title": "Rationale documentation",
+            "body": {
+              "block": "step",
+              "id": "WRITE_RATIONALE",
+              "title": "Rationale document",
+              "instruction": "Attach the rationale for the change: what is being changed, why, and what was considered.",
+              "role": "engineer",
+              "evidence": { "required": true, "kinds": ["Rationale"], "min": 1 },
+              "record": { "kind": "Rationale" }
+            }
+          },
+          {
+            "id": "SETTINGS",
+            "title": "Settings file",
+            "body": {
+              "block": "foreach",
+              "id": "BUILD",
+              "title": "Settings for every relay in the change",
+              "over": "step.capture[id='REQUEST', field='devices']",
+              "as": "device",
+              "subjectKind": "Device",
+              "concurrency": "parallel",
+              "join": "all",
+              "body": {
+                "block": "choice",
+                "id": "DEVICE_KIND",
+                "title": "A settings file for a microprocessor relay; a text file for anything else",
+                "cases": [
+                  {
+                    "title": "Microprocessor relay",
+                    "when": "device.technology = 'Microprocessor'",
+                    "body": {
+                      "block": "step",
+                      "id": "BUILD_SETTINGS",
+                      "title": "Settings file from the vendor tool",
+                      "instruction": "Attach the settings file for this relay. It becomes the outstanding revision in the settings book (the legacy M).",
+                      "role": "engineer",
+                      "evidence": { "required": true, "kinds": ["SettingsFile"], "min": 1 },
+                      "signoff": { "action": "Calculate" },
+                      "record": { "kind": "ConfigurationFileRevision" }
+                    }
+                  }
+                ],
+                "else": {
+                  "block": "step",
+                  "id": "RECORD_SETTINGS",
+                  "title": "Settings as a text file",
+                  "instruction": "No vendor file exists for this relay: attach the settings as a text file in name=value form. It becomes the outstanding revision in the settings book (the legacy M).",
+                  "role": "engineer",
+                  "evidence": { "required": true, "kinds": ["SettingsText"], "min": 1 },
+                  "signoff": { "action": "Calculate" },
+                  "record": { "kind": "ConfigurationFileRevision" }
+                }
+              }
+            }
+          }
+        ]
+      },
+      {
+        "block": "hold",
+        "id": "AWAIT_OUTAGE",
+        "title": "[3] To the field — wait for the outage window, if one is required",
+        "reason": "outage",
+        "until": "work.outage_required = false or work.outage_window_start <= @at",
+        "releaseRole": "engineer",
+        "maxDuration": "180 d"
+      },
+      {
+        "block": "foreach",
+        "id": "FIELD",
+        "title": "[4] Install and commission, per relay",
+        "over": "step.capture[id='REQUEST', field='devices']",
+        "as": "device",
+        "subjectKind": "Device",
+        "concurrency": "parallel",
+        "join": "all",
+        "body": {
+          "block": "step",
+          "id": "INSTALL",
+          "title": "Settings installed and commissioned",
+          "instruction": "Load the settings to the relay and commission them. Record when. Captured in the field and checked in, or committed here.",
+          "role": "technician",
+          "capture": {
+            "installedAt": { "type": "date", "required": true },
+            "commissioningNote": { "type": "text" }
+          },
+          "evidence": { "required": false, "kinds": ["TestSheet"] },
+          "signoff": { "action": "Apply" },
+          "record": { "kind": "FieldApplication" },
+          "advances": { "workflow": "SETTINGS_LIFECYCLE_SIMPLE", "subject": "procedure.package", "transition": "Apply" }
+        }
+      },
+      {
+        "block": "step",
+        "id": "COMPLETE",
+        "title": "Work request completed — the new settings are the in-service settings",
+        "instruction": "The settings book now says this is the truth: the new revision goes in service and the one it replaces is archived (the M becomes the A, the A becomes the P).",
+        "role": "engineer",
+        "record": { "kind": "Baseline" },
+        "advances": { "workflow": "SETTINGS_LIFECYCLE_SIMPLE", "subject": "procedure.package", "transition": "Baseline" }
+      }
+    ]
+  }
+}
