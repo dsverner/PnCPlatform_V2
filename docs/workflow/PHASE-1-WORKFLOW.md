@@ -701,6 +701,31 @@ the release with SBOM and `release.json`.
   writes 0. **Known gap, recorded**: a header *note* change alone is not applied — the request's hash omits Notes; and a
   changed SET1 text or a changed track state on an already-landed row is reported, not re-shaped (#148). Widening the
   hash is free on a fresh PROD load and costs a full re-revision on DEV and QA — round 2 decides.
+- **The review stopped, the reference applications brought up (owner, 2026-09-14; #157)**: the V2 screens were "nothing like"
+  the legacy program, so the legacy C++Builder settings program (rebuilt with RAD Studio 13 against `dbRelay`), the
+  predecessor V1, `pnc-platform` (`PNC_Dev` is its environment, not the legacy's — `SOURCES.md` corrected) and Dev_Final's
+  `pilot/hardening-2026-06-12` branch (the owner's chosen comparison) all run on the build laptop; every screen since is
+  compared against the running original. Round 4 (`cards/w8-ux-round4`) and round 5 (`cards/w8-ux-round5`, rebuilt around
+  Dev_Final) answered — decisions #157, #158, #161.
+- **Release 0.9.0 — the settings book in the legacy shape, grouped by functional scheme (#157–#162).** The location list, the
+  station's schemes as collapsed groups, the row that unfolds to its card and filed settings text, the context menu, filters by
+  field, Export CSV, the location report page, the request with its stage bar and three tracks, the request queue with
+  counters, scheme curation, Compare on the record, the migrated classification and CT/PT read back under the platform's
+  labels; no legacy field name or record number on screen. No table or column change: one view revised (approved in plan
+  mode), a scheme-type seed, a migration stage (1 769 schemes, 9 846 memberships). Found on the way and fixed: the FLOC
+  view's per-position join to the windowed scheme view (1 s → 11 s with 1 769 schemes), and the API's read-scope
+  predicate — an IN (subquery) the optimizer pushed into the view's correlated lookups once the process tables were full
+  (100–170 s for the whole book against 1.7 s unscoped), now a join to the readable set (1.9 s; #162). DEV: fresh deploy,
+  smoke → load → verify in that order (the load's landings need the smoke's definitions; learned by running them the other
+  way), rehearsal second pass 0, `verify_chains` 0 differ, API smoke **229 PASS**; the screens observed in Chrome
+  (`evidence/W8-settings-groups-bathurst.jpg`, `W8-settings-menu.jpg`, `W8-request-stage-bar.jpg`, `W8-record-compare.jpg`, `W8-report-bathurst.jpg`, `W8-schemes-bathurst.jpg`). QA: fresh deploy with `dist/0.9.0` (schema smoke 268), VM02 on 0.9.0
+  (`/health` → `environment QA, release 0.9.0, database ok`; the fresh database needed the site's service-account user
+  re-created — runbook step 1), two Administrator → Approver gate pairs to make the three definitions Effective, the full
+  load (`REHEARSAL-2026-09-14-QA.md`: 262 625 rows, second pass 0, `verify_chains` 0 differ; the 3 007
+  `scheme.CommissionedFunction` provenance gap is the one the 13th's reports carry — its provenance is keyed on the
+  function node, not the row), gate accounts **Administrator 81, Approver 58, ReadOnly 44, Hydro 26 PASS, 0 FAIL**. The
+  owner's test card is round 6 (`cards/w8-ux-round6`). Known and on the card: the request queue reads the whole list
+  (11 851 rows, 4–6 s) — a leaner read is a 0.9.1 item.
 
 
 **Depends on.** W5, W6, W7. **Estimate.** H: 24–40 h · G: 63–100 h.
