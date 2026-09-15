@@ -726,6 +726,19 @@ the release with SBOM and `release.json`.
   function node, not the row), gate accounts **Administrator 81, Approver 58, ReadOnly 44, Hydro 26 PASS, 0 FAIL**. The
   owner's test card is round 6 (`cards/w8-ux-round6`). Known and on the card: the request queue reads the whole list
   (11 851 rows, 4–6 s) — a leaner read is a 0.9.1 item.
+- **2026-09-15 — the owner's review of 0.9.0, and the turn to React (#163).** Reviewed beside the legacy program and Dev_Final:
+  "the functionality isn't anywhere near the same as either". Rulings in the terminal (the cards are retired): the references
+  are the floor; direct saves with audit on an outstanding record or request, the engine only to raise and complete; the
+  columnless legacy fields as characteristics; the front end moves to React. Items 1 and 2 of the accepted twelve-item build
+  order: `src/PnC.Web` (React 19, TypeScript, Vite 8, Tailwind 4, react-router 7, TanStack Query 5) with the shell (collapsible
+  grouped sidebar, who, health), the shared parts (panel, pill, grid with groups / unfold / column chooser / CSV / context
+  menu, stage bar), the settings book and the request queue ported with every 0.9.0 function; built into
+  `src/PnC.Api/wwwroot/app` (git-ignored), served at `/app/` by a `nonfile` fallback route under the unchanged CSP;
+  `package_release.py` builds it with `npm ci` and lists the lockfile's packages in the SBOM; the smoke checks `/app/`,
+  `/app/settings`, `/app/requests` under the CSP. Observed in Chrome on DEV: Bathurst Terminal's 199 active records in
+  scheme groups (1.6 s), a row unfolded to its card and settings text, the context menu, the outstanding-request badges, the
+  queue's counters over 11 851 requests (`evidence/W8-react-settings-bathurst.jpg`, `W8-react-requests.jpg`). The record,
+  request, report, FLOC, schemes, grants and definitions pages stay as plain pages, linked from the shell, until their item.
 
 
 **Depends on.** W5, W6, W7. **Estimate.** H: 24–40 h · G: 63–100 h.

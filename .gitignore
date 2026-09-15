@@ -55,3 +55,4 @@ appsettings.Local.json
 # the browser tier build (decision 257)
 src/PnC.Web/node_modules/
 src/PnC.Web/dist/
+src/PnC.Api/wwwroot/app/

@@ -991,7 +991,7 @@ else Skip("W4 run (needs the Administrator, Approver, Hydro and Technician ident
     var who = admin ?? readOnly ?? approver ?? hydro ?? tech;
     if (who is not null)
     {
-        foreach (var path in new[] { "", "definitions.html", "definitions.js", "pnc.js", "app.js", "styles.css", "sw.js", "settings.html", "settings.js", "request.html", "request.js", "setting.html", "setting.js", "floc.html", "floc.js" })
+        foreach (var path in new[] { "", "definitions.html", "definitions.js", "pnc.js", "app.js", "styles.css", "sw.js", "settings.html", "settings.js", "request.html", "request.js", "setting.html", "setting.js", "floc.html", "floc.js", "app/", "app/settings", "app/requests" })
         {
             var r = await who.GetAsync(path);
             var csp = r.Headers.TryGetValues("Content-Security-Policy", out var v) ? string.Join("", v) : "";

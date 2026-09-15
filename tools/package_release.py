@@ -5,8 +5,8 @@ Produced on the build machine, never on an OT server:
   dist/<version>/PnCPlatform.dacpac      the schema (built from docs/schema/ddl)
   dist/<version>/app/                     the published site (PnC.Api, framework-dependent, win-x64) + wwwroot
   dist/<version>/PnC.Api-<version>.zip    the same, zipped
-  dist/<version>/sbom.json                every server package (direct + transitive) for PnC.Api and PnC.Api.Smoke;
-                                          the browser tier carries no packages (decision 242)
+  dist/<version>/sbom.json                every server package (direct + transitive) for PnC.Api and PnC.Api.Smoke, and
+                                          every browser package from src/PnC.Web/package-lock.json (decision 163: React)
   dist/<version>/release.json             version, commit, built-at, SHA-256 of dacpac / zip / sbom
   dist/<version>/RELEASE-<version>.md     the release document skeleton (sections to fill before promotion)
 
@@ -57,6 +57,17 @@ def commit():
         return None
 
 
+def browser_sbom():
+    """Every package the lockfile resolved (direct + transitive, dev and runtime), the way npm ci installs it."""
+    lock = json.load(open(os.path.join(ROOT, "src", "PnC.Web", "package-lock.json"), encoding="utf-8"))
+    out = []
+    for path, p in lock.get("packages", {}).items():
+        if not path:
+            continue
+        out.append({"name": path.split("node_modules/")[-1], "version": p.get("version"), "dev": bool(p.get("dev")), "license": p.get("license"), "integrity": p.get("integrity")})
+    return sorted(out, key=lambda x: (x["name"], x["version"] or ""))
+
+
 def sbom(projects, configuration):
     """dotnet list package --include-transitive --format json, per project, folded into one list."""
     packages = {}
@@ -101,6 +112,14 @@ def main():
     dacpac = os.path.join(out, "PnCPlatform.dacpac")
     shutil.copyfile(src, dacpac)
 
+    # 2a. the React shell (decision 163): built from the lockfile into src/PnC.Api/wwwroot/app, which dotnet publish carries
+    web = os.path.join(ROOT, "src", "PnC.Web")
+    npm = "npm.cmd" if os.name == "nt" else "npm"
+    run([npm, "ci", "--no-audit", "--no-fund"], cwd=web)
+    run([npm, "run", "build"], cwd=web)
+    if not os.path.exists(os.path.join(ROOT, "src", "PnC.Api", "wwwroot", "app", "index.html")):
+        sys.exit("the React shell did not build (src/PnC.Api/wwwroot/app/index.html missing)")
+
     # 2. the application package (framework-dependent: the OT server carries the shared framework, PLATFORM-ARCHITECTURE §2.1)
     run([DOTNET, "publish", os.path.join(ROOT, "src", "PnC.Api", "PnC.Api.csproj"), "-c", a.configuration, "-r", "win-x64", "--self-contained", "false", "-o", os.path.join(out, "app"), "-nologo", "-v", "q"])
     for f in ("appsettings.Local.json", "appsettings.Development.json"):
@@ -127,7 +146,7 @@ def main():
     with open(sbom_path, "w", encoding="utf-8") as f:
         json.dump({"version": version, "generatedAt": datetime.now(timezone.utc).isoformat(), "format": "pnc-sbom-1",
                    "serverPackages": packages, "sharedFramework": "Microsoft.AspNetCore.App / Microsoft.NETCore.App (net10.0, on the host)",
-                   "browserPackages": [], "note": "decision 239: one direct package; decision 242: the shell carries no browser packages"}, f, indent=2)
+                   "browserPackages": browser_sbom(), "note": "decision 239: one direct server package; decision 163: the React shell's packages from package-lock.json, built with npm ci"}, f, indent=2)
 
     # 4. release.json + the release document skeleton
     rel = {"version": version, "commit": commit(), "builtAt": datetime.now(timezone.utc).isoformat(), "configuration": a.configuration,

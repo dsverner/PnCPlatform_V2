@@ -72,5 +72,7 @@ DefinitionEndpoints.Map(app, catalog, map, authz);
 FileEndpoints.Map(app, authz);                                           // W7: the file download (#144)
 ProcessEndpoints.Map(app, catalog, map, authz, connectionString);   // W4: the procedure engine   // W3: fixed routes before the generic {schema}/{procedure}
 ApiEndpoints.Map(app, catalog, map, authz, app.Environment.EnvironmentName, connectionString);
+// the React shell (#163): every /app/* route the browser asks for is the one page; the router picks the screen
+app.MapFallbackToFile("app/{*path:nonfile}", "app/index.html");   // nonfile: the built assets stay with the static-file middleware
 
 app.Run();

@@ -1,0 +1,59 @@
+@import "tailwindcss";
+
+/* The theme follows the system (round 4 ruling). Components are written in dark-theme classes, as Dev_Final's are; in a
+   light system theme the slate and sky families are swapped symmetrically (shade N ↔ 1000−N), so every class works in
+   both without per-component handling. */
+html { font-size: 15px; }
+body { @apply bg-slate-950 text-slate-200 antialiased; }
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --color-slate-950: oklch(0.984 0.003 247.858);
+    --color-slate-900: oklch(0.968 0.007 247.896);
+    --color-slate-800: oklch(0.929 0.013 255.508);
+    --color-slate-700: oklch(0.869 0.022 252.894);
+    --color-slate-600: oklch(0.704 0.04 256.788);
+    --color-slate-500: oklch(0.554 0.046 257.417);
+    --color-slate-400: oklch(0.446 0.043 257.281);
+    --color-slate-300: oklch(0.372 0.044 257.287);
+    --color-slate-200: oklch(0.279 0.041 260.031);
+    --color-slate-100: oklch(0.208 0.042 265.755);
+    --color-slate-50:  oklch(0.129 0.042 264.695);
+    --color-sky-950: oklch(0.977 0.013 236.62);
+    --color-sky-900: oklch(0.951 0.026 236.824);
+    --color-sky-800: oklch(0.901 0.058 230.902);
+    --color-sky-700: oklch(0.828 0.111 230.318);
+    --color-sky-600: oklch(0.692 0.167 254.119);
+    --color-sky-500: oklch(0.685 0.169 237.323);
+    --color-sky-400: oklch(0.546 0.245 256.802);
+    --color-sky-300: oklch(0.5 0.204 256.802);
+    --color-sky-200: oklch(0.443 0.177 257.281);
+    --color-sky-100: oklch(0.391 0.09 257.281);
+    --color-sky-50:  oklch(0.293 0.066 259.391);
+    --color-amber-900: oklch(0.962 0.059 95.617);
+    --color-amber-800: oklch(0.924 0.12 95.746);
+    --color-amber-300: oklch(0.555 0.163 48.998);
+    --color-amber-200: oklch(0.473 0.137 46.201);
+    --color-emerald-900: oklch(0.95 0.052 163.051);
+    --color-emerald-800: oklch(0.905 0.093 164.15);
+    --color-emerald-300: oklch(0.508 0.118 165.612);
+    --color-emerald-200: oklch(0.432 0.095 166.913);
+    --color-red-900: oklch(0.936 0.032 17.717);
+    --color-red-800: oklch(0.885 0.062 18.334);
+    --color-red-300: oklch(0.505 0.213 27.518);
+    --color-red-200: oklch(0.444 0.177 26.899);
+  }
+}
+
+/* the grid's rows and groups */
+.grid-table { @apply w-full border-collapse text-sm tabular-nums; }
+.grid-table th { @apply sticky top-0 z-10 bg-slate-900 px-2 py-1.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-400 whitespace-nowrap border-b border-slate-700; }
+.grid-table td { @apply px-2 py-1 border-b border-slate-800 whitespace-nowrap max-w-md overflow-hidden text-ellipsis; }
+.grid-table tr.row:hover td { @apply bg-slate-800/60; }
+.grid-table tr.row.selected td { @apply bg-slate-800; }
+.grid-table tr.group td { @apply bg-slate-900 p-0 border-b border-slate-700; }
+
+@media print {
+  aside, nav, .no-print { display: none !important; }
+  body { background: #fff; color: #000; }
+}
