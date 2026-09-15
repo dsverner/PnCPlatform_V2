@@ -1,0 +1,42 @@
+{
+  "g": 1, "kind": "screen", "key": "REQUEST_QUEUE", "name": "Requests",
+  "description": "The change-request queue: every request the person may read, counted by state, filtered by state and location; a row opens the request (#158, #165).",
+  "menu": { "group": "Settings book", "label": "Requests", "order": 20 },
+  "permission": "WorkRequest.Read",
+  "screenKind": "list",
+  "params": {
+    "view": "work.vChangeRequestStatus",
+    "orderBy": "-RequestedAt",
+    "rowKey": "WorkRequestEntityId",
+    "columns": [
+      { "key": "Title", "label": "Request", "format": "legacyFree" },
+      { "key": "RequestState", "label": "State", "format": "state" },
+      { "key": "WorkTypeKey", "label": "Action type" },
+      { "key": "StationName", "label": "Location" },
+      { "key": "EquipmentName", "label": "Relay / equipment", "format": "legacyFree", "fallback": "ScopeName" },
+      { "key": "DeviceCount", "label": "Devices", "format": "number" },
+      { "key": "RequestedByDisplayName", "label": "Requested by" },
+      { "key": "RequestedAt", "label": "Requested", "format": "date" },
+      { "key": "DocumentationStatus", "label": "Documentation" },
+      { "key": "DatabaseStatus", "label": "Database" },
+      { "key": "LifecycleState", "label": "Package" },
+      { "key": "RequestCompletedAt", "label": "Completed", "format": "date" }
+    ],
+    "textFilterColumns": ["Title", "ScopeName", "EquipmentName", "StationName", "RequestedByDisplayName", "WorkTypeKey", "Description"],
+    "filters": [
+      { "column": "RequestState", "label": "State", "options": [
+        { "label": "Open (raised or in progress)", "value": ["Raised", "InProgress"], "default": true },
+        { "label": "Every state", "value": null },
+        { "label": "Raised", "value": "Raised" }, { "label": "In progress", "value": "InProgress" }, { "label": "Closed", "value": "Closed" }, { "label": "Cancelled", "value": "Cancelled" } ] },
+      { "column": "StationName", "label": "Location" }
+    ],
+    "counters": [
+      { "label": "Raised", "when": { "RequestState": "Raised" } },
+      { "label": "In progress", "when": { "RequestState": "InProgress" } },
+      { "label": "Closed this month", "when": { "RequestState": "Closed" }, "thisMonth": "RequestCompletedAt" },
+      { "label": "Cancelled", "when": { "RequestState": "Cancelled" } },
+      { "label": "Not started", "when": { "RequestState": null } }
+    ],
+    "rowOpen": { "label": "Open the request", "action": "url", "url": "/request.html?id={WorkRequestEntityId}" }
+  }
+}

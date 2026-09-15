@@ -4,7 +4,7 @@
 (function () {
   "use strict";
   const { $, text, getJson, postJson, el } = window.PnC;
-  const KINDS = { "Program.Procedure": "Procedures", "Program.Workflow": "Workflows" };
+  const KINDS = { "Program.Procedure": "Procedures", "Program.Workflow": "Workflows", "Program.Screen": "Screens (#165)" };
   const SKELETON = {
     g: 1, kind: "procedure", key: "NEW_PROCEDURE", name: "New procedure", description: "", subjectKind: "WorkRequest",
     roles: { engineer: { role: "PCEngineer" } },

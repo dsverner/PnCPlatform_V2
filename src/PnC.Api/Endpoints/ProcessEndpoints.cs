@@ -127,6 +127,58 @@ public static class ProcessEndpoints
             return (Guid.Parse(row["ProcedureInstanceEntityId"]!.GetValue<string>()), G(row["WorkRequestEntityId"]), G(row["ClaimedByActorId"]));
         }
 
+        // #165: one read for the generic step screen — the step's live state and claim, its draft, and its definition node lifted
+        // from the pinned document (title, instruction, capture fields, evidence, outcomes, sign-off), so no screen is coded per step.
+        app.MapGet("/api/v1/process/step-instances/{id:guid}", async (Guid id, HttpContext http, CancellationToken ct) =>
+        {
+            var u = http.User(); var s = http.Session();
+            var (instanceId, wr, claimant) = await StepHead(s, id, ct);
+            await authz.RequireAsync(s, u, map.ForView("process", "vStepInstance") ?? "WorkRequest.Read", "WorkRequest", wr, "GET process.vStepInstance", http.Connection.RemoteIpAddress?.ToString() ?? "", ct);
+            var interp = Interp(http);
+            var inst = await interp.LoadAsync(instanceId, ct);
+            var row = inst.Rows.FirstOrDefault(r => r.StepEntityId == id) ?? throw new ApiException(404, "unknown_step", "No step instance has that id.");
+            var doc = FindDoc(inst.Root, row.Path, "step") ?? throw new ApiException(500, "internal", $"The pinned document has no step at {row.Path}.");
+            var node = doc.Node;
+            var live = (await s.RowsAsync("""
+                SELECT st.State, st.Outcome, st.AssignedRoleCode, st.ClaimedByActorId, st.ClaimedAt, st.ClaimExpiresAt, st.Draft, st.DraftModifiedAt,
+                       st.CapturedAt, st.CapturedByActorId, st.CaptureSource, st.CommittedRecordEntityId, st.CommittedByActorId, st.WitnessedByActorId, st.CommittedAt, st.HeldReason,
+                       cp.DisplayName AS ClaimedByDisplayName, wp.DisplayName AS WitnessedByDisplayName
+                FROM process.vStepInstance st
+                LEFT JOIN personnel.vActor ca ON ca.ActorId = st.ClaimedByActorId LEFT JOIN personnel.vPerson cp ON cp.EntityId = ca.PersonEntityId
+                LEFT JOIN personnel.vActor wa ON wa.ActorId = st.WitnessedByActorId LEFT JOIN personnel.vPerson wp ON wp.EntityId = wa.PersonEntityId
+                WHERE st.EntityId = @s
+                """, new Dictionary<string, object?> { ["@s"] = id }, ct)).FirstOrDefault() as JsonObject ?? throw new ApiException(404, "unknown_step", "No step instance has that id.");
+            var mine = claimant is not null && await s.ScalarAsync<bool>("SELECT CASE WHEN EXISTS (SELECT 1 FROM personnel.vActor a WHERE a.ActorId = @a AND a.PersonEntityId = @p) THEN 1 ELSE 0 END",
+                new Dictionary<string, object?> { ["@a"] = claimant, ["@p"] = u.PersonEntityId }, ct);
+            if (!mine && live["Draft"] is not null)   // #68: every read of a draft by anyone other than its claimant is audit-logged
+                await s.ExecAsync("EXEC [audit].[LogRead] @SubjectSchema = N'process', @SubjectTable = N'StepInstance', @SubjectEntityId = @id", new Dictionary<string, object?> { ["@id"] = id }, ct);
+            var now = await s.NowAsync(ct);
+            (DateTimeOffset? at, string basis) due = node["due"] is not null ? interp.Due(inst, doc, row, now) : (null, "None");
+            var alias = node["role"]?.GetValue<string>();
+            var roleNode = alias is null ? null : inst.Document["roles"]?[alias] as JsonObject;
+            var draftText = live["Draft"]?.GetValue<string>();
+            return Results.Json(new
+            {
+                stepInstanceEntityId = id, procedureInstanceEntityId = instanceId, procedureKey = inst.Document["key"]?.DeepClone(), procedureVersionRowId = inst.VersionRowId,
+                workRequestEntityId = wr, workflowInstanceEntityId = inst.WorkflowInstanceEntityId, subjectKind = inst.SubjectKind, subjectEntityId = inst.SubjectEntityId,
+                blockPath = row.Path, stepId = row.StepId, state = live["State"]?.DeepClone(), outcome = live["Outcome"]?.DeepClone(), heldReason = live["HeldReason"]?.DeepClone(),
+                memberSubjectKind = row.MemberKind, memberSubjectEntityId = row.MemberId,
+                assignedRoleCode = live["AssignedRoleCode"]?.DeepClone(), claimedByActorId = claimant, claimedByDisplayName = live["ClaimedByDisplayName"]?.DeepClone(),
+                claimedAt = live["ClaimedAt"]?.DeepClone(), claimExpiresAt = live["ClaimExpiresAt"]?.DeepClone(), isClaimant = mine,
+                witnessedByActorId = live["WitnessedByActorId"]?.DeepClone(), witnessedByDisplayName = live["WitnessedByDisplayName"]?.DeepClone(),
+                committedAt = live["CommittedAt"]?.DeepClone(), committedByActorId = live["CommittedByActorId"]?.DeepClone(), committedRecordEntityId = live["CommittedRecordEntityId"]?.DeepClone(),
+                capturedAt = live["CapturedAt"]?.DeepClone(), captureSource = live["CaptureSource"]?.DeepClone(), draftModifiedAt = live["DraftModifiedAt"]?.DeepClone(),
+                draft = draftText is null ? null : JsonNode.Parse(draftText), dueAt = due.at, dueBasis = due.basis,
+                definition = new
+                {
+                    title = node["title"]?.DeepClone(), instruction = node["instruction"]?.DeepClone(), role = alias, roleCode = roleNode?["role"]?.DeepClone(), requires = roleNode?["requires"]?.DeepClone(),
+                    capture = node["capture"]?.DeepClone(), outcomes = node["outcomes"]?.DeepClone() ?? new JsonArray("Done"), evidence = node["evidence"]?.DeepClone(), signoff = node["signoff"]?.DeepClone(),
+                    deviation = node["deviation"]?.DeepClone(), due = node["due"]?.DeepClone(), record = node["record"]?.DeepClone(), produces = node["produces"]?.DeepClone(),
+                    advances = node["advances"]?.DeepClone(), branchOutcome = node["branchOutcome"]?.DeepClone(), precondition = node["precondition"] is not null,
+                },
+            });
+        });
+
         app.MapGet("/api/v1/process/step-instances/{id:guid}/draft", async (Guid id, HttpContext http, CancellationToken ct) =>
         {
             var u = http.User(); var s = http.Session();

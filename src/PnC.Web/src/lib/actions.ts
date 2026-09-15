@@ -28,9 +28,9 @@ export async function workTypes(): Promise<WorkTypeOption[]> {
 }
 
 /** Raise a work request and start the settings-change workflow on it; returns the request's entity id. */
-export async function raiseAndStart(o: { workTypeVersionRowId: string; title: string; scopeKind: 'Asset' | 'Node'; scopeEntityId: string }): Promise<string> {
+export async function raiseAndStart(o: { workTypeVersionRowId: string; title: string; scopeKind: 'Asset' | 'Node'; scopeEntityId: string; workflowKey?: string }): Promise<string> {
   const wr = await proc('work', 'WorkRequest_Add', { WorkTypeDefinitionVersionRowId: o.workTypeVersionRowId, Title: o.title, ScopeKind: o.scopeKind, ScopeEntityId: o.scopeEntityId })
-  const wf = await postJson<{ workflowInstanceEntityId: string }>('/api/v1/process/workflows/start', { workflowKey: 'SETTINGS_CHANGE_REQUEST', subjectKind: 'WorkRequest', subjectEntityId: wr.EntityId })
+  const wf = await postJson<{ workflowInstanceEntityId: string }>('/api/v1/process/workflows/start', { workflowKey: o.workflowKey ?? 'SETTINGS_CHANGE_REQUEST', subjectKind: 'WorkRequest', subjectEntityId: wr.EntityId })
   await postJson(`/api/v1/process/workflow-instances/${wf.workflowInstanceEntityId}/transitions`, { name: 'Start' })
   return String(wr.EntityId)
 }

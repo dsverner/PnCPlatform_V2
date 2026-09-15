@@ -1,0 +1,140 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pnc.nbpower.internal/schemas/screen/1",
+  "title": "Screen definition (Program.Screen), grammar version 1",
+  "description": "A screen the administrator designs: one of the platform's screen kinds (written once in code), bound to the data and the procedure it shows. Decision #165. No formula expressions: every 'when' is a plain equality on a column of the row.",
+  "type": "object",
+  "required": ["g", "kind", "key", "name", "screenKind", "params"],
+  "additionalProperties": false,
+  "properties": {
+    "g": { "const": 1 },
+    "kind": { "const": "screen" },
+    "key": { "$ref": "#/$defs/key" },
+    "name": { "type": "string", "minLength": 1 },
+    "description": { "type": "string" },
+    "menu": {
+      "type": "object", "description": "Where the screen sits in the navigation. Absent: reachable only from another screen's command.",
+      "required": ["group", "label"], "additionalProperties": false,
+      "properties": { "group": { "type": "string", "minLength": 1 }, "label": { "type": "string", "minLength": 1 }, "order": { "type": "integer", "minimum": 0 } }
+    },
+    "permission": { "$ref": "#/$defs/code", "description": "The permission code a person must hold for the screen to be listed and opened. The API's own checks on every read and call still decide." },
+    "screenKind": { "type": "string", "enum": ["settingsBook", "list", "workItem", "step", "record"] },
+    "params": {
+      "type": "object",
+      "oneOf": [
+        { "$ref": "#/$defs/settingsBook" }, { "$ref": "#/$defs/list" }, { "$ref": "#/$defs/workItem" }, { "$ref": "#/$defs/step" }, { "$ref": "#/$defs/record" }
+      ]
+    }
+  },
+  "$defs": {
+    "key": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]{1,99}$" },
+    "code": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_.]{0,99}$" },
+    "view": { "type": "string", "pattern": "^[a-z]+\\.v[A-Za-z0-9]+$", "description": "schema.view, as the dispatcher serves it (GET /api/v1/<schema>/<view>)." },
+    "column": {
+      "type": "object", "required": ["key"], "additionalProperties": false,
+      "properties": {
+        "key": { "type": "string", "minLength": 1, "description": "The view's column." },
+        "label": { "type": "string" },
+        "format": { "type": "string", "enum": ["text", "date", "when", "number", "state", "legacyFree"], "description": "How the cell is shown: date (day), when (day and time), state (a coloured pill), legacyFree (the migrated record number stripped)." },
+        "fallback": { "type": "string", "description": "A second column shown when the first is empty." }
+      }
+    },
+    "when": { "type": "object", "description": "Every entry must hold: the row's column equals the value (or, with an array, is one of them).", "additionalProperties": { "anyOf": [ { "type": "string" }, { "type": "boolean" }, { "type": "number" }, { "type": "null" }, { "type": "array", "items": { "type": "string" } } ] } },
+    "command": {
+      "type": "object", "required": ["label", "action"], "additionalProperties": false,
+      "properties": {
+        "label": { "type": "string", "minLength": 1 },
+        "action": { "type": "string", "enum": ["openScreen", "raiseRequest", "transition", "openStep", "url"] },
+        "screen": { "$ref": "#/$defs/key", "description": "openScreen: the screen to open." },
+        "param": { "type": "string", "description": "openScreen: the row's column whose value is the screen's id parameter." },
+        "query": { "type": "object", "additionalProperties": { "type": "string" }, "description": "openScreen: extra query parameters, value = the row's column." },
+        "workflowKey": { "$ref": "#/$defs/code", "description": "raiseRequest: the workflow to start on the new request." },
+        "workType": { "$ref": "#/$defs/code", "description": "raiseRequest: the default Program.WorkType key." },
+        "scopeKind": { "type": "string", "enum": ["Asset", "Node"], "description": "raiseRequest: what the request is about." },
+        "scopeColumn": { "type": "string", "description": "raiseRequest: the row's column holding the scope entity id." },
+        "titleFrom": { "type": "string", "description": "raiseRequest: the row's column used in the request's title." },
+        "transition": { "type": "string", "description": "transition: the transition name on the work item's request workflow." },
+        "requiresReason": { "type": "boolean" },
+        "url": { "type": "string", "description": "url: a page path; {Column} placeholders are filled from the row." },
+        "when": { "$ref": "#/$defs/when", "description": "Shown greyed when it does not hold." },
+        "permission": { "$ref": "#/$defs/code", "description": "Shown greyed when the person does not hold it." }
+      }
+    },
+    "settingsBook": {
+      "type": "object", "required": ["view", "stationColumn", "stateColumn", "states", "leadColumns", "defaultColumns"], "additionalProperties": false,
+      "properties": {
+        "view": { "$ref": "#/$defs/view" },
+        "stationsView": { "$ref": "#/$defs/view", "description": "The location list (default location.vNode with NodeTypeCode=Station)." },
+        "stationColumn": { "type": "string" },
+        "stateColumn": { "type": "string" },
+        "states": { "type": "array", "minItems": 1, "items": { "type": "object", "required": ["value", "label"], "additionalProperties": false, "properties": { "value": { "type": "string" }, "label": { "type": "string" }, "badgeFrom": { "type": "string", "description": "Another state whose rows, for the same device, mark this state's rows with a badge." }, "badgeLabel": { "type": "string" } } } },
+        "deviceColumn": { "type": "string", "description": "The column that identifies the device a row belongs to (badges, compare)." },
+        "rowKey": { "type": "string", "description": "The column that identifies a row (default RevisionRowId)." },
+        "orderBy": { "type": "string" },
+        "groupings": { "type": "array", "items": { "type": "object", "required": ["key", "label"], "additionalProperties": false, "properties": { "key": { "type": "string", "description": "A column, or 'none'." }, "label": { "type": "string" }, "empty": { "type": "string", "description": "The group name when the column is empty." }, "showInstead": { "type": "array", "items": { "type": "string" }, "description": "Context columns shown on the row while this grouping is on." } } } },
+        "leadColumns": { "type": "array", "items": { "$ref": "#/$defs/column" } },
+        "defaultColumns": { "type": "array", "items": { "type": "string" } },
+        "labels": { "type": "object", "additionalProperties": { "type": "string" } },
+        "formats": { "type": "object", "additionalProperties": { "type": "string", "enum": ["text", "date", "when", "number", "state", "legacyFree"] } },
+        "hiddenColumns": { "type": "array", "items": { "type": "string" } },
+        "textFilterColumns": { "type": "array", "items": { "type": "string" } },
+        "card": { "type": "object", "additionalProperties": false, "properties": { "facts": { "type": "array", "items": { "$ref": "#/$defs/column" } }, "textFrom": { "type": "string", "enum": ["revisionFile"], "description": "revisionFile: the settings text filed for the row's RevisionRowId." }, "links": { "type": "array", "items": { "$ref": "#/$defs/command" } } } },
+        "commands": { "type": "array", "items": { "$ref": "#/$defs/command" } },
+        "report": { "type": "string", "description": "A page path for the location report, {StationNodeEntityId} and {GridState} filled." }
+      }
+    },
+    "list": {
+      "type": "object", "required": ["view", "columns"], "additionalProperties": false,
+      "properties": {
+        "view": { "$ref": "#/$defs/view" },
+        "fixedFilters": { "type": "object", "additionalProperties": { "type": "string" } },
+        "orderBy": { "type": "string" },
+        "rowKey": { "type": "string" },
+        "columns": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/column" } },
+        "textFilterColumns": { "type": "array", "items": { "type": "string" } },
+        "filters": { "type": "array", "items": { "type": "object", "required": ["column", "label"], "additionalProperties": false, "properties": { "column": { "type": "string" }, "label": { "type": "string" }, "options": { "type": "array", "items": { "type": "object", "required": ["label"], "additionalProperties": false, "properties": { "label": { "type": "string" }, "value": { "anyOf": [ { "type": "string" }, { "type": "null" }, { "type": "array", "items": { "type": "string" } } ] }, "default": { "type": "boolean" } } }, "description": "Absent: the distinct values of the column." } } } },
+        "counters": { "type": "array", "items": { "type": "object", "required": ["label", "when"], "additionalProperties": false, "properties": { "label": { "type": "string" }, "when": { "$ref": "#/$defs/when" }, "thisMonth": { "type": "string", "description": "A date column that must fall in the current month." } } } },
+        "rowOpen": { "$ref": "#/$defs/command" },
+        "commands": { "type": "array", "items": { "$ref": "#/$defs/command" } }
+      }
+    },
+    "workItem": {
+      "type": "object", "required": ["headerView", "headerKey", "headerFacts"], "additionalProperties": false,
+      "properties": {
+        "headerView": { "$ref": "#/$defs/view" },
+        "headerKey": { "type": "string", "description": "The header view's column the screen's id parameter matches (the work request's entity id)." },
+        "headerFacts": { "type": "array", "items": { "$ref": "#/$defs/column" } },
+        "title": { "type": "string", "description": "The header column used as the title." },
+        "notes": { "type": "array", "items": { "$ref": "#/$defs/column" }, "description": "Text columns shown as blocks under the header." },
+        "tracks": { "type": "string", "enum": ["auto", "branches"], "description": "auto: every top-level block as a row; branches: the parallel branches of the first running parallel block side by side, the rest as rows." },
+        "tracksOf": { "type": "string", "description": "branches: the block path whose branches are the tracks (default: the first parallel block)." },
+        "showSteps": { "type": "string", "enum": ["all", "open"], "description": "Which steps are listed under a block: all, or only the ones not yet committed or skipped." },
+        "produced": { "type": "array", "items": { "type": "object", "required": ["name", "label"], "additionalProperties": false, "properties": { "name": { "type": "string" }, "label": { "type": "string" }, "screen": { "$ref": "#/$defs/key" } } }, "description": "The run's produced entities to show, with the screen that opens each." },
+        "items": { "type": "object", "additionalProperties": false, "properties": { "view": { "$ref": "#/$defs/view" }, "key": { "type": "string" }, "columns": { "type": "array", "items": { "$ref": "#/$defs/column" } }, "rowOpen": { "$ref": "#/$defs/command" } }, "description": "A grid of the work item's items (the settings records of a request), read from a view by the work request id." },
+        "commands": { "type": "array", "items": { "$ref": "#/$defs/command" } }
+      }
+    },
+    "step": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "help": { "type": "object", "additionalProperties": { "type": "string" }, "description": "Extra help per capture field name." },
+        "refViews": { "type": "object", "additionalProperties": { "type": "object", "required": ["view", "label"], "additionalProperties": false, "properties": { "view": { "$ref": "#/$defs/view" }, "label": { "type": "string" }, "filters": { "type": "object", "additionalProperties": { "type": "string" } } } }, "description": "For ref and set fields: per refKind, the view to pick from and its label column." }
+      }
+    },
+    "record": {
+      "type": "object", "required": ["view", "key", "facts"], "additionalProperties": false,
+      "properties": {
+        "view": { "$ref": "#/$defs/view" },
+        "key": { "type": "string", "description": "The column the screen's id parameter matches." },
+        "title": { "type": "string" },
+        "facts": { "type": "array", "items": { "$ref": "#/$defs/column" } },
+        "characteristics": { "type": "object", "additionalProperties": false, "properties": { "schemaKey": { "$ref": "#/$defs/code", "description": "The CharacteristicSchema definition whose characteristics are shown by DisplayGroup." }, "hostColumn": { "type": "string" }, "editableWhen": { "$ref": "#/$defs/when" } } },
+        "textFrom": { "type": "string", "enum": ["revisionFile"] },
+        "parsed": { "type": "boolean", "description": "Show the parsed settings (document.vParsedSettingNamed) and allow Compare." },
+        "files": { "type": "boolean" },
+        "history": { "type": "object", "additionalProperties": false, "properties": { "byColumn": { "type": "string", "description": "The column the other revisions of the same subject share (DeviceEntityId)." }, "columns": { "type": "array", "items": { "$ref": "#/$defs/column" } } } },
+        "commands": { "type": "array", "items": { "$ref": "#/$defs/command" } }
+      }
+    }
+  }
+}

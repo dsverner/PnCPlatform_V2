@@ -1,9 +1,11 @@
-// The frame every screen sits in: a collapsible sidebar with grouped navigation (Dev_Final's layout, with our screens),
-// the signed-in person top right, the health line in the footer. Screens not yet ported link to the plain pages.
+// The frame every screen sits in: a collapsible sidebar with grouped navigation (Dev_Final's layout), the signed-in
+// person top right, the health line in the footer. The navigation is built from the screen definitions the person may
+// open (#165: GET /api/v1/screens, grouped by each screen's menu.group); the plain pages not yet ported stay as links.
 import { NavLink, Outlet, useLocation } from 'react-router'
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useHealth, useMe } from '@/lib/hooks'
 import { devUser } from '@/lib/api'
+import { useScreens, screenPath } from '@/lib/screens'
 
 function useStored(key: string, initial: boolean) {
   const [v, setV] = useState<boolean>(() => { try { const s = localStorage.getItem(key); return s === null ? initial : s === 'true' } catch { return initial } })
@@ -13,13 +15,11 @@ function useStored(key: string, initial: boolean) {
 
 interface Item { to: string; label: string; external?: boolean }
 interface Group { key: string; label: string; items: Item[]; match: string[] }
-const GROUPS: Group[] = [
-  { key: 'book', label: 'Settings book', match: ['/settings', '/requests', '/report', '/record', '/request'], items: [
-    { to: '/settings', label: 'Settings' }, { to: '/requests', label: 'Requests' }, { to: '/report.html', label: 'Location report', external: true } ] },
-  { key: 'assets', label: 'Assets and schemes', match: ['/floc', '/schemes'], items: [
-    { to: '/floc.html', label: 'Locations', external: true }, { to: '/schemes.html', label: 'Schemes', external: true } ] },
-  { key: 'admin', label: 'Administration', match: ['/grants', '/definitions'], items: [
-    { to: '/grants.html', label: 'Grants', external: true }, { to: '/definitions.html', label: 'Definitions', external: true } ] },
+// the plain pages still to be ported, under the group each belongs to
+const PAGES: Group[] = [
+  { key: 'Settings book', label: 'Settings book', match: [], items: [{ to: '/report.html', label: 'Location report', external: true }] },
+  { key: 'Assets and schemes', label: 'Assets and schemes', match: [], items: [{ to: '/floc.html', label: 'Locations', external: true }, { to: '/schemes.html', label: 'Schemes', external: true }] },
+  { key: 'Administration', label: 'Administration', match: [], items: [{ to: '/grants.html', label: 'Grants', external: true }, { to: '/definitions.html', label: 'Definitions', external: true }] },
 ]
 
 function GroupHeader({ label, open, onToggle }: { label: string; open: boolean; onToggle: () => void }) {
@@ -36,8 +36,19 @@ function NavItem({ it, collapsed }: { it: Item; collapsed: boolean }) {
 }
 
 export default function AppLayout({ children }: { children?: ReactNode }) {
-  const meQ = useMe(); const healthQ = useHealth(); const loc = useLocation()
+  const meQ = useMe(); const healthQ = useHealth(); const loc = useLocation(); const screensQ = useScreens()
   const [collapsed, toggleCollapsed] = useStored('pnc.sidebar.collapsed', false)
+  const groups = useMemo<Group[]>(() => {
+    const byGroup = new Map<string, Group>()
+    for (const g of PAGES) byGroup.set(g.key, { ...g, items: [] })
+    for (const sc of [...(screensQ.data ?? [])].filter((x) => x.menu).sort((a, b) => (a.menu!.order ?? 0) - (b.menu!.order ?? 0))) {
+      const key = sc.menu!.group
+      if (!byGroup.has(key)) byGroup.set(key, { key, label: key, match: [], items: [] })
+      const g = byGroup.get(key)!; g.items.push({ to: screenPath(sc.key), label: sc.menu!.label }); g.match.push(screenPath(sc.key))
+    }
+    for (const g of PAGES) byGroup.get(g.key)!.items.push(...g.items)
+    return [...byGroup.values()].filter((g) => g.items.length)
+  }, [screensQ.data])
   const who = meQ.data ? (meQ.data.person.displayName || meQ.data.user.userPrincipalName) + (devUser() ? ' (DEV act-as)' : '') : meQ.isError ? 'not signed in' : '…'
   return (
     <div className="flex min-h-screen">
@@ -47,7 +58,8 @@ export default function AppLayout({ children }: { children?: ReactNode }) {
           <button type="button" onClick={toggleCollapsed} className="text-slate-500 hover:text-slate-200" aria-label={collapsed ? 'Expand the menu' : 'Collapse the menu'}>{collapsed ? '›' : '‹'}</button>
         </div>
         <nav className="flex-1 overflow-y-auto pb-4">
-          {GROUPS.map((g) => <NavGroup key={g.key} g={g} collapsed={collapsed} path={loc.pathname} />)}
+          {groups.map((g) => <NavGroup key={g.key} g={g} collapsed={collapsed} path={loc.pathname} />)}
+          {screensQ.isError && <p className="px-3 py-2 text-xs text-red-300">The screens could not be read.</p>}
         </nav>
         <footer className="border-t border-slate-800 px-3 py-2 text-[11px] text-slate-500">
           {healthQ.data ? `${healthQ.data.environment} · ${healthQ.data.release}` : '…'}

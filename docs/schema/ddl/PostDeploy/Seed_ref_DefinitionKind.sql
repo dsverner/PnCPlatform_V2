@@ -36,7 +36,8 @@ USING (VALUES
     (N'Program.CleansingRules',                   N'Program',              N'Migration cleansing rules',             1),
     (N'Program.TestPlan',                         N'Program',              N'Test plan',                             1),
     (N'Program.NotificationType',                 N'Program',              N'Notification type',                     1),
-    (N'Program.BackupPolicy',                     N'Program',              N'Backup policy',                         1)
+    (N'Program.BackupPolicy',                     N'Program',              N'Backup policy',                         1),
+    (N'Program.Screen',                           N'Program',              N'Screen (a screen kind bound to its data and procedure; document per screen.schema.json, #165)', 1)
 ) AS s ([DefinitionKind], [MetaKind], [Name], [HasPayloadText])
 ON t.[DefinitionKind] = s.[DefinitionKind]
 WHEN MATCHED AND (t.[MetaKind] <> s.[MetaKind] OR t.[Name] <> s.[Name] OR t.[HasPayloadText] <> s.[HasPayloadText])

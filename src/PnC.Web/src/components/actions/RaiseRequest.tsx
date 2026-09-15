@@ -6,7 +6,7 @@ import { ApiError } from '@/lib/api'
 import { workTypes, raiseAndStart } from '@/lib/actions'
 import { Panel, Button, Field, inputClass, Status } from '@/components/ui/ui'
 
-export interface RaiseOpts { heading: string; title: string; scopeKind: 'Asset' | 'Node'; scopeEntityId: string; defaultType: string; before?: [string, string][]; note?: string }
+export interface RaiseOpts { heading: string; title: string; scopeKind: 'Asset' | 'Node'; scopeEntityId: string; defaultType: string; workflowKey?: string; before?: [string, string][]; note?: string }
 
 export function RaiseRequest({ o, onClose }: { o: RaiseOpts; onClose: () => void }) {
   const typesQ = useQuery({ queryKey: ['workTypes'], queryFn: workTypes, staleTime: 5 * 60_000 })
@@ -16,7 +16,7 @@ export function RaiseRequest({ o, onClose }: { o: RaiseOpts; onClose: () => void
   const chosen = type || types.find((t) => t.key === o.defaultType)?.versionRowId || types[0]?.versionRowId || ''
   const go = async () => {
     setBusy(true); setErr('')
-    try { const id = await raiseAndStart({ workTypeVersionRowId: chosen, title: title.trim(), scopeKind: o.scopeKind, scopeEntityId: o.scopeEntityId }); location.href = '/request.html?id=' + id }
+    try { const id = await raiseAndStart({ workTypeVersionRowId: chosen, title: title.trim(), scopeKind: o.scopeKind, scopeEntityId: o.scopeEntityId, workflowKey: o.workflowKey }); location.href = '/request.html?id=' + id }
     catch (e) { setErr('Refused: ' + (e instanceof ApiError ? e.status + ' ' : '') + (e as Error).message); setBusy(false) }
   }
   return (

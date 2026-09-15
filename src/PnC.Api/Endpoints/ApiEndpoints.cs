@@ -52,17 +52,7 @@ public static class ApiEndpoints
                 """, args, ct);
             // W5: the permission codes the person's roles carry (grants and delegations in force), so a screen can say
             // what it will refuse before the API does; the API's own check is still the one that decides.
-            var permissions = await s.RowsAsync("""
-                SELECT DISTINCT rp.PermissionCode
-                FROM security.vRolePermission rp
-                WHERE rp.RoleCode IN (
-                    SELECT g.RoleCode FROM security.fGrantAsOf(SYSDATETIMEOFFSET(), SYSUTCDATETIME()) g
-                    WHERE g.GranteeKind = N'User' AND g.GranteeEntityId = @u AND g.RevokedByActorId IS NULL AND g.IsDeleted = 0
-                    UNION SELECT dl.RoleCode FROM security.fDelegationAsOf(SYSDATETIMEOFFSET(), SYSUTCDATETIME()) dl
-                    WHERE dl.ToPersonEntityId = @p AND dl.RevokedByActorId IS NULL AND dl.IsDeleted = 0
-                      AND dl.StartsAt <= SYSDATETIMEOFFSET() AND (dl.EndsAt IS NULL OR dl.EndsAt > SYSDATETIMEOFFSET()))
-                ORDER BY rp.PermissionCode
-                """, args, ct);
+            var permissions = await PermissionCodes(s, u, ct);
             // W8 (#149, the grants screen): the session's own actor, resolved by the database (personnel.ResolveActor from the
             // session context) — a grant names who granted it (@GrantedByActorId), and that is this id, never one the page picks
             var actorId = await s.ScalarAsync<Guid?>("SET NOCOUNT ON; DECLARE @a UNIQUEIDENTIFIER; EXEC personnel.ResolveActor @ActorId = @a OUTPUT; SELECT @a", new Dictionary<string, object?>(), ct);
@@ -73,7 +63,7 @@ public static class ApiEndpoints
                 actorId,
                 actingAs = new { delegation = u.DelegationEntityId, sponsoredPerson = u.SponsoredPersonEntityId },
                 grants, delegations,
-                permissions = permissions.Select(r => r!["PermissionCode"]!.GetValue<string>()).ToList(),
+                permissions,
             });
         });
 
@@ -188,5 +178,23 @@ public static class ApiEndpoints
             return (kind, g);
         }
         return (classKind, null);
+    }
+
+    /// <summary>The permission codes the person's roles carry (grants and delegations in force) — what /me lists and what a
+    /// screen definition's `permission` is checked against (#165). The API's own check on every call is still the one that decides.</summary>
+    public static async Task<List<string>> PermissionCodes(SqlSession s, RequestUser u, CancellationToken ct)
+    {
+        var rows = await s.RowsAsync("""
+            SELECT DISTINCT rp.PermissionCode
+            FROM security.vRolePermission rp
+            WHERE rp.RoleCode IN (
+                SELECT g.RoleCode FROM security.fGrantAsOf(SYSDATETIMEOFFSET(), SYSUTCDATETIME()) g
+                WHERE g.GranteeKind = N'User' AND g.GranteeEntityId = @u AND g.RevokedByActorId IS NULL AND g.IsDeleted = 0
+                UNION SELECT dl.RoleCode FROM security.fDelegationAsOf(SYSDATETIMEOFFSET(), SYSUTCDATETIME()) dl
+                WHERE dl.ToPersonEntityId = @p AND dl.RevokedByActorId IS NULL AND dl.IsDeleted = 0
+                  AND dl.StartsAt <= SYSDATETIMEOFFSET() AND (dl.EndsAt IS NULL OR dl.EndsAt > SYSDATETIMEOFFSET()))
+            ORDER BY rp.PermissionCode
+            """, new Dictionary<string, object?> { ["@u"] = u.UserEntityId, ["@p"] = u.PersonEntityId }, ct);
+        return rows.Select(r => r!["PermissionCode"]!.GetValue<string>()).ToList();
     }
 }
