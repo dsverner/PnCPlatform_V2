@@ -95,34 +95,20 @@ Carried forward from the predecessor, after a run of avoidable mistakes there.
 
 ## How to ask the owner anything
 
-Standing instruction, carried forward from `PnCPlatform` at the owner's request.
+**Ask here, in the terminal, as an ordinary conversation.** Owner's instruction, 2026-09-15: *"I think we have to throw
+away the use of cards, that is causing more confusion than it is clearing up… lets stop using those… lets do it here,
+as is the normal procedure."* Published cards (artifacts with buttons, autosave and a read-back) are retired; do not
+publish one, and do not read old ones for new rulings.
 
-**Never end a turn with a list of questions or verification steps in the terminal.** Publish a
-card and hand over the link — a **test card** (what to check on a screen) or a **decision card**
-(open questions the work is blocked on).
-
-- **One card per round**, with its own artifact URL, so an earlier round's answers stay readable.
-- Every item states **what is being asked and why it matters**, in a sentence each.
-- **Every item shows a concrete example of what is being asked** — the thing as it would actually
-  look: a step as the technician sees it, a screen, a data row, a filename, a before and after.
-  Never describe a mechanism in the abstract and ask for a ruling on it. Where two options are
-  offered, show both as examples side by side. If an item cannot be illustrated, it is not yet a
-  decision. Owner's instruction, 2026-09-11, after an abstract design card came back all-keep with
-  no notes: *"An example showing what you are asking would be extremely helpful."*
-- **Buttons for the discrete answers**, and a **free-text box on every item**, because the useful
-  answer is often the one that fits no button.
-- **Autosave on every keystroke and click** to the artifact's `db` capability under a stable
-  document path. A half-finished round must survive a closed tab.
-- **A submit button** recording `submittedAt`. Read the answers back with
-  `Artifact action:"read_db"` and act on what the document says, not on what was expected.
-- **Scope it explicitly** — an *out of scope* list and an *already known* list, so the owner is
-  not made to report what is already logged. This exists because the owner asked for guard rails
-  on himself.
-- **Keep the terminal reply to the link and the headline.**
-
-Note on the owner's answering style, observed across seven rounds: buttons get answered, free-text
-boxes often do not. Prefer putting **propositions to accept, reject or amend** over asking for
-narrative.
+- Ask only what the references cannot answer. The legacy program and Dev_Final are running on the build laptop; their
+  screens and code are the specification for behaviour. Reproduce it; ask only where the two disagree or where the
+  platform's rules forbid a copy (owner, 2026-09-15: *"I thought that you would be able to click through the other
+  applications and with both the visuals and the code in each, be able to come up with something similar"*).
+- When a ruling is needed, put the concrete example in the reply (a step as the technician sees it, a before and after)
+  and state the options with a recommendation — one question at a time, answered here.
+- Verification is the session's job (the checks it can make through the database, the guest agent and Chrome); the
+  owner is asked to look only at a finished, working task, shown beside the reference doing the same task.
+- The earlier rounds' answers (cards/w8-ux-round4 … round6) remain on record in `docs/decisions/DECISION-LOG.md`.
 
 ## Files over ~50 MB
 
