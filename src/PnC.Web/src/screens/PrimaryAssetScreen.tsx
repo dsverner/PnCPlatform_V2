@@ -71,7 +71,10 @@ const STATUSES = ['Planned', 'InService', 'OutOfService', 'Retired']
 function Terminals({ r, readOnly = false }: { r: Row; readOnly?: boolean }) {
   const qc = useQueryClient()
   const stationsQ = useViewAll('location', 'vNode', { NodeTypeCode: 'Station' }, 'Name')
+  const voltagesQ = useViewAll('ref', 'vVoltageClass', {}, 'DisplayOrder')
   const q = useViewAll('asset', 'vAssetTerminal', { AssetEntityId: s(r.EntityId) }, 'TerminalNo')
+  const [addVolt, setAddVolt] = useState('')
+  const voltageOptions = (voltagesQ.data ?? []).map((v) => <option key={s(v.VoltageClassCode)} value={s(v.VoltageClassCode)}>{v.NominalKv != null ? `${Number(v.NominalKv)} kV` : s(v.VoltageClassCode)}</option>)
   const [msg, setMsg] = useState<string | null>(null); const [adding, setAdding] = useState(''); const [busy, setBusy] = useState(false)
   const rows = q.data ?? []
   const done = (text: string) => { setMsg(text); qc.invalidateQueries({ queryKey: ['view', 'asset', 'vAssetTerminal'] }); qc.invalidateQueries({ queryKey: ['view', 'asset', 'vPrimaryAsset'] }) }
@@ -82,15 +85,16 @@ function Terminals({ r, readOnly = false }: { r: Row; readOnly?: boolean }) {
   const protectedHere = (id: unknown) => protectedIds.includes(s(id).toLowerCase())
   const strays = protectedIds.filter((id) => !rows.some((x) => s(x.StationNodeEntityId).toLowerCase() === id)).map(name)
   const mark = (on: boolean) => <span className={`ml-1 inline-flex items-center gap-1 text-xs ${on ? 'text-emerald-300' : 'text-slate-600'}`} title={on ? 'a scheme at this station protects the asset' : 'no scheme at this station names the asset'}><span aria-hidden="true">{on ? '☑' : '☐'}</span> protection location</span>
-  if (readOnly) return <span>{rows.length ? rows.map((x, i) => <span key={s(x.EntityId)}>{i > 0 ? ' – ' : ''}{name(x.StationNodeEntityId)}{mark(protectedHere(x.StationNodeEntityId))}</span>) : '—'}{strays.length > 0 && <span className="ml-2 text-xs text-amber-300">also protected from {strays.join(', ')} — not a terminal</span>}</span>
+  if (readOnly) return <span>{rows.length ? rows.map((x, i) => <span key={s(x.EntityId)}>{i > 0 ? ' – ' : ''}{name(x.StationNodeEntityId)}{x.VoltageClassCode ? <span className="ml-1 text-xs text-slate-400">{s(x.VoltageClassCode)}</span> : null}{mark(protectedHere(x.StationNodeEntityId))}</span>) : '—'}{strays.length > 0 && <span className="ml-2 text-xs text-amber-300">also protected from {strays.join(', ')} — not a terminal</span>}</span>
   return (
     <div className="space-y-1">
       {rows.map((x) => (
         <div key={s(x.EntityId)} className="flex items-center gap-2">
           <span className="w-6 text-xs text-slate-500">{s(x.TerminalNo)}</span>
-          <select className={`${inputClass} w-64`} value={s(x.StationNodeEntityId).toLowerCase()} disabled={busy} onChange={(e) => void run(() => proc('asset', 'AssetTerminal_Revise', { EntityId: x.EntityId, AssetEntityId: r.EntityId, TerminalNo: x.TerminalNo, StationNodeEntityId: e.target.value }), `terminal ${s(x.TerminalNo)}: ${name(e.target.value)}.`)}>
+          <select className={`${inputClass} w-64`} value={s(x.StationNodeEntityId).toLowerCase()} disabled={busy} onChange={(e) => void run(() => proc('asset', 'AssetTerminal_Revise', { EntityId: x.EntityId, AssetEntityId: r.EntityId, TerminalNo: x.TerminalNo, StationNodeEntityId: e.target.value, VoltageClassCode: x.VoltageClassCode ?? null }), `terminal ${s(x.TerminalNo)}: ${name(e.target.value)}.`)}>
             {(stationsQ.data ?? []).map((n) => <option key={s(n.EntityId)} value={s(n.EntityId).toLowerCase()}>{s(n.Name)}</option>)}
           </select>
+          <select className={`${inputClass} w-28`} value={s(x.VoltageClassCode)} disabled={busy} title="the voltage at this terminal" onChange={(e) => void run(() => proc('asset', 'AssetTerminal_Revise', { EntityId: x.EntityId, AssetEntityId: r.EntityId, TerminalNo: x.TerminalNo, StationNodeEntityId: x.StationNodeEntityId, VoltageClassCode: e.target.value || null }), `terminal ${s(x.TerminalNo)}: ${e.target.value || 'no voltage'}.`)}><option value="">— kV —</option>{voltageOptions}</select>
           <Button kind="mini" disabled={busy} onClick={() => void run(() => proc('asset', 'AssetTerminal_SoftDelete', { EntityId: x.EntityId }), `terminal ${s(x.TerminalNo)} removed.`)}>remove</Button>
           {mark(protectedHere(x.StationNodeEntityId))}
         </div>))}
@@ -98,7 +102,8 @@ function Terminals({ r, readOnly = false }: { r: Row; readOnly?: boolean }) {
       <div className="flex items-center gap-2">
         <span className="w-6 text-xs text-slate-500">{nextNo}</span>
         <select className={`${inputClass} w-64`} value={adding} disabled={busy} onChange={(e) => setAdding(e.target.value)}><option value="">— choose a station —</option>{(stationsQ.data ?? []).map((n) => <option key={s(n.EntityId)} value={s(n.EntityId).toLowerCase()}>{s(n.Name)}</option>)}</select>
-        <Button kind="mini" disabled={!adding || busy} onClick={() => void run(async () => { await proc('asset', 'AssetTerminal_Add', { AssetEntityId: r.EntityId, TerminalNo: nextNo, StationNodeEntityId: adding }); setAdding('') }, `terminal ${nextNo}: ${name(adding)}.`)}>+ terminal</Button>
+        <select className={`${inputClass} w-28`} value={addVolt} disabled={busy} title="the voltage at this terminal" onChange={(e) => setAddVolt(e.target.value)}><option value="">— kV —</option>{voltageOptions}</select>
+        <Button kind="mini" disabled={!adding || busy} onClick={() => void run(async () => { await proc('asset', 'AssetTerminal_Add', { AssetEntityId: r.EntityId, TerminalNo: nextNo, StationNodeEntityId: adding, VoltageClassCode: addVolt || null }); setAdding(''); setAddVolt('') }, `terminal ${nextNo}: ${name(adding)}${addVolt ? ' ' + addVolt : ''}.`)}>+ terminal</Button>
       </div>
       {msg && <div className="text-xs text-slate-400">{msg}</div>}
       {!rows.length && !q.isPending && <div className="text-xs text-slate-500">No terminal yet — a capacitor or reactor has one, a transformer two, a line two or more.</div>}
@@ -112,8 +117,7 @@ function Terminals({ r, readOnly = false }: { r: Row; readOnly?: boolean }) {
 function AssetForm({ r }: { r: Row }) {
   const qc = useQueryClient()
   const typesQ = useViewAll('ref', 'vAssetType', { AssetClassCode: 'Primary' })
-  const voltagesQ = useViewAll('ref', 'vVoltageClass', {})
-  const [f, setF] = useState({ Name: s(r.Name), AssetTypeCode: s(r.AssetTypeCode), VoltageClassCode: s(r.VoltageClassCode), Status: s(r.Status), Notes: s(r.Notes) })   // the terminals are t1 / t2 below
+  const [f, setF] = useState({ Name: s(r.Name), AssetTypeCode: s(r.AssetTypeCode), VoltageClassCode: s(r.VoltageClassCode), Status: s(r.Status), Notes: s(r.Notes) })   // the voltage is each terminal's (Terminals); the asset's own column is carried unchanged
   const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null); const [busy, setBusy] = useState(false)
   const dirty = f.Name !== s(r.Name) || f.AssetTypeCode !== s(r.AssetTypeCode) || f.VoltageClassCode !== s(r.VoltageClassCode) || f.Status !== s(r.Status) || f.Notes !== s(r.Notes)
   const save = async () => {
@@ -132,8 +136,7 @@ function AssetForm({ r }: { r: Row }) {
         <label className="text-slate-400">Name</label><input className={`${inputClass} w-64`} value={f.Name} onChange={set('Name')} placeholder="e.g. L0012" />
         <label className="text-slate-400">Type</label><select className={`${inputClass} w-64`} value={f.AssetTypeCode} onChange={set('AssetTypeCode')}>{(typesQ.data ?? []).map((t) => <option key={s(t.AssetTypeCode)} value={s(t.AssetTypeCode)}>{s(t.Name)}</option>)}</select>
         <label className="text-slate-400">Terminals</label><Terminals r={r} />
-        <label className="text-slate-400">Voltage</label><select className={`${inputClass} w-64`} value={f.VoltageClassCode} onChange={set('VoltageClassCode')}><option value="">—</option>{(voltagesQ.data ?? []).map((v) => <option key={s(v.VoltageClassCode)} value={s(v.VoltageClassCode)}>{s(v.VoltageClassCode)}{v.NominalKv != null ? ` · ${s(v.NominalKv)} kV` : ''}</option>)}</select>
-        <label className="text-slate-400">Status</label><select className={`${inputClass} w-64`} value={f.Status} onChange={set('Status')}>{STATUSES.map((x) => <option key={x}>{x}</option>)}</select>
+        <label className="text-slate-400">Status</label><span><select className={`${inputClass} w-64`} value={f.Status} onChange={set('Status')}>{STATUSES.map((x) => <option key={x}>{x}</option>)}</select><span className="ml-2 text-xs text-slate-500">the asset as a whole, not a terminal</span></span>
         <label className="text-slate-400">Notes</label><textarea className={`${inputClass} w-full`} rows={2} value={f.Notes} onChange={set('Notes')} />
       </div>
       <Button kind="primary" disabled={!dirty || busy} onClick={() => void save()}>Save</Button>
@@ -163,7 +166,7 @@ export default function PrimaryAssetScreen({ params: p, id }: { screen: Screen; 
       </header>
       <div className="grid gap-3 lg:grid-cols-2">
         <Panel title="Primary asset">
-          {editable ? <AssetForm r={r} /> : <Facts cols={1} pairs={[['Name', s(r.Name)], ['Type', s(r.AssetTypeName)], ['Terminals', <Terminals r={r} readOnly />], ['Voltage', s(r.VoltageClassCode) || '—'], ['Status', s(r.Status)], ['Notes', s(r.Notes) || '—']]} />}
+          {editable ? <AssetForm r={r} /> : <Facts cols={1} pairs={[['Name', s(r.Name)], ['Type', s(r.AssetTypeName)], ['Terminals', <Terminals r={r} readOnly />], ['Status', s(r.Status)], ['Notes', s(r.Notes) || '—']]} />}
           <Status>A thin record for this phase: a name, a type and its terminals — one station for a capacitor or reactor, two for a transformer, two or more for a line. Connectivity, impedances and, for a line, its route and structures come from the power-system model (the TLM project) in a later phase.</Status></Panel>
         <Panel title={`Protected by · ${protectedByQ.isPending ? '…' : (protectedByQ.data ?? []).length} scheme(s)`}>
           <DataGrid rows={protectedByQ.data ?? []} rowKey={(x) => s(x.EntityId)} emptyText="No scheme names this asset yet — on a scheme's page, “protects”." columns={[

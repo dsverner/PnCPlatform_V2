@@ -25,6 +25,7 @@ CREATE TABLE [asset].[AssetTerminal] (
     [AssetEntityId]      UNIQUEIDENTIFIER NOT NULL CONSTRAINT [FK_AssetTerminal_Asset] REFERENCES [asset].[AssetRegistry] ([EntityId]),
     [TerminalNo]         TINYINT          NOT NULL CONSTRAINT [CK_AssetTerminal_No] CHECK ([TerminalNo] >= 1),
     [StationNodeEntityId] UNIQUEIDENTIFIER NOT NULL CONSTRAINT [FK_AssetTerminal_Station] REFERENCES [location].[NodeRegistry] ([EntityId]),
+    [VoltageClassCode]   NVARCHAR(20)     NULL     CONSTRAINT [FK_AssetTerminal_VoltageClass] REFERENCES [ref].[VoltageClass] ([VoltageClassCode]),   -- the voltage at this terminal (a transformer's differ — the owner, 2026-09-16)
     [Notes]              NVARCHAR(400)    NULL,
     CONSTRAINT [PK_AssetTerminal] PRIMARY KEY CLUSTERED ([RowSeq]),
     CONSTRAINT [UQ_AssetTerminal_RowId] UNIQUE NONCLUSTERED ([RowId])
