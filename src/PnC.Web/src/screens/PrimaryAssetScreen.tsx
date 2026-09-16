@@ -40,6 +40,12 @@ export function ClassificationPanel({ subjectKind, subjectEntityId, editable, as
   const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null)
   const current = (code: string) => rows.find((r) => s(r.ClassificationKindCode) === code)
   const kinds = CLASSIFICATION_KINDS.filter((k) => !k.busOnly || assetTypeCode === 'Bus' || !assetTypeCode)
+  const recordOnBus = async (busId: string, busName: string, bps: boolean) => {
+    try {
+      await proc('asset', 'RecordClassification', { SubjectKind: 'Asset', SubjectEntityId: busId, ClassificationKindCode: 'NpccBulkPowerSystem', ClassificationValue: bps ? 'BPS' : 'Not BPS' })
+      setMsg({ text: `${busName}: NPCC ${bps ? 'BPS' : 'Not BPS'} recorded on the bus.` }); qc.invalidateQueries({ queryKey: ['view', 'asset', 'vAssetTerminalDetail'] }); qc.invalidateQueries({ queryKey: ['view', 'asset', 'vClassification'] }); qc.invalidateQueries({ queryKey: ['view', 'asset', 'vPrimaryAsset'] })
+    } catch (e) { setMsg({ text: e instanceof ApiError ? e.message : String(e), bad: true }) }
+  }
   const record = async (code: string, value: string) => {
     try {
       await proc('asset', 'RecordClassification', { SubjectKind: subjectKind, SubjectEntityId: subjectEntityId, ClassificationKindCode: code, ClassificationValue: value || null })
@@ -69,8 +75,14 @@ export function ClassificationPanel({ subjectKind, subjectEntityId, editable, as
           <div className="grid grid-cols-[13rem_1fr] items-start gap-2">
             <dt className="text-slate-400" title="The A-10 test is a bus test: the BPS declaration is the bus's; this element inherits it at each terminal">NPCC bulk power system</dt>
             <dd className="min-w-0 text-slate-200">
-              {(terminalsQ.data ?? []).length ? (terminalsQ.data ?? []).map((t) => <div key={s(t.TerminalEntityId)}>Terminal {s(t.TerminalNo)} · {s(t.StationName)}: {t.BusAssetEntityId ? <>{s(t.BusName)} — <span className={t.BusNpcc ? 'text-slate-100' : 'text-slate-500'}>{s(t.BusNpcc) || 'not recorded on the bus'}</span></> : <span className="text-slate-500">no bus linked at this terminal</span>}</div>) : <span className="text-slate-500">no terminals yet</span>}
-              <div className="text-xs text-slate-600">Inherited from the bus at each end (the A-10 study declares busses, not lines); recorded on the bus's own page.</div>
+              {/* a check box per terminal (the owner, 2026-09-16): ticked = the bus at that end is declared BPS; it records on the bus itself */}
+              {(terminalsQ.data ?? []).length ? (terminalsQ.data ?? []).map((t) => (
+                <label key={s(t.TerminalEntityId)} className={`flex items-center gap-2 ${t.BusAssetEntityId ? '' : 'text-slate-500'}`} title={t.BusAssetEntityId ? `recorded on ${s(t.BusName)}` : 'link a bus to this terminal first'}>
+                  <input type="checkbox" disabled={!editable || !t.BusAssetEntityId} checked={s(t.BusNpcc) === 'BPS'} onChange={(e) => void recordOnBus(s(t.BusAssetEntityId), s(t.BusName), e.target.checked)} />
+                  <span>Terminal {s(t.TerminalNo)} · {s(t.StationName)}{t.BusAssetEntityId ? ` — ${s(t.BusName)}` : ' — no bus linked'}</span>
+                  <span className="text-xs text-slate-500">{t.BusAssetEntityId ? (s(t.BusNpcc) ? `${s(t.BusNpcc)}, recorded on the bus` : 'not recorded on the bus') : ''}</span>
+                </label>)) : <span className="text-slate-500">no terminals yet</span>}
+              <div className="text-xs text-slate-600">Ticked: the bus at that end is declared BPS by the A-10 study; unticked after a tick: Not BPS. The declaration is the bus's and shows on every element connected to it.</div>
             </dd>
           </div>)}
       </dl>
@@ -215,9 +227,9 @@ function AssignRow({ t, pick, zone, busy, exclude, onPick, onZone, onAssign }: {
   return (
     <div className="flex flex-wrap items-center gap-2 text-xs">
       <span className="text-slate-500">└ assign</span>
-      <select className={`${inputClass} w-56`} value={pick} disabled={busy} onChange={(e) => onPick(e.target.value)}><option value="">— a scheme at {s(t.StationName)} —</option>{options.map((x) => <option key={s(x.SchemeEntityId)} value={s(x.SchemeEntityId)}>{s(x.SchemeName)}</option>)}</select>
-      <select className={`${inputClass} w-24`} value={zone} disabled={busy} onChange={(e) => onZone(e.target.value)}>{ZONES.map((z) => <option key={z}>{z}</option>)}</select>
-      <Button kind="mini" disabled={!pick || busy} onClick={() => onAssign(pick, s(options.find((x) => s(x.SchemeEntityId) === pick)?.SchemeName), zone)}>protects from here</Button>
+      <select className={`${inputClass} w-24`} value={zone} disabled={busy} title="the zone of the scheme you are about to assign" onChange={(e) => onZone(e.target.value)}>{ZONES.map((z) => <option key={z}>{z}</option>)}</select>
+      {/* choosing a scheme assigns it at once — like every other drop-down on this page (the owner picked one and waited, 2026-09-16) */}
+      <select className={`${inputClass} w-56`} value={pick} disabled={busy} onChange={(e) => { const v = e.target.value; onPick(v); if (v) onAssign(v, s(options.find((x) => s(x.SchemeEntityId) === v)?.SchemeName), zone) }}><option value="">— a scheme at {s(t.StationName)}: choose to assign —</option>{options.map((x) => <option key={s(x.SchemeEntityId)} value={s(x.SchemeEntityId)}>{s(x.SchemeName)}</option>)}</select>
     </div>
   )
 }
