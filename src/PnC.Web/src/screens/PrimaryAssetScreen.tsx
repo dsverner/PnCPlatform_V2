@@ -61,6 +61,44 @@ export function ClassificationPanel({ subjectKind, subjectEntityId, editable }: 
   )
 }
 
+const STATUSES = ['Planned', 'InService', 'OutOfService', 'Retired']
+
+/** The primary asset's own fields, editable by anyone who may modify assets (the owner, 2026-09-16: "there needs to be a way for the
+ * user to edit these fields" — Line 0012 should have been L0012). Saved through asset.Asset_Revise (the prior row closes in valid
+ * time; audited). The station is the placement and is not changed here. */
+function AssetForm({ r }: { r: Row }) {
+  const qc = useQueryClient()
+  const typesQ = useViewAll('ref', 'vAssetType', { AssetClassCode: 'Primary' })
+  const voltagesQ = useViewAll('ref', 'vVoltageClass', {})
+  const [f, setF] = useState({ Name: s(r.Name), AssetTypeCode: s(r.AssetTypeCode), VoltageClassCode: s(r.VoltageClassCode), Status: s(r.Status), Notes: s(r.Notes) })
+  const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null); const [busy, setBusy] = useState(false)
+  const dirty = f.Name !== s(r.Name) || f.AssetTypeCode !== s(r.AssetTypeCode) || f.VoltageClassCode !== s(r.VoltageClassCode) || f.Status !== s(r.Status) || f.Notes !== s(r.Notes)
+  const save = async () => {
+    if (!f.Name.trim()) { setMsg({ text: 'A name is needed.', bad: true }); return }
+    setBusy(true)
+    try {
+      await proc('asset', 'Asset_Revise', { EntityId: r.EntityId, AssetTypeCode: f.AssetTypeCode, Name: f.Name.trim(), VoltageClassCode: f.VoltageClassCode || null, Status: f.Status, Notes: f.Notes || null })
+      setMsg({ text: `${f.Name.trim()} saved.` }); qc.invalidateQueries({ queryKey: ['view', 'asset', 'vPrimaryAsset'] })
+    } catch (e) { setMsg({ text: e instanceof ApiError ? e.message : String(e), bad: true }) } finally { setBusy(false) }
+  }
+  const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value })
+  return (
+    <div className="space-y-2 text-sm">
+      {msg && <Status bad={msg.bad}>{msg.text}</Status>}
+      <div className="grid grid-cols-[8rem_1fr] items-center gap-2">
+        <label className="text-slate-400">Name</label><input className={`${inputClass} w-64`} value={f.Name} onChange={set('Name')} placeholder="e.g. L0012" />
+        <label className="text-slate-400">Type</label><select className={`${inputClass} w-64`} value={f.AssetTypeCode} onChange={set('AssetTypeCode')}>{(typesQ.data ?? []).map((t) => <option key={s(t.AssetTypeCode)} value={s(t.AssetTypeCode)}>{s(t.Name)}</option>)}</select>
+        <label className="text-slate-400">Stations</label><span className="text-slate-200">{s(r.Terminals) || <span className="text-slate-500">no scheme protects it yet</span>}<span className="ml-2 text-xs text-slate-500">from the schemes that protect it — a line has two ends</span></span>
+        <label className="text-slate-400">Placed at</label><span className="text-slate-200">{s(r.StationName) || 'not placed'}<span className="ml-2 text-xs text-slate-500">where it was created; the route comes with the TLM project</span></span>
+        <label className="text-slate-400">Voltage</label><select className={`${inputClass} w-64`} value={f.VoltageClassCode} onChange={set('VoltageClassCode')}><option value="">—</option>{(voltagesQ.data ?? []).map((v) => <option key={s(v.VoltageClassCode)} value={s(v.VoltageClassCode)}>{s(v.VoltageClassCode)}{v.NominalKv != null ? ` · ${s(v.NominalKv)} kV` : ''}</option>)}</select>
+        <label className="text-slate-400">Status</label><select className={`${inputClass} w-64`} value={f.Status} onChange={set('Status')}>{STATUSES.map((x) => <option key={x}>{x}</option>)}</select>
+        <label className="text-slate-400">Notes</label><textarea className={`${inputClass} w-full`} rows={2} value={f.Notes} onChange={set('Notes')} />
+      </div>
+      <Button kind="primary" disabled={!dirty || busy} onClick={() => void save()}>Save</Button>
+    </div>
+  )
+}
+
 export default function PrimaryAssetScreen({ params: p, id }: { screen: Screen; params: RecordParams; id?: string }) {
   const navigate = useNavigate(); const can = useCan()
   const rowQ = useViewAll('asset', 'vPrimaryAsset', { [p.key]: id ?? '' }, undefined, !!id)
@@ -82,7 +120,8 @@ export default function PrimaryAssetScreen({ params: p, id }: { screen: Screen; 
         <div className="flex gap-2">{!!r.StationNodeEntityId && <Button onClick={() => navigate(screenPath('SETTINGS_BOOK') + `?StationNodeEntityId=${r.StationNodeEntityId}`)}>Settings book</Button>}<Button onClick={() => navigate(-1)}>Close</Button></div>
       </header>
       <div className="grid gap-3 lg:grid-cols-2">
-        <Panel title="Primary asset"><Facts cols={1} pairs={[['Name', s(r.Name)], ['Type', s(r.AssetTypeName)], ['Station', s(r.StationName) || 'not placed'], ['Voltage', s(r.VoltageClassCode) || '—'], ['Status', s(r.Status)], ['Notes', s(r.Notes) || '—']]} />
+        <Panel title="Primary asset">
+          {editable ? <AssetForm r={r} /> : <Facts cols={1} pairs={[['Name', s(r.Name)], ['Type', s(r.AssetTypeName)], ['Stations', s(r.Terminals) || 'no scheme protects it yet'], ['Placed at', s(r.StationName) || 'not placed'], ['Voltage', s(r.VoltageClassCode) || '—'], ['Status', s(r.Status)], ['Notes', s(r.Notes) || '—']]} />}
           <Status>A thin record for this phase: a name, a type and a station. Connectivity, impedances and, for a line, its structures come from the power-system model (the TLM project) in a later phase.</Status></Panel>
         <Panel title={`Protected by · ${protectedByQ.isPending ? '…' : (protectedByQ.data ?? []).length} scheme(s)`}>
           <DataGrid rows={protectedByQ.data ?? []} rowKey={(x) => s(x.EntityId)} emptyText="No scheme names this asset yet — on a scheme's page, “protects”." columns={[

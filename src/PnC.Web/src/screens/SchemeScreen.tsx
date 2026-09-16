@@ -85,7 +85,7 @@ export default function SchemeScreen({ params: p, id }: { screen: Screen; params
         {msg && <Status bad={msg.bad}>{msg.text}</Status>}
         <DataGrid rows={protectsQ.data ?? []} rowKey={(x) => s(x.LinkEntityId)} emptyText="Nothing recorded yet: which primary asset does this scheme protect?" columns={[
           { key: 'Name', label: 'Primary asset', render: (x) => <a className="text-sky-300 underline" href={screenPath('PRIMARY_ASSET', s(x.PrimaryAssetEntityId))} onClick={(e) => { e.preventDefault(); navigate(screenPath('PRIMARY_ASSET', s(x.PrimaryAssetEntityId))) }}>{s(x.Name) || s(x.PrimaryAssetEntityId).slice(0, 8)}</a> },
-          { key: 'AssetTypeName', label: 'Type' }, { key: 'StationName', label: 'Station' }, { key: 'ZoneRole', label: 'Zone' },
+          { key: 'AssetTypeName', label: 'Type' }, { key: 'Terminals', label: 'Stations (from its schemes)', render: (x) => s(x.Terminals) || s(x.StationName) }, { key: 'ZoneRole', label: 'Zone' },
           { key: 'Classifications', label: 'Classifications', render: (x) => <span className="text-xs text-slate-400">{s(x.Classifications) || 'none recorded'}</span> },
           ...(editable ? [{ key: '_x', label: '', render: (x: Row) => <Button kind="mini" onClick={() => void unlink(x)}>remove</Button> }] : [])]} />
         {editable && (
@@ -103,7 +103,7 @@ export default function SchemeScreen({ params: p, id }: { screen: Screen; params
               <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Or create one{station ? ` at ${s(station.StationName)}` : ' (the scheme has no station yet)'}</h4>
               <div className="mt-1 flex flex-wrap items-end gap-2">
                 <Field label="Type"><select className={inputClass} value={newType} onChange={(e) => setNewType(e.target.value)}>{(typesQ.data ?? []).map((t) => <option key={s(t.AssetTypeCode)} value={s(t.AssetTypeCode)}>{s(t.Name)}</option>)}</select></Field>
-                <Field label="Name"><input className={inputClass} value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="e.g. Line 0012" /></Field>
+                <Field label="Name"><input className={inputClass} value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="e.g. L0012" /></Field>
                 <Button kind="primary" disabled={!newName.trim() || !station?.StationNodeEntityId || busy} onClick={() => void create()}>Create and protect</Button>
               </div>
               <div className="mt-1 text-xs text-slate-500">A name, a type and the station — nothing more in this phase. The power-system model (the TLM project) attaches later.</div>

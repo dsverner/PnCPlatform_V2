@@ -31,6 +31,7 @@
 :r .\Seed_config_ReadLoggedClass.sql
 :r .\Seed_ref_AssetType_Platform.sql
 :r .\Seed_ref_AssetType_Primary.sql
+:r .\Seed_ref_VoltageClass.sql
 :r .\Seed_config_PlatformDeploymentTemplate.sql
 :r .\Seed_config_NotificationType.sql
 :r .\Seed_config_Workflow_Standard.sql

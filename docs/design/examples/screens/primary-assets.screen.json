@@ -25,8 +25,12 @@
         "label": "Type"
       },
       {
+        "key": "Terminals",
+        "label": "Stations (from its schemes)"
+      },
+      {
         "key": "StationName",
-        "label": "Station"
+        "label": "Placed at"
       },
       {
         "key": "Status",
@@ -41,6 +45,7 @@
     "textFilterColumns": [
       "Name",
       "StationName",
+      "Terminals",
       "AssetTypeName",
       "Classifications"
     ],
