@@ -762,6 +762,14 @@ the release with SBOM and `release.json`.
   smoke's shell list follows. Owner's test for the whole path, set 2026-09-15: every settings-management function of the legacy
   program reachable through the platform's screens with the procedure JSON as the only group-specific thing — anything coded
   specially for the procedure is a fail (`evidence/W8-record-*.{jpg,png}`).
+- **2026-09-15 (night) — the migrated requests read as they are (#164, increment 5).** The resumed DEV load (`legacy_import.py`,
+  run 311DA460, 2 060 s, `RECONCILIATION-2026-09-15-DEV.md`) landed the 6 721 A and P rows that had no legacy track row as completed
+  changes with both tracks NA; the engine's sweep found nothing left to advance (531 instances, 0 changes); `run_rehearsal.py --close`
+  closed 11 574 requests. DEV afterwards: request workflows 11 580 Closed, 272 In progress, 5 Cancelled; root runs 11 580 Completed,
+  272 Running; settings records 5 540 Active, 5 684 Archived, 355 Outstanding, 5 Withdrawn. Found by the pass and corrected for the
+  next load: 105 M rows with two terminal tracks were closed although their revision never went in service — `close_landed` now
+  skips M-row landings (#164). The work item shows which revision each item replaced. The list screen draws at most 500 rows (the
+  queue's eleven thousand froze the page); the filters and CSV cover the rest.
 
 
 **Depends on.** W5, W6, W7. **Estimate.** H: 24–40 h · G: 63–100 h.

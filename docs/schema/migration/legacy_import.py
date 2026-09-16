@@ -830,7 +830,8 @@ def load(database, limit=None, report=None, source_db=None):
 
 def close_landed(database):
     """After the API's sweep has completed landed runs whose two tracks were terminal (Complete / NA), close their requests
-    (#148). A separate call, not a load stage: the sweep runs on the host's own cadence, and the rehearsal's second pass
+    (#148) — the A and P landings only: an M row's request stays open whatever its two tracks say, because in the legacy
+    program a request is complete only when its M becomes the A (#164; the dropped software track was that third check, #58). A separate call, not a load stage: the sweep runs on the host's own cadence, and the rehearsal's second pass
     must write nothing. Idempotent: a closed request is not touched again."""
     if not database.startswith("PnCPlatform_V2_"):
         sys.exit("refusing: the target must be a PnCPlatform_V2_* database (#99)")
@@ -839,6 +840,7 @@ def close_landed(database):
             JOIN process.vProcedureInstance pi ON pi.EntityId = p.TargetEntityId
             JOIN process.vWorkflowInstance wf ON wf.EntityId = pi.WorkflowInstanceEntityId
             WHERE r.SourceSystem = ? AND p.TargetTable = 'ProcedureInstance' AND p.SourceKey LIKE 'Landing:%'
+              AND p.SourceKey NOT LIKE 'Landing:M%'   -- #164: an M row is an open request by definition (its revision never went in service); only A/P landings close
               AND pi.State = 'Completed' AND pi.Outcome = 'Completed' AND wf.CurrentState = 'InProgress'""", SOURCE)
         n = 0
         for key, wf in rows:

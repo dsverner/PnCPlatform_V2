@@ -12,6 +12,9 @@ import type { MenuItem } from '@/components/ui/context-menu'
 import { RaiseRequest, type RaiseOpts } from '@/components/actions/RaiseRequest'
 import { legacyFree } from '@/lib/legacy'
 
+// a list draws at most this many rows (a browser table of eleven thousand rows freezes the page; the filters and CSV cover the rest)
+const LIST_CAP = 500
+
 export function raiseOptsFor(cmd: Command, r: Row): RaiseOpts | null {
   if (!cmd.scopeColumn || !cmd.scopeKind || !r[cmd.scopeColumn]) return null
   const subject = cmd.titleFrom ? legacyFree(r[cmd.titleFrom]) : ''
@@ -63,8 +66,9 @@ export default function ListScreen({ screen, params: p }: { screen: Screen; para
       </div>
       {raise && <RaiseRequest o={raise} onClose={() => setRaise(null)} />}
       {q.isError ? <Status bad>Could not load: {(q.error as Error).message}</Status> : <Status>{q.isPending ? 'Loading…' : `${visible.length} shown of ${rows.length}`}</Status>}
-      <DataGrid rows={visible} columns={columns} rowKey={(r) => s(r[p.rowKey ?? p.columns[0].key])} menu={menu}
+      <DataGrid rows={visible.slice(0, LIST_CAP)} columns={columns} rowKey={(r) => s(r[p.rowKey ?? p.columns[0].key])} menu={menu}
         onRowClick={p.rowOpen ? (r) => runCommand(p.rowOpen!, r, ctx) : undefined} emptyText={q.isPending ? 'Loading…' : 'Nothing for this choice.'} />
+      {visible.length > LIST_CAP && <Status>The first {LIST_CAP} of {visible.length} rows are shown — narrow the list with the filters; Export CSV writes every row.</Status>}
     </div>
   )
 }

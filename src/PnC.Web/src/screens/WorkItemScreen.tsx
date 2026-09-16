@@ -139,7 +139,21 @@ function Tracks({ inst, p, memberNames, can, onChanged, navigate }: { inst: Proc
 }
 
 function Items({ p, rows, pending, ctx, can }: { p: WorkItemParams; rows: Row[]; pending: boolean; ctx: Parameters<typeof runCommand>[2]; can: (c: string) => boolean }) {
-  const cols: Column<Row>[] = p.items!.columns.map((c) => ({ key: c.key, label: labelOf(c), render: (r) => (c.format === 'state' ? <Pill tone={stateTone(r[c.key])}>{cellText(c, r)}</Pill> : cellText(c, r)), csv: (r) => cellText(c, r) }))
+  // #164: the revision this item replaced — the device's revision whose in-service period ended when this one began (the legacy
+  // A that became the P), else the device's latest earlier revision; one read per device
+  const devices = useMemo(() => [...new Set(rows.map((r) => s(r.DeviceEntityId)).filter(Boolean))].sort(), [rows])
+  const histQ = useQuery({ queryKey: ['deviceRevisions', devices], enabled: devices.length > 0, staleTime: 60_000,
+    queryFn: async () => { const out: Record<string, Row[]> = {}; for (const d of devices) out[d] = (await readView('document', 'vSettingsRecord', { DeviceEntityId: d }, { take: 200 })).rows; return out } })
+  const replaced = (r: Row): string => {
+    const list = (histQ.data?.[s(r.DeviceEntityId)] ?? []).filter((x) => x.RevisionRowId !== r.RevisionRowId)
+    const byEnd = r.InServiceFrom ? list.find((x) => x.InServiceTo && String(x.InServiceTo) === String(r.InServiceFrom)) : undefined
+    const earlier = list.filter((x) => x.CalculatedAt && r.CalculatedAt && String(x.CalculatedAt) < String(r.CalculatedAt)).sort((a, b) => String(b.CalculatedAt).localeCompare(String(a.CalculatedAt)))[0]
+    const x = byEnd ?? earlier; return x ? `rev ${s(x.RevisionLabel)} (${s(x.GridState).toLowerCase()})` : '—'
+  }
+  const cols: Column<Row>[] = [
+    ...p.items!.columns.map((c): Column<Row> => ({ key: c.key, label: labelOf(c), render: (r) => (c.format === 'state' ? <Pill tone={stateTone(r[c.key])}>{cellText(c, r)}</Pill> : cellText(c, r)), csv: (r) => cellText(c, r) })),
+    { key: '_replaces', label: 'Replaces', render: (r) => replaced(r), csv: (r) => replaced(r) },
+  ]
   const open = p.items!.rowOpen
   return (
     <Panel title={`Items · ${pending ? '…' : rows.length}`}>
