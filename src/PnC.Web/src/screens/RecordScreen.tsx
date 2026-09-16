@@ -12,7 +12,7 @@ import { useCan, useViewAll } from '@/lib/hooks'
 import { legacyFree, legacyDetail } from '@/lib/legacy'
 import { settingsText } from '@/lib/actions'
 import { type RecordParams, type Screen, splitView, screenPath } from '@/lib/screens'
-import { Panel, Pill, stateTone, Button, Facts, Status, Field, inputClass } from '@/components/ui/ui'
+import { Panel, Pill, stateTone, Button, Facts, Status, Field, Tabs, inputClass } from '@/components/ui/ui'
 import { DataGrid, type Column } from '@/components/ui/data-grid'
 import DeviceSettings, { useTemplate, isRatio } from './DeviceSettings'
 
@@ -28,8 +28,11 @@ export default function RecordScreen({ params: p, id }: { screen: Screen; params
   const revisionsQ = useViewAll(schema, vw, { DeviceEntityId: s(r?.DeviceEntityId) }, '-CalculatedAt', !!r?.DeviceEntityId)
   const others = useMemo(() => (revisionsQ.data ?? []).filter((x) => x.RevisionRowId !== revision), [revisionsQ.data, revision])
   const templateQ = useTemplate(s(r?.ModelId) || null); const template = templateQ.data ?? null
-  const [compareWith, setCompareWith] = useState(''); const [showCompare, setShowCompare] = useState(loc.hash === '#compare')
+  const [compareWith, setCompareWith] = useState('')
   const compareId = compareWith || s(others[0]?.RevisionRowId)   // #compare in the address: the newest other revision until one is chosen
+  // owner, 2026-09-16: the settings, the classification, the notes, the text as filed, the files and Compare are each a tab of their
+  // own — nothing sits under the settings tabs whatever tab is chosen (it read as part of the settings and confused)
+  const [section, setSection] = useState(loc.hash === '#compare' ? 'compare' : loc.hash === '#files' ? 'files' : 'settings')
   if (!id) return <Status bad>No revision in the address.</Status>
   if (rowQ.isPending) return <Status>Loading the record…</Status>
   if (rowQ.isError) return <Status bad>Could not load: {(rowQ.error as Error).message}</Status>
@@ -42,8 +45,8 @@ export default function RecordScreen({ params: p, id }: { screen: Screen; params
         <div className="flex items-center gap-2"><h1 className="text-lg font-semibold text-slate-100">{legacyFree(r.DeviceName)} — rev {s(r.RevisionLabel) || '?'}</h1><Pill tone={stateTone(r.GridState)}>{s(r.GridState)}</Pill></div>
         <div className="flex flex-wrap gap-2">
           {!!r.WorkRequestEntityId && <Button onClick={() => navigate(screenPath('WORK_ITEM', s(r.WorkRequestEntityId)))}>Change request</Button>}
-          <Button disabled={!others.length} title={others.length ? undefined : 'This device has no other revision'} onClick={() => { setShowCompare(true); if (!compareWith && others[0]) setCompareWith(s(others[0].RevisionRowId)) }}>Compare</Button>
-          <Button onClick={() => document.getElementById('files-panel')?.scrollIntoView({ behavior: 'smooth' })}>Documentation</Button>
+          <Button disabled={!others.length} title={others.length ? undefined : 'This device has no other revision'} onClick={() => { setSection('compare'); if (!compareWith && others[0]) setCompareWith(s(others[0].RevisionRowId)) }}>Compare</Button>
+          <Button onClick={() => setSection('files')}>Documentation</Button>
           <Button onClick={back}>Close</Button>
         </div>
       </header>
@@ -53,22 +56,28 @@ export default function RecordScreen({ params: p, id }: { screen: Screen; params
         <Panel title="Where"><Facts cols={1} pairs={[['Location', s(r.StationName) + (r.StationNumber ? ' · ' + r.StationNumber : '')], ['Scheme', s(r.SchemeName)], ['Equipment', s(r.PanelName)], ['Position', s(r.PositionName)]]} /></Panel>
         <Panel title="Dates and state"><Facts cols={1} pairs={[['Calculated', fmtWhen(r.CalculatedAt) + (r.CalculatedByDisplayName ? ' by ' + r.CalculatedByDisplayName : '')], ['Verified', fmtWhen(r.VerifiedAt)], ['In service', r.InServiceFrom ? fmtWhen(r.InServiceFrom) + (r.InServiceTo ? ' – ' + fmtWhen(r.InServiceTo) : ' – now') : 'not in service'], ['Change request', legacyFree(r.WorkRequestTitle)], ['Action type', s(r.WorkTypeKey)], ['Lifecycle', s(r.LifecycleState)], ['Revision', s(r.RevisionLabel) + ' · ' + s(r.RevisionStatus)]]} /></Panel>
       </div>
-      {/* #168: the template's view of the device — functions, inputs, settings by function — when the model has one */}
-      {template && <DeviceSettings r={r} revision={revision} filedText={textQ.data?.text ?? null} editable={r.GridState === 'Outstanding' && can('ConfigurationFile.Modify')} />}
+      <Tabs value={section} onChange={setSection} tabs={[{ key: 'settings', label: 'Settings' }, { key: 'classification', label: 'Classification' }, { key: 'notes', label: 'Notes' }, { key: 'text', label: 'Text as filed' }, { key: 'files', label: 'Files and records' }, ...(others.length ? [{ key: 'compare', label: 'Compare' }] : [])]} />
+      {section === 'settings' && (template
+        /* #168: the template's view of the device — functions, inputs, settings by function — when the model has one */
+        ? <DeviceSettings r={r} revision={revision} filedText={textQ.data?.text ?? null} editable={r.GridState === 'Outstanding' && can('ConfigurationFile.Modify')} />
+        : <Panel title={parsed.length ? `Settings · ${parsed.length} parsed from the ${s(r.FileKind)} file` : r.FileKind === 'NativeSettings' ? 'Settings · the native (vendor) file is stored as is; no reader exists for it yet (#113)' : 'Settings · no parsed settings; the text as filed is the record'}>
+            {parsed.length > 0 ? <DataGrid rows={parsed} columns={PARSED_COLS} rowKey={(x) => s(x.SettingCode) + '|' + s(x.GroupNumber)} /> : <Status>No settings template for this model yet; the text as filed is the record.</Status>}
+          </Panel>)}
       {/* an outstanding record is editable (owner, 2026-09-15); in service or archived is the record */}
-      <Characteristics r={r} revision={revision} editable={r.GridState === 'Outstanding' && can('Record.Modify')} hideGroups={template?.rows.some(isRatio) ? ['Instrument transformers'] : []} />
-      <Notes r={r} revision={revision} />
-      <Panel title={template ? 'Settings text as filed' : parsed.length ? `Settings · ${parsed.length} parsed from the ${s(r.FileKind)} file` : r.FileKind === 'NativeSettings' ? 'Settings · the native (vendor) file is stored as is; no reader exists for it yet (#113)' : 'Settings · no parsed settings; the text below is the record'}>
-        {!template && parsed.length > 0 && <DataGrid rows={parsed} columns={PARSED_COLS} rowKey={(x) => s(x.SettingCode) + '|' + s(x.GroupNumber)} />}
-        <h3 className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-400">{textQ.data ? textQ.data.name : 'file'}</h3>
-        <pre className="mt-1 max-h-[32rem] overflow-auto rounded border border-slate-800 bg-slate-950 p-2 text-xs whitespace-pre-wrap">{textQ.isPending ? 'loading…' : textQ.isError ? 'The settings text could not be read: ' + (textQ.error as Error).message : textQ.data ? textQ.data.text : 'No settings file is filed for this revision.'}</pre>
-      </Panel>
-      {showCompare && others.length > 0 && (
-        <Panel title="Compare" actions={<><Field label="With"><select className={inputClass} value={compareId} onChange={(e) => setCompareWith(e.target.value)}>{others.map((x) => <option key={s(x.RevisionRowId)} value={s(x.RevisionRowId)}>rev {s(x.RevisionLabel) || '?'} · {s(x.GridState)} · calculated {fmtDate(x.CalculatedAt)}{x.WorkRequestTitle ? ' · ' + legacyFree(x.WorkRequestTitle) : ''}</option>)}</select></Field><Button kind="mini" onClick={() => setShowCompare(false)}>Close</Button></>}>
+      {section === 'classification' && <Characteristics r={r} revision={revision} editable={r.GridState === 'Outstanding' && can('Record.Modify')} hideGroups={template?.rows.some(isRatio) ? ['Instrument transformers'] : []} />}
+      {section === 'notes' && <Notes r={r} revision={revision} />}
+      {section === 'text' && (
+        <Panel title="Settings text as filed">
+          <h3 className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-400">{textQ.data ? textQ.data.name : 'file'}</h3>
+          <pre className="mt-1 max-h-[32rem] overflow-auto rounded border border-slate-800 bg-slate-950 p-2 text-xs whitespace-pre-wrap">{textQ.isPending ? 'loading…' : textQ.isError ? 'The settings text could not be read: ' + (textQ.error as Error).message : textQ.data ? textQ.data.text : 'No settings file is filed for this revision.'}</pre>
+        </Panel>
+      )}
+      {section === 'compare' && others.length > 0 && (
+        <Panel title="Compare" actions={<Field label="With"><select className={inputClass} value={compareId} onChange={(e) => setCompareWith(e.target.value)}>{others.map((x) => <option key={s(x.RevisionRowId)} value={s(x.RevisionRowId)}>rev {s(x.RevisionLabel) || '?'} · {s(x.GridState)} · calculated {fmtDate(x.CalculatedAt)}{x.WorkRequestTitle ? ' · ' + legacyFree(x.WorkRequestTitle) : ''}</option>)}</select></Field>}>
           {compareId && <Compare mine={parsed} mineText={textQ.data?.text ?? ''} mineLabel={s(r.RevisionLabel)} other={others.find((x) => s(x.RevisionRowId) === compareId)!} />}
         </Panel>
       )}
-      <FilesPanel r={r} revision={revision} />
+      {section === 'files' && <FilesPanel r={r} revision={revision} />}
     </div>
   )
 }
