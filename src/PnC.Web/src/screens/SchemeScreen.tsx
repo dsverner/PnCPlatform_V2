@@ -43,7 +43,7 @@ export default function SchemeScreen({ params: p, id }: { screen: Screen; params
   const station = stationQ.data
   // every primary asset, any station: a line has two ends and both ends' schemes protect the one line (2103 B-PROT at Bathurst and at Eel River, 2026-09-16)
   const candidatesQ = useViewAll('asset', 'vPrimaryAsset', {}, 'Name')
-  const candidates = useMemo(() => { const f = find.toLowerCase(); const all = candidatesQ.data ?? []; const hit = all.filter((x) => !f || s(x.Name).toLowerCase().includes(f) || s(x.Stations).toLowerCase().includes(f)); const here = (x: Row) => s(x.Terminal1NodeEntityId) === s(station?.StationNodeEntityId) || s(x.Terminal2NodeEntityId) === s(station?.StationNodeEntityId) ? 0 : 1; return hit.sort((a, b) => here(a) - here(b) || s(a.Name).localeCompare(s(b.Name))) }, [candidatesQ.data, find, station])
+  const candidates = useMemo(() => { const f = find.toLowerCase(); const all = candidatesQ.data ?? []; const hit = all.filter((x) => !f || s(x.Name).toLowerCase().includes(f) || s(x.Stations).toLowerCase().includes(f)); const here = (x: Row) => s(x.TerminalNodeIds).toLowerCase().includes(s(station?.StationNodeEntityId).toLowerCase()) && station?.StationNodeEntityId ? 0 : 1; return hit.sort((a, b) => here(a) - here(b) || s(a.Name).localeCompare(s(b.Name))) }, [candidatesQ.data, find, station])
   const editable = can('Scheme.Modify')
   const refresh = () => { qc.invalidateQueries({ queryKey: ['schemeProtects', id] }); qc.invalidateQueries({ queryKey: ['view', 'asset', 'vPrimaryAsset'] }) }
   const link = async (assetId: string, label: string) => {

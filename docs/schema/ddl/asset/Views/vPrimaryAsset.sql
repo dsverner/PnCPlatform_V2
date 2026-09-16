@@ -11,22 +11,20 @@ SELECT a.[EntityId],
        a.[Status],
        a.[VoltageClassCode],
        a.[Notes],
-       t1.[StationNodeEntityId]     AS [Terminal1NodeEntityId],
-       t1.[StationName]             AS [Terminal1StationName],
-       t2.[StationNodeEntityId]     AS [Terminal2NodeEntityId],
-       t2.[StationName]             AS [Terminal2StationName],
-       [Stations] = CASE WHEN t1.[StationName] IS NULL THEN t2.[StationName] WHEN t2.[StationName] IS NULL THEN t1.[StationName] ELSE CONCAT(t1.[StationName], N' – ', t2.[StationName]) END,
+       tm.[TerminalCount],
+       tm.[Stations],
+       tm.[TerminalNodeIds],
        pf.[ProtectedFrom],
        cls.[Classifications],
        a.[RowSeq]
 FROM [asset].[Asset] a
 JOIN [ref].[AssetType] t ON t.[AssetTypeCode] = a.[AssetTypeCode] AND t.[AssetClassCode] = N'Primary' AND t.[IsDevice] = 0
-OUTER APPLY (SELECT TOP (1) at.[StationNodeEntityId], n.[Name] AS [StationName]
+-- the terminals in their order: as many as the asset has (a capacitor one, a transformer two, a line two or more — the owner)
+OUTER APPLY (SELECT COUNT(*) AS [TerminalCount],
+                    STRING_AGG(n.[Name], N' – ') WITHIN GROUP (ORDER BY at.[TerminalNo]) AS [Stations],
+                    STRING_AGG(LOWER(CONVERT(NVARCHAR(36), at.[StationNodeEntityId])), N',') WITHIN GROUP (ORDER BY at.[TerminalNo]) AS [TerminalNodeIds]
              FROM [asset].[AssetTerminal] at JOIN [location].[Node] n ON n.[EntityId] = at.[StationNodeEntityId] AND n.[ValidTo] IS NULL AND n.[IsDeleted] = 0
-             WHERE at.[ValidTo] IS NULL AND at.[IsDeleted] = 0 AND at.[AssetEntityId] = a.[EntityId] AND at.[TerminalNo] = 1 ORDER BY at.[RowSeq] DESC) t1
-OUTER APPLY (SELECT TOP (1) at.[StationNodeEntityId], n.[Name] AS [StationName]
-             FROM [asset].[AssetTerminal] at JOIN [location].[Node] n ON n.[EntityId] = at.[StationNodeEntityId] AND n.[ValidTo] IS NULL AND n.[IsDeleted] = 0
-             WHERE at.[ValidTo] IS NULL AND at.[IsDeleted] = 0 AND at.[AssetEntityId] = a.[EntityId] AND at.[TerminalNo] = 2 ORDER BY at.[RowSeq] DESC) t2
+             WHERE at.[ValidTo] IS NULL AND at.[IsDeleted] = 0 AND at.[AssetEntityId] = a.[EntityId]) tm
 OUTER APPLY (SELECT STRING_AGG(CONCAT(c.[ClassificationKindCode], N'=', c.[ClassificationValue]), N'; ') WITHIN GROUP (ORDER BY c.[ClassificationKindCode]) AS [Classifications]
              FROM [asset].[Classification] c
              WHERE c.[ValidTo] IS NULL AND c.[IsDeleted] = 0 AND c.[SubjectKind] = N'Asset' AND c.[SubjectEntityId] = a.[EntityId]) cls
