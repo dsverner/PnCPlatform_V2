@@ -18,7 +18,7 @@ interface Group { key: string; label: string; items: Item[]; match: string[] }
 // the plain pages still to be ported, under the group each belongs to
 const PAGES: Group[] = [
   { key: 'Settings book', label: 'Settings book', match: [], items: [{ to: '/report.html', label: 'Location report', external: true }] },
-  { key: 'Assets and schemes', label: 'Assets and schemes', match: [], items: [{ to: '/floc.html', label: 'Locations', external: true }, { to: '/schemes.html', label: 'Schemes', external: true }] },
+  { key: 'Assets and schemes', label: 'Assets and schemes', match: [], items: [{ to: '/floc.html', label: 'Locations', external: true }] },   // #170: Schemes and Primary assets are defined screens now
   { key: 'Administration', label: 'Administration', match: [], items: [{ to: '/grants.html', label: 'Grants', external: true }, { to: '/definitions.html', label: 'Definitions', external: true }] },
 ]
 

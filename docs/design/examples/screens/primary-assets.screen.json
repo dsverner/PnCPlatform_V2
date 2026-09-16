@@ -1,0 +1,64 @@
+{
+  "g": 1,
+  "kind": "screen",
+  "key": "PRIMARY_ASSETS",
+  "name": "Primary assets",
+  "description": "The primary assets \u2014 lines, transformers, busses, breakers, generators, capacitors, reactors, the system \u2014 with their station and applicability classifications; a row opens the primary asset (#170).",
+  "menu": {
+    "group": "Assets and schemes",
+    "label": "Primary assets",
+    "order": 15
+  },
+  "permission": "Asset.Read",
+  "screenKind": "list",
+  "params": {
+    "view": "asset.vPrimaryAsset",
+    "orderBy": "Name",
+    "rowKey": "EntityId",
+    "columns": [
+      {
+        "key": "Name",
+        "label": "Primary asset"
+      },
+      {
+        "key": "AssetTypeName",
+        "label": "Type"
+      },
+      {
+        "key": "StationName",
+        "label": "Station"
+      },
+      {
+        "key": "Status",
+        "label": "Status",
+        "format": "state"
+      },
+      {
+        "key": "Classifications",
+        "label": "Classifications"
+      }
+    ],
+    "textFilterColumns": [
+      "Name",
+      "StationName",
+      "AssetTypeName",
+      "Classifications"
+    ],
+    "filters": [
+      {
+        "column": "AssetTypeName",
+        "label": "Type"
+      },
+      {
+        "column": "StationName",
+        "label": "Station"
+      }
+    ],
+    "rowOpen": {
+      "label": "Open the primary asset",
+      "action": "openScreen",
+      "screen": "PRIMARY_ASSET",
+      "param": "EntityId"
+    }
+  }
+}

@@ -15,8 +15,7 @@ import { DataGrid } from '@/components/ui/data-grid'
 export const CLASSIFICATION_KINDS: { code: string; label: string; values: string[]; help: string }[] = [
   { code: 'BesStatus', label: 'BES status', values: ['BES', 'Not BES'], help: 'Bulk Electric System element (NERC definition)' },
   { code: 'CipImpactRating', label: 'CIP impact rating', values: ['High', 'Medium', 'Low', 'None'], help: 'CIP-002: the impact rating of the BES asset this element belongs to; the cyber systems protecting it follow' },
-  { code: 'NpccBulkPowerSystem', label: 'NPCC bulk power system', values: ['BPS', 'Not BPS'], help: 'NPCC bulk power system element (the A-10 classification of the element)' },
-  { code: 'NpccA10', label: 'NPCC A-10', values: ['Impactful', 'Not impactful'], help: 'On the A-10 study\'s list of impactful busses/elements; the directories then apply' },
+  { code: 'NpccBulkPowerSystem', label: 'NPCC bulk power system', values: ['BPS', 'Not BPS'], help: 'Declared a BPS bus (or not) by the entity\'s A-10 study; the NPCC directories then apply' },
   { code: 'Prc023', label: 'PRC-023', values: ['Listed', 'Not listed'], help: 'On the entity\'s PRC-023 list of impactful lines: the relay loadability calculation applies' },
 ]
 
@@ -57,7 +56,7 @@ export function ClassificationPanel({ subjectKind, subjectEntityId, editable }: 
               </dd>
             </div>) })}
       </dl>
-      <Status>{editable ? 'Recorded by you from the entity\'s own CIP-002 evaluation, A-10 study and PRC-023 list (this phase); the platform derives them in a later phase and keeps both. A value saves at once, audited.' : 'Recorded values; the platform derives them in a later phase.'}</Status>
+      <Status>{editable ? 'Recorded by you from the entity\'s own CIP-002 evaluation, A-10 study (the BPS declaration) and PRC-023 list (this phase); the platform derives them in a later phase and keeps both. A value saves at once, audited.' : 'Recorded values; the platform derives them in a later phase.'}</Status>
     </Panel>
   )
 }

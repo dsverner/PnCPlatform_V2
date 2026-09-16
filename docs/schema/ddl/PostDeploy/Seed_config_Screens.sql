@@ -17,6 +17,20 @@ BEGIN
     EXEC [config].[ApproveDefinitionVersion] @VersionRowId = @v, @ActorId = @approver;
 END
 GO
+-- primary-assets.screen.json
+DECLARE @author UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000001', @approver UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000002';
+DECLARE @e UNIQUEIDENTIFIER, @v UNIQUEIDENTIFIER, @no INT, @payload NVARCHAR(MAX) = N'{"g":1,"kind":"screen","key":"PRIMARY_ASSETS","name":"Primary assets","description":"The primary assets — lines, transformers, busses, breakers, generators, capacitors, reactors, the system — with their station and applicability classifications; a row opens the primary asset (#170).","menu":{"group":"Assets and schemes","label":"Primary assets","order":15},"permission":"Asset.Read","screenKind":"list","params":{"view":"asset.vPrimaryAsset","orderBy":"Name","rowKey":"EntityId","columns":[{"key":"Name","label":"Primary asset"},{"key":"AssetTypeName","label":"Type"},{"key":"StationName","label":"Station"},{"key":"Status","label":"Status","format":"state"},{"key":"Classifications","label":"Classifications"}],"textFilterColumns":["Name","StationName","AssetTypeName","Classifications"],"filters":[{"column":"AssetTypeName","label":"Type"},{"column":"StationName","label":"Station"}],"rowOpen":{"label":"Open the primary asset","action":"openScreen","screen":"PRIMARY_ASSET","param":"EntityId"}}}';
+DECLARE @note NVARCHAR(200) = N'seed 574600094ae57100';
+SELECT @e = EntityId FROM [config].[Definition] WHERE [DefinitionKind] = N'Program.Screen' AND [DefinitionKey] = N'PRIMARY_ASSETS' AND [IsDeleted] = 0;
+IF @e IS NULL
+    EXEC [config].[AddDefinition] @DefinitionKind = N'Program.Screen', @DefinitionKey = N'PRIMARY_ASSETS', @Name = N'Primary assets', @Description = N'The primary assets — lines, transformers, busses, breakers, generators, capacitors, reactors, the system — with their station and applicability classifications; a row opens the primary asset (#170).', @ActorId = @author, @EntityId = @e OUTPUT;
+IF NOT EXISTS (SELECT 1 FROM [config].[vDefinitionVersion] WHERE [DefinitionEntityId] = @e AND [ChangeNote] NOT LIKE N'seed %')      -- untouched by an Administrator
+   AND NOT EXISTS (SELECT 1 FROM [config].[vDefinitionVersion] WHERE [DefinitionEntityId] = @e AND [Status] = N'Effective' AND [ChangeNote] = @note)
+BEGIN
+    EXEC [config].[AddDefinitionVersion] @DefinitionKey = N'PRIMARY_ASSETS', @DefinitionKind = N'Program.Screen', @ChangeNote = @note, @PayloadText = @payload, @ActorId = @author, @VersionRowId = @v OUTPUT, @VersionNumber = @no OUTPUT;
+    EXEC [config].[ApproveDefinitionVersion] @VersionRowId = @v, @ActorId = @approver;
+END
+GO
 -- request-queue.screen.json
 DECLARE @author UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000001', @approver UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000002';
 DECLARE @e UNIQUEIDENTIFIER, @v UNIQUEIDENTIFIER, @no INT, @payload NVARCHAR(MAX) = N'{"g":1,"kind":"screen","key":"REQUEST_QUEUE","name":"Requests","description":"The change-request queue: every request the person may read, counted by state, filtered by state and location; a row opens the request (#158, #165).","menu":{"group":"Settings book","label":"Requests","order":20},"permission":"WorkRequest.Read","screenKind":"list","params":{"view":"work.vChangeRequestStatus","orderBy":"-RequestedAt","rowKey":"WorkRequestEntityId","columns":[{"key":"Title","label":"Request","format":"legacyFree"},{"key":"RequestState","label":"State","format":"state"},{"key":"WorkTypeKey","label":"Action type"},{"key":"StationName","label":"Location"},{"key":"EquipmentName","label":"Relay / equipment","format":"legacyFree","fallback":"ScopeName"},{"key":"DeviceCount","label":"Devices","format":"number"},{"key":"RequestedByDisplayName","label":"Requested by"},{"key":"RequestedAt","label":"Requested","format":"date"},{"key":"DocumentationStatus","label":"Documentation"},{"key":"DatabaseStatus","label":"Database"},{"key":"LifecycleState","label":"Package"},{"key":"RequestCompletedAt","label":"Completed","format":"date"}],"textFilterColumns":["Title","ScopeName","EquipmentName","StationName","RequestedByDisplayName","WorkTypeKey","Description"],"filters":[{"column":"RequestState","label":"State","options":[{"label":"Open (raised or in progress)","value":["Raised","InProgress"],"default":true},{"label":"Every state","value":null},{"label":"Raised","value":"Raised"},{"label":"In progress","value":"InProgress"},{"label":"Closed","value":"Closed"},{"label":"Cancelled","value":"Cancelled"}]},{"column":"StationName","label":"Location"}],"counters":[{"label":"Raised","when":{"RequestState":"Raised"}},{"label":"In progress","when":{"RequestState":"InProgress"}},{"label":"Closed this month","when":{"RequestState":"Closed"},"thisMonth":"RequestCompletedAt"},{"label":"Cancelled","when":{"RequestState":"Cancelled"}},{"label":"Not started","when":{"RequestState":null}}],"rowOpen":{"label":"Open the request","action":"openScreen","screen":"WORK_ITEM","param":"WorkRequestEntityId"}}}';
@@ -42,6 +56,20 @@ IF NOT EXISTS (SELECT 1 FROM [config].[vDefinitionVersion] WHERE [DefinitionEnti
    AND NOT EXISTS (SELECT 1 FROM [config].[vDefinitionVersion] WHERE [DefinitionEntityId] = @e AND [Status] = N'Effective' AND [ChangeNote] = @note)
 BEGIN
     EXEC [config].[AddDefinitionVersion] @DefinitionKey = N'SCHEME', @DefinitionKind = N'Program.Screen', @ChangeNote = @note, @PayloadText = @payload, @ActorId = @author, @VersionRowId = @v OUTPUT, @VersionNumber = @no OUTPUT;
+    EXEC [config].[ApproveDefinitionVersion] @VersionRowId = @v, @ActorId = @approver;
+END
+GO
+-- schemes.screen.json
+DECLARE @author UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000001', @approver UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000002';
+DECLARE @e UNIQUEIDENTIFIER, @v UNIQUEIDENTIFIER, @no INT, @payload NVARCHAR(MAX) = N'{"g":1,"kind":"screen","key":"SCHEMES","name":"Schemes","description":"The protection schemes; a row opens the scheme — its members and the primary assets it protects (#170).","menu":{"group":"Assets and schemes","label":"Schemes","order":20},"permission":"Scheme.Read","screenKind":"list","params":{"view":"scheme.vScheme","orderBy":"Name","rowKey":"EntityId","columns":[{"key":"Name","label":"Scheme"},{"key":"SystemDesignation","label":"System designation"},{"key":"Status","label":"Status","format":"state"},{"key":"Notes","label":"Notes"}],"textFilterColumns":["Name","SystemDesignation","Notes"],"filters":[{"column":"Status","label":"Status"}],"rowOpen":{"label":"Open the scheme","action":"openScreen","screen":"SCHEME","param":"EntityId"}}}';
+DECLARE @note NVARCHAR(200) = N'seed 5983950bd4962297';
+SELECT @e = EntityId FROM [config].[Definition] WHERE [DefinitionKind] = N'Program.Screen' AND [DefinitionKey] = N'SCHEMES' AND [IsDeleted] = 0;
+IF @e IS NULL
+    EXEC [config].[AddDefinition] @DefinitionKind = N'Program.Screen', @DefinitionKey = N'SCHEMES', @Name = N'Schemes', @Description = N'The protection schemes; a row opens the scheme — its members and the primary assets it protects (#170).', @ActorId = @author, @EntityId = @e OUTPUT;
+IF NOT EXISTS (SELECT 1 FROM [config].[vDefinitionVersion] WHERE [DefinitionEntityId] = @e AND [ChangeNote] NOT LIKE N'seed %')      -- untouched by an Administrator
+   AND NOT EXISTS (SELECT 1 FROM [config].[vDefinitionVersion] WHERE [DefinitionEntityId] = @e AND [Status] = N'Effective' AND [ChangeNote] = @note)
+BEGIN
+    EXEC [config].[AddDefinitionVersion] @DefinitionKey = N'SCHEMES', @DefinitionKind = N'Program.Screen', @ChangeNote = @note, @PayloadText = @payload, @ActorId = @author, @VersionRowId = @v OUTPUT, @VersionNumber = @no OUTPUT;
     EXEC [config].[ApproveDefinitionVersion] @VersionRowId = @v, @ActorId = @approver;
 END
 GO

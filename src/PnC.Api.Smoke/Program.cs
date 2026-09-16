@@ -995,19 +995,19 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
             Must(pas == HttpStatusCode.OK && prow?["AssetTypeCode"]?.ToString() == "Line" && string.Equals(prow?["StationNodeEntityId"]?.ToString(), station.ToString(), StringComparison.OrdinalIgnoreCase) && prow?["Classifications"] is null,
                 $"#170: the primary-asset read model shows the line at its station with no classification yet ({prow?["AssetTypeName"]} at {prow?["StationName"]})");
             var (k1s, k1b) = await Post(hydro!, "api/v1/asset/RecordClassification", new { SubjectKind = "Asset", SubjectEntityId = line, ClassificationKindCode = "CipImpactRating", ClassificationValue = "Medium" });
-            var (k2s, k2b) = await Post(admin, "api/v1/asset/RecordClassification", new { SubjectKind = "Asset", SubjectEntityId = line, ClassificationKindCode = "NpccA10", ClassificationValue = "Impactful" });
+            var (k2s, k2b) = await Post(admin, "api/v1/asset/RecordClassification", new { SubjectKind = "Asset", SubjectEntityId = line, ClassificationKindCode = "NpccBulkPowerSystem", ClassificationValue = "BPS" });
             var (k3s, k3b) = await Post(admin, "api/v1/asset/RecordClassification", new { SubjectKind = "Asset", SubjectEntityId = line, ClassificationKindCode = "CipImpactRating", ClassificationValue = "High" });
             Must(k2s == HttpStatusCode.OK && k3s == HttpStatusCode.OK, $"#170: classifications recorded and revised as the Administrator ({(int)k2s} {Code(k2b)} · {(int)k3s} {Code(k3b)}); the subtree-scoped engineer → {(int)k1s} {Code(k1b)}");
             var (k4s, k4b) = await Post(readOnly!, "api/v1/asset/RecordClassification", new { SubjectKind = "Asset", SubjectEntityId = line, ClassificationKindCode = "Prc023", ClassificationValue = "Listed" });
             var (k5s, k5b) = await Post(admin, "api/v1/asset/RecordClassification", new { SubjectKind = "Asset", SubjectEntityId = line, ClassificationKindCode = "NoSuchKind", ClassificationValue = "x" });
             Must(k4s == HttpStatusCode.Forbidden && k5s == HttpStatusCode.Conflict, $"#170: ReadOnly may not record ({(int)k4s}); an unknown kind is refused in the procedure's words ({(int)k5s} {k5b?["detail"]})");
-            var (k6s, _) = await Post(admin, "api/v1/asset/RecordClassification", new { SubjectKind = "Asset", SubjectEntityId = line, ClassificationKindCode = "NpccA10", ClassificationValue = "" });
+            var (k6s, _) = await Post(admin, "api/v1/asset/RecordClassification", new { SubjectKind = "Asset", SubjectEntityId = line, ClassificationKindCode = "NpccBulkPowerSystem", ClassificationValue = "" });
             var (kcls, kclb) = await Get(admin, $"api/v1/asset/vClassification?SubjectEntityId={line}");
             var crow = (kclb?["rows"] as JsonArray)?.ToDictionary(r => r?["ClassificationKindCode"]?.ToString() ?? "", r => r) ?? new();
             var (pas2, pab2) = await Get(admin, $"api/v1/asset/vPrimaryAsset?EntityId={line}");
             Must(k6s == HttpStatusCode.OK && crow.Count == 1 && crow.GetValueOrDefault("CipImpactRating")?["ClassificationValue"]?.ToString() == "High" && crow["CipImpactRating"]?["Basis"]?.ToString() == "Recorded"
                  && (pab2?["rows"] as JsonArray)?.FirstOrDefault()?["Classifications"]?.ToString() == "CipImpactRating=High",
-                $"#170: one current classification after the A-10 value was withdrawn — CIP High, Recorded, the read model summarises it ({(pab2?["rows"] as JsonArray)?.FirstOrDefault()?["Classifications"]})");
+                $"#170: one current classification after the BPS value was withdrawn — CIP High, Recorded, the read model summarises it ({(pab2?["rows"] as JsonArray)?.FirstOrDefault()?["Classifications"]})");
             var (his, hib) = await Get(admin, $"api/v1/asset/vClassificationHistory?SubjectEntityId={line}");
             Must(his == HttpStatusCode.OK && ((hib?["rows"] as JsonArray)?.Count ?? 0) >= 3, $"#170: the history keeps the revised and withdrawn values ({(hib?["rows"] as JsonArray)?.Count} rows)");
             var (sps, spb) = await Get(admin, $"api/v1/scheme/vSchemeProtects?SchemeEntityId={scheme}");
