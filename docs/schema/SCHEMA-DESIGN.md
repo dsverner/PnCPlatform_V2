@@ -1158,7 +1158,7 @@ Decisions here: 116–123.
 
 Alternate key `SchemeNumber`. Stations spanned are derived from members' locations, not stored.
 
-| `scheme.SchemeProtects` — class `ValidTime` | `SchemeEntityId`, `PrimaryAssetEntityId` → `asset.AssetRegistry` (a line by route, a transformer, a bus, a generator), `ZoneRole` (`Primary`, `Backup`, `Overlap`) |
+| `scheme.SchemeProtects` — class `ValidTime` | `SchemeEntityId`, `PrimaryAssetEntityId` → `asset.AssetRegistry` (a line by route, a transformer, a bus, a generator), `ZoneRole` (`Primary`, `Backup`, `BreakerFailure` — the owner, 2026-09-16: the design's `Overlap` is breaker failure in the group's words) |
 |---|---|
 
 ### 7.2 `scheme.SchemeMember` — class `BiTemporal` (116)

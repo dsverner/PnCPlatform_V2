@@ -19,7 +19,7 @@ CREATE TABLE [scheme].[SchemeProtects] (
     [MigrationRunId]    UNIQUEIDENTIFIER  NULL     CONSTRAINT [FK_SchemeProtects_MigrationRun] REFERENCES [migration].[Run] ([RunId]),
     [SchemeEntityId]     UNIQUEIDENTIFIER NOT NULL CONSTRAINT [FK_SchemeProtects_Scheme] REFERENCES [scheme].[SchemeRegistry] ([EntityId]),
     [PrimaryAssetEntityId] UNIQUEIDENTIFIER NOT NULL CONSTRAINT [FK_SchemeProtects_Asset] REFERENCES [asset].[AssetRegistry] ([EntityId]),
-    [ZoneRole]           NVARCHAR(20)     NOT NULL CONSTRAINT [CK_SchemeProtects_Zone] CHECK ([ZoneRole] IN (N'Primary', N'Backup', N'Overlap')),
+    [ZoneRole]           NVARCHAR(20)     NOT NULL CONSTRAINT [CK_SchemeProtects_Zone] CHECK ([ZoneRole] IN (N'Primary', N'Backup', N'BreakerFailure')),   -- the owner, 2026-09-16: Primary and Backup stand; "Overlap" is Breaker Failure in the group's words
     [AssetTerminalEntityId] UNIQUEIDENTIFIER NULL CONSTRAINT [FK_SchemeProtects_Terminal] REFERENCES [asset].[AssetTerminalRegistry] ([EntityId]),   -- #170: the terminal end the scheme protects from (a line's two ends have their own schemes); NULL = matched by station
     CONSTRAINT [PK_SchemeProtects] PRIMARY KEY CLUSTERED ([RowSeq]),
     CONSTRAINT [UQ_SchemeProtects_RowId] UNIQUE NONCLUSTERED ([RowId])

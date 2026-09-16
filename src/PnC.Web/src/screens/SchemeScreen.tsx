@@ -11,7 +11,7 @@ import { type RecordParams, type Screen, screenPath } from '@/lib/screens'
 import { Panel, Pill, Button, Facts, Status, Field, inputClass } from '@/components/ui/ui'
 import { DataGrid } from '@/components/ui/data-grid'
 
-const ZONES = ['Primary', 'Backup', 'Overlap']
+const ZONES = ['Primary', 'Backup', 'BreakerFailure']   // the owner, 2026-09-16: Primary, Backup, Breaker Failure
 
 export default function SchemeScreen({ params: p, id }: { screen: Screen; params: RecordParams; id?: string }) {
   const navigate = useNavigate(); const can = useCan(); const qc = useQueryClient()
@@ -99,7 +99,7 @@ export default function SchemeScreen({ params: p, id }: { screen: Screen; params
               <div className="mt-1 flex flex-wrap items-end gap-2">
                 <Field label="Find"><input className={inputClass} value={find} onChange={(e) => setFind(e.target.value)} placeholder="name contains…" /></Field>
                 <Field label="Primary asset"><select className={inputClass} value={pick} onChange={(e) => setPick(e.target.value)}><option value="">— choose —</option>{candidates.map((x) => <option key={s(x.EntityId)} value={s(x.EntityId)}>{s(x.Name)} · {s(x.AssetTypeName)}{x.Stations ? ' · ' + s(x.Stations) : ''}</option>)}</select></Field>
-                <Field label="Zone"><select className={inputClass} value={zone} onChange={(e) => setZone(e.target.value)}>{ZONES.map((z) => <option key={z}>{z}</option>)}</select></Field>
+                <Field label="Zone"><select className={inputClass} value={zone} onChange={(e) => setZone(e.target.value)}>{ZONES.map((z) => <option key={z} value={z}>{z === 'BreakerFailure' ? 'Breaker failure' : z}</option>)}</select></Field>
                 <Button kind="primary" disabled={!pick || busy} onClick={() => void link(pick, s(candidates.find((x) => s(x.EntityId) === pick)?.Name))}>Protects</Button>
               </div>
             </div>

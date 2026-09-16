@@ -23,7 +23,7 @@ export const CLASSIFICATION_KINDS: { code: string; label: string; values: string
   { code: 'NpccBulkPowerSystem', label: 'NPCC bulk power system', values: ['BPS', 'Not BPS'], help: 'This bus declared BPS (or not) by the entity\'s A-10 study; the NPCC directories then apply to the protections at it', busOnly: true },
   { code: 'Prc023', label: 'PRC-023', values: ['Listed', 'Not listed'], help: 'On the entity\'s PRC-023 list of impactful lines: the relay loadability calculation applies' },
 ]
-const ZONES = ['Primary', 'Backup', 'Overlap']
+const ZONES = ['Primary', 'Backup', 'BreakerFailure']   // the owner, 2026-09-16: Primary, Backup, Breaker Failure
 const STATUSES = ['Planned', 'InService', 'OutOfService', 'Retired']
 
 export function useClassifications(subjectKind: string, subjectEntityId: string) {
@@ -201,7 +201,7 @@ function ProtectedBy({ r, editable }: { r: Row; editable: boolean }) {
           <li key={s(t.TerminalEntityId)}>
             <div className="font-semibold text-slate-200">Terminal {s(t.TerminalNo)} · {s(t.StationName)}{t.VoltageClassCode ? ` · ${s(t.VoltageClassCode)}` : ''}{t.BusName ? <span className="ml-2 text-xs font-normal text-slate-400">bus {s(t.BusName)}{t.BusNpcc ? ` · NPCC ${s(t.BusNpcc)}` : ''}</span> : null}</div>
             <ul className="ml-4 mt-1 space-y-1">
-              {linksAt(t).map((l) => <li key={s(l.EntityId)} className="flex items-center gap-2">└ {schemeLink(l)} <span className="text-xs text-slate-500">{s(l.ZoneRole).toLowerCase()}{l.AssetTerminalEntityId ? '' : ' · by station'}</span>
+              {linksAt(t).map((l) => <li key={s(l.EntityId)} className="flex items-center gap-2">└ {schemeLink(l)} <span className="text-xs text-slate-500">{s(l.ZoneRole) === 'BreakerFailure' ? 'breaker failure' : s(l.ZoneRole).toLowerCase()}{l.AssetTerminalEntityId ? '' : ' · by station'}</span>
                 {editable && !l.AssetTerminalEntityId && <Button kind="mini" disabled={busy} onClick={() => void run(() => proc('scheme', 'SchemeProtects_Revise', { EntityId: l.EntityId, SchemeEntityId: l.SchemeEntityId, PrimaryAssetEntityId: r.EntityId, ZoneRole: l.ZoneRole, AssetTerminalEntityId: t.TerminalEntityId }), `${s(l.SchemeName)} tied to terminal ${s(t.TerminalNo)}.`)}>tie to this end</Button>}
                 {editable && <Button kind="mini" disabled={busy} onClick={() => void run(() => proc('scheme', 'SchemeProtects_SoftDelete', { EntityId: l.EntityId }), `${s(l.SchemeName)} no longer listed.`)}>remove</Button>}</li>)}
               {!linksAt(t).length && <li className="text-xs text-slate-500">└ no protection assigned at this end</li>}
@@ -227,7 +227,7 @@ function AssignRow({ t, pick, zone, busy, exclude, onPick, onZone, onAssign }: {
   return (
     <div className="flex flex-wrap items-center gap-2 text-xs">
       <span className="text-slate-500">└ assign</span>
-      <select className={`${inputClass} w-24`} value={zone} disabled={busy} title="the zone of the scheme you are about to assign" onChange={(e) => onZone(e.target.value)}>{ZONES.map((z) => <option key={z}>{z}</option>)}</select>
+      <select className={`${inputClass} w-24`} value={zone} disabled={busy} title="the zone of the scheme you are about to assign" onChange={(e) => onZone(e.target.value)}>{ZONES.map((z) => <option key={z} value={z}>{z === 'BreakerFailure' ? 'Breaker failure' : z}</option>)}</select>
       {/* choosing a scheme assigns it at once — like every other drop-down on this page (the owner picked one and waited, 2026-09-16) */}
       <select className={`${inputClass} w-56`} value={pick} disabled={busy} onChange={(e) => { const v = e.target.value; onPick(v); if (v) onAssign(v, s(options.find((x) => s(x.SchemeEntityId) === v)?.SchemeName), zone) }}><option value="">— a scheme at {s(t.StationName)}: choose to assign —</option>{options.map((x) => <option key={s(x.SchemeEntityId)} value={s(x.SchemeEntityId)}>{s(x.SchemeName)}</option>)}</select>
     </div>
