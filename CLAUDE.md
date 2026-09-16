@@ -110,6 +110,13 @@ publish one, and do not read old ones for new rulings.
   owner is asked to look only at a finished, working task, shown beside the reference doing the same task.
 - The earlier rounds' answers (cards/w8-ux-round4 … round6) remain on record in `docs/decisions/DECISION-LOG.md`.
 
+## Subagents run on Opus
+
+Owner's instruction, 2026-09-16: every subagent spawned with the Agent tool is started with `model: "opus"` (a fork inherits the
+parent model and ignores the override; everything else takes it). The reason is context use: the session's own context is the scarce
+resource, and a search or review that runs elsewhere should run on the model that carries it best. No exceptions unless the owner
+says so for a particular task.
+
 ## Files over ~50 MB
 
 GitHub hard-rejects any push containing a blob over 100 MB, anywhere in history. This bit the
