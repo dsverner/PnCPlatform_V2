@@ -4,6 +4,7 @@ CREATE PROCEDURE [asset].[AssetTerminal_Add]
     @TerminalNo TINYINT,
     @StationNodeEntityId UNIQUEIDENTIFIER,
     @VoltageClassCode NVARCHAR(20) = NULL,
+    @BusAssetEntityId UNIQUEIDENTIFIER = NULL,
     @Notes NVARCHAR(400) = NULL,
     @ValidFrom DATETIMEOFFSET(7) = NULL,
     @ValidFromQuality TINYINT = 0,
@@ -22,9 +23,9 @@ BEGIN
     SET @EntityId = ISNULL(@EntityId, NEWID());
     INSERT [asset].[AssetTerminalRegistry] ([EntityId]) VALUES (@EntityId);
     DECLARE @out TABLE ([RowId] UNIQUEIDENTIFIER);
-    INSERT [asset].[AssetTerminal] ([EntityId], [ValidFrom], [ValidFromQuality], [CreatedBy], [CreatedAt], [ModifiedBy], [ModifiedAt], [MigrationRunId], [AssetEntityId], [TerminalNo], [StationNodeEntityId], [VoltageClassCode], [Notes])
+    INSERT [asset].[AssetTerminal] ([EntityId], [ValidFrom], [ValidFromQuality], [CreatedBy], [CreatedAt], [ModifiedBy], [ModifiedAt], [MigrationRunId], [AssetEntityId], [TerminalNo], [StationNodeEntityId], [VoltageClassCode], [BusAssetEntityId], [Notes])
     OUTPUT inserted.[RowId] INTO @out
-    VALUES (@EntityId, @ValidFrom, @ValidFromQuality, @ActorId, @now, @ActorId, @now, @MigrationRunId, @AssetEntityId, @TerminalNo, @StationNodeEntityId, @VoltageClassCode, @Notes);
+    VALUES (@EntityId, @ValidFrom, @ValidFromQuality, @ActorId, @now, @ActorId, @now, @MigrationRunId, @AssetEntityId, @TerminalNo, @StationNodeEntityId, @VoltageClassCode, @BusAssetEntityId, @Notes);
     SELECT @RowId = [RowId] FROM @out;
     COMMIT TRANSACTION;
 END;

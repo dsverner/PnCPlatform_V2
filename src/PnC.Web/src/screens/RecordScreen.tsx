@@ -90,14 +90,19 @@ function Protects({ schemeEntityId }: { schemeEntityId: string }) {
   const q = useQuery({ queryKey: ['schemeProtectsNamed', schemeEntityId], enabled: !!schemeEntityId, staleTime: 60_000, queryFn: async () => {
     const links = await viewAll('scheme', 'vSchemeProtects', { SchemeEntityId: schemeEntityId })
     const out: Row[] = []
-    for (const l of links) { const a = (await view('asset', 'vPrimaryAsset', { EntityId: s(l.PrimaryAssetEntityId) }, { take: 1 })).rows[0]; if (a) out.push({ ...a, ZoneRole: l.ZoneRole }) }
+    for (const l of links) {
+      const a = (await view('asset', 'vPrimaryAsset', { EntityId: s(l.PrimaryAssetEntityId) }, { take: 1 })).rows[0]; if (!a) continue
+      // the end this scheme protects from, and the bus there: the NPCC A-10 declaration is the bus's (the owner, 2026-09-16)
+      const term = l.AssetTerminalEntityId ? (await view('asset', 'vAssetTerminalDetail', { TerminalEntityId: s(l.AssetTerminalEntityId) }, { take: 1 })).rows[0] : null
+      out.push({ ...a, ZoneRole: l.ZoneRole, TerminalNo: term?.TerminalNo, TerminalStation: term?.StationName, BusName: term?.BusName, BusNpcc: term?.BusNpcc, HasTerminal: !!term })
+    }
     return out
   } })
   if (!schemeEntityId) return <span className="text-slate-500">—</span>
   if (q.isPending) return <span className="text-slate-500">…</span>
   const rows = q.data ?? []
   if (!rows.length) return <span className="text-slate-500">not recorded on the scheme yet</span>
-  return <span>{rows.map((a, i) => <span key={s(a.EntityId)}>{i > 0 ? '; ' : ''}<a className="text-sky-300 underline" href={screenPath('PRIMARY_ASSET', s(a.EntityId))} onClick={(e) => { e.preventDefault(); navigate(screenPath('PRIMARY_ASSET', s(a.EntityId))) }}>{s(a.Name)}</a> <span className="text-xs text-slate-500">{s(a.AssetTypeName).toLowerCase()}{a.ZoneRole !== 'Primary' ? ' · ' + s(a.ZoneRole).toLowerCase() : ''}{a.Classifications ? ' · ' + s(a.Classifications) : ' · no classification recorded'}</span></span>)}</span>
+  return <span>{rows.map((a, i) => <span key={s(a.EntityId)}>{i > 0 ? '; ' : ''}<a className="text-sky-300 underline" href={screenPath('PRIMARY_ASSET', s(a.EntityId))} onClick={(e) => { e.preventDefault(); navigate(screenPath('PRIMARY_ASSET', s(a.EntityId))) }}>{s(a.Name)}</a> <span className="text-xs text-slate-500">{s(a.AssetTypeName).toLowerCase()}{a.ZoneRole !== 'Primary' ? ' · ' + s(a.ZoneRole).toLowerCase() : ''}{a.Classifications ? ' · ' + s(a.Classifications) : ' · no classification recorded'}{a.HasTerminal ? ` · from terminal ${s(a.TerminalNo)} ${s(a.TerminalStation)}: ` + (a.BusName ? `bus ${s(a.BusName)} NPCC ${s(a.BusNpcc) || 'not recorded'}` : 'no bus linked') : ''}</span></span>)}</span>
 }
 
 const PARSED_COLS: Column<Row>[] = [

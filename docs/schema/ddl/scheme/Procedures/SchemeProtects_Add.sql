@@ -3,6 +3,7 @@ CREATE PROCEDURE [scheme].[SchemeProtects_Add]
     @SchemeEntityId UNIQUEIDENTIFIER,
     @PrimaryAssetEntityId UNIQUEIDENTIFIER,
     @ZoneRole NVARCHAR(20),
+    @AssetTerminalEntityId UNIQUEIDENTIFIER = NULL,
     @ValidFrom DATETIMEOFFSET(7) = NULL,
     @ValidFromQuality TINYINT = 0,
     @ActorId UNIQUEIDENTIFIER = NULL,
@@ -20,9 +21,9 @@ BEGIN
     SET @EntityId = ISNULL(@EntityId, NEWID());
     INSERT [scheme].[SchemeProtectsRegistry] ([EntityId]) VALUES (@EntityId);
     DECLARE @out TABLE ([RowId] UNIQUEIDENTIFIER);
-    INSERT [scheme].[SchemeProtects] ([EntityId], [ValidFrom], [ValidFromQuality], [CreatedBy], [CreatedAt], [ModifiedBy], [ModifiedAt], [MigrationRunId], [SchemeEntityId], [PrimaryAssetEntityId], [ZoneRole])
+    INSERT [scheme].[SchemeProtects] ([EntityId], [ValidFrom], [ValidFromQuality], [CreatedBy], [CreatedAt], [ModifiedBy], [ModifiedAt], [MigrationRunId], [SchemeEntityId], [PrimaryAssetEntityId], [ZoneRole], [AssetTerminalEntityId])
     OUTPUT inserted.[RowId] INTO @out
-    VALUES (@EntityId, @ValidFrom, @ValidFromQuality, @ActorId, @now, @ActorId, @now, @MigrationRunId, @SchemeEntityId, @PrimaryAssetEntityId, @ZoneRole);
+    VALUES (@EntityId, @ValidFrom, @ValidFromQuality, @ActorId, @now, @ActorId, @now, @MigrationRunId, @SchemeEntityId, @PrimaryAssetEntityId, @ZoneRole, @AssetTerminalEntityId);
     SELECT @RowId = [RowId] FROM @out;
     COMMIT TRANSACTION;
 END;

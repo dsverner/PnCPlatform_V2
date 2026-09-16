@@ -46,9 +46,13 @@ export default function SchemeScreen({ params: p, id }: { screen: Screen; params
   const candidates = useMemo(() => { const f = find.toLowerCase(); const all = candidatesQ.data ?? []; const hit = all.filter((x) => !f || s(x.Name).toLowerCase().includes(f) || s(x.Stations).toLowerCase().includes(f)); const here = (x: Row) => s(x.TerminalNodeIds).toLowerCase().includes(s(station?.StationNodeEntityId).toLowerCase()) && station?.StationNodeEntityId ? 0 : 1; return hit.sort((a, b) => here(a) - here(b) || s(a.Name).localeCompare(s(b.Name))) }, [candidatesQ.data, find, station])
   const editable = can('Scheme.Modify')
   const refresh = () => { qc.invalidateQueries({ queryKey: ['schemeProtects', id] }); qc.invalidateQueries({ queryKey: ['view', 'asset', 'vPrimaryAsset'] }) }
-  const link = async (assetId: string, label: string) => {
+  const link = async (assetId: string, label: string, terminalId?: string) => {
     setBusy(true)
-    try { await proc('scheme', 'SchemeProtects_Add', { SchemeEntityId: id, PrimaryAssetEntityId: assetId, ZoneRole: zone }); setMsg({ text: `${s(r?.Name)} protects ${label} (${zone.toLowerCase()}).` }); setPick(''); refresh() }
+    try {
+      // the terminal end this scheme protects from: the asset's terminal at this scheme's station (#170 — a line's ends have their own schemes)
+      let term = terminalId ?? ''
+      if (!term && station?.StationNodeEntityId) { const ts = await viewAll('asset', 'vAssetTerminalDetail', { AssetEntityId: assetId }); term = s(ts.find((x) => s(x.StationNodeEntityId).toLowerCase() === s(station.StationNodeEntityId).toLowerCase())?.TerminalEntityId) }
+      await proc('scheme', 'SchemeProtects_Add', { SchemeEntityId: id, PrimaryAssetEntityId: assetId, ZoneRole: zone, AssetTerminalEntityId: term || null }); setMsg({ text: `${s(r?.Name)} protects ${label} (${zone.toLowerCase()})${term ? ' from this end' : ' — no terminal of the asset is at this station; set one on its page'}.` }); setPick(''); refresh() }
     catch (e) { setMsg({ text: e instanceof ApiError ? e.message : String(e), bad: true }) } finally { setBusy(false) }
   }
   const create = async () => {
@@ -57,9 +61,9 @@ export default function SchemeScreen({ params: p, id }: { screen: Screen; params
     try {
       const a = await proc<Row>('asset', 'Asset_Add', { AssetTypeCode: newType, Name: newName.trim(), Status: 'InService' })
       const assetId = s(a.EntityId)
-      await proc('asset', 'AssetTerminal_Add', { AssetEntityId: assetId, TerminalNo: 1, StationNodeEntityId: s(station.StationNodeEntityId) })   // terminal 1: this scheme's station; the other end on the asset's page
+      const term = await proc<Row>('asset', 'AssetTerminal_Add', { AssetEntityId: assetId, TerminalNo: 1, StationNodeEntityId: s(station.StationNodeEntityId) })   // terminal 1: this scheme's station; the other ends on the asset's page
       setNewName('')
-      await link(assetId, `${newName.trim()} (new ${newType.toLowerCase()}, terminal 1 ${s(station.StationName)})`)
+      await link(assetId, `${newName.trim()} (new ${newType.toLowerCase()}, terminal 1 ${s(station.StationName)})`, s(term.EntityId))
     } catch (e) { setMsg({ text: e instanceof ApiError ? e.message : String(e), bad: true }); setBusy(false) }
   }
   const unlink = async (x: Row) => {

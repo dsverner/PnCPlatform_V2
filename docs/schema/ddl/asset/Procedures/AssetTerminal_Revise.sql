@@ -5,6 +5,7 @@ CREATE PROCEDURE [asset].[AssetTerminal_Revise]
     @TerminalNo TINYINT,
     @StationNodeEntityId UNIQUEIDENTIFIER,
     @VoltageClassCode NVARCHAR(20) = NULL,
+    @BusAssetEntityId UNIQUEIDENTIFIER = NULL,
     @Notes NVARCHAR(400) = NULL,
     @ValidFrom DATETIMEOFFSET(7) = NULL,
     @ValidFromQuality TINYINT = 0,
@@ -25,9 +26,9 @@ BEGIN
     UPDATE [asset].[AssetTerminal] SET [ValidTo] = @ValidFrom, [ModifiedBy] = @ActorId, [ModifiedAt] = @now
     WHERE [EntityId] = @EntityId AND [IsDeleted] = 0 AND [ValidTo] IS NULL AND [ValidFrom] <= @ValidFrom;
     DECLARE @out TABLE ([RowId] UNIQUEIDENTIFIER);
-    INSERT [asset].[AssetTerminal] ([EntityId], [ValidFrom], [ValidFromQuality], [CreatedBy], [CreatedAt], [ModifiedBy], [ModifiedAt], [MigrationRunId], [AssetEntityId], [TerminalNo], [StationNodeEntityId], [VoltageClassCode], [Notes])
+    INSERT [asset].[AssetTerminal] ([EntityId], [ValidFrom], [ValidFromQuality], [CreatedBy], [CreatedAt], [ModifiedBy], [ModifiedAt], [MigrationRunId], [AssetEntityId], [TerminalNo], [StationNodeEntityId], [VoltageClassCode], [BusAssetEntityId], [Notes])
     OUTPUT inserted.[RowId] INTO @out
-    VALUES (@EntityId, @ValidFrom, @ValidFromQuality, @ActorId, @now, @ActorId, @now, @MigrationRunId, @AssetEntityId, @TerminalNo, @StationNodeEntityId, @VoltageClassCode, @Notes);
+    VALUES (@EntityId, @ValidFrom, @ValidFromQuality, @ActorId, @now, @ActorId, @now, @MigrationRunId, @AssetEntityId, @TerminalNo, @StationNodeEntityId, @VoltageClassCode, @BusAssetEntityId, @Notes);
     SELECT @RowId = [RowId] FROM @out;
     COMMIT TRANSACTION;
 END;
