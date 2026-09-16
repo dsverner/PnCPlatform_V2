@@ -64,8 +64,11 @@ export function ClassificationPanel({ subjectKind, subjectEntityId, editable }: 
 const STATUSES = ['Planned', 'InService', 'OutOfService', 'Retired']
 
 /** The asset's terminals, as many as it has (the owner, 2026-09-16: a capacitor or reactor one, a transformer two, a line could have n):
- * a station each, numbered in order; "+ terminal" adds one, a change saves at once, remove withdraws it (asset.AssetTerminal, audited). */
-function Terminals({ r }: { r: Row }) {
+ * a station each, numbered in order; "+ terminal" adds one, a change saves at once, remove withdraws it (asset.AssetTerminal, audited).
+ * "Protection location" beside a terminal is not ticked by hand: it is lit when a scheme at that station protects the asset (the owner's
+ * ask of 2026-09-16, as a mark the platform derives so it cannot disagree with the schemes); a scheme at a station that is no terminal
+ * is flagged. */
+function Terminals({ r, readOnly = false }: { r: Row; readOnly?: boolean }) {
   const qc = useQueryClient()
   const stationsQ = useViewAll('location', 'vNode', { NodeTypeCode: 'Station' }, 'Name')
   const q = useViewAll('asset', 'vAssetTerminal', { AssetEntityId: s(r.EntityId) }, 'TerminalNo')
@@ -75,6 +78,11 @@ function Terminals({ r }: { r: Row }) {
   const run = async (what: () => Promise<unknown>, text: string) => { setBusy(true); try { await what(); done(text) } catch (e) { setMsg(e instanceof ApiError ? e.message : String(e)) } finally { setBusy(false) } }
   const nextNo = rows.reduce((m, x) => Math.max(m, Number(x.TerminalNo)), 0) + 1
   const name = (id: unknown) => s((stationsQ.data ?? []).find((n) => s(n.EntityId).toLowerCase() === s(id).toLowerCase())?.Name)
+  const protectedIds = s(r.ProtectedFromIds).toLowerCase().split(',').filter(Boolean)
+  const protectedHere = (id: unknown) => protectedIds.includes(s(id).toLowerCase())
+  const strays = protectedIds.filter((id) => !rows.some((x) => s(x.StationNodeEntityId).toLowerCase() === id)).map(name)
+  const mark = (on: boolean) => <span className={`ml-1 inline-flex items-center gap-1 text-xs ${on ? 'text-emerald-300' : 'text-slate-600'}`} title={on ? 'a scheme at this station protects the asset' : 'no scheme at this station names the asset'}><span aria-hidden="true">{on ? '☑' : '☐'}</span> protection location</span>
+  if (readOnly) return <span>{rows.length ? rows.map((x, i) => <span key={s(x.EntityId)}>{i > 0 ? ' – ' : ''}{name(x.StationNodeEntityId)}{mark(protectedHere(x.StationNodeEntityId))}</span>) : '—'}{strays.length > 0 && <span className="ml-2 text-xs text-amber-300">also protected from {strays.join(', ')} — not a terminal</span>}</span>
   return (
     <div className="space-y-1">
       {rows.map((x) => (
@@ -84,7 +92,9 @@ function Terminals({ r }: { r: Row }) {
             {(stationsQ.data ?? []).map((n) => <option key={s(n.EntityId)} value={s(n.EntityId).toLowerCase()}>{s(n.Name)}</option>)}
           </select>
           <Button kind="mini" disabled={busy} onClick={() => void run(() => proc('asset', 'AssetTerminal_SoftDelete', { EntityId: x.EntityId }), `terminal ${s(x.TerminalNo)} removed.`)}>remove</Button>
+          {mark(protectedHere(x.StationNodeEntityId))}
         </div>))}
+      {strays.length > 0 && <div className="text-xs text-amber-300">A scheme at {strays.join(', ')} protects this asset, and that station is not one of its terminals — add the terminal or correct the scheme.</div>}
       <div className="flex items-center gap-2">
         <span className="w-6 text-xs text-slate-500">{nextNo}</span>
         <select className={`${inputClass} w-64`} value={adding} disabled={busy} onChange={(e) => setAdding(e.target.value)}><option value="">— choose a station —</option>{(stationsQ.data ?? []).map((n) => <option key={s(n.EntityId)} value={s(n.EntityId).toLowerCase()}>{s(n.Name)}</option>)}</select>
@@ -122,7 +132,6 @@ function AssetForm({ r }: { r: Row }) {
         <label className="text-slate-400">Name</label><input className={`${inputClass} w-64`} value={f.Name} onChange={set('Name')} placeholder="e.g. L0012" />
         <label className="text-slate-400">Type</label><select className={`${inputClass} w-64`} value={f.AssetTypeCode} onChange={set('AssetTypeCode')}>{(typesQ.data ?? []).map((t) => <option key={s(t.AssetTypeCode)} value={s(t.AssetTypeCode)}>{s(t.Name)}</option>)}</select>
         <label className="text-slate-400">Terminals</label><Terminals r={r} />
-        <label className="text-slate-400">Protected from</label><span className="text-slate-200">{s(r.ProtectedFrom) || <span className="text-slate-500">no scheme yet</span>}<span className="ml-2 text-xs text-slate-500">the stations of the schemes that name it — each should be one of its terminals</span></span>
         <label className="text-slate-400">Voltage</label><select className={`${inputClass} w-64`} value={f.VoltageClassCode} onChange={set('VoltageClassCode')}><option value="">—</option>{(voltagesQ.data ?? []).map((v) => <option key={s(v.VoltageClassCode)} value={s(v.VoltageClassCode)}>{s(v.VoltageClassCode)}{v.NominalKv != null ? ` · ${s(v.NominalKv)} kV` : ''}</option>)}</select>
         <label className="text-slate-400">Status</label><select className={`${inputClass} w-64`} value={f.Status} onChange={set('Status')}>{STATUSES.map((x) => <option key={x}>{x}</option>)}</select>
         <label className="text-slate-400">Notes</label><textarea className={`${inputClass} w-full`} rows={2} value={f.Notes} onChange={set('Notes')} />
@@ -154,7 +163,7 @@ export default function PrimaryAssetScreen({ params: p, id }: { screen: Screen; 
       </header>
       <div className="grid gap-3 lg:grid-cols-2">
         <Panel title="Primary asset">
-          {editable ? <AssetForm r={r} /> : <Facts cols={1} pairs={[['Name', s(r.Name)], ['Type', s(r.AssetTypeName)], ['Terminals', s(r.Stations) || '—'], ['Protected from', s(r.ProtectedFrom) || 'no scheme yet'], ['Voltage', s(r.VoltageClassCode) || '—'], ['Status', s(r.Status)], ['Notes', s(r.Notes) || '—']]} />}
+          {editable ? <AssetForm r={r} /> : <Facts cols={1} pairs={[['Name', s(r.Name)], ['Type', s(r.AssetTypeName)], ['Terminals', <Terminals r={r} readOnly />], ['Voltage', s(r.VoltageClassCode) || '—'], ['Status', s(r.Status)], ['Notes', s(r.Notes) || '—']]} />}
           <Status>A thin record for this phase: a name, a type and its terminals — one station for a capacitor or reactor, two for a transformer, two or more for a line. Connectivity, impedances and, for a line, its route and structures come from the power-system model (the TLM project) in a later phase.</Status></Panel>
         <Panel title={`Protected by · ${protectedByQ.isPending ? '…' : (protectedByQ.data ?? []).length} scheme(s)`}>
           <DataGrid rows={protectedByQ.data ?? []} rowKey={(x) => s(x.EntityId)} emptyText="No scheme names this asset yet — on a scheme's page, “protects”." columns={[

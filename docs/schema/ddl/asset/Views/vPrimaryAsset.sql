@@ -15,6 +15,7 @@ SELECT a.[EntityId],
        tm.[Stations],
        tm.[TerminalNodeIds],
        pf.[ProtectedFrom],
+       pf.[ProtectedFromIds],
        cls.[Classifications],
        a.[RowSeq]
 FROM [asset].[Asset] a
@@ -30,8 +31,9 @@ OUTER APPLY (SELECT STRING_AGG(CONCAT(c.[ClassificationKindCode], N'=', c.[Class
              WHERE c.[ValidTo] IS NULL AND c.[IsDeleted] = 0 AND c.[SubjectKind] = N'Asset' AND c.[SubjectEntityId] = a.[EntityId]) cls
 -- the stations of the schemes that protect it (their device members' positions, up the tree to the Station; Node.Path is the
 -- ancestors' chain, the node's own id excluded)
-OUTER APPLY (SELECT STRING_AGG(x.[StationName], N', ') WITHIN GROUP (ORDER BY x.[StationName]) AS [ProtectedFrom]
-             FROM (SELECT DISTINCT stn.[Name] AS [StationName]
+OUTER APPLY (SELECT STRING_AGG(x.[StationName], N', ') WITHIN GROUP (ORDER BY x.[StationName]) AS [ProtectedFrom],
+                    STRING_AGG(LOWER(CONVERT(NVARCHAR(36), x.[StationEntityId])), N',') WITHIN GROUP (ORDER BY x.[StationName]) AS [ProtectedFromIds]
+             FROM (SELECT DISTINCT stn.[Name] AS [StationName], stn.[EntityId] AS [StationEntityId]
                    FROM [scheme].[SchemeProtects] sp
                    JOIN [scheme].[SchemeMember] sm ON sm.[SchemeEntityId] = sp.[SchemeEntityId] AND sm.[ValidTo] IS NULL AND sm.[IsDeleted] = 0 AND sm.[MemberKind] = N'Asset'
                    JOIN [asset].[Placement] pl ON pl.[AssetEntityId] = sm.[MemberEntityId] AND pl.[ValidTo] IS NULL AND pl.[IsDeleted] = 0 AND pl.[NodeEntityId] IS NOT NULL
