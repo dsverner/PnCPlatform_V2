@@ -1,5 +1,5 @@
 -- SCHEMA-DESIGN §12.3, §8.3, §7.5 (121). A device.settings.<code> fact: the parsed value of that setting on
--- the device's in-service NativeSettings file at @at. The settings group read is the ActiveSettingsGroup
+-- the device's in-service settings file (native or text, #168) at @at. The settings group read is the ActiveSettingsGroup
 -- condition on the device at @at (decision 121); if none, the global (null-group) value; else the lowest
 -- group present. The setting definition is matched by code under the transform definition entity across
 -- its versions, as characteristics are.
@@ -26,7 +26,7 @@ BEGIN
         AND ps.[ValidFrom] <= @at AND (ps.[ValidTo] IS NULL OR ps.[ValidTo] > @at)
     JOIN [config].[SettingDefinition] sd ON sd.[RowId] = ps.[SettingDefinitionRowId] AND sd.[IsDeleted] = 0
     JOIN [config].[DefinitionVersion] dv ON dv.[RowId] = sd.[DefinitionVersionRowId] AND dv.[IsDeleted] = 0
-    WHERE cf.[DeviceEntityId] = @subjectEntityId AND cf.[FileKind] = N'NativeSettings' AND cf.[IsDeleted] = 0
+    WHERE cf.[DeviceEntityId] = @subjectEntityId AND cf.[FileKind] IN (N'NativeSettings', N'SettingsText') AND cf.[IsDeleted] = 0   -- #168: a parsed text file is a settings file too
       AND cf.[InServiceFrom] IS NOT NULL AND cf.[InServiceFrom] <= @at AND (cf.[InServiceTo] IS NULL OR cf.[InServiceTo] > @at)
       AND dv.[DefinitionEntityId] = @transformDefinitionEntityId AND sd.[SettingCode] = @settingCode
       AND (ps.[GroupNumber] IS NULL OR @group IS NULL OR ps.[GroupNumber] = @group)

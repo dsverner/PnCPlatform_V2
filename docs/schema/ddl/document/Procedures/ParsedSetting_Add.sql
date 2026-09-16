@@ -11,6 +11,7 @@ CREATE PROCEDURE [document].[ParsedSetting_Add]
     @ReferenceEntityId UNIQUEIDENTIFIER = NULL,
     @RangeCheck NVARCHAR(20) = N'NotChecked',
     @RangeCheckNote NVARCHAR(400) = NULL,
+    @RawValue NVARCHAR(400) = NULL,
     @ValidFrom DATETIMEOFFSET(7) = NULL,
     @ValidFromQuality TINYINT = 0,
     @ActorId UNIQUEIDENTIFIER = NULL,
@@ -28,9 +29,9 @@ BEGIN
     SET @EntityId = ISNULL(@EntityId, NEWID());
     INSERT [document].[ParsedSettingRegistry] ([EntityId]) VALUES (@EntityId);
     DECLARE @out TABLE ([RowId] UNIQUEIDENTIFIER);
-    INSERT [document].[ParsedSetting] ([EntityId], [ValidFrom], [ValidFromQuality], [CreatedBy], [CreatedAt], [ModifiedBy], [ModifiedAt], [MigrationRunId], [ConfigurationFileRevisionRowId], [SettingDefinitionRowId], [GroupNumber], [TextValue], [IntegerValue], [DecimalValue], [BooleanValue], [DateTimeValue], [ReferenceEntityId], [RangeCheck], [RangeCheckNote])
+    INSERT [document].[ParsedSetting] ([EntityId], [ValidFrom], [ValidFromQuality], [CreatedBy], [CreatedAt], [ModifiedBy], [ModifiedAt], [MigrationRunId], [ConfigurationFileRevisionRowId], [SettingDefinitionRowId], [GroupNumber], [TextValue], [IntegerValue], [DecimalValue], [BooleanValue], [DateTimeValue], [ReferenceEntityId], [RangeCheck], [RangeCheckNote], [RawValue])
     OUTPUT inserted.[RowId] INTO @out
-    VALUES (@EntityId, @ValidFrom, @ValidFromQuality, @ActorId, @now, @ActorId, @now, @MigrationRunId, @ConfigurationFileRevisionRowId, @SettingDefinitionRowId, @GroupNumber, @TextValue, @IntegerValue, @DecimalValue, @BooleanValue, @DateTimeValue, @ReferenceEntityId, @RangeCheck, @RangeCheckNote);
+    VALUES (@EntityId, @ValidFrom, @ValidFromQuality, @ActorId, @now, @ActorId, @now, @MigrationRunId, @ConfigurationFileRevisionRowId, @SettingDefinitionRowId, @GroupNumber, @TextValue, @IntegerValue, @DecimalValue, @BooleanValue, @DateTimeValue, @ReferenceEntityId, @RangeCheck, @RangeCheckNote, @RawValue);
     SELECT @RowId = [RowId] FROM @out;
     COMMIT TRANSACTION;
 END;

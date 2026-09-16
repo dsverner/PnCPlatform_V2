@@ -35,7 +35,8 @@ USING (VALUES
     (N'ft',     N'foot',                 N'Length',         N'm',     0.3048),
     (N'km',     N'kilometre',            N'Length',         N'm',     1000),
     (N'mi',     N'mile (statute)',       N'Length',         N'm',     1609.344),
-    (N'min',    N'minute',               N'Time',           N's',     60)
+    (N'min',    N'minute',               N'Time',           N's',     60),
+    (N'deg',    N'degree',               N'Angle',          NULL,     NULL)    -- #168: relay angle settings (SEL-221F MTA)
 ) AS s ([UnitCode], [Name], [Dimension], [BaseUnitCode], [ToBaseFactor])
 ON t.[UnitCode] = s.[UnitCode]
 WHEN NOT MATCHED BY TARGET

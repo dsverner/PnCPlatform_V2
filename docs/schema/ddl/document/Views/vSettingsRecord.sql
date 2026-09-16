@@ -29,7 +29,7 @@ SELECT r.[RowSeq],
        r.[RevisionLabel],
        r.[Status]                   AS [RevisionStatus],
        r.[DocumentEntityId],
-       cf.[FileKind], cf.[CaptureKind], cf.[ParseStatus], cf.[SettingsGroupCount],
+       cf.[FileKind], cf.[CaptureKind], cf.[ParseStatus], cf.[ParseError], cf.[SettingsGroupCount],   -- ParseError: the names the template did not know (#168)
        it.[PackageRevisionRowId],
        it.[Sequence]                AS [PackageSequence],
        w.[EntityId]                 AS [WorkRequestEntityId],

@@ -16,6 +16,9 @@ CREATE PROCEDURE [config].[SettingDefinition_Update]
     @IsGroupSpecific BIT = 0,
     @AnsiCode NVARCHAR(10) = NULL,
     @IsCatalogueFact BIT = 0,
+    @DisplayOrder INT = 0,
+    @Aliases NVARCHAR(400) = NULL,
+    @Format NVARCHAR(40) = NULL,
     @ActorId UNIQUEIDENTIFIER = NULL
 AS
 BEGIN
@@ -23,7 +26,7 @@ BEGIN
     SET XACT_ABORT ON;
     DECLARE @now DATETIMEOFFSET(7) = SYSDATETIMEOFFSET();
     IF @ActorId IS NULL EXEC [personnel].[ResolveActor] @ActorId = @ActorId OUTPUT;
-    UPDATE [config].[SettingDefinition] SET [DefinitionVersionRowId] = @DefinitionVersionRowId, [SettingCode] = @SettingCode, [Name] = @Name, [Category] = @Category, [Description] = @Description, [DataType] = @DataType, [UnitCode] = @UnitCode, [Base] = @Base, [MinValue] = @MinValue, [MaxValue] = @MaxValue, [DefaultValue] = @DefaultValue, [EnumerationDefinitionRowId] = @EnumerationDefinitionRowId, [IsGroupSpecific] = @IsGroupSpecific, [AnsiCode] = @AnsiCode, [IsCatalogueFact] = @IsCatalogueFact, [ModifiedBy] = @ActorId, [ModifiedAt] = @now
+    UPDATE [config].[SettingDefinition] SET [DefinitionVersionRowId] = @DefinitionVersionRowId, [SettingCode] = @SettingCode, [Name] = @Name, [Category] = @Category, [Description] = @Description, [DataType] = @DataType, [UnitCode] = @UnitCode, [Base] = @Base, [MinValue] = @MinValue, [MaxValue] = @MaxValue, [DefaultValue] = @DefaultValue, [EnumerationDefinitionRowId] = @EnumerationDefinitionRowId, [IsGroupSpecific] = @IsGroupSpecific, [AnsiCode] = @AnsiCode, [IsCatalogueFact] = @IsCatalogueFact, [DisplayOrder] = @DisplayOrder, [Aliases] = @Aliases, [Format] = @Format, [ModifiedBy] = @ActorId, [ModifiedAt] = @now
     WHERE [RowId] = @RowId AND [IsDeleted] = 0;
     IF @@ROWCOUNT = 0 THROW 50104, N'config.SettingDefinition: no live row with that key.', 1;
 END;

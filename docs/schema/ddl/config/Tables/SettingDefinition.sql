@@ -31,6 +31,11 @@ CREATE TABLE [config].[SettingDefinition] (
     [IsGroupSpecific]           BIT               NOT NULL CONSTRAINT [DF_SettingDefinition_IsGroupSpecific] DEFAULT 0,
     [AnsiCode]                  NVARCHAR(10)      NULL     CONSTRAINT [FK_SettingDefinition_Ansi] REFERENCES [ref].[AnsiFunction] ([AnsiCode]),
     [IsCatalogueFact]           BIT               NOT NULL CONSTRAINT [DF_SettingDefinition_IsCatalogueFact] DEFAULT 0,
+    -- #168 (2026-09-16): the writer's order (the vendor's SET order), the legacy spellings the parser accepts, and how the
+    -- writer prints the value (decimal:2 | integer | text | mask3) — a template reads and writes the same file
+    [DisplayOrder]              INT               NOT NULL CONSTRAINT [DF_SettingDefinition_DisplayOrder] DEFAULT 0,
+    [Aliases]                   NVARCHAR(400)     NULL,
+    [Format]                    NVARCHAR(40)      NULL,
     CONSTRAINT [PK_SettingDefinition] PRIMARY KEY CLUSTERED ([RowSeq]),
     CONSTRAINT [UQ_SettingDefinition_RowId] UNIQUE NONCLUSTERED ([RowId]),
     CONSTRAINT [CK_SettingDefinition_Range] CHECK ([MinValue] IS NULL OR [MaxValue] IS NULL OR [MaxValue] >= [MinValue])

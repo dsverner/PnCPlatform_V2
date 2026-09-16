@@ -15,6 +15,9 @@ CREATE PROCEDURE [config].[SettingDefinition_Add]
     @IsGroupSpecific BIT = 0,
     @AnsiCode NVARCHAR(10) = NULL,
     @IsCatalogueFact BIT = 0,
+    @DisplayOrder INT = 0,
+    @Aliases NVARCHAR(400) = NULL,
+    @Format NVARCHAR(40) = NULL,
     @ActorId UNIQUEIDENTIFIER = NULL,
     @MigrationRunId UNIQUEIDENTIFIER = NULL,
     @EntityId UNIQUEIDENTIFIER = NULL OUTPUT,
@@ -29,9 +32,9 @@ BEGIN
     SET @EntityId = ISNULL(@EntityId, NEWID());
     INSERT [config].[SettingDefinitionRegistry] ([EntityId]) VALUES (@EntityId);
     DECLARE @out TABLE ([RowId] UNIQUEIDENTIFIER);
-    INSERT [config].[SettingDefinition] ([EntityId], [CreatedBy], [CreatedAt], [ModifiedBy], [ModifiedAt], [MigrationRunId], [DefinitionVersionRowId], [SettingCode], [Name], [Category], [Description], [DataType], [UnitCode], [Base], [MinValue], [MaxValue], [DefaultValue], [EnumerationDefinitionRowId], [IsGroupSpecific], [AnsiCode], [IsCatalogueFact])
+    INSERT [config].[SettingDefinition] ([EntityId], [CreatedBy], [CreatedAt], [ModifiedBy], [ModifiedAt], [MigrationRunId], [DefinitionVersionRowId], [SettingCode], [Name], [Category], [Description], [DataType], [UnitCode], [Base], [MinValue], [MaxValue], [DefaultValue], [EnumerationDefinitionRowId], [IsGroupSpecific], [AnsiCode], [IsCatalogueFact], [DisplayOrder], [Aliases], [Format])
     OUTPUT inserted.[RowId] INTO @out
-    VALUES (@EntityId, @ActorId, @now, @ActorId, @now, @MigrationRunId, @DefinitionVersionRowId, @SettingCode, @Name, @Category, @Description, @DataType, @UnitCode, @Base, @MinValue, @MaxValue, @DefaultValue, @EnumerationDefinitionRowId, @IsGroupSpecific, @AnsiCode, @IsCatalogueFact);
+    VALUES (@EntityId, @ActorId, @now, @ActorId, @now, @MigrationRunId, @DefinitionVersionRowId, @SettingCode, @Name, @Category, @Description, @DataType, @UnitCode, @Base, @MinValue, @MaxValue, @DefaultValue, @EnumerationDefinitionRowId, @IsGroupSpecific, @AnsiCode, @IsCatalogueFact, @DisplayOrder, @Aliases, @Format);
     SELECT @RowId = [RowId] FROM @out;
     COMMIT TRANSACTION;
 END;

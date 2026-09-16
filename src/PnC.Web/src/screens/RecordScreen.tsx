@@ -14,6 +14,7 @@ import { settingsText } from '@/lib/actions'
 import { type RecordParams, type Screen, splitView, screenPath } from '@/lib/screens'
 import { Panel, Pill, stateTone, Button, Facts, Status, Field, inputClass } from '@/components/ui/ui'
 import { DataGrid, type Column } from '@/components/ui/data-grid'
+import DeviceSettings, { useTemplate, isRatio } from './DeviceSettings'
 
 const CHARACTERISTIC_SCHEMA = 'SETTINGS_RECORD'   // CharacteristicSchema.RecordTemplate seeded for the settings record (#167)
 
@@ -26,6 +27,7 @@ export default function RecordScreen({ params: p, id }: { screen: Screen; params
   const textQ = useQuery({ queryKey: ['settingsText', revision], queryFn: () => settingsText(revision), enabled: !!r, staleTime: 5 * 60_000 })
   const revisionsQ = useViewAll(schema, vw, { DeviceEntityId: s(r?.DeviceEntityId) }, '-CalculatedAt', !!r?.DeviceEntityId)
   const others = useMemo(() => (revisionsQ.data ?? []).filter((x) => x.RevisionRowId !== revision), [revisionsQ.data, revision])
+  const templateQ = useTemplate(s(r?.ModelId) || null); const template = templateQ.data ?? null
   const [compareWith, setCompareWith] = useState(''); const [showCompare, setShowCompare] = useState(loc.hash === '#compare')
   const compareId = compareWith || s(others[0]?.RevisionRowId)   // #compare in the address: the newest other revision until one is chosen
   if (!id) return <Status bad>No revision in the address.</Status>
@@ -51,12 +53,14 @@ export default function RecordScreen({ params: p, id }: { screen: Screen; params
         <Panel title="Where"><Facts cols={1} pairs={[['Location', s(r.StationName) + (r.StationNumber ? ' · ' + r.StationNumber : '')], ['Scheme', s(r.SchemeName)], ['Equipment', s(r.PanelName)], ['Position', s(r.PositionName)]]} /></Panel>
         <Panel title="Dates and state"><Facts cols={1} pairs={[['Calculated', fmtWhen(r.CalculatedAt) + (r.CalculatedByDisplayName ? ' by ' + r.CalculatedByDisplayName : '')], ['Verified', fmtWhen(r.VerifiedAt)], ['In service', r.InServiceFrom ? fmtWhen(r.InServiceFrom) + (r.InServiceTo ? ' – ' + fmtWhen(r.InServiceTo) : ' – now') : 'not in service'], ['Change request', legacyFree(r.WorkRequestTitle)], ['Action type', s(r.WorkTypeKey)], ['Lifecycle', s(r.LifecycleState)], ['Revision', s(r.RevisionLabel) + ' · ' + s(r.RevisionStatus)]]} /></Panel>
       </div>
+      {/* #168: the template's view of the device — functions, inputs, settings by function — when the model has one */}
+      {template && <DeviceSettings r={r} revision={revision} filedText={textQ.data?.text ?? null} />}
       {/* an outstanding record is editable (owner, 2026-09-15); in service or archived is the record */}
-      <Characteristics r={r} revision={revision} editable={r.GridState === 'Outstanding' && can('Record.Modify')} />
+      <Characteristics r={r} revision={revision} editable={r.GridState === 'Outstanding' && can('Record.Modify')} hideGroups={template?.rows.some(isRatio) ? ['Instrument transformers'] : []} />
       <Notes r={r} revision={revision} />
-      <Panel title={parsed.length ? `Settings · ${parsed.length} parsed from the ${s(r.FileKind)} file` : r.FileKind === 'NativeSettings' ? 'Settings · the native (vendor) file is stored as is; no reader exists for it yet (#113)' : 'Settings · no parsed settings; the text below is the record'}>
-        {parsed.length > 0 && <DataGrid rows={parsed} columns={PARSED_COLS} rowKey={(x) => s(x.SettingCode) + '|' + s(x.GroupNumber)} />}
-        <h3 className="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Settings text as filed{textQ.data ? ` — ${textQ.data.name}` : ''}</h3>
+      <Panel title={template ? 'Settings text as filed' : parsed.length ? `Settings · ${parsed.length} parsed from the ${s(r.FileKind)} file` : r.FileKind === 'NativeSettings' ? 'Settings · the native (vendor) file is stored as is; no reader exists for it yet (#113)' : 'Settings · no parsed settings; the text below is the record'}>
+        {!template && parsed.length > 0 && <DataGrid rows={parsed} columns={PARSED_COLS} rowKey={(x) => s(x.SettingCode) + '|' + s(x.GroupNumber)} />}
+        <h3 className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-400">{textQ.data ? textQ.data.name : 'file'}</h3>
         <pre className="mt-1 max-h-[32rem] overflow-auto rounded border border-slate-800 bg-slate-950 p-2 text-xs whitespace-pre-wrap">{textQ.isPending ? 'loading…' : textQ.isError ? 'The settings text could not be read: ' + (textQ.error as Error).message : textQ.data ? textQ.data.text : 'No settings file is filed for this revision.'}</pre>
       </Panel>
       {showCompare && others.length > 0 && (
@@ -77,7 +81,7 @@ const PARSED_COLS: Column<Row>[] = [
 /** The classification and instrument-transformer fields (the columnless legacy fields, characteristics by the owner's ruling of
  * 2026-09-15): the schema's definitions by display group; a migrated record's values read from its summary until the values are
  * migrated; a draft revision's values saved directly (document.CharacteristicValue_Add/_Revise, audited). */
-function Characteristics({ r, revision, editable }: { r: Row; revision: string; editable: boolean }) {
+function Characteristics({ r, revision, editable, hideGroups = [] }: { r: Row; revision: string; editable: boolean; hideGroups?: string[] }) {
   const qc = useQueryClient()
   const defsQ = useQuery({ queryKey: ['characteristicSchema', CHARACTERISTIC_SCHEMA], staleTime: 10 * 60_000, queryFn: async () => {
     const d = (await view('config', 'vDefinition', { DefinitionKind: 'CharacteristicSchema.RecordTemplate', DefinitionKey: CHARACTERISTIC_SCHEMA }, { take: 1 })).rows[0]; if (!d) return []
@@ -109,7 +113,7 @@ function Characteristics({ r, revision, editable }: { r: Row; revision: string; 
   }
   return (
     <div className="grid gap-3 lg:grid-cols-2">
-      {[...groups.entries()].map(([g, list]) => (
+      {[...groups.entries()].filter(([g]) => !hideGroups.includes(g)).map(([g, list]) => (
         <Panel key={g} title={g}>
           <dl className="grid grid-cols-1 gap-x-6 gap-y-1 text-sm">
             {list.map((d) => { const v = valueOf(d); const lv = legacyValue(d); const key = s(d.RowId)

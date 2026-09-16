@@ -29,6 +29,9 @@ CREATE TABLE [document].[ParsedSetting] (
     [ReferenceEntityId]  UNIQUEIDENTIFIER NULL,
     [RangeCheck]         NVARCHAR(20)     NOT NULL CONSTRAINT [DF_ParsedSetting_RangeCheck] DEFAULT N'NotChecked' CONSTRAINT [CK_ParsedSetting_RangeCheck] CHECK ([RangeCheck] IN (N'Ok', N'OutOfRange', N'NotChecked')),
     [RangeCheckNote]     NVARCHAR(400)    NULL,
+    -- #168 (2026-09-16): the value text exactly as filed or entered (13.90, 12 CYCLES, F4 A2 00); the typed column is the
+    -- reading of it; the writer prints RawValue, so a platform-written file re-parses to the same bytes
+    [RawValue]           NVARCHAR(400)    NULL,
     CONSTRAINT [PK_ParsedSetting] PRIMARY KEY CLUSTERED ([RowSeq]),
     CONSTRAINT [UQ_ParsedSetting_RowId] UNIQUE NONCLUSTERED ([RowId]),
     CONSTRAINT [CK_ParsedSetting_OneValue] CHECK (

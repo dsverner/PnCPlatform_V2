@@ -12,6 +12,7 @@ CREATE PROCEDURE [document].[ParsedSetting_Revise]
     @ReferenceEntityId UNIQUEIDENTIFIER = NULL,
     @RangeCheck NVARCHAR(20) = N'NotChecked',
     @RangeCheckNote NVARCHAR(400) = NULL,
+    @RawValue NVARCHAR(400) = NULL,
     @ValidFrom DATETIMEOFFSET(7) = NULL,
     @ValidFromQuality TINYINT = 0,
     @ActorId UNIQUEIDENTIFIER = NULL,
@@ -31,9 +32,9 @@ BEGIN
     UPDATE [document].[ParsedSetting] SET [ValidTo] = @ValidFrom, [ModifiedBy] = @ActorId, [ModifiedAt] = @now
     WHERE [EntityId] = @EntityId AND [IsDeleted] = 0 AND [ValidTo] IS NULL AND [ValidFrom] <= @ValidFrom;
     DECLARE @out TABLE ([RowId] UNIQUEIDENTIFIER);
-    INSERT [document].[ParsedSetting] ([EntityId], [ValidFrom], [ValidFromQuality], [CreatedBy], [CreatedAt], [ModifiedBy], [ModifiedAt], [MigrationRunId], [ConfigurationFileRevisionRowId], [SettingDefinitionRowId], [GroupNumber], [TextValue], [IntegerValue], [DecimalValue], [BooleanValue], [DateTimeValue], [ReferenceEntityId], [RangeCheck], [RangeCheckNote])
+    INSERT [document].[ParsedSetting] ([EntityId], [ValidFrom], [ValidFromQuality], [CreatedBy], [CreatedAt], [ModifiedBy], [ModifiedAt], [MigrationRunId], [ConfigurationFileRevisionRowId], [SettingDefinitionRowId], [GroupNumber], [TextValue], [IntegerValue], [DecimalValue], [BooleanValue], [DateTimeValue], [ReferenceEntityId], [RangeCheck], [RangeCheckNote], [RawValue])
     OUTPUT inserted.[RowId] INTO @out
-    VALUES (@EntityId, @ValidFrom, @ValidFromQuality, @ActorId, @now, @ActorId, @now, @MigrationRunId, @ConfigurationFileRevisionRowId, @SettingDefinitionRowId, @GroupNumber, @TextValue, @IntegerValue, @DecimalValue, @BooleanValue, @DateTimeValue, @ReferenceEntityId, @RangeCheck, @RangeCheckNote);
+    VALUES (@EntityId, @ValidFrom, @ValidFromQuality, @ActorId, @now, @ActorId, @now, @MigrationRunId, @ConfigurationFileRevisionRowId, @SettingDefinitionRowId, @GroupNumber, @TextValue, @IntegerValue, @DecimalValue, @BooleanValue, @DateTimeValue, @ReferenceEntityId, @RangeCheck, @RangeCheckNote, @RawValue);
     SELECT @RowId = [RowId] FROM @out;
     COMMIT TRANSACTION;
 END;

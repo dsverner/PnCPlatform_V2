@@ -390,7 +390,7 @@ class Importer:
                 if codes and not is_switch:
                     for code in dict.fromkeys(codes):
                         if code not in self.ansi:
-                            self.run.exec("ref.AnsiFunction_Upsert", AnsiCode=code[:10], Name=(functions or code)[:200]); self.ansi.add(code)
+                            self.run.exec("ref.AnsiFunction_Upsert", AnsiCode=code[:10], Name=code[:10]); self.ansi.add(code)   # #168: the code is its own name until a seed names it (C37.2); a position text is not a function name
                             if ("ref", "AnsiFunction", f"AnsiFunction:{code[:10]}") not in self.run._existing:
                                 self.run.provenance("ref", "AnsiFunction", f"AnsiFunction:{code[:10]}", row_hash("Ansi", code[:10]))
                         fnode = self.node("ProtectionFunction", position, code, f"Function:{base}:{code}")
@@ -629,7 +629,15 @@ class Importer:
                     at2, q2, f2 = dto(vdate)
                     at = at2 or capture_at(); q = 2
                     flags.append(self.run.flag("CalculatedDateUnknown", f"{oldno}/{cr}: CDATE {f}; {'VDATE used' if at2 else 'capture date used'}", oldno))
-                text = strip(set1)
+                text = strip(set1) or ""
+                # #168 (2026-09-16): the legacy program split one settings text across SET1 (255 characters) and SETTINGS2 —
+                # 51 of the 53 in-service SEL-221F texts were cut mid-list (#140 filed SET1 only). The filed text is the two
+                # fields joined as the legacy user typed them; "LOGIC SETTINGS:" inside SETTINGS2 stays as written (the parser
+                # reads it as a separator). Nothing is re-spelled: the truncated tail fragment of SET1, if any, stays too.
+                set2s = strip(set2) or ""
+                if set2s:
+                    text = (text + ", " if text else "") + set2s
+                    self.rule("SET1 + SETTINGS2 → one settings text (#168)", oldno)
                 if not text:
                     flags.append(self.run.flag("NoSettingsText", f"{oldno}/{cr}: SET1 is empty; an empty settings file was written", oldno))
                 status = {"A": "Issued", "P": "Superseded", "M": "Draft"}[prefix]

@@ -256,57 +256,11 @@ SELECT @def = [EntityId] FROM [config].[Definition] WHERE [DefinitionKind] = N'T
 IF NOT EXISTS (SELECT 1 FROM [ref].[vFirmwareVersion] WHERE [ModelId] = @model AND [ParseTransformDefinitionEntityId] = @def)
     EXEC [ref].[FirmwareVersion_Upsert] @FirmwareVersionId = 'A0000000-0000-4000-8000-0000000311CF', @ModelId = @model, @VersionString = N'n/a', @ParseTransformDefinitionEntityId = @def, @ActorId = @author;
 
--- ---- SEL-221F Z1-3=.125-64 OHMS: 32 names as found
-SET @def = NULL; SET @ver = NULL; SET @model = NULL;
+-- ---- SEL-221F Z1-3=.125-64 OHMS: the model row only — its template is Seed_config_SettingsTemplate_SEL221F.sql (#168)
+SET @model = NULL;
 SELECT @model = [ModelId] FROM [ref].[vModel] WHERE [ManufacturerId] = @sel AND [ModelCode] = N'SEL-221F Z1-3=.125-64 OHMS';
 IF @model IS NULL
-BEGIN
-    SET @model = 'A0000000-0000-4000-8000-00000000221F';
-    EXEC [ref].[Model_Upsert] @ModelId = @model, @ManufacturerId = @sel, @ModelCode = N'SEL-221F Z1-3=.125-64 OHMS', @ModelName = N'SEL-221F distance relay (legacy label ''SEL-221F Z1-3=.125-64 OHMS'')',
+    EXEC [ref].[Model_Upsert] @ModelId = 'A0000000-0000-4000-8000-00000000221F', @ManufacturerId = @sel, @ModelCode = N'SEL-221F Z1-3=.125-64 OHMS', @ModelName = N'SEL-221F distance relay (legacy label ''SEL-221F Z1-3=.125-64 OHMS'')',
          @AssetTypeCode = N'ProtectiveRelay', @DeviceCategory = N'Relay', @Technology = N'Microprocessor', @ActorId = @author;
-END
-IF NOT EXISTS (SELECT 1 FROM [config].[Definition] WHERE [DefinitionKind] = N'Transform.SettingsParse' AND [DefinitionKey] = N'SETTINGS_TEXT_SEL_221F' AND [IsDeleted] = 0)
-BEGIN
-    EXEC [config].[AddDefinition] @DefinitionKind = N'Transform.SettingsParse', @DefinitionKey = N'SETTINGS_TEXT_SEL_221F',
-         @Name = N'SEL-221F Z1-3=.125-64 OHMS — text settings template (as found)', @Description = N'Every setting name the legacy SET1 text carries for the SEL-221F Z1-3=.125-64 OHMS, as SEL spells it; seeded as found on the owner''s ruling (W8 card B, #153); units and limits to follow',
-         @ActorId = @author, @EntityId = @def OUTPUT;
-    EXEC [config].[AddDefinitionVersion] @DefinitionKey = N'SETTINGS_TEXT_SEL_221F', @DefinitionKind = N'Transform.SettingsParse',
-         @ChangeNote = N'W8 seed as found from the legacy SET1 profile of 2026-09-13', @ActorId = @author, @VersionRowId = @ver OUTPUT, @VersionNumber = @no OUTPUT;
-    EXEC [config].[SettingDefinition_Add] @DefinitionVersionRowId = @ver, @SettingCode = N'R1', @Name = N'R1', @Category = N'As found', @DataType = N'Decimal', @IsCatalogueFact = 1, @ActorId = @author, @RowId = @r OUTPUT;   -- 190 rows
-    EXEC [config].[SettingDefinition_Add] @DefinitionVersionRowId = @ver, @SettingCode = N'X1', @Name = N'X1', @Category = N'As found', @DataType = N'Decimal', @IsCatalogueFact = 1, @ActorId = @author, @RowId = @r OUTPUT;   -- 190 rows
-    EXEC [config].[SettingDefinition_Add] @DefinitionVersionRowId = @ver, @SettingCode = N'LL', @Name = N'LL', @Category = N'As found', @DataType = N'Decimal', @IsCatalogueFact = 1, @ActorId = @author, @RowId = @r OUTPUT;   -- 190 rows
-    EXEC [config].[SettingDefinition_Add] @DefinitionVersionRowId = @ver, @SettingCode = N'CTR', @Name = N'CTR', @Category = N'As found', @DataType = N'Decimal', @IsCatalogueFact = 1, @ActorId = @author, @RowId = @r OUTPUT;   -- 190 rows
-    EXEC [config].[SettingDefinition_Add] @DefinitionVersionRowId = @ver, @SettingCode = N'PTR', @Name = N'PTR', @Category = N'As found', @DataType = N'Decimal', @IsCatalogueFact = 1, @ActorId = @author, @RowId = @r OUTPUT;   -- 190 rows
-    EXEC [config].[SettingDefinition_Add] @DefinitionVersionRowId = @ver, @SettingCode = N'SPTR', @Name = N'SPTR', @Category = N'As found', @DataType = N'Decimal', @IsCatalogueFact = 1, @ActorId = @author, @RowId = @r OUTPUT;   -- 190 rows
-    EXEC [config].[SettingDefinition_Add] @DefinitionVersionRowId = @ver, @SettingCode = N'MTA', @Name = N'MTA', @Category = N'As found', @DataType = N'Decimal', @IsCatalogueFact = 1, @ActorId = @author, @RowId = @r OUTPUT;   -- 190 rows
-    EXEC [config].[SettingDefinition_Add] @DefinitionVersionRowId = @ver, @SettingCode = N'79OI', @Name = N'79OI', @Category = N'As found', @DataType = N'Decimal', @IsCatalogueFact = 1, @ActorId = @author, @RowId = @r OUTPUT;   -- 190 rows
-    EXEC [config].[SettingDefinition_Add] @DefinitionVersionRowId = @ver, @SettingCode = N'79RS', @Name = N'79RS', @Category = N'As found', @DataType = N'Decimal', @IsCatalogueFact = 1, @ActorId = @author, @RowId = @r OUTPUT;   -- 190 rows
-    EXEC [config].[SettingDefinition_Add] @DefinitionVersionRowId = @ver, @SettingCode = N'PSVC', @Name = N'PSVC', @Category = N'As found', @DataType = N'Text', @IsCatalogueFact = 1, @ActorId = @author, @RowId = @r OUTPUT;   -- 190 rows
-    EXEC [config].[SettingDefinition_Add] @DefinitionVersionRowId = @ver, @SettingCode = N'59VHI', @Name = N'59VHI', @Category = N'As found', @DataType = N'Decimal', @IsCatalogueFact = 1, @ActorId = @author, @RowId = @r OUTPUT;   -- 190 rows
-    EXEC [config].[SettingDefinition_Add] @DefinitionVersionRowId = @ver, @SettingCode = N'25T', @Name = N'25T', @Category = N'As found', @DataType = N'Decimal', @IsCatalogueFact = 1, @ActorId = @author, @RowId = @r OUTPUT;   -- 190 rows
-    EXEC [config].[SettingDefinition_Add] @DefinitionVersionRowId = @ver, @SettingCode = N'VCT', @Name = N'VCT', @Category = N'As found', @DataType = N'Decimal', @IsCatalogueFact = 1, @ActorId = @author, @RowId = @r OUTPUT;   -- 190 rows
-    EXEC [config].[SettingDefinition_Add] @DefinitionVersionRowId = @ver, @SettingCode = N'R0', @Name = N'R0', @Category = N'As found', @DataType = N'Decimal', @IsCatalogueFact = 1, @ActorId = @author, @RowId = @r OUTPUT;   -- 189 rows
-    EXEC [config].[SettingDefinition_Add] @DefinitionVersionRowId = @ver, @SettingCode = N'X0', @Name = N'X0', @Category = N'As found', @DataType = N'Decimal', @IsCatalogueFact = 1, @ActorId = @author, @RowId = @r OUTPUT;   -- 189 rows
-    EXEC [config].[SettingDefinition_Add] @DefinitionVersionRowId = @ver, @SettingCode = N'A1TP', @Name = N'A1TP', @Category = N'As found', @DataType = N'Decimal', @IsCatalogueFact = 1, @ActorId = @author, @RowId = @r OUTPUT;   -- 189 rows
-    EXEC [config].[SettingDefinition_Add] @DefinitionVersionRowId = @ver, @SettingCode = N'A1TD', @Name = N'A1TD', @Category = N'As found', @DataType = N'Decimal', @IsCatalogueFact = 1, @ActorId = @author, @RowId = @r OUTPUT;   -- 189 rows
-    EXEC [config].[SettingDefinition_Add] @DefinitionVersionRowId = @ver, @SettingCode = N'Z2DP', @Name = N'Z2DP', @Category = N'As found', @DataType = N'Decimal', @IsCatalogueFact = 1, @ActorId = @author, @RowId = @r OUTPUT;   -- 189 rows
-    EXEC [config].[SettingDefinition_Add] @DefinitionVersionRowId = @ver, @SettingCode = N'Z2DG', @Name = N'Z2DG', @Category = N'As found', @DataType = N'Decimal', @IsCatalogueFact = 1, @ActorId = @author, @RowId = @r OUTPUT;   -- 189 rows
-    EXEC [config].[SettingDefinition_Add] @DefinitionVersionRowId = @ver, @SettingCode = N'Z3D', @Name = N'Z3D', @Category = N'As found', @DataType = N'Decimal', @IsCatalogueFact = 1, @ActorId = @author, @RowId = @r OUTPUT;   -- 189 rows
-    EXEC [config].[SettingDefinition_Add] @DefinitionVersionRowId = @ver, @SettingCode = N'25DV', @Name = N'25DV', @Category = N'As found', @DataType = N'Decimal', @IsCatalogueFact = 1, @ActorId = @author, @RowId = @r OUTPUT;   -- 188 rows
-    EXEC [config].[SettingDefinition_Add] @DefinitionVersionRowId = @ver, @SettingCode = N'SYNCP', @Name = N'SYNCP', @Category = N'As found', @DataType = N'Text', @IsCatalogueFact = 1, @ActorId = @author, @RowId = @r OUTPUT;   -- 186 rows
-    EXEC [config].[SettingDefinition_Add] @DefinitionVersionRowId = @ver, @SettingCode = N'27VLO', @Name = N'27VLO', @Category = N'As found', @DataType = N'Decimal', @IsCatalogueFact = 1, @ActorId = @author, @RowId = @r OUTPUT;   -- 180 rows
-    EXEC [config].[SettingDefinition_Add] @DefinitionVersionRowId = @ver, @SettingCode = N'50NG', @Name = N'50NG', @Category = N'As found', @DataType = N'Text', @IsCatalogueFact = 1, @ActorId = @author, @RowId = @r OUTPUT;   -- 164 rows
-    EXEC [config].[SettingDefinition_Add] @DefinitionVersionRowId = @ver, @SettingCode = N'TDUR', @Name = N'TDUR', @Category = N'As found', @DataType = N'Decimal', @IsCatalogueFact = 1, @ActorId = @author, @RowId = @r OUTPUT;   -- 116 rows
-    EXEC [config].[SettingDefinition_Add] @DefinitionVersionRowId = @ver, @SettingCode = N'50P', @Name = N'50P', @Category = N'As found', @DataType = N'Text', @IsCatalogueFact = 1, @ActorId = @author, @RowId = @r OUTPUT;   -- 70 rows
-    EXEC [config].[SettingDefinition_Add] @DefinitionVersionRowId = @ver, @SettingCode = N'Z1', @Name = N'Z1', @Category = N'As found', @DataType = N'Decimal', @IsCatalogueFact = 1, @ActorId = @author, @RowId = @r OUTPUT;   -- 43 rows
-    EXEC [config].[SettingDefinition_Add] @DefinitionVersionRowId = @ver, @SettingCode = N'Z2', @Name = N'Z2', @Category = N'As found', @DataType = N'Decimal', @IsCatalogueFact = 1, @ActorId = @author, @RowId = @r OUTPUT;   -- 43 rows
-    EXEC [config].[SettingDefinition_Add] @DefinitionVersionRowId = @ver, @SettingCode = N'Z3', @Name = N'Z3', @Category = N'As found', @DataType = N'Decimal', @IsCatalogueFact = 1, @ActorId = @author, @RowId = @r OUTPUT;   -- 40 rows
-    EXEC [config].[SettingDefinition_Add] @DefinitionVersionRowId = @ver, @SettingCode = N'50H', @Name = N'50H', @Category = N'As found', @DataType = N'Text', @IsCatalogueFact = 1, @ActorId = @author, @RowId = @r OUTPUT;   -- 11 rows
-    EXEC [config].[SettingDefinition_Add] @DefinitionVersionRowId = @ver, @SettingCode = N'RO', @Name = N'RO', @Category = N'As found', @DataType = N'Decimal', @IsCatalogueFact = 1, @ActorId = @author, @RowId = @r OUTPUT;   -- 1 rows
-    EXEC [config].[SettingDefinition_Add] @DefinitionVersionRowId = @ver, @SettingCode = N'XO', @Name = N'XO', @Category = N'As found', @DataType = N'Decimal', @IsCatalogueFact = 1, @ActorId = @author, @RowId = @r OUTPUT;   -- 1 rows
-    EXEC [config].[ApproveDefinitionVersion] @VersionRowId = @ver, @ActorId = @approver;
-END
-SELECT @def = [EntityId] FROM [config].[Definition] WHERE [DefinitionKind] = N'Transform.SettingsParse' AND [DefinitionKey] = N'SETTINGS_TEXT_SEL_221F' AND [IsDeleted] = 0;
-IF NOT EXISTS (SELECT 1 FROM [ref].[vFirmwareVersion] WHERE [ModelId] = @model AND [ParseTransformDefinitionEntityId] = @def)
-    EXEC [ref].[FirmwareVersion_Upsert] @FirmwareVersionId = 'A0000000-0000-4000-8000-0000000221FF', @ModelId = @model, @VersionString = N'n/a', @ParseTransformDefinitionEntityId = @def, @ActorId = @author;
 GO
+

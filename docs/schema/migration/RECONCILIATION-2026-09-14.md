@@ -1,6 +1,6 @@
 # Reconciliation — dbRelayManagement_Legacy → PnCPlatform_V2_DEV — 2026-09-14
 
-Run `CFB3417A-3BDA-4BC3-AAC2-6E2D46CD0232` · 10 procedure calls · 256 s · limit none
+Run `EEC43A7E-3770-4CF7-8BAF-9CBF5D08919D` · 10 procedure calls · 142 s · limit none
 
 ## Source totals
 

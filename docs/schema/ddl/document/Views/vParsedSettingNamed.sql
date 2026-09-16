@@ -14,6 +14,7 @@ SELECT ps.[RowSeq],
        sd.[DataType],
        sd.[MinValue], sd.[MaxValue],
        sd.[AnsiCode],
+       sd.[Description], sd.[DisplayOrder], sd.[Aliases], sd.[Format], sd.[EnumerationDefinitionRowId],   -- #168
        ps.[GroupNumber],
        ps.[TextValue], ps.[IntegerValue], ps.[DecimalValue], ps.[BooleanValue], ps.[DateTimeValue],
        [DisplayValue] = COALESCE(ps.[TextValue],
@@ -21,7 +22,8 @@ SELECT ps.[RowSeq],
                                  CONVERT(NVARCHAR(50), ps.[IntegerValue]),
                                  CASE ps.[BooleanValue] WHEN 1 THEN N'true' WHEN 0 THEN N'false' END,
                                  CONVERT(NVARCHAR(40), ps.[DateTimeValue], 127)),
-       ps.[RangeCheck], ps.[RangeCheckNote]
+       ps.[RangeCheck], ps.[RangeCheckNote],
+       ps.[RawValue]   -- #168: the value text as filed or entered
 FROM [document].[vParsedSetting] ps
 JOIN [document].[vConfigurationFile] cf ON cf.[RevisionRowId] = ps.[ConfigurationFileRevisionRowId]
 LEFT JOIN [config].[vSettingDefinition] sd ON sd.[RowId] = ps.[SettingDefinitionRowId];
