@@ -116,7 +116,7 @@
   function link(href, text) { const a = el("a", "row-link", text); a.href = href; return a; }
   function actions(r) {
     const box = el("span", "row-actions");
-    if (r.InstalledAssetEntityId) box.appendChild(link("/settings.html?DeviceEntityId=" + r.InstalledAssetEntityId, "Settings"));
+    if (r.InstalledAssetEntityId) box.appendChild(link("/app/s/SETTINGS_BOOK?DeviceEntityId=" + r.InstalledAssetEntityId, "Settings"));
     const b = el("button", "mini", "New setting"); b.type = "button"; b.disabled = !(state.user && state.user.can("WorkRequest.Modify"));
     b.addEventListener("click", () => newSetting(r)); box.appendChild(b);
     return box;
@@ -138,7 +138,7 @@
         const wr = await postJson("/api/v1/work/WorkRequest_Add", { WorkTypeDefinitionVersionRowId: sel.value, Title: title.value.trim(), ScopeKind: "Node", ScopeEntityId: r.NodeEntityId });
         const wf = await postJson("/api/v1/process/workflows/start", { workflowKey: "SETTINGS_CHANGE_REQUEST", subjectKind: "WorkRequest", subjectEntityId: wr.EntityId });
         await postJson("/api/v1/process/workflow-instances/" + wf.workflowInstanceEntityId + "/transitions", { name: "Start" });
-        location.href = "/request.html?id=" + wr.EntityId;
+        location.href = "/app/s/WORK_ITEM/" + wr.EntityId;
       } catch (e) { setStatus("action-status", "Refused: " + (e.status || "") + " " + e.message, true); }
     });
     const row = el("div", "action-row");

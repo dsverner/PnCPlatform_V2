@@ -698,10 +698,17 @@ class Importer:
                 key = f"Landing:{oldno}" if oldno[0] == "M" else f"Landing:{oldno}/{cr}"
                 flags = []
                 doc = self.track_for("doc", cr, oldno, flags); db = self.track_for("db", cr, oldno, flags)
-                if oldno[0] != "M" and doc is None and db is None:
-                    continue   # an A or P row with no track row anywhere: nothing to land (card H)
+                untracked = oldno[0] != "M" and doc is None and db is None
+                if untracked:
+                    # #164 (2026-09-15): an A or P row was a change request once (its CR is stamped at creation, never reused);
+                    # with no track row anywhere its change lands complete — both tracks NotApplicable, nothing invented —
+                    # so the request reads Closed after --close, not "not started". Before #164 these rows were skipped.
+                    doc = ("NA", None, None); db = ("NA", None, None)
+                    flags.append(self.run.flag("NoTrackRows", f"{oldno}/{cr}: no legacy track row anywhere; landed complete with both tracks NA (#164)", oldno))
                 h = row_hash("Landing", oldno, cr, doc[0] if doc else None, db[0] if db else None)
-                rule_name = "M row → a SETTINGS_CHANGE run landed at COMPLETION with its two tracks (#56)" if oldno[0] == "M" else f"{oldno[0]} row with track rows → its change landed at COMPLETION with the two tracks (card H, #148)"
+                rule_name = ("M row → a SETTINGS_CHANGE run landed at COMPLETION with its two tracks (#56)" if oldno[0] == "M"
+                             else f"{oldno[0]} row with no track rows → its change landed complete, both tracks NA (#164)" if untracked
+                             else f"{oldno[0]} row with track rows → its change landed at COMPLETION with the two tracks (card H, #148)")
                 if self.run.already_loaded("process", "ProcedureInstance", key, h):
                     self.rule(rule_name, oldno); continue
                 if self.run.existing_entity("process", "ProcedureInstance", key):

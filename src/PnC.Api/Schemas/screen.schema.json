@@ -122,7 +122,8 @@
       }
     },
     "record": {
-      "type": "object", "required": ["view", "key", "facts"], "additionalProperties": false,
+      "type": "object", "required": ["view", "key"], "additionalProperties": false,
+      "description": "The settings record is plain code (2026-09-15 rule): the definition names its data; the rest is the component's.",
       "properties": {
         "view": { "$ref": "#/$defs/view" },
         "key": { "type": "string", "description": "The column the screen's id parameter matches." },

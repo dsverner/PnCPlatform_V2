@@ -41,4 +41,5 @@
 :r .\Seed_config_WorkTypes.sql
 :r .\Seed_config_SchemeType_Legacy.sql
 :r .\Seed_config_Screens.sql
+:r .\Seed_config_CharacteristicSchema_SettingsRecord.sql
 :r .\Seed_location_Divisions.sql

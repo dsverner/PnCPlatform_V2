@@ -48,17 +48,17 @@
       ],
       "textFrom": "revisionFile",
       "links": [
-        { "label": "Open the record", "action": "url", "url": "/setting.html?revision={RevisionRowId}" },
+        { "label": "Open the record", "action": "openScreen", "screen": "SETTINGS_RECORD", "param": "RevisionRowId" },
         { "label": "Change request", "action": "openScreen", "screen": "WORK_ITEM", "param": "WorkRequestEntityId", "when": { "WorkRequestEntityId": ["*"] } }
       ]
     },
     "commands": [
-      { "label": "Open the record", "action": "url", "url": "/setting.html?revision={RevisionRowId}" },
+      { "label": "Open the record", "action": "openScreen", "screen": "SETTINGS_RECORD", "param": "RevisionRowId" },
       { "label": "Change request", "action": "openScreen", "screen": "WORK_ITEM", "param": "WorkRequestEntityId", "when": { "WorkRequestEntityId": ["*"] } },
       { "label": "Set verified date", "action": "openStep", "param": "RtsStepInstanceEntityId", "when": { "RtsStepState": ["Ready", "Active"] }, "permission": "Record.Modify" },
       { "label": "Request change", "action": "raiseRequest", "workflowKey": "SETTINGS_CHANGE_REQUEST", "workType": "SETTINGS_CHANGE", "scopeKind": "Asset", "scopeColumn": "DeviceEntityId", "titleFrom": "DeviceName", "when": { "GridState": "Active" }, "permission": "WorkRequest.Modify" },
       { "label": "New setting here", "action": "raiseRequest", "workflowKey": "SETTINGS_CHANGE_REQUEST", "workType": "SETTINGS_ADD", "scopeKind": "Node", "scopeColumn": "PositionNodeEntityId", "titleFrom": "PositionName", "when": { "PositionNodeEntityId": ["*"] }, "permission": "WorkRequest.Modify" },
-      { "label": "Compare revisions", "action": "url", "url": "/setting.html?revision={RevisionRowId}#compare" }
+      { "label": "Compare revisions", "action": "url", "url": "/app/s/SETTINGS_RECORD/{RevisionRowId}#compare" }
     ],
     "report": "/report.html?StationNodeEntityId={StationNodeEntityId}&GridState={GridState}"
   }

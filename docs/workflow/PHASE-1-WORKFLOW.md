@@ -752,6 +752,16 @@ the release with SBOM and `release.json`.
   1 Archived to 20:02, the request Closed (`evidence/W8-fourstep-*.jpg`, `W8-book-after-fourstep-*.png`). One rule relaxed on the way
   (#166): a text settings file with no template is kept as `NoTemplate`, not refused. The hand-coded React state is tagged
   `react-handcoded-2026-09-15`.
+- **2026-09-15 (evening) — the record screen, the last plain page retired (#167).** The rule agreed with the owner: customization by
+  code is cheap with this pair, so a one-off screen is plain React with its constants; definitions stay where the engine executes
+  them (procedures, workflows) and where one component serves many procedures (the work item, the step). `RecordScreen.tsx`
+  carries the 0.9.0 record page's functions plus the characteristics of the revision by display group from the seeded
+  `SETTINGS_RECORD` schema (18 definitions on DEV), editable on an Outstanding revision (a Class value saved on the migrated M
+  of the 0063 A-PROT MCGG22 through `document.CharacteristicValue_Add`, POST 200, read back). `settings.html`, `requests.html`,
+  `request.html`, `setting.html` deleted; every link in the remaining plain pages points at `/app/s/…`; `sw.js` shell-10; the
+  smoke's shell list follows. Owner's test for the whole path, set 2026-09-15: every settings-management function of the legacy
+  program reachable through the platform's screens with the procedure JSON as the only group-specific thing — anything coded
+  specially for the procedure is a fail (`evidence/W8-record-*.{jpg,png}`).
 
 
 **Depends on.** W5, W6, W7. **Estimate.** H: 24–40 h · G: 63–100 h.

@@ -991,13 +991,13 @@ else Skip("W4 run (needs the Administrator, Approver, Hydro and Technician ident
     var who = admin ?? readOnly ?? approver ?? hydro ?? tech;
     if (who is not null)
     {
-        foreach (var path in new[] { "", "definitions.html", "definitions.js", "pnc.js", "app.js", "styles.css", "sw.js", "settings.html", "settings.js", "request.html", "request.js", "setting.html", "setting.js", "floc.html", "floc.js", "app/", "app/settings", "app/requests" })
+        foreach (var path in new[] { "", "definitions.html", "definitions.js", "pnc.js", "app.js", "styles.css", "sw.js", "floc.html", "floc.js", "app/", "app/s/SETTINGS_BOOK", "app/s/REQUEST_QUEUE" })
         {
             var r = await who.GetAsync(path);
             var csp = r.Headers.TryGetValues("Content-Security-Policy", out var v) ? string.Join("", v) : "";
             var bodyText = await r.Content.ReadAsStringAsync();
             var ok = r.StatusCode == HttpStatusCode.OK && csp.Contains("script-src 'self'") && !bodyText.Contains("<script>") && !bodyText.Contains("style=\"");
-            if (path == "sw.js") ok = ok && bodyText.Contains("\"/definitions.js\"") && bodyText.Contains("\"/pnc.js\"") && bodyText.Contains("\"/floc.js\"") && bodyText.Contains("\"/settings.js\"") && bodyText.Contains("shell-9");
+            if (path == "sw.js") ok = ok && bodyText.Contains("\"/definitions.js\"") && bodyText.Contains("\"/pnc.js\"") && bodyText.Contains("\"/floc.js\"") && !bodyText.Contains("\"/settings.js\"") && bodyText.Contains("shell-10");
             Check(ok, $"GET /{path} → {(int)r.StatusCode}, CSP script-src 'self', no inline script or style{(path == "sw.js" ? ", the editor files in the shell list" : "")}");
         }
         var (ms, mb) = await Get(who, "api/v1/me");

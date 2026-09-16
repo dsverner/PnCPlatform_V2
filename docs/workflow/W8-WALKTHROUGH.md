@@ -6,8 +6,8 @@ parity walkthrough*; FR-8.2: *reporting parity is the acceptance gate*). One sec
 and a line to sign. The fixture is a W4/W6 smoke run on the demonstration database (a station under Generation · Hydro
 with three relays: an SEL-421, a CGE BDD15B and a Westinghouse CYL); after W7 the same rows exist for the migrated data.
 
-Screens: **Settings** `/settings.html` · **Requests** `/requests.html` (0.9.0) · **Change request** `/request.html?id=` · **Record**
-`/setting.html?revision=` · **Location report** `/report.html?StationNodeEntityId=&GridState=` (0.9.0) · **Schemes** `/schemes.html` (0.9.0) ·
+Screens (2026-09-15, #165 — the React screens, from definitions): **Settings** `/app/s/SETTINGS_BOOK` · **Requests** `/app/s/REQUEST_QUEUE` · **Change request** `/app/s/WORK_ITEM/<id>` · **Step** `/app/s/STEP/<id>` · **Record**
+`/app/s/SETTINGS_RECORD/<revision>` · **Location report** `/report.html?StationNodeEntityId=&GridState=` (0.9.0) · **Schemes** `/schemes.html` (0.9.0) ·
 **Locations** `/floc.html` · **Grants** `/grants.html` · **Definitions** `/definitions.html`. Rows 11–17 (0.9.0) are compared
 against the running legacy program and Dev_Final's pilot branch, not against descriptions (decisions #157–#158).
 

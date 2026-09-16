@@ -35,7 +35,7 @@
         { "key": "ModelCode", "label": "Model" }, { "key": "Functions", "label": "Functions", "fallback": "PositionName" }, { "key": "RevisionLabel", "label": "Rev" }, { "key": "FileKind", "label": "File" }, { "key": "ParseStatus", "label": "Parsed" },
         { "key": "CalculatedAt", "label": "Calculated", "format": "date" }, { "key": "VerifiedAt", "label": "Verified", "format": "date" }
       ],
-      "rowOpen": { "label": "Open the record", "action": "url", "url": "/setting.html?revision={RevisionRowId}" }
+      "rowOpen": { "label": "Open the record", "action": "openScreen", "screen": "SETTINGS_RECORD", "param": "RevisionRowId" }
     },
     "commands": [
       { "label": "Settings book", "action": "openScreen", "screen": "SETTINGS_BOOK", "query": { "WorkRequestEntityId": "WorkRequestEntityId" } },

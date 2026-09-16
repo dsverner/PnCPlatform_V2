@@ -154,7 +154,7 @@
         const wr = await call("POST", "/api/v1/work/WorkRequest_Add", { WorkTypeDefinitionVersionRowId: sel.value, Title: title.value.trim(), ScopeKind: opts.scopeKind, ScopeEntityId: opts.scopeEntityId });
         const wf = await call("POST", "/api/v1/process/workflows/start", { workflowKey: "SETTINGS_CHANGE_REQUEST", subjectKind: "WorkRequest", subjectEntityId: wr.EntityId });
         await call("POST", "/api/v1/process/workflow-instances/" + wf.workflowInstanceEntityId + "/transitions", { name: "Start" });
-        location.href = "/request.html?id=" + wr.EntityId;
+        location.href = "/app/s/WORK_ITEM/" + wr.EntityId;
       } catch (e) { setStatus("action-status", "Refused: " + (e.status || "") + " " + e.message, true); go.disabled = false; }
     });
     const row = el("div", "action-row");

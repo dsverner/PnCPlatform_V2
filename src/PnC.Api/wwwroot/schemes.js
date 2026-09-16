@@ -68,7 +68,7 @@
       det.appendChild(sum);
       const acts = el("div", "row-actions");
       for (const [label, fn] of [["Rename", () => rename(s)], ["Merge into…", () => merge(s)]]) { const b = el("button", "mini", label); b.type = "button"; b.disabled = !can; b.addEventListener("click", fn); acts.appendChild(b); }
-      const g = el("a", "row-link", "Settings of this scheme"); g.href = "/settings.html?StationNodeEntityId=" + encodeURIComponent(state.station); acts.appendChild(g);
+      const g = el("a", "row-link", "Settings of this scheme"); g.href = "/app/s/SETTINGS_BOOK?StationNodeEntityId=" + encodeURIComponent(state.station); acts.appendChild(g);
       det.appendChild(acts);
       const tbl = el("table", "grid rows"); det.appendChild(tbl);
       table(tbl, [...s.positions.values()].sort((a, b) => (a.p.PanelName || "").localeCompare(b.p.PanelName || "") || (a.p.PositionName || "").localeCompare(b.p.PositionName || "")), [

@@ -40,7 +40,7 @@ export interface WorkItemParams {
 }
 export interface StepParams { help?: Record<string, string>; refViews?: Record<string, { view: string; label: string; filters?: Record<string, string> }> }
 export interface RecordParams {
-  view: string; key: string; title?: string; facts: ColumnDef[]
+  view: string; key: string; title?: string; facts?: ColumnDef[]
   characteristics?: { schemaKey: string; hostColumn?: string; editableWhen?: When }
   textFrom?: 'revisionFile'; parsed?: boolean; files?: boolean
   history?: { byColumn: string; columns?: ColumnDef[] }; commands?: Command[]

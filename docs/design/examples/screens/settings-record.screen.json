@@ -1,0 +1,7 @@
+{
+  "g": 1, "kind": "screen", "key": "SETTINGS_RECORD", "name": "Settings record",
+  "description": "One settings revision: the device, where it is, the dates and state, the classification and instrument-transformer characteristics, the notes, the parsed settings, the settings text as filed, the files and records, Compare with another revision (#157, #165). The screen is plain code for the settings record; the definition only names its data.",
+  "permission": "ConfigurationFile.Read",
+  "screenKind": "record",
+  "params": { "view": "document.vSettingsRecord", "key": "RevisionRowId" }
+}

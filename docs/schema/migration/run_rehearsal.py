@@ -83,6 +83,7 @@ def main():
     # The name carries the environment as well as the date. It did not, and on 2026-09-09 a DEV
     # rebuild silently overwrote that morning's QA rehearsal report — same date, same filename.
     ap.add_argument("--report", default=None)
+    ap.add_argument("--close", action="store_true", help="after the load (and the host's sweep), close the landed requests whose runs completed — legacy_import.close_landed (#148, #164)")
     a = ap.parse_args()
     if not a.database.startswith("PnCPlatform_V2_"):
         sys.exit("refusing: the target must be a PnCPlatform_V2_* database (#99)")
@@ -91,6 +92,13 @@ def main():
         a.report = os.path.join(HERE, f"REHEARSAL-{datetime.date.today().isoformat()}-{env}.md")
     os.environ["PNC_TARGET_DB"] = a.database
     sys.path.insert(0, HERE)
+    if a.close:
+        # the closing pass (#148, #164): the landed requests whose runs the host's sweep has completed are closed; a separate
+        # pass because the sweep runs on the host's cadence (POST /api/v1/process/sweep, or every Engine:SweepMinutes)
+        import legacy_import
+        rep = legacy_import.close_landed(a.database)
+        print(json.dumps(rep, indent=1, default=str)); return
+
     started = datetime.datetime.now()
 
     passes = []
