@@ -4,8 +4,8 @@
 // is the template's ANSI codes; its inputs are the ratio settings the template carries. Nothing here is per model in
 // code: a template for another relay draws the same way.
 import { useMemo, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { getText, view, viewAll, s, type Row } from '@/lib/api'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { getText, proc, view, viewAll, s, ApiError, type Row } from '@/lib/api'
 import { useViewAll } from '@/lib/hooks'
 import { Panel, Pill, Tabs, Status } from '@/components/ui/ui'
 import { DataGrid, type Column } from '@/components/ui/data-grid'
@@ -53,16 +53,35 @@ export function InputsPanel({ template, values }: { template: Template; values: 
 }
 
 /** The settings by function: a tab per category in the template's order; every template row, with the revision's value or "not set". */
-export function SettingsByFunction({ template, parsed, parseStatus, parseError, revision, filedText }: { template: Template; parsed: Row[]; parseStatus: string; parseError: string; revision: string; filedText: string | null }) {
+export function SettingsByFunction({ template, parsed, parseStatus, parseError, revision, filedText, editable = false, deviceId = '' }: { template: Template; parsed: Row[]; parseStatus: string; parseError: string; revision: string; filedText: string | null; editable?: boolean; deviceId?: string }) {
   const values = useMemo(() => new Map(parsed.map((p) => [s(p.SettingCode), p])), [parsed])
   const categories = useMemo(() => { const seen: string[] = []; for (const r of template.rows) { const c = s(r.Category) || 'Settings'; if (!seen.includes(c)) seen.push(c) } return seen }, [template.rows])
   const [tab, setTab] = useState(categories[0] ?? '')
   const current = tab || categories[0] || ''
   const rows: (Row & { _v?: Row })[] = template.rows.filter((r) => (s(r.Category) || 'Settings') === current).map((r) => ({ ...r, _v: values.get(s(r.SettingCode)) }))
   const renderedQ = useQuery({ queryKey: ['rendered', revision], queryFn: () => getText(`/api/v1/settings/${revision}/rendered`), staleTime: 60_000, enabled: parsed.length > 0 })
+  // #168 increment 2: a value edited in the platform — process.SetParsedSetting reads it as the parser would (type, range, closed list),
+  // closes the prior row in valid time and audits the change; the platform writes the settings file from these rows at the settings step
+  const qc = useQueryClient()
+  const [edits, setEdits] = useState<Record<string, string>>({})
+  const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null)
+  const save = async (code: string, was: string) => {
+    const v = edits[code]; if (v === undefined || v === was) return
+    try {
+      await proc('process', 'SetParsedSetting', { ConfigurationFileRevisionRowId: revision, DeviceEntityId: deviceId, SettingCode: code, RawValue: v })
+      setMsg({ text: `${code} saved${v === '' ? ' (unset)' : ''}.` })
+      setEdits((e) => { const n = { ...e }; delete n[code]; return n })
+      qc.invalidateQueries({ queryKey: ['view', 'document', 'vParsedSettingNamed'] }); qc.invalidateQueries({ queryKey: ['rendered', revision] })
+    } catch (err) { setMsg({ text: err instanceof ApiError ? err.message : String(err), bad: true }) }
+  }
   const cols: Column<Row & { _v?: Row }>[] = [
     { key: 'Name', label: 'Setting', render: (r) => <span>{s(r.Name)} <span className="text-xs text-slate-500">{s(r.SettingCode)}</span></span> },
-    { key: '_value', label: 'Value', render: (r) => (r._v ? <span className={r._v.RangeCheck === 'OutOfRange' ? 'font-semibold text-amber-300' : 'text-slate-100'}>{s(r._v.RawValue ?? r._v.DisplayValue)}</span> : <span className="text-slate-500">not set</span>), csv: (r) => (r._v ? s(r._v.RawValue ?? r._v.DisplayValue) : '') },
+    { key: '_value', label: 'Value', render: (r) => {
+        const was = r._v ? s(r._v.RawValue ?? r._v.DisplayValue) : ''; const code = s(r.SettingCode)
+        if (editable) return <input className="w-32 rounded border border-slate-700 bg-slate-950 px-2 py-0.5 text-sm text-slate-100" value={edits[code] ?? was} placeholder="not set" aria-label={`${code} value`}
+          onChange={(e) => setEdits((x) => ({ ...x, [code]: e.target.value }))} onBlur={() => void save(code, was)} onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }} />
+        return r._v ? <span className={r._v.RangeCheck === 'OutOfRange' ? 'font-semibold text-amber-300' : 'text-slate-100'}>{was}</span> : <span className="text-slate-500">not set</span> },
+      csv: (r) => (r._v ? s(r._v.RawValue ?? r._v.DisplayValue) : '') },
     { key: 'UnitCode', label: 'Unit', render: (r) => s(r.UnitCode) + (r.Base ? ` (${s(r.Base).toLowerCase()})` : '') },
     { key: '_range', label: 'Range', render: (r) => rangeText(r), csv: (r) => rangeText(r) },
     { key: '_flag', label: '', render: (r) => (r._v?.RangeCheck === 'OutOfRange' ? <Pill tone="bad" title={s(r._v.RangeCheckNote)}>out of range</Pill> : null), csv: (r) => s(r._v?.RangeCheck) },
@@ -73,6 +92,8 @@ export function SettingsByFunction({ template, parsed, parseStatus, parseError, 
     <Panel title={`Settings · ${template.name}`} actions={<>{parseStatus && <Pill tone={parseStatus === 'Parsed' ? 'good' : parseStatus === 'Partial' ? 'warn' : 'neutral'}>{parseStatus}</Pill>}
       {parsed.length > 0 && <a className="text-xs text-sky-300 underline" href={`/api/v1/settings/${revision}/rendered`} target="_blank" rel="noopener">the settings file as the platform writes it</a>}</>}>
       {unmatched && <Status bad>Names in the filed text that the template does not know: {unmatched}</Status>}
+      {msg && <Status bad={msg.bad}>{msg.text}</Status>}
+      {editable && <Status>Outstanding revision: a value saves when you leave the field (audited as your change). The platform writes the settings file from these values when the settings step of the change commits.</Status>}
       <Tabs tabs={categories.map((c) => ({ key: c, label: c.length > 42 ? c.slice(0, 40) + '…' : c }))} value={current} onChange={setTab} />
       <div className="mt-2"><DataGrid rows={rows} columns={cols} rowKey={(r) => s(r.SettingCode)} emptyText="No settings in this group." /></div>
       <details className="mt-3">
@@ -98,7 +119,7 @@ function listing(rows: Row[], values: Map<string, Row>): string {
 }
 
 /** Everything the template gives a record: functions, inputs, settings by function. Falls back to the plain parsed grid when the model has no template. */
-export default function DeviceSettings({ r, revision, filedText }: { r: Row; revision: string; filedText: string | null }) {
+export default function DeviceSettings({ r, revision, filedText, editable = false }: { r: Row; revision: string; filedText: string | null; editable?: boolean }) {
   const tq = useTemplate(s(r.ModelId) || null)
   const parsedQ = useViewAll('document', 'vParsedSettingNamed', { ConfigurationFileRevisionRowId: revision }, 'DisplayOrder')
   const parsed = parsedQ.data ?? []
@@ -109,7 +130,7 @@ export default function DeviceSettings({ r, revision, filedText }: { r: Row; rev
     <>
       <FunctionChips template={tq.data} />
       <InputsPanel template={tq.data} values={values} />
-      <SettingsByFunction template={tq.data} parsed={parsed} parseStatus={s(r.ParseStatus)} parseError={s(r.ParseError)} revision={revision} filedText={filedText} />
+      <SettingsByFunction template={tq.data} parsed={parsed} parseStatus={s(r.ParseStatus)} parseError={s(r.ParseError)} revision={revision} filedText={filedText} editable={editable} deviceId={s(r.DeviceEntityId)} />
     </>
   )
 }

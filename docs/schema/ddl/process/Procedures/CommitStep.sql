@@ -127,10 +127,21 @@ BEGIN
     END
     ELSE SET @witness = NULL;
 
-    -- ---- evidence: required kinds and minimum; the first item's bytes
+    -- #168 (increment 2): the outstanding revision the package already holds for this step's device — the copy of the in-service
+    -- settings made when the package was produced (CopyRevisionAsDraft), edited in the platform since
+    DECLARE @pkgDraft UNIQUEIDENTIFIER;
+    IF @pkg IS NOT NULL AND @recordKind = N'ConfigurationFileRevision'
+        SELECT TOP (1) @pkgDraft = cf.[RevisionRowId]
+        FROM [document].[SettingsIssuePackageItem] it JOIN [document].[ConfigurationFile] cf ON cf.[RevisionRowId] = it.[ConfigurationFileRevisionRowId] AND cf.[IsDeleted] = 0
+        JOIN [document].[Revision] r ON r.[RowId] = cf.[RevisionRowId]
+        WHERE it.[PackageRevisionRowId] = @pkg AND it.[IsDeleted] = 0 AND it.[ValidTo] IS NULL AND cf.[DeviceEntityId] = @recSubject AND r.[Status] = N'Draft' AND cf.[InServiceFrom] IS NULL
+        ORDER BY it.[Sequence] DESC;
+
+    -- ---- evidence: required kinds and minimum; the first item's bytes (#168: a settings step whose device holds a draft in the
+    -- package needs no file — the platform writes the file from the settings edited here)
     IF @Evidence IS NOT NULL AND ISJSON(@Evidence) <> 1 THROW 50165, N'process.CommitStep: the evidence list is not valid JSON.', 1;
     DECLARE @evCount INT = ISNULL((SELECT COUNT(*) FROM OPENJSON(@Evidence)), 0);
-    IF JSON_VALUE(@node, '$.evidence.required') = 'true' AND @evCount < ISNULL(TRY_CONVERT(INT, JSON_VALUE(@node, '$.evidence.min')), 1)
+    IF JSON_VALUE(@node, '$.evidence.required') = 'true' AND @evCount < ISNULL(TRY_CONVERT(INT, JSON_VALUE(@node, '$.evidence.min')), 1) AND NOT (@evCount = 0 AND @pkgDraft IS NOT NULL)
     BEGIN DECLARE @m3 NVARCHAR(400) = N'process.CommitStep: step ' + @stepId + N' requires evidence (' + ISNULL((SELECT STRING_AGG([value], N', ') FROM OPENJSON(@node, '$.evidence.kinds')), N'a file') + N'), at least ' + ISNULL(JSON_VALUE(@node, '$.evidence.min'), N'1') + N'.'; THROW 50194, @m3, 1; END
     DECLARE @f1Name NVARCHAR(255), @f1Mime NVARCHAR(100), @f1B64 NVARCHAR(MAX), @f1Bin VARBINARY(MAX), @f1Text NVARCHAR(MAX);
     IF @evCount > 0
@@ -174,12 +185,31 @@ BEGIN
     -- ---- 8 kind-specific rows (§5.1)
     IF @recordKind = N'ConfigurationFileRevision'
     BEGIN
-        IF @f1Bin IS NULL THROW 50194, N'process.CommitStep: a configuration-file revision needs the settings file as its first evidence item.', 1;
         IF @pkg IS NULL THROW 50196, N'process.CommitStep: no settings-issue package has been produced in this run (procedure.package).', 1;
-        EXEC [process].[WriteConfigurationRevision] @DeviceEntityId = @recSubject, @CaptureKind = N'Designed', @FileName = @f1Name, @MimeType = @f1Mime, @Content = @f1Bin, @TextContent = @f1Text,
-             @PreparedByActorId = @committer, @At = @occurred, @ActorId = @ActorId, @RevisionRowId = @cfRev OUTPUT, @FileKind = @cfKind OUTPUT;
-        DECLARE @seq INT = 1 + (SELECT COUNT(*) FROM [document].[SettingsIssuePackageItem] WHERE [PackageRevisionRowId] = @pkg AND [IsDeleted] = 0 AND [ValidTo] IS NULL), @ie UNIQUEIDENTIFIER, @ir UNIQUEIDENTIFIER;
-        EXEC [document].[SettingsIssuePackageItem_Add] @PackageRevisionRowId = @pkg, @ConfigurationFileRevisionRowId = @cfRev, @Sequence = @seq, @ActorId = @ActorId, @EntityId = @ie OUTPUT, @RowId = @ir OUTPUT;
+        IF @f1Bin IS NULL AND @pkgDraft IS NULL THROW 50194, N'process.CommitStep: a configuration-file revision needs the settings file as its first evidence item (the device has no outstanding revision the platform could write).', 1;
+        IF @f1Bin IS NULL
+        BEGIN
+            -- #168: no file attached — the platform writes the settings file from the draft's settings, edited here (IssueRenderedSettings)
+            DECLARE @wrote BIT;
+            EXEC [process].[IssueRenderedSettings] @ConfigurationFileRevisionRowId = @pkgDraft, @ActorId = @ActorId, @FileName = @f1Name OUTPUT, @Written = @wrote OUTPUT;
+            SET @cfRev = @pkgDraft; SET @cfKind = N'SettingsText';
+            SET @summary = LEFT(ISNULL(@summary + N' — ', N'') + N'settings file written by the platform: ' + ISNULL(@f1Name, N''), 400);
+            UPDATE [record].[Record] SET [Summary] = @summary, [ModifiedBy] = @ActorId, [ModifiedAt] = @now WHERE [RowId] = @recRow;   -- the record was written before this branch
+        END
+        ELSE IF @pkgDraft IS NOT NULL
+        BEGIN
+            -- #168: a file attached over the platform's copy — the copy takes the file (one outstanding revision per device per package)
+            DECLARE @filed NVARCHAR(255), @fsid2 UNIQUEIDENTIFIER;
+            EXEC [process].[RefileRevision] @ConfigurationFileRevisionRowId = @pkgDraft, @FileName = @f1Name, @MimeType = @f1Mime, @Content = @f1Bin, @TextContent = @f1Text, @ActorId = @ActorId, @FiledName = @filed OUTPUT, @FileStreamId = @fsid2 OUTPUT;
+            SET @cfRev = @pkgDraft; SET @cfKind = (SELECT [FileKind] FROM [document].[ConfigurationFile] WHERE [RevisionRowId] = @pkgDraft AND [IsDeleted] = 0);
+        END
+        ELSE
+        BEGIN
+            EXEC [process].[WriteConfigurationRevision] @DeviceEntityId = @recSubject, @CaptureKind = N'Designed', @FileName = @f1Name, @MimeType = @f1Mime, @Content = @f1Bin, @TextContent = @f1Text,
+                 @PreparedByActorId = @committer, @At = @occurred, @ActorId = @ActorId, @RevisionRowId = @cfRev OUTPUT, @FileKind = @cfKind OUTPUT;
+            DECLARE @seq INT = 1 + (SELECT COUNT(*) FROM [document].[SettingsIssuePackageItem] WHERE [PackageRevisionRowId] = @pkg AND [IsDeleted] = 0 AND [ValidTo] IS NULL), @ie UNIQUEIDENTIFIER, @ir UNIQUEIDENTIFIER;
+            EXEC [document].[SettingsIssuePackageItem_Add] @PackageRevisionRowId = @pkg, @ConfigurationFileRevisionRowId = @cfRev, @Sequence = @seq, @ActorId = @ActorId, @EntityId = @ie OUTPUT, @RowId = @ir OUTPUT;
+        END
         -- the record is about the revision it produced
         UPDATE [record].[Record] SET [SecondSubjectKind] = N'ConfigurationFileRevision', [SecondSubjectEntityId] = @cfRev WHERE [RowId] = @recRow;
         SET @restEvidence = (SELECT JSON_QUERY(N'[' + ISNULL(STRING_AGG(e.[value], N','), N'') + N']') FROM OPENJSON(@Evidence) e WHERE CAST(e.[key] AS INT) > 0);
@@ -250,6 +280,29 @@ BEGIN
                 FETCH NEXT FROM wc INTO @wfKey;
             END
             CLOSE wc; DEALLOCATE wc;
+            -- #168 (increment 2): the legacy M from the A — every device named by a Device set captured at this step gets a draft
+            -- revision copied from its in-service revision, in the package, outstanding at once (CopyRevisionAsDraft)
+            DECLARE @devs TABLE ([DeviceEntityId] UNIQUEIDENTIFIER);
+            DECLARE @capKey NVARCHAR(100), @capPath NVARCHAR(120);
+            DECLARE ck CURSOR LOCAL FAST_FORWARD FOR SELECT c.[key] FROM OPENJSON(@node, '$.capture') c WHERE JSON_VALUE(c.[value], '$.type') = N'set' AND JSON_VALUE(c.[value], '$.refKind') = N'Device';
+            OPEN ck; FETCH NEXT FROM ck INTO @capKey;
+            WHILE @@FETCH_STATUS = 0
+            BEGIN
+                SET @capPath = N'$."' + @capKey + N'"';
+                IF ISJSON(@Capture) = 1 AND JSON_QUERY(@Capture, @capPath) IS NOT NULL
+                    INSERT @devs SELECT DISTINCT TRY_CONVERT(UNIQUEIDENTIFIER, d.[value]) FROM OPENJSON(@Capture, @capPath) d WHERE TRY_CONVERT(UNIQUEIDENTIFIER, d.[value]) IS NOT NULL;
+                FETCH NEXT FROM ck INTO @capKey;
+            END
+            CLOSE ck; DEALLOCATE ck;
+            DECLARE @dev UNIQUEIDENTIFIER, @srcRev UNIQUEIDENTIFIER, @cpyRev UNIQUEIDENTIFIER;
+            DECLARE dc CURSOR LOCAL FAST_FORWARD FOR SELECT DISTINCT [DeviceEntityId] FROM @devs;
+            OPEN dc; FETCH NEXT FROM dc INTO @dev;
+            WHILE @@FETCH_STATUS = 0
+            BEGIN
+                EXEC [process].[CopyRevisionAsDraft] @DeviceEntityId = @dev, @PackageRevisionRowId = @ProducedEntityId, @PreparedByActorId = @committer, @At = @occurred, @ActorId = @ActorId, @SourceRevisionRowId = @srcRev OUTPUT, @RevisionRowId = @cpyRev OUTPUT;
+                FETCH NEXT FROM dc INTO @dev;
+            END
+            CLOSE dc; DEALLOCATE dc;
         END
         ELSE THROW 50198, N'process.CommitStep: only a SettingsIssuePackage can be produced in this wave.', 1;
         SET @produced = JSON_MODIFY(@produced, N'$."' + @producesName + N'"', LOWER(CONVERT(NVARCHAR(36), @ProducedEntityId)));

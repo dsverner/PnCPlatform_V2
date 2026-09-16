@@ -1,7 +1,7 @@
 -- #168 (2026-09-16): the text writer — the other half of the settings template (Transform.SettingsParse reads, this
 -- writes). A revision's parsed settings printed as the name=value list the relay and the group use: the template's
 -- rows in DisplayOrder (the vendor's SET order) as "CODE=value" joined by ", " on one line, then the logic masks
--- (Format mask3) on a second line after "LOGIC SETTINGS: " — the legacy overflow field's own marker, which
+-- (Format mask3) after ", LOGIC SETTINGS: " on the same line — the legacy overflow field's own form and marker, which
 -- ParseSettingsText treats as a separator, so a rendered file re-parses to the same rows and renders again to the same
 -- bytes (the round-trip rule, owner 2026-09-16). A value prints as its RawValue (exactly as filed or entered); a value
 -- with no raw text (a computed or migrated one) prints by the definition's Format: decimal:N (fixed N decimals),
@@ -31,6 +31,6 @@ BEGIN
       AND ps.[ValidFrom] <= @now AND (ps.[ValidTo] IS NULL OR ps.[ValidTo] > @now) AND ps.[GroupNumber] IS NULL;
     DECLARE @main NVARCHAR(MAX) = (SELECT STRING_AGG(CONCAT([SettingCode], N'=', [Value]), N', ') WITHIN GROUP (ORDER BY [DisplayOrder], [SettingCode]) FROM #v WHERE ISNULL([Format], N'') <> N'mask3' AND [Value] IS NOT NULL);
     DECLARE @masks NVARCHAR(MAX) = (SELECT STRING_AGG(CONCAT([SettingCode], N'=', [Value]), N', ') WITHIN GROUP (ORDER BY [DisplayOrder], [SettingCode]) FROM #v WHERE [Format] = N'mask3' AND [Value] IS NOT NULL);
-    SET @Text = CONCAT(ISNULL(@main, N''), CASE WHEN @masks IS NULL THEN N'' ELSE CONCAT(NCHAR(13), NCHAR(10), N'LOGIC SETTINGS: ', @masks) END);
+    SET @Text = CONCAT(ISNULL(@main, N''), CASE WHEN @masks IS NULL THEN N'' ELSE CONCAT(CASE WHEN @main IS NULL THEN N'' ELSE N', ' END, N'LOGIC SETTINGS: ', @masks) END);
 END;
 GO

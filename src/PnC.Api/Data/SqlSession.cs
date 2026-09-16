@@ -190,7 +190,11 @@ public sealed class SqlSession : IAsyncDisposable
         // W7: a scoped read is compiled for its own grant. A plan cached for one readable set (the whole registry under a
         // Global grant, 55 assets under a subtree) served another for 30 s on DEV until the cache was cleared; the
         // recompile costs ~0.1 s on the migrated estate, measured.
-        var hint = scope is not null ? " OPTION (RECOMPILE)" : "";
+        // #168 (2026-09-16): on the reloaded DEV estate the optimizer drove a materialised read model from the readable set (6 879 assets)
+        // and re-evaluated the view's correlated lookups per subject: every free form (join, IN, a table variable) ran past 40 s;
+        // the written order — the view first, the readable set joined to it — ran in 1.7 s. FORCE ORDER pins that for the
+        // hand-written read models (the MaterialiseBeforePaging list); the generated views keep the optimizer's freedom.
+        var hint = scope is null ? "" : MaterialiseBeforePaging.Contains(view.Key) ? " OPTION (RECOMPILE, FORCE ORDER)" : " OPTION (RECOMPILE)";
 
         // Stable ordering: RowSeq is always the tiebreaker, so paging never repeats or skips a row.
         var order = new List<string>();

@@ -21,7 +21,7 @@ SEED = os.path.join(ROOT, "docs", "schema", "ddl", "PostDeploy", "Seed_config_Se
 DOC = os.path.join(ROOT, "docs", "design", "examples", "templates", "sel-221f.template.md")
 
 KEY = "SETTINGS_TEXT_SEL_221F"
-CHANGE_NOTE = "seed v3 (#168): groups by the manual's Specifications headings, the Section-5 heading in each description"
+CHANGE_NOTE = "seed v4 (#168): alias MT0 for MTO (a zero for the letter O in the legacy texts); v3 grouped by the manual's Specifications headings"
 MODEL_CODES = ["SEL-221F Z1-3=.125-64 OHMS", "SEL-221F"]   # the SEL-221S is its own relay (its texts carry 67ND; its own manual) — not this template
 
 # enumerations the template's closed lists use: key -> (name, [(code, name)])
@@ -95,8 +95,9 @@ ROWS = [
 MASKS = [("MTU", "Mask for trip unconditional"), ("MPT", "Mask for trip with permissive-trip asserted"), ("MTB", "Mask for trip with block-trip unasserted"),
          ("MTO", "Mask for trip with breaker open (switch-onto-fault)"), ("MA1", "Mask for A1 relay control"), ("MA2", "Mask for A2 relay control"),
          ("MA3", "Mask for A3 relay control"), ("MA4", "Mask for A4 relay control"), ("MRI", "Mask for reclose initiate"), ("MRC", "Mask for reclose cancel")]
+MASK_ALIASES = {"MTO": "MT0"}   # the legacy texts typed a zero for the letter O (four revisions, 2026-09-16)
 for i, (code, name) in enumerate(MASKS, start=47):
-    ROWS.append((i, code, name, "Logic settings", "Text", None, None, None, None, None, None, None, "mask3",
+    ROWS.append((i, code, name, "Logic settings", "Text", None, None, None, None, None, None, MASK_ALIASES.get(code), "mask3",
                  "§ Logic settings (5-32). One of the ten logic masks: 24 Relay Word bits in three rows of eight, entered as binary, shown as three hex bytes (3-20; 3-14; 5-32). Row 3 bit 2 is TRIP on the -2 and BFT on the -3/-4 (2-51)."))
 
 UNITS_USED = sorted({r[5] for r in ROWS if r[5]})
@@ -151,7 +152,10 @@ def seed():
                  f" @UnitCode = {q(unit)}, @Base = {q(base)}, @MinValue = {num(mn)}, @MaxValue = {num(mx)}, @EnumerationDefinitionRowId = {'@enum' if enum else 'NULL'}, @AnsiCode = {q(ansi)},"
                  f" @DisplayOrder = {order}, @Aliases = {q(aliases)}, @Format = {q(fmt)}, @Description = {q(desc)}, @IsCatalogueFact = 1, @ActorId = @author, @RowId = @r OUTPUT;")
     L += ["    EXEC [config].[ApproveDefinitionVersion] @VersionRowId = @ver, @ActorId = @approver;", "END",
-          "-- the same relay under every model code the legacy data used (#168: a migration finding, not a model merge)",
+          "-- the same relay under every model code the legacy data used (#168: a migration finding, not a model merge). The plain",
+          "-- SEL-221F code is seeded here so a fresh database binds it before the migration (which reuses a model row of that code)",
+          "IF NOT EXISTS (SELECT 1 FROM [ref].[vModel] WHERE [ManufacturerId] = @sel AND [ModelCode] = N'SEL-221F')",
+          "    EXEC [ref].[Model_Upsert] @ModelId = 'A0000000-0000-4000-8000-0000221F0000', @ManufacturerId = @sel, @ModelCode = N'SEL-221F', @ModelName = N'SEL-221F distance relay (legacy code without the reach range)', @AssetTypeCode = N'ProtectiveRelay', @DeviceCategory = N'Relay', @Technology = N'Microprocessor', @ActorId = @author;",
           "DECLARE @model UNIQUEIDENTIFIER, @code NVARCHAR(200), @fvid UNIQUEIDENTIFIER;",
           "DECLARE mc CURSOR LOCAL FAST_FORWARD FOR SELECT [Code] FROM (VALUES " + ", ".join(f"({q(c)})" for c in MODEL_CODES) + ") x ([Code]);",
           "OPEN mc; FETCH NEXT FROM mc INTO @code;", "WHILE @@FETCH_STATUS = 0", "BEGIN",

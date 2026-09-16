@@ -16,11 +16,12 @@ def main():
     ap.add_argument("--database", default=common.TARGET_DB)
     ap.add_argument("--model", action="append", default=None, help="model code(s); default: every model that has a template")
     ap.add_argument("--all", action="store_true", help="also re-parse Partial and Empty revisions, not only NotParsed")
+    ap.add_argument("--force", action="store_true", help="re-parse every revision, Parsed ones included (a parser rule or the template changed, #168)")
     a = ap.parse_args()
     if not a.database.startswith("PnCPlatform_V2_"):
         sys.exit("refusing: the target must be a PnCPlatform_V2_* database (#99)")
     con = common.connect(a.database); cur = con.cursor()
-    statuses = "(N'NotParsed', N'Partial', N'Empty')" if a.all else "(N'NotParsed')"
+    statuses = "(N'NotParsed', N'Partial', N'Empty', N'Parsed')" if a.force else "(N'NotParsed', N'Partial', N'Empty')" if a.all else "(N'NotParsed')"
     sql = f"""SELECT cf.RevisionRowId, f.FileStreamId, m.ModelCode
         FROM document.vConfigurationFile cf
         JOIN document.vFile f ON f.RevisionRowId = cf.RevisionRowId AND f.FileRole = N'Native'

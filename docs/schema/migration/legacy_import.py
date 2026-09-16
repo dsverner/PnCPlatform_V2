@@ -394,8 +394,9 @@ class Importer:
                             if ("ref", "AnsiFunction", f"AnsiFunction:{code[:10]}") not in self.run._existing:
                                 self.run.provenance("ref", "AnsiFunction", f"AnsiFunction:{code[:10]}", row_hash("Ansi", code[:10]))
                         fnode = self.node("ProtectionFunction", position, code, f"Function:{base}:{code}")
-                        self.run.exec("scheme.CommissionedFunction_Add", ProtectionFunctionNodeEntityId=fnode, AnsiCode=code[:10], IsPrincipal=1 if code == codes[0] else 0, ValidFrom=capture_at(), ValidFromQuality=2)
-                        self.run.provenance("scheme", "CommissionedFunction", f"Function:{base}:{code}", row_hash("CF", base, code), entity_id=fnode)
+                        (cfe,) = self.run.exec("scheme.CommissionedFunction_Add", outputs=(("EntityId", "UNIQUEIDENTIFIER"),), ProtectionFunctionNodeEntityId=fnode, AnsiCode=code[:10], IsPrincipal=1 if code == codes[0] else 0, ValidFrom=capture_at(), ValidFromQuality=2)
+                        # its provenance is keyed on the commissioned function's own entity (the rehearsal's gap check matches the row, not the node; the 09-16 load showed 3 007 rows keyed on the node)
+                        self.run.provenance("scheme", "CommissionedFunction", f"Function:{base}:{code}", row_hash("CF", base, code), entity_id=cfe)
                     self.rule("FUNCTIONS with an ANSI code → ProtectionFunction + CommissionedFunction", base)
                 elif functions:
                     nk = f"NodeFunction:{base}"; nh = row_hash("NodeFunction", base, functions[:200])

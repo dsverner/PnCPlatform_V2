@@ -980,6 +980,105 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
         Must(new[] { c1ms, f1ms, f2ms, f3ms, n2ms, t1ms, g1ms }.All(ms => ms < 1000), "NFR-2: every measured screen-sized list call under one second on DEV");
         // W7 (#145): the grid's Active list is the whole estate materialised before paging — 1.6–2.0 s measured; a sargable station is W8's
         Must(n1ms < 5000, $"NFR-2 (W8 round-2 item, #154): the whole-estate Active grid under five seconds — the state filter is applied in memory over the whole view ({n1ms} ms)");
+
+        // ======== #168 increment 2 (2026-09-16): the settings edited in the platform, the file written by it — the owner's four-step
+        // procedure on the BDD15B that the run above left in service. REQUEST copies the in-service revision as the change's outstanding
+        // revision (the legacy M from the A); a value is edited through SetParsedSetting; the settings step commits with no file and
+        // the platform writes the file from the rows; the file re-read is the rows (the round trip, in place); install and complete:
+        // the copy goes in service and the previous revision is archived.
+        {
+            async Task<bool> LoadApprove(string file, string what)
+            {
+                var (ls9, lb9) = await Post(author!, "api/v1/definitions/documents", new { document = JsonNode.Parse(Example(file)), changeNote = "#168 smoke" });
+                var row9 = lb9?["versionRowId"]?.ToString();
+                if (ls9 != HttpStatusCode.OK || row9 is null) { Must(false, $"#168: load {what} → {(int)ls9} {Code(lb9)} {lb9?["detail"]}"); return false; }
+                var (as9, ab9) = await Post(approver, $"api/v1/definitions/documents/{row9}/approve", new { });
+                var ok9 = as9 == HttpStatusCode.OK || AlreadyApproved(ab9);
+                Must(ok9, $"#168: {what} Effective ({(int)as9} {Code(ab9)})");
+                return ok9;
+            }
+            var okL = await LoadApprove("settings-lifecycle-simple.workflow.json", "SETTINGS_LIFECYCLE_SIMPLE");
+            var okP = await LoadApprove("settings-change-simple.procedure.json", "SETTINGS_CHANGE_SIMPLE");
+            var okW = await LoadApprove("settings-change-simple.workflow.json", "SETTINGS_CHANGE_REQUEST_SIMPLE");
+            var simpleType = await Definition("Program.WorkType", $"{tag}_SETTINGS_CHANGE_SIMPLE", "Settings change, four steps (#168 smoke)", new { g = 1, workflow = "SETTINGS_CHANGE_REQUEST_SIMPLE", requiredRecordKinds = Array.Empty<string>() });
+            async Task<string> Rendered(Guid? rev) { var r = await admin.GetAsync($"api/v1/settings/{rev}/rendered"); return r.StatusCode == HttpStatusCode.OK ? await r.Content.ReadAsStringAsync() : $"<{(int)r.StatusCode}>"; }
+            async Task<JsonNode?> Record(Guid? dev, string state) { var (_, b) = await Get(admin, $"api/v1/document/vSettingsRecord?DeviceEntityId={dev}&GridState={state}"); return (b?["rows"] as JsonArray)?.OrderByDescending(r => r?["RowSeq"]?.GetValue<long>()).FirstOrDefault(); }
+            async Task<Dictionary<string, string>> Parsed(Guid? rev) { var (_, b) = await Get(admin, $"api/v1/document/vParsedSettingNamed?ConfigurationFileRevisionRowId={rev}"); return (b?["rows"] as JsonArray)?.ToDictionary(r => r?["SettingCode"]?.ToString() ?? "", r => r?["RawValue"]?.ToString() ?? "") ?? new(); }
+            var aRow = await Record(devBdd, "Active"); var aRev = Id(aRow, "RevisionRowId");
+            Must(okL && okP && okW && simpleType is not null && aRev is not null, $"#168 fixture: the four-step documents Effective, a work type bound, the BDD15B in service (revision {aRow?["RevisionLabel"]})");
+            if (okL && okP && okW && simpleType is not null && aRev is not null)
+            {
+                var aText = await Rendered(aRev); var aParsed = await Parsed(aRev);
+                var (wr9s, wr9b) = await Post(admin, "api/v1/work/WorkRequest_Add", new { WorkTypeDefinitionVersionRowId = simpleType, Title = $"{tag} slope change (#168)", ScopeKind = "Node", ScopeEntityId = station, OutageRequired = false });
+                var wr9 = Id(wr9b);
+                var (sw9s, sw9b) = await Post(admin, "api/v1/process/workflows/start", new { workflowKey = "SETTINGS_CHANGE_REQUEST_SIMPLE", subjectKind = "WorkRequest", subjectEntityId = wr9 });
+                var wf9 = Id(sw9b, "workflowInstanceEntityId");
+                var (tr9s, tr9b) = await Post(admin, $"api/v1/process/workflow-instances/{wf9}/transitions", new { name = "Start" });
+                var (pi9s, pi9b) = await Get(admin, $"api/v1/process/vProcedureInstance?WorkflowInstanceEntityId={wf9}");
+                var inst9 = Id((pi9b?["rows"] as JsonArray)?.FirstOrDefault(r => r?["ParentInstanceEntityId"] is null));
+                Must(wr9s == HttpStatusCode.OK && sw9s == HttpStatusCode.OK && tr9s == HttpStatusCode.OK && inst9 is not null, $"#168: a request under the four-step work type started ({(int)wr9s} {Code(wr9b)} · {(int)sw9s} {Code(sw9b)} · {(int)tr9s} {Code(tr9b)} · instance {inst9})");
+                if (inst9 is not null)
+                {
+                    inst = inst9;   // RunStep and ReadyStep read this instance now
+                    // [1] request: the copy appears as the outstanding revision, its rows the in-service rows
+                    var (q1s, q1b) = await RunStep(admin, "REQUEST", new { outcome = "Done", capture = new { reason = "#168 smoke: SLOPE 25 → 30 %", devices = new[] { devBdd } } });
+                    var pkg9 = Id(q1b, "producedEntityId");
+                    var mRow = await Record(devBdd, "Outstanding"); var mRev = Id(mRow, "RevisionRowId");
+                    var (it9s, it9b) = await Get(admin, $"api/v1/document/vSettingsIssuePackageItem?PackageRevisionRowId={pkg9}");
+                    var items9 = (it9b?["rows"] as JsonArray)?.Select(r => r?["ConfigurationFileRevisionRowId"]?.ToString()?.ToLowerInvariant()).ToList() ?? [];
+                    Must(pkg9 is not null && mRev is not null && mRev != aRev && items9.Count == 1 && items9[0] == mRev.ToString()!.ToLowerInvariant(),
+                        $"#168 [1]: REQUEST copied the in-service revision {aRow?["RevisionLabel"]} as outstanding revision {mRow?["RevisionLabel"]}, the package's one item ({items9.Count} item(s))");
+                    var mParsed = await Parsed(mRev); var mText = await Rendered(mRev);
+                    Must(mRev is not null && mParsed.Count == aParsed.Count && mParsed.All(kv => aParsed.TryGetValue(kv.Key, out var v) && v == kv.Value) && mText == aText,
+                        $"#168 [1]: the copy's parsed rows are the in-service rows ({mParsed.Count} of {aParsed.Count}), rendered alike ({mText.Length} chars)");
+                    // the edit: read as the parser reads it; the refusals in the procedure's words
+                    var (e1s, e1b) = await Post(admin, "api/v1/process/SetParsedSetting", new { ConfigurationFileRevisionRowId = mRev, DeviceEntityId = devBdd, SettingCode = "SLOPE", RawValue = "30 %" });
+                    Must(e1s == HttpStatusCode.OK && e1b?["RangeCheck"]?.ToString() == "Ok", $"#168 edit: SLOPE=30 % on the outstanding revision → {(int)e1s} {Code(e1b)} {e1b?["detail"]} (range {e1b?["RangeCheck"]})");
+                    var (e2s, e2b) = await Post(admin, "api/v1/process/SetParsedSetting", new { ConfigurationFileRevisionRowId = mRev, DeviceEntityId = devBdd, SettingCode = "SLOPE", RawValue = "steep" });
+                    Must(e2s == HttpStatusCode.Conflict && (e2b?["detail"]?.ToString() ?? "").Contains("takes a number"), $"#168 edit: a word where a number is due → 409 rule in the procedure's words ({(int)e2s} {Code(e2b)} {e2b?["detail"]})");
+                    var (e3s, e3b) = await Post(admin, "api/v1/process/SetParsedSetting", new { ConfigurationFileRevisionRowId = mRev, DeviceEntityId = devBdd, SettingCode = "NOSUCH", RawValue = "1" });
+                    Must(e3s == HttpStatusCode.Conflict && (e3b?["detail"]?.ToString() ?? "").Contains("does not know"), $"#168 edit: a code the template does not know → 409 rule ({(int)e3s} {e3b?["detail"]})");
+                    var (e4s, e4b) = await Post(admin, "api/v1/process/SetParsedSetting", new { ConfigurationFileRevisionRowId = aRev, DeviceEntityId = devBdd, SettingCode = "SLOPE", RawValue = "30 %" });
+                    Must(e4s == HttpStatusCode.Conflict && (e4b?["detail"]?.ToString() ?? "").Contains("outstanding"), $"#168 edit: the in-service revision is the record, not edited → 409 rule ({(int)e4s} {e4b?["detail"]})");
+                    var (e5s, e5b) = await Post(admin, "api/v1/process/SetParsedSetting", new { ConfigurationFileRevisionRowId = mRev, DeviceEntityId = devBdd, SettingCode = "SLOPE", RawValue = "55" });
+                    Must(e5s == HttpStatusCode.OK && e5b?["RangeCheck"]?.ToString() == "OutOfRange", $"#168 edit: 55 % is outside 15–40: saved and flagged, not refused ({(int)e5s} range {e5b?["RangeCheck"]}: {e5b?["RangeCheckNote"]})");
+                    var (e6s, _) = await Post(admin, "api/v1/process/SetParsedSetting", new { ConfigurationFileRevisionRowId = mRev, DeviceEntityId = devBdd, SettingCode = "SLOPE", RawValue = "30 %" });
+                    var (e7s, e7b) = await Post(readOnly!, "api/v1/process/SetParsedSetting", new { ConfigurationFileRevisionRowId = mRev, DeviceEntityId = devBdd, SettingCode = "SLOPE", RawValue = "31 %" });
+                    Must(e6s == HttpStatusCode.OK && e7s == HttpStatusCode.Forbidden, $"#168 edit: back to 30 % ({(int)e6s}); ReadOnly may not edit ({(int)e7s} {Code(e7b)})");
+                    var afterEdit = await Parsed(mRev);
+                    var (al9s, al9b) = await Get(admin, $"api/v1/audit/vActionLog?SubjectRowId={mRev}&take=50");
+                    var edits9 = (al9b?["rows"] as JsonArray)?.Count(r => (r?["Detail"]?.ToString() ?? "").Contains("setting-edited")) ?? 0;
+                    Must(afterEdit.GetValueOrDefault("SLOPE") == "30 %" && edits9 >= 3, $"#168 edit: the row reads 30 % as typed; {edits9} edits in the audit log with code, from and to");
+                    // [2] rationale and settings side by side: the settings step commits with NO file — the platform writes it
+                    await RunStep(admin, "WRITE_RATIONALE", new { outcome = "Done", evidence = new[] { File("rationale.txt", "text/plain", "#168 smoke: slope raised to 30 % after the CT saturation study", "Rationale") } });
+                    var (c9s, c9b) = await RunStep(admin, "RECORD_SETTINGS", new { outcome = "Done" }, devBdd);
+                    var (rc9s, rc9b) = await Get(admin, $"api/v1/record/vRecord?WorkRequestEntityId={wr9}&RecordKindCode=ConfigurationFileRevision");
+                    var rec9 = (rc9b?["rows"] as JsonArray)?.FirstOrDefault();
+                    Must(c9s == HttpStatusCode.OK && (rec9?["Summary"]?.ToString() ?? "").Contains("written by the platform") && rec9?["SecondSubjectEntityId"]?.ToString()?.ToLowerInvariant() == mRev.ToString()!.ToLowerInvariant(),
+                        $"#168 [2]: the settings step committed with no file; the record says the platform wrote it and points at the outstanding revision ({rec9?["Summary"]})");
+                    var (f9s, f9b) = await Get(admin, $"api/v1/document/vFile?RevisionRowId={mRev}&FileRole=Native");
+                    var files9 = (f9b?["rows"] as JsonArray) ?? new JsonArray();
+                    var mText2 = await Rendered(mRev);
+                    string filedText = "";
+                    if (files9.Count == 1) { var dl9 = await admin.GetAsync($"api/v1/files/{files9[0]?["RowId"]}"); filedText = System.Text.Encoding.UTF8.GetString(await dl9.Content.ReadAsByteArrayAsync()); }
+                    var mRow2 = await Record(devBdd, "Outstanding"); var reread = await Parsed(mRev);
+                    Must(files9.Count == 1 && filedText == mText2 && mText2.Contains("SLOPE=30 %") && mRow2?["ParseStatus"]?.ToString() == "Parsed" && reread.GetValueOrDefault("SLOPE") == "30 %" && reread.Count == afterEdit.Count,
+                        $"#168 [2]: one Native file on the revision ({files9[0]?["FileName"]}), byte-identical to the rendered text, re-read Parsed with the same rows — the round trip ({mText2})");
+                    var (it9s2, it9b2) = await Get(admin, $"api/v1/document/vSettingsIssuePackageItem?PackageRevisionRowId={pkg9}");
+                    Must((it9b2?["rows"] as JsonArray)?.Count == 1, "#168 [2]: still one item in the package (the copy took the file; no second revision)");
+                    // [3] the outage hold releases on evaluate (no outage required); [4] install as the technician, complete as the engineer
+                    await Post(admin, $"api/v1/process/procedure-instances/{inst9}/evaluate", new { }); await Post(admin, $"api/v1/process/procedure-instances/{inst9}/evaluate", new { });
+                    var (i9s, _) = await RunStep(tech, "INSTALL", new { outcome = "Done", capture = new { installedAt = DateTime.UtcNow.ToString("o"), commissioningNote = "#168 smoke" } }, devBdd);
+                    var (k9s, _) = await RunStep(admin, "COMPLETE", new { outcome = "Done" });
+                    var aAfter = await Record(devBdd, "Active"); var pAfter = await Record(devBdd, "Archived");
+                    var (cl9s, cl9b) = await Post(admin, $"api/v1/process/workflow-instances/{wf9}/transitions", new { name = "Close" });
+                    Must(i9s == HttpStatusCode.OK && k9s == HttpStatusCode.OK && Id(aAfter, "RevisionRowId") == mRev && Id(pAfter, "RevisionRowId") == aRev && cl9s == HttpStatusCode.OK,
+                        $"#168 [4]: the copy is in service (revision {aAfter?["RevisionLabel"]}), the previous revision archived (revision {pAfter?["RevisionLabel"]}), the request Closed ({(int)cl9s} {Code(cl9b)})");
+                    var final9 = await Rendered(mRev);
+                    Must(final9 == filedText, "#168: the in-service revision's rendered text is still its filed file, byte for byte");
+                }
+            }
+        }
     }
 }
 else Skip("W4 run (needs the Administrator, Approver, Hydro and Technician identities in one process — DEV mode)");

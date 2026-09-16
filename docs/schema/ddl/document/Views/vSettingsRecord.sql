@@ -65,11 +65,19 @@ SELECT r.[RowSeq],
 FROM [document].[vConfigurationFile] cf
 JOIN [document].[vRevision] r ON r.[RowId] = cf.[RevisionRowId]
 LEFT JOIN [document].[vSettingsIssuePackageItem] it ON it.[ConfigurationFileRevisionRowId] = cf.[RevisionRowId]
-LEFT JOIN [process].[vWorkflowInstance] lc ON lc.[SubjectKind] = N'SettingsIssuePackage' AND lc.[SubjectEntityId] = it.[PackageRevisionRowId]
+OUTER APPLY (SELECT TOP (1) lc.[EntityId], lc.[CurrentState] FROM [process].[WorkflowInstance] lc
+             WHERE lc.[IsDeleted] = 0 AND lc.[SubjectKind] = N'SettingsIssuePackage' AND lc.[SubjectEntityId] = it.[PackageRevisionRowId] ORDER BY lc.[RowSeq] DESC) lc
 OUTER APPLY (SELECT TOP (1) x.[WorkRequestEntityId] FROM [record].[Record] x
              WHERE x.[ValidTo] IS NULL AND x.[IsDeleted] = 0 AND x.[SecondSubjectKind] = N'ConfigurationFileRevision' AND x.[SecondSubjectEntityId] = cf.[RevisionRowId]
              ORDER BY x.[OccurredAt]) rec
-LEFT JOIN [work].[vWorkRequest] w ON w.[EntityId] = rec.[WorkRequestEntityId]
+-- #168 (2026-09-16): the request and the package's lifecycle read from the base tables in the current-row form, like the other lookups here:
+-- on the reloaded DEV the optimizer evaluated the generated current view of work requests once per outer row (the whole table scanned and
+-- sorted 11 572 times, 137 million rows, 48 s for the view)
+OUTER APPLY (SELECT TOP (1) x.[WorkRequestEntityId] FROM [record].[Record] x
+             WHERE x.[ValidTo] IS NULL AND x.[IsDeleted] = 0 AND x.[SecondSubjectKind] = N'SettingsIssuePackage' AND x.[SecondSubjectEntityId] = it.[PackageRevisionRowId]
+             ORDER BY x.[OccurredAt]) prec
+OUTER APPLY (SELECT TOP (1) w.[EntityId], w.[Title], w.[WorkTypeDefinitionVersionRowId] FROM [work].[WorkRequest] w
+             WHERE w.[ValidTo] IS NULL AND w.[IsDeleted] = 0 AND w.[EntityId] = COALESCE(rec.[WorkRequestEntityId], prec.[WorkRequestEntityId]) ORDER BY w.[RowSeq] DESC) w   -- #168: a copy made at the request step belongs to its request before any record points at it
 LEFT JOIN [config].[vDefinitionVersion] wtv ON wtv.[RowId] = w.[WorkTypeDefinitionVersionRowId]
 LEFT JOIN [config].[vDefinition] wt ON wt.[EntityId] = wtv.[DefinitionEntityId]
 OUTER APPLY (SELECT TOP (1) p.[EntityId], p.[State] FROM [process].[ProcedureInstance] p

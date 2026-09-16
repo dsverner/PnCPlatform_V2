@@ -20,8 +20,11 @@ def main():
     src = common.connect("dbRelay").cursor()   # the legacy copy, renamed by the owner 2026-09-14 (legacy_import.SOURCE_DB)
     tgt = common.connect(a.database); tgt.add_output_converter(-155, lambda b: b); cur = tgt.cursor()
     legacy = {}
-    for oldno, cr, set1, cdate, vdate in src.execute("SELECT OLD_NO, [Change Request ID], SET1, CDATE, VDATE FROM SETTINGS WHERE LEFT(OLD_NO,1) IN ('A','M','P')").fetchall():
-        legacy[(oldno, cr)] = (hashlib.sha256((set1 or "").strip().encode("utf-8")).hexdigest(), cdate, vdate)   # the importer strips the text (strip()) before writing
+    for oldno, cr, set1, set2, cdate, vdate in src.execute("SELECT OLD_NO, [Change Request ID], SET1, SETTINGS2, CDATE, VDATE FROM SETTINGS WHERE LEFT(OLD_NO,1) IN ('A','M','P')").fetchall():
+        # the importer's rule (#140, #168): the stripped SET1, then ", " + the stripped SETTINGS2 when there is one — one settings text
+        text = (set1 or "").strip(); set2s = (set2 or "").strip()
+        if set2s: text = (text + ", " if text else "") + set2s
+        legacy[(oldno, cr)] = (hashlib.sha256(text.encode("utf-8")).hexdigest(), cdate, vdate)
     rows = cur.execute("""SELECT p.SourceKey, f.Sha256, CONVERT(NVARCHAR(19), cf.InServiceFrom, 120), cf.InServiceFromQuality
         FROM migration.vProvenance p
         JOIN document.vConfigurationFile cf ON cf.RevisionRowId = p.TargetRowId

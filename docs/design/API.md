@@ -321,6 +321,20 @@ The setting display (§9) links every file name to it.
   `DefinitionEndpoints.cs` (schema file, definition kind, add/approve procedures, whether expressions compile). A screen document
   compiles nothing: the schema is the whole check and the stored form is the document.
 
+## 8e. The settings template's writer and the edit — W8 (2026-09-16, decision #168)
+
+- `GET /api/v1/settings/{revisionRowId}/rendered` — the revision's parsed settings written as the model's settings text
+  (`process.RenderSettingsText`: the template's SET order, `CODE=value` joined by `, `, the logic masks after `LOGIC SETTINGS: `),
+  `text/plain`, `Content-Disposition: inline` with the filed file's name. `ConfigurationFile.Read` on the revision's device. For a
+  legacy text it is the values as read (order and aliases canonical); for a platform-written file it is the file, byte for byte.
+- `POST /api/v1/process/SetParsedSetting` `{ ConfigurationFileRevisionRowId, DeviceEntityId, SettingCode, RawValue }` — one value of an
+  outstanding revision, through the dispatcher (`ConfigurationFile.Modify` on `DeviceEntityId`, which must be the revision's device).
+  Refused with the procedure's message when the revision is not a draft (50183), the template does not know the code (50182), or the
+  value is not a number / whole number / on the closed list (50184). An empty `RawValue` unsets the setting. Returns
+  `RangeCheck` / `RangeCheckNote` as the procedure's outputs.
+- The file the platform writes is filed by the engine at the settings step (`process.IssueRenderedSettings`, PROCEDURE-ENGINE §5.1
+  #168 note); `IssueRenderedSettings`, `RefileRevision` and `CopyRevisionAsDraft` are engine procedures, not callable over HTTP.
+
 ## 9. The PWA shell
 
 **The definitions screen (W5, 2026-09-12; decisions #119, #120, #122).** `/definitions.html` + `definitions.js`, with

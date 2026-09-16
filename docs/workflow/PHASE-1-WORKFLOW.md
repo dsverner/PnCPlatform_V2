@@ -772,6 +772,24 @@ the release with SBOM and `release.json`.
   queue's eleven thousand froze the page); the filters and CSV cover the rest.
 
 
+- **2026-09-16 — the first device template, the SEL-221F all the way through the settings side (#168, increments 1–2; #169).** The owner's
+  redirection: device templates are the daily-value work; settings are edited in the platform and the platform writes the vendor's file at
+  implementation, reader and writer per format proven by round trip. Built and shown: the 221F template from its manual (56 rows, twelve
+  groups by the manual's Specifications headings, aliases, formats, page cites; `tools/template_sel221f.py` is the single source of the seed
+  and `examples/templates/sel-221f.template.md`), the parser's new rules (aliases, chains, the marker, a missing separator, a misspelt name in
+  a chain), the writer `process.RenderSettingsText` and `GET /api/v1/settings/{rev}/rendered`, the device sheet (function chips, inputs from
+  the ratio settings, a tab per group, the SHOWSET listing beside the file the platform writes; `evidence/W8-221f-sheet-after-reload*.jpg`),
+  the migration filing SET1+SETTINGS2 as one text and DEV reloaded fresh (`RECONCILIATION-2026-09-16-DEV.md`: 437 358 rows, 7 304 s; 949
+  revisions parsed; the 221F round trip 181 revisions values-equal, 0 mismatch). Increment 2, the owner's four steps on Bathurst 0012 B-PROT
+  SEL-221F through the generic screens (`evidence/W8-fourstep-221f-1…11.jpg`): the request step copied the in-service revision 2 as
+  outstanding revision 3 (the legacy M from the A), Z1% edited on the sheet 21→22 (audited), the settings step committed with no file and the
+  platform wrote `A0523_875199 (2).txt` — byte-identical to its rendered text, re-read Parsed — the hold released, installed as the technician,
+  completed: revision 3 in service, revision 2 archived, the request Closed. The smoke carries the same proof on the BDD15B fixture (the
+  #168 section). Found and fixed on the way (#169): the settings-record view at 48 s on the reloaded estate (a generated current view
+  evaluated per row) and the API's scoped read past 200 s (the optimizer driving the view from the readable set) — 1.2 s and 1.6 s now.
+  Deferred: classifications and the generic obligation rules (increment 3; the standards, the classified relays and the line-rating source
+  are the owner's to give), QA (increment 4).
+
 **Depends on.** W5, W6, W7. **Estimate.** H: 24–40 h · G: 63–100 h.
 
 ---

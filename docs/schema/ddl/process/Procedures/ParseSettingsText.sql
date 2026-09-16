@@ -56,6 +56,25 @@ BEGIN
 
     -- the fragments: the text split on commas and line ends; "LOGIC SETTINGS:" (the legacy overflow field's marker) is a separator too
     DECLARE @t NVARCHAR(MAX) = REPLACE(REPLACE(REPLACE(@Text, NCHAR(13), N','), NCHAR(10), N','), N'LOGIC SETTINGS:', N',');
+    -- a separator the legacy user missed ("PSVC=S 27VLO=40", "MTU=00 86 00 MRI=MPT=..." — 2026-09-16): a space followed by a name the
+    -- template knows and '=' can only be a missing comma, so it is read as one and noted; a spaced separator is normalised first
+    SET @t = REPLACE(@t, N', ', N',');
+    DECLARE @sepNotes NVARCHAR(MAX), @sepName NVARCHAR(200);
+    DECLARE sn CURSOR LOCAL FAST_FORWARD FOR
+        SELECT x.[Name] FROM (SELECT sd.[SettingCode] AS [Name] FROM [config].[SettingDefinition] sd WHERE sd.[DefinitionVersionRowId] = @tver AND sd.[IsDeleted] = 0
+                              UNION SELECT LTRIM(RTRIM(a.[value])) FROM [config].[SettingDefinition] sd CROSS APPLY STRING_SPLIT(sd.[Aliases], N',') a WHERE sd.[DefinitionVersionRowId] = @tver AND sd.[IsDeleted] = 0 AND sd.[Aliases] IS NOT NULL) x
+        WHERE x.[Name] NOT LIKE N'% %' AND x.[Name] <> N'' ORDER BY LEN(x.[Name]) DESC;
+    OPEN sn; FETCH NEXT FROM sn INTO @sepName;
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        IF CHARINDEX(N' ' + @sepName + N'=', @t) > 0
+        BEGIN
+            SET @t = REPLACE(@t, N' ' + @sepName + N'=', N',' + @sepName + N'=');
+            SET @sepNotes = CONCAT(ISNULL(@sepNotes + N', ', N''), @sepName);
+        END
+        FETCH NEXT FROM sn INTO @sepName;
+    END
+    CLOSE sn; DEALLOCATE sn;
     SELECT ROW_NUMBER() OVER (ORDER BY (SELECT 1)) AS n, LTRIM(RTRIM(p.[value])) AS Fragment
     INTO #frag
     FROM STRING_SPLIT(@t, N',') p
@@ -84,6 +103,9 @@ BEGIN
         FETCH NEXT FROM f INTO @fn, @frag;
     END
     CLOSE f; DEALLOCATE f;
+    -- a misspelt marker glued to the first mask's name ("LOGIC SEETINGS: MTU" — six legacy texts, #168) is still the marker: the name is what follows the colon
+    UPDATE #pairs SET Name = SUBSTRING(Name, CHARINDEX(N':', Name) + 1, 200) WHERE Name LIKE N'LOGIC%TINGS:%';
+    UPDATE #pairs SET Name = SUBSTRING(Name, PATINDEX(N'%[^_]%', Name), 200) WHERE Name LIKE N'\_%' ESCAPE N'\';
     -- the leading number of the value text, if any (the reading; the text stays whole in RawValue)
     UPDATE #pairs SET Number = TRY_CONVERT(DECIMAL(28,10), LEFT(RawValue, ISNULL(NULLIF(PATINDEX(N'%[^0-9.+-]%', RawValue + N' '), 0) - 1, LEN(RawValue)))) WHERE RawValue <> N'';
 
@@ -94,12 +116,14 @@ BEGIN
         AND (UPPER(sd.[SettingCode]) = p.Name
              OR (sd.[Aliases] IS NOT NULL AND EXISTS (SELECT 1 FROM STRING_SPLIT(UPPER(sd.[Aliases]), N',') a WHERE LTRIM(RTRIM(a.[value])) = p.Name)));
 
-    -- a chained fragment is only a chain when every name in it is a setting; otherwise it is one pair whose value holds the
+    -- a chained fragment is a chain unless one of its segments is a value and a name run together; then it is one pair whose value holds the
     -- rest ("PSVC=S 27VLO=40" — a comma the legacy user missed): the value shows the defect instead of a wrong number landing
     -- in PSVC and 27VLO (#168). Re-read such fragments at their first '='.
     DECLARE @bad TABLE (n INT PRIMARY KEY);
     INSERT @bad SELECT DISTINCT n FROM #m m WHERE sub > 1 OR EXISTS (SELECT 1 FROM #m x WHERE x.n = m.n AND x.sub > 1);
-    DELETE @bad WHERE n IN (SELECT n FROM #m GROUP BY n HAVING COUNT(*) = SUM(CASE WHEN DefRowId IS NULL THEN 0 ELSE 1 END));   -- every name resolved: a true chain
+    -- a chain is malformed only when an unresolved segment is more than one word ("S 27VLO": a value and a name run together);
+    -- an unresolved single word in a chain is a misspelt name ("MBT" for MTB, "M4A" for MA4 — 2026-09-16) and the other names keep the value
+    DELETE @bad WHERE n NOT IN (SELECT n FROM #m WHERE DefRowId IS NULL AND Name LIKE N'%\_%' ESCAPE N'\');
     DECLARE @malformed NVARCHAR(MAX) = (SELECT STRING_AGG(LEFT(f.Fragment, 60), N'; ') FROM #frag f JOIN @bad b ON b.n = f.n);
     DELETE #m WHERE n IN (SELECT n FROM @bad);
     INSERT #m (n, sub, Name, RawValue, Number, DefRowId, DataType, MinValue, MaxValue)
@@ -149,6 +173,7 @@ BEGIN
     DECLARE @empty NVARCHAR(MAX) = (SELECT STRING_AGG(Name, N', ') FROM #m WHERE RawValue = N'');
     IF @empty IS NOT NULL SET @err = CONCAT(ISNULL(@err + N'; ', N''), N'empty value (not set): ', @empty);
     IF @malformed IS NOT NULL SET @err = CONCAT(ISNULL(@err + N'; ', N''), N'malformed (a separator missing?): ', @malformed);
+    IF @sepNotes IS NOT NULL SET @err = CONCAT(ISNULL(@err + N'; ', N''), N'a separator was missing before: ', @sepNotes);
     UPDATE [document].[ConfigurationFile] SET [ParseStatus] = @status, [ParseError] = @err, [ModifiedBy] = @ActorId, [ModifiedAt] = @now
     WHERE [RevisionRowId] = @ConfigurationFileRevisionRowId AND [IsDeleted] = 0;
     COMMIT TRANSACTION;

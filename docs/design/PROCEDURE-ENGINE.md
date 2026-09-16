@@ -243,6 +243,20 @@ The settings book is a consequence of commits, never edited by hand.
 and `AsLeftReadback` (not *Readback*), and the text file's kind is `SettingsText`; the table above reads with those
 substitutions. The lifecycle's `Check` and `Apply` transitions are fired by the `CHECK` and `APPLY` steps (#112).
 
+**#168 note (2026-09-16, increment 2) — the settings edited in the platform, the file written by it.** The owner's rule: settings are
+edited in the platform and at implementation the platform writes the manufacturer's file, no retyping. Three additions to the table:
+(1) `RequestConfirmation` with `produces: package` also gives **every device named by a captured `set` of `Device` refs a draft
+revision copied from its in-service revision** (`process.CopyRevisionAsDraft`: the same file bytes filed again, parsed against the
+template, added to the package) — the settings book shows the legacy M at once, a copy of the A; a device with no in-service revision
+gets no copy. (2) A value of an outstanding revision is edited through `process.SetParsedSetting` (read as the parser reads it: type,
+range, closed list; the prior row closed in valid time; audited). (3) `ConfigurationFileRevision` **with no file attached** and a draft
+in the package for the member device: `process.IssueRenderedSettings` renders the draft's rows as the model's settings text
+(`process.RenderSettingsText`, the template's SET order) and files it as the revision's Native file through `process.RefileRevision`,
+which parses the platform's own file back through the same reader — the round trip proven in place; `evidence.required` on such a step
+is satisfied by the platform-written file. A file attached over the copy re-files the copy (one outstanding revision per device per
+package); a device without a copy gets a new revision as before. A native vendor file is still attached, never written, until that
+vendor's reader and writer exist (a vendor whose format cannot be written is excluded from procurement — the owner, 2026-09-16).
+
 ### 5.2 Deferred commit — field work (#53)
 
 The field pack **captures; it does not authorise** (FR-7.1). A step performed offline is captured
