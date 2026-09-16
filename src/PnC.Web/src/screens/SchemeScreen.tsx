@@ -41,8 +41,9 @@ export default function SchemeScreen({ params: p, id }: { screen: Screen; params
   const [pick, setPick] = useState(''); const [find, setFind] = useState(''); const [zone, setZone] = useState('Primary')
   const [newType, setNewType] = useState('Line'); const [newName, setNewName] = useState(''); const [busy, setBusy] = useState(false)
   const station = stationQ.data
-  const candidatesQ = useViewAll('asset', 'vPrimaryAsset', station?.StationNodeEntityId ? { StationNodeEntityId: s(station.StationNodeEntityId) } : {}, 'Name', !!station)
-  const candidates = useMemo(() => (candidatesQ.data ?? []).filter((x) => !find || s(x.Name).toLowerCase().includes(find.toLowerCase())), [candidatesQ.data, find])
+  // every primary asset, any station: a line has two ends and both ends' schemes protect the one line (2103 B-PROT at Bathurst and at Eel River, 2026-09-16)
+  const candidatesQ = useViewAll('asset', 'vPrimaryAsset', {}, 'Name')
+  const candidates = useMemo(() => { const f = find.toLowerCase(); const all = candidatesQ.data ?? []; const hit = all.filter((x) => !f || s(x.Name).toLowerCase().includes(f) || s(x.StationName).toLowerCase().includes(f)); return hit.sort((a, b) => (s(a.StationNodeEntityId) === s(station?.StationNodeEntityId) ? 0 : 1) - (s(b.StationNodeEntityId) === s(station?.StationNodeEntityId) ? 0 : 1) || s(a.Name).localeCompare(s(b.Name))) }, [candidatesQ.data, find, station])
   const editable = can('Scheme.Modify')
   const refresh = () => { qc.invalidateQueries({ queryKey: ['schemeProtects', id] }); qc.invalidateQueries({ queryKey: ['view', 'asset', 'vPrimaryAsset'] }) }
   const link = async (assetId: string, label: string) => {
@@ -90,10 +91,10 @@ export default function SchemeScreen({ params: p, id }: { screen: Screen; params
         {editable && (
           <div className="mt-3 grid gap-3 lg:grid-cols-2">
             <div className="rounded border border-slate-800 p-2">
-              <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Add an existing primary asset{station ? ` at ${s(station.StationName)}` : ''}</h4>
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Add an existing primary asset (any station — a line has two ends){station ? `; ${s(station.StationName)} first` : ''}</h4>
               <div className="mt-1 flex flex-wrap items-end gap-2">
                 <Field label="Find"><input className={inputClass} value={find} onChange={(e) => setFind(e.target.value)} placeholder="name contains…" /></Field>
-                <Field label="Primary asset"><select className={inputClass} value={pick} onChange={(e) => setPick(e.target.value)}><option value="">— choose —</option>{candidates.map((x) => <option key={s(x.EntityId)} value={s(x.EntityId)}>{s(x.Name)} · {s(x.AssetTypeName)}</option>)}</select></Field>
+                <Field label="Primary asset"><select className={inputClass} value={pick} onChange={(e) => setPick(e.target.value)}><option value="">— choose —</option>{candidates.map((x) => <option key={s(x.EntityId)} value={s(x.EntityId)}>{s(x.Name)} · {s(x.AssetTypeName)}{x.StationName ? ' · ' + s(x.StationName) : ''}</option>)}</select></Field>
                 <Field label="Zone"><select className={inputClass} value={zone} onChange={(e) => setZone(e.target.value)}>{ZONES.map((z) => <option key={z}>{z}</option>)}</select></Field>
                 <Button kind="primary" disabled={!pick || busy} onClick={() => void link(pick, s(candidates.find((x) => s(x.EntityId) === pick)?.Name))}>Protects</Button>
               </div>
