@@ -335,6 +335,19 @@ The setting display (§9) links every file name to it.
 - The file the platform writes is filed by the engine at the settings step (`process.IssueRenderedSettings`, PROCEDURE-ENGINE §5.1
   #168 note); `IssueRenderedSettings`, `RefileRevision` and `CopyRevisionAsDraft` are engine procedures, not callable over HTTP.
 
+## 8f. Primary assets and applicability classifications — W8 (2026-09-16, decision #170)
+
+- `GET /api/v1/asset/vPrimaryAsset?…` — the non-device assets of the Primary class with their station (through their placement) and
+  their current classifications summarised (`Classifications`: `Kind=Value; …`). `Asset.Read`.
+- `POST /api/v1/asset/RecordClassification` `{ SubjectKind, SubjectEntityId, ClassificationKindCode, ClassificationValue, DeterminedAt?,
+  ReferenceDocumentRevisionRowId? }` — one current value per subject and kind, `Basis = Recorded`, the caller as the determiner; an empty
+  value withdraws; the history keeps every prior value (`vClassificationHistory`). `Asset.Modify` (Node/Scheme by SubjectKind) on the subject;
+  an unknown kind is refused (50231). The kinds: BesStatus, CipImpactRating, NpccBulkPowerSystem, NpccA10, Prc023 — values in the standards'
+  own words, chosen on the screen.
+- The scheme's "protects" link is the generated `scheme.SchemeProtects_Add` / `_SoftDelete` (`Scheme.Modify` on `SchemeEntityId`); a primary
+  asset is created with `asset.Asset_Add` (type Line, Transformer, Bus, Breaker, Generator, Capacitor, Reactor, System) and placed at its
+  station with `asset.PlaceAsset`.
+
 ## 9. The PWA shell
 
 **The definitions screen (W5, 2026-09-12; decisions #119, #120, #122).** `/definitions.html` + `definitions.js`, with

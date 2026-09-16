@@ -63,6 +63,7 @@
 
   "procedures": {
     "asset.PlaceAsset":                    "Asset.Modify",
+    "asset.RecordClassification":          "Asset.Modify",
     "audit.LogAction":                     null,
     "audit.LogRead":                       null,
     "audit.RecordBackupRun":               null,

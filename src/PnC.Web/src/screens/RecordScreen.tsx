@@ -53,7 +53,9 @@ export default function RecordScreen({ params: p, id }: { screen: Screen; params
       <Status>Revision {s(r.RevisionStatus)} · lifecycle {s(r.LifecycleState) || '—'} · {s(r.FileKind)} {s(r.ParseStatus)}</Status>
       <div className="grid gap-3 lg:grid-cols-3">
         <Panel title="Device"><Facts cols={1} pairs={[['Device', legacyFree(r.DeviceName)], ['Model', s(r.ModelCode) + (r.ModelName ? ' — ' + r.ModelName : '')], ['Manufacturer', s(r.ManufacturerName)], ['Technology', s(r.Technology)], ['Software version', s(r.FirmwareVersion)], ['Serial number', s(r.SerialNumber)], ['Voltage', s(r.VoltageClassCode)], ['Functions', s(r.Functions || r.PositionName)]]} /></Panel>
-        <Panel title="Where"><Facts cols={1} pairs={[['Location', s(r.StationName) + (r.StationNumber ? ' · ' + r.StationNumber : '')], ['Scheme', s(r.SchemeName)], ['Equipment', s(r.PanelName)], ['Position', s(r.PositionName)]]} /></Panel>
+        <Panel title="Where"><Facts cols={1} pairs={[['Location', s(r.StationName) + (r.StationNumber ? ' · ' + r.StationNumber : '')],
+          ['Scheme', r.SchemeEntityId ? <a className="text-sky-300 underline" href={screenPath('SCHEME', s(r.SchemeEntityId))} onClick={(e) => { e.preventDefault(); navigate(screenPath('SCHEME', s(r.SchemeEntityId))) }}>{s(r.SchemeName)}</a> : s(r.SchemeName)],
+          ['Protects', <Protects schemeEntityId={s(r.SchemeEntityId)} />], ['Equipment', s(r.PanelName)], ['Position', s(r.PositionName)]]} /></Panel>
         <Panel title="Dates and state"><Facts cols={1} pairs={[['Calculated', fmtWhen(r.CalculatedAt) + (r.CalculatedByDisplayName ? ' by ' + r.CalculatedByDisplayName : '')], ['Verified', fmtWhen(r.VerifiedAt)], ['In service', r.InServiceFrom ? fmtWhen(r.InServiceFrom) + (r.InServiceTo ? ' – ' + fmtWhen(r.InServiceTo) : ' – now') : 'not in service'], ['Change request', legacyFree(r.WorkRequestTitle)], ['Action type', s(r.WorkTypeKey)], ['Lifecycle', s(r.LifecycleState)], ['Revision', s(r.RevisionLabel) + ' · ' + s(r.RevisionStatus)]]} /></Panel>
       </div>
       <Tabs value={section} onChange={setSection} tabs={[{ key: 'settings', label: 'Settings' }, { key: 'classification', label: 'Classification' }, { key: 'notes', label: 'Notes' }, { key: 'text', label: 'Text as filed' }, { key: 'files', label: 'Files and records' }, ...(others.length ? [{ key: 'compare', label: 'Compare' }] : [])]} />
@@ -80,6 +82,22 @@ export default function RecordScreen({ params: p, id }: { screen: Screen; params
       {section === 'files' && <FilesPanel r={r} revision={revision} />}
     </div>
   )
+}
+
+/** #170: what the device's scheme protects, with the primary assets' applicability classifications — the device inherits them (the owner, 2026-09-16). */
+function Protects({ schemeEntityId }: { schemeEntityId: string }) {
+  const navigate = useNavigate()
+  const q = useQuery({ queryKey: ['schemeProtectsNamed', schemeEntityId], enabled: !!schemeEntityId, staleTime: 60_000, queryFn: async () => {
+    const links = await viewAll('scheme', 'vSchemeProtects', { SchemeEntityId: schemeEntityId })
+    const out: Row[] = []
+    for (const l of links) { const a = (await view('asset', 'vPrimaryAsset', { EntityId: s(l.PrimaryAssetEntityId) }, { take: 1 })).rows[0]; if (a) out.push({ ...a, ZoneRole: l.ZoneRole }) }
+    return out
+  } })
+  if (!schemeEntityId) return <span className="text-slate-500">—</span>
+  if (q.isPending) return <span className="text-slate-500">…</span>
+  const rows = q.data ?? []
+  if (!rows.length) return <span className="text-slate-500">not recorded on the scheme yet</span>
+  return <span>{rows.map((a, i) => <span key={s(a.EntityId)}>{i > 0 ? '; ' : ''}<a className="text-sky-300 underline" href={screenPath('PRIMARY_ASSET', s(a.EntityId))} onClick={(e) => { e.preventDefault(); navigate(screenPath('PRIMARY_ASSET', s(a.EntityId))) }}>{s(a.Name)}</a> <span className="text-xs text-slate-500">{s(a.AssetTypeName).toLowerCase()}{a.ZoneRole !== 'Primary' ? ' · ' + s(a.ZoneRole).toLowerCase() : ''}{a.Classifications ? ' · ' + s(a.Classifications) : ' · no classification recorded'}</span></span>)}</span>
 }
 
 const PARSED_COLS: Column<Row>[] = [

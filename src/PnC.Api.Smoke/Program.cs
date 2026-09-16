@@ -981,6 +981,39 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
         // W7 (#145): the grid's Active list is the whole estate materialised before paging — 1.6–2.0 s measured; a sargable station is W8's
         Must(n1ms < 5000, $"NFR-2 (W8 round-2 item, #154): the whole-estate Active grid under five seconds — the state filter is applied in memory over the whole view ({n1ms} ms)");
 
+        // ======== #170 (2026-09-16): the primary asset a scheme protects, and the applicability classifications recorded on it (not on the
+        // relay — the owner's ruling). A line at the fixture station, the fixture scheme protects it, a CIP impact rating and an A-10 value
+        // recorded by the engineer, withdrawn once, read back on the primary-asset read model; ReadOnly may not record.
+        {
+            var (la, lb) = await Post(admin, "api/v1/asset/Asset_Add", new { AssetTypeCode = "Line", Name = $"{tag} line 0001", Status = "InService" });
+            var line = Id(lb);
+            var (pa, pb) = await Post(admin, "api/v1/asset/PlaceAsset", new { AssetEntityId = line, NodeEntityId = station, PlacementKind = "Installed" });
+            var (sa, sb) = await Post(admin, "api/v1/scheme/SchemeProtects_Add", new { SchemeEntityId = scheme, PrimaryAssetEntityId = line, ZoneRole = "Primary" });
+            Must(la == HttpStatusCode.OK && line is not null && pa == HttpStatusCode.OK && sa == HttpStatusCode.OK, $"#170: a line created at the station and the scheme protects it ({(int)la} {Code(lb)} · {(int)pa} {Code(pb)} · {(int)sa} {Code(sb)})");
+            var (pas, pab) = await Get(admin, $"api/v1/asset/vPrimaryAsset?EntityId={line}");
+            var prow = (pab?["rows"] as JsonArray)?.FirstOrDefault();
+            Must(pas == HttpStatusCode.OK && prow?["AssetTypeCode"]?.ToString() == "Line" && string.Equals(prow?["StationNodeEntityId"]?.ToString(), station.ToString(), StringComparison.OrdinalIgnoreCase) && prow?["Classifications"] is null,
+                $"#170: the primary-asset read model shows the line at its station with no classification yet ({prow?["AssetTypeName"]} at {prow?["StationName"]})");
+            var (k1s, k1b) = await Post(hydro!, "api/v1/asset/RecordClassification", new { SubjectKind = "Asset", SubjectEntityId = line, ClassificationKindCode = "CipImpactRating", ClassificationValue = "Medium" });
+            var (k2s, k2b) = await Post(admin, "api/v1/asset/RecordClassification", new { SubjectKind = "Asset", SubjectEntityId = line, ClassificationKindCode = "NpccA10", ClassificationValue = "Impactful" });
+            var (k3s, k3b) = await Post(admin, "api/v1/asset/RecordClassification", new { SubjectKind = "Asset", SubjectEntityId = line, ClassificationKindCode = "CipImpactRating", ClassificationValue = "High" });
+            Must(k2s == HttpStatusCode.OK && k3s == HttpStatusCode.OK, $"#170: classifications recorded and revised as the Administrator ({(int)k2s} {Code(k2b)} · {(int)k3s} {Code(k3b)}); the subtree-scoped engineer → {(int)k1s} {Code(k1b)}");
+            var (k4s, k4b) = await Post(readOnly!, "api/v1/asset/RecordClassification", new { SubjectKind = "Asset", SubjectEntityId = line, ClassificationKindCode = "Prc023", ClassificationValue = "Listed" });
+            var (k5s, k5b) = await Post(admin, "api/v1/asset/RecordClassification", new { SubjectKind = "Asset", SubjectEntityId = line, ClassificationKindCode = "NoSuchKind", ClassificationValue = "x" });
+            Must(k4s == HttpStatusCode.Forbidden && k5s == HttpStatusCode.Conflict, $"#170: ReadOnly may not record ({(int)k4s}); an unknown kind is refused in the procedure's words ({(int)k5s} {k5b?["detail"]})");
+            var (k6s, _) = await Post(admin, "api/v1/asset/RecordClassification", new { SubjectKind = "Asset", SubjectEntityId = line, ClassificationKindCode = "NpccA10", ClassificationValue = "" });
+            var (kcls, kclb) = await Get(admin, $"api/v1/asset/vClassification?SubjectEntityId={line}");
+            var crow = (kclb?["rows"] as JsonArray)?.ToDictionary(r => r?["ClassificationKindCode"]?.ToString() ?? "", r => r) ?? new();
+            var (pas2, pab2) = await Get(admin, $"api/v1/asset/vPrimaryAsset?EntityId={line}");
+            Must(k6s == HttpStatusCode.OK && crow.Count == 1 && crow.GetValueOrDefault("CipImpactRating")?["ClassificationValue"]?.ToString() == "High" && crow["CipImpactRating"]?["Basis"]?.ToString() == "Recorded"
+                 && (pab2?["rows"] as JsonArray)?.FirstOrDefault()?["Classifications"]?.ToString() == "CipImpactRating=High",
+                $"#170: one current classification after the A-10 value was withdrawn — CIP High, Recorded, the read model summarises it ({(pab2?["rows"] as JsonArray)?.FirstOrDefault()?["Classifications"]})");
+            var (his, hib) = await Get(admin, $"api/v1/asset/vClassificationHistory?SubjectEntityId={line}");
+            Must(his == HttpStatusCode.OK && ((hib?["rows"] as JsonArray)?.Count ?? 0) >= 3, $"#170: the history keeps the revised and withdrawn values ({(hib?["rows"] as JsonArray)?.Count} rows)");
+            var (sps, spb) = await Get(admin, $"api/v1/scheme/vSchemeProtects?SchemeEntityId={scheme}");
+            Must(sps == HttpStatusCode.OK && (spb?["rows"] as JsonArray)?.Any(r => string.Equals(r?["PrimaryAssetEntityId"]?.ToString(), line.ToString(), StringComparison.OrdinalIgnoreCase)) == true, "#170: the scheme's protects link reads back (the device sheet's 'protects … via …' line)");
+        }
+
         // ======== #168 increment 2 (2026-09-16): the settings edited in the platform, the file written by it — the owner's four-step
         // procedure on the BDD15B that the run above left in service. REQUEST copies the in-service revision as the change's outstanding
         // revision (the legacy M from the A); a value is edited through SetParsedSetting; the settings step commits with no file and

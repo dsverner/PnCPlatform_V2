@@ -790,6 +790,16 @@ the release with SBOM and `release.json`.
   Deferred: classifications and the generic obligation rules (increment 3; the standards, the classified relays and the line-rating source
   are the owner's to give), QA (increment 4).
 
+- **2026-09-16 (later) — the record's sections as tabs; the primary asset and its applicability classifications (#170).** The owner, on
+  seeing the sheet: the classification, notes and text under the settings tabs read as part of the settings — each is a tab now. On
+  compliance: applicability is decided at the primary element (CIP-002's evaluation, the A-10 study's impactful busses), the relay
+  inherits it from what it protects; the derivation is a later phase, the values are a person's for now; the classification belongs to
+  the primary asset. Built: the primary asset types (line … system), `asset.vPrimaryAsset`, `asset.RecordClassification`, the SCHEME and
+  PRIMARY_ASSET screens, the device sheet's "protects … via …" line. Shown: Line 0012 at Bathurst Terminal protected by 0012 B-PROT,
+  CIP Medium and A-10 Impactful recorded, read on the 221F's sheet (`evidence/W8-scheme-protects-line-0012.jpg`,
+  `W8-primary-asset-line-0012-classified.jpg`, `W8-record-protects-inherited.jpg`). Next: the obligation rules on the recorded
+  classifications and the compliance panel, with the requirement sets, thresholds and the line-rating source from the owner.
+
 **Depends on.** W5, W6, W7. **Estimate.** H: 24–40 h · G: 63–100 h.
 
 ---

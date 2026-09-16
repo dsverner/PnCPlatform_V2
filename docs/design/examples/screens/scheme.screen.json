@@ -1,0 +1,13 @@
+{
+  "g": 1,
+  "kind": "screen",
+  "key": "SCHEME",
+  "name": "Protection scheme",
+  "description": "One protection scheme: its members, the primary assets it protects (with their applicability classifications) and the change requests on it (#170). Plain code for the scheme; the definition names its data.",
+  "permission": "Scheme.Read",
+  "screenKind": "record",
+  "params": {
+    "view": "scheme.vScheme",
+    "key": "EntityId"
+  }
+}

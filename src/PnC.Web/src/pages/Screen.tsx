@@ -7,6 +7,8 @@ import ListScreen from '@/screens/ListScreen'
 import WorkItemScreen from '@/screens/WorkItemScreen'
 import StepScreen from '@/screens/StepScreen'
 import RecordScreen from '@/screens/RecordScreen'
+import SchemeScreen from '@/screens/SchemeScreen'
+import PrimaryAssetScreen from '@/screens/PrimaryAssetScreen'
 
 export default function ScreenPage() {
   const { key = '', id } = useParams()
@@ -24,7 +26,13 @@ function ScreenBody({ screen, id }: { screen: Screen; id?: string }) {
     case 'list': return <ListScreen screen={screen} params={screen.params as ListParams} />
     case 'workItem': return <WorkItemScreen screen={screen} params={screen.params as WorkItemParams} id={id} />
     case 'step': return <StepScreen screen={screen} params={screen.params as StepParams} id={id} />
-    case 'record': return <RecordScreen screen={screen} params={screen.params as RecordParams} id={id} />
+    case 'record': {
+      // #170: the record kind names its view; the view names the plain-React component (a one-off screen each, the #167 rule)
+      const rp = screen.params as RecordParams
+      if (rp.view === 'scheme.vScheme') return <SchemeScreen screen={screen} params={rp} id={id} />
+      if (rp.view === 'asset.vPrimaryAsset') return <PrimaryAssetScreen screen={screen} params={rp} id={id} />
+      return <RecordScreen screen={screen} params={rp} id={id} />
+    }
     default: return <Status bad>The screen kind “{screen.screenKind}” is not built yet (screen {screen.key}{id ? ', id ' + id : ''}).</Status>
   }
 }

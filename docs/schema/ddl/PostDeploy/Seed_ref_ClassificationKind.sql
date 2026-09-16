@@ -7,7 +7,8 @@ USING (VALUES
     (N'BesStatus',            N'BES status'),
     (N'CipImpactRating',      N'CIP impact rating'),
     (N'NpccBulkPowerSystem',  N'NPCC bulk power system'),
-    (N'NpccA10',              N'NPCC A-10 list')
+    (N'NpccA10',              N'NPCC A-10 list'),
+    (N'Prc023',               N'PRC-023 list (impactful lines)')
 ) AS s ([ClassificationKindCode], [Name])
 ON t.[ClassificationKindCode] = s.[ClassificationKindCode]
 WHEN MATCHED AND t.[Name] <> s.[Name] THEN UPDATE SET [Name] = s.[Name], [ModifiedBy] = @actor, [ModifiedAt] = @now
