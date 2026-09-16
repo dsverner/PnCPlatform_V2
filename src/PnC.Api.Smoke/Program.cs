@@ -987,13 +987,13 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
         {
             var (la, lb) = await Post(admin, "api/v1/asset/Asset_Add", new { AssetTypeCode = "Line", Name = $"{tag} line 0001", Status = "InService" });
             var line = Id(lb);
-            var (pa, pb) = await Post(admin, "api/v1/asset/PlaceAsset", new { AssetEntityId = line, NodeEntityId = station, PlacementKind = "Installed" });
+            var (pa, pb) = await Post(admin, "api/v1/asset/AssetTerminal_Add", new { AssetEntityId = line, TerminalNo = 1, StationNodeEntityId = station });
             var (sa, sb) = await Post(admin, "api/v1/scheme/SchemeProtects_Add", new { SchemeEntityId = scheme, PrimaryAssetEntityId = line, ZoneRole = "Primary" });
-            Must(la == HttpStatusCode.OK && line is not null && pa == HttpStatusCode.OK && sa == HttpStatusCode.OK, $"#170: a line created at the station and the scheme protects it ({(int)la} {Code(lb)} · {(int)pa} {Code(pb)} · {(int)sa} {Code(sb)})");
+            Must(la == HttpStatusCode.OK && line is not null && pa == HttpStatusCode.OK && sa == HttpStatusCode.OK, $"#170: a line created with the station as its terminal 1 and the scheme protects it ({(int)la} {Code(lb)} · {(int)pa} {Code(pb)} · {(int)sa} {Code(sb)})");
             var (pas, pab) = await Get(admin, $"api/v1/asset/vPrimaryAsset?EntityId={line}");
             var prow = (pab?["rows"] as JsonArray)?.FirstOrDefault();
-            Must(pas == HttpStatusCode.OK && prow?["AssetTypeCode"]?.ToString() == "Line" && string.Equals(prow?["StationNodeEntityId"]?.ToString(), station.ToString(), StringComparison.OrdinalIgnoreCase) && prow?["Classifications"] is null,
-                $"#170: the primary-asset read model shows the line at its station with no classification yet ({prow?["AssetTypeName"]} at {prow?["StationName"]})");
+            Must(pas == HttpStatusCode.OK && prow?["AssetTypeCode"]?.ToString() == "Line" && string.Equals(prow?["Terminal1NodeEntityId"]?.ToString(), station.ToString(), StringComparison.OrdinalIgnoreCase) && prow?["Classifications"] is null,
+                $"#170: the primary-asset read model shows the line with its terminal and no classification yet ({prow?["AssetTypeName"]}, terminals {prow?["Stations"]})");
             var (k1s, k1b) = await Post(hydro!, "api/v1/asset/RecordClassification", new { SubjectKind = "Asset", SubjectEntityId = line, ClassificationKindCode = "CipImpactRating", ClassificationValue = "Medium" });
             var (k2s, k2b) = await Post(admin, "api/v1/asset/RecordClassification", new { SubjectKind = "Asset", SubjectEntityId = line, ClassificationKindCode = "NpccBulkPowerSystem", ClassificationValue = "BPS" });
             var (k3s, k3b) = await Post(admin, "api/v1/asset/RecordClassification", new { SubjectKind = "Asset", SubjectEntityId = line, ClassificationKindCode = "CipImpactRating", ClassificationValue = "High" });

@@ -43,7 +43,7 @@ export default function SchemeScreen({ params: p, id }: { screen: Screen; params
   const station = stationQ.data
   // every primary asset, any station: a line has two ends and both ends' schemes protect the one line (2103 B-PROT at Bathurst and at Eel River, 2026-09-16)
   const candidatesQ = useViewAll('asset', 'vPrimaryAsset', {}, 'Name')
-  const candidates = useMemo(() => { const f = find.toLowerCase(); const all = candidatesQ.data ?? []; const hit = all.filter((x) => !f || s(x.Name).toLowerCase().includes(f) || s(x.StationName).toLowerCase().includes(f)); return hit.sort((a, b) => (s(a.StationNodeEntityId) === s(station?.StationNodeEntityId) ? 0 : 1) - (s(b.StationNodeEntityId) === s(station?.StationNodeEntityId) ? 0 : 1) || s(a.Name).localeCompare(s(b.Name))) }, [candidatesQ.data, find, station])
+  const candidates = useMemo(() => { const f = find.toLowerCase(); const all = candidatesQ.data ?? []; const hit = all.filter((x) => !f || s(x.Name).toLowerCase().includes(f) || s(x.Stations).toLowerCase().includes(f)); const here = (x: Row) => s(x.Terminal1NodeEntityId) === s(station?.StationNodeEntityId) || s(x.Terminal2NodeEntityId) === s(station?.StationNodeEntityId) ? 0 : 1; return hit.sort((a, b) => here(a) - here(b) || s(a.Name).localeCompare(s(b.Name))) }, [candidatesQ.data, find, station])
   const editable = can('Scheme.Modify')
   const refresh = () => { qc.invalidateQueries({ queryKey: ['schemeProtects', id] }); qc.invalidateQueries({ queryKey: ['view', 'asset', 'vPrimaryAsset'] }) }
   const link = async (assetId: string, label: string) => {
@@ -57,9 +57,9 @@ export default function SchemeScreen({ params: p, id }: { screen: Screen; params
     try {
       const a = await proc<Row>('asset', 'Asset_Add', { AssetTypeCode: newType, Name: newName.trim(), Status: 'InService' })
       const assetId = s(a.EntityId)
-      await proc('asset', 'PlaceAsset', { AssetEntityId: assetId, NodeEntityId: s(station.StationNodeEntityId), PlacementKind: 'Installed' })
+      await proc('asset', 'AssetTerminal_Add', { AssetEntityId: assetId, TerminalNo: 1, StationNodeEntityId: s(station.StationNodeEntityId) })   // terminal 1: this scheme's station; the other end on the asset's page
       setNewName('')
-      await link(assetId, `${newName.trim()} (new ${newType.toLowerCase()} at ${s(station.StationName)})`)
+      await link(assetId, `${newName.trim()} (new ${newType.toLowerCase()}, terminal 1 ${s(station.StationName)})`)
     } catch (e) { setMsg({ text: e instanceof ApiError ? e.message : String(e), bad: true }); setBusy(false) }
   }
   const unlink = async (x: Row) => {
@@ -85,7 +85,7 @@ export default function SchemeScreen({ params: p, id }: { screen: Screen; params
         {msg && <Status bad={msg.bad}>{msg.text}</Status>}
         <DataGrid rows={protectsQ.data ?? []} rowKey={(x) => s(x.LinkEntityId)} emptyText="Nothing recorded yet: which primary asset does this scheme protect?" columns={[
           { key: 'Name', label: 'Primary asset', render: (x) => <a className="text-sky-300 underline" href={screenPath('PRIMARY_ASSET', s(x.PrimaryAssetEntityId))} onClick={(e) => { e.preventDefault(); navigate(screenPath('PRIMARY_ASSET', s(x.PrimaryAssetEntityId))) }}>{s(x.Name) || s(x.PrimaryAssetEntityId).slice(0, 8)}</a> },
-          { key: 'AssetTypeName', label: 'Type' }, { key: 'Terminals', label: 'Stations (from its schemes)', render: (x) => s(x.Terminals) || s(x.StationName) }, { key: 'ZoneRole', label: 'Zone' },
+          { key: 'AssetTypeName', label: 'Type' }, { key: 'Stations', label: 'Terminals' }, { key: 'ProtectedFrom', label: 'Protected from' }, { key: 'ZoneRole', label: 'Zone' },
           { key: 'Classifications', label: 'Classifications', render: (x) => <span className="text-xs text-slate-400">{s(x.Classifications) || 'none recorded'}</span> },
           ...(editable ? [{ key: '_x', label: '', render: (x: Row) => <Button kind="mini" onClick={() => void unlink(x)}>remove</Button> }] : [])]} />
         {editable && (
@@ -94,7 +94,7 @@ export default function SchemeScreen({ params: p, id }: { screen: Screen; params
               <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Add an existing primary asset (any station — a line has two ends){station ? `; ${s(station.StationName)} first` : ''}</h4>
               <div className="mt-1 flex flex-wrap items-end gap-2">
                 <Field label="Find"><input className={inputClass} value={find} onChange={(e) => setFind(e.target.value)} placeholder="name contains…" /></Field>
-                <Field label="Primary asset"><select className={inputClass} value={pick} onChange={(e) => setPick(e.target.value)}><option value="">— choose —</option>{candidates.map((x) => <option key={s(x.EntityId)} value={s(x.EntityId)}>{s(x.Name)} · {s(x.AssetTypeName)}{x.StationName ? ' · ' + s(x.StationName) : ''}</option>)}</select></Field>
+                <Field label="Primary asset"><select className={inputClass} value={pick} onChange={(e) => setPick(e.target.value)}><option value="">— choose —</option>{candidates.map((x) => <option key={s(x.EntityId)} value={s(x.EntityId)}>{s(x.Name)} · {s(x.AssetTypeName)}{x.Stations ? ' · ' + s(x.Stations) : ''}</option>)}</select></Field>
                 <Field label="Zone"><select className={inputClass} value={zone} onChange={(e) => setZone(e.target.value)}>{ZONES.map((z) => <option key={z}>{z}</option>)}</select></Field>
                 <Button kind="primary" disabled={!pick || busy} onClick={() => void link(pick, s(candidates.find((x) => s(x.EntityId) === pick)?.Name))}>Protects</Button>
               </div>
@@ -106,7 +106,7 @@ export default function SchemeScreen({ params: p, id }: { screen: Screen; params
                 <Field label="Name"><input className={inputClass} value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="e.g. L0012" /></Field>
                 <Button kind="primary" disabled={!newName.trim() || !station?.StationNodeEntityId || busy} onClick={() => void create()}>Create and protect</Button>
               </div>
-              <div className="mt-1 text-xs text-slate-500">A name, a type and the station — nothing more in this phase. The power-system model (the TLM project) attaches later.</div>
+              <div className="mt-1 text-xs text-slate-500">A name, a type and this station as its terminal 1 — the other end of a line is set on the asset's page. The power-system model (the TLM project) attaches later.</div>
             </div>
           </div>
         )}

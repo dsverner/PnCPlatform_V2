@@ -25,12 +25,12 @@
         "label": "Type"
       },
       {
-        "key": "Terminals",
-        "label": "Stations (from its schemes)"
+        "key": "Stations",
+        "label": "Terminals"
       },
       {
-        "key": "StationName",
-        "label": "Placed at"
+        "key": "ProtectedFrom",
+        "label": "Protected from"
       },
       {
         "key": "Status",
@@ -44,8 +44,8 @@
     ],
     "textFilterColumns": [
       "Name",
-      "StationName",
-      "Terminals",
+      "Stations",
+      "ProtectedFrom",
       "AssetTypeName",
       "Classifications"
     ],
@@ -55,8 +55,8 @@
         "label": "Type"
       },
       {
-        "column": "StationName",
-        "label": "Station"
+        "column": "Terminal1StationName",
+        "label": "Terminal 1"
       }
     ],
     "rowOpen": {
