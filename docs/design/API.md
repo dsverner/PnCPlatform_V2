@@ -306,6 +306,21 @@ process and is skipped in Windows mode.
 
 The setting display (§9) links every file name to it.
 
+## 8d. Screens from definitions — W8 (2026-09-15, decisions #165, #167)
+
+- `GET /api/v1/screens` — the Effective `Program.Screen` definitions the person may open (each screen's `permission` is checked
+  against the codes `/me` lists; no `Definition.Read` needed): `{ screens: [{ key, name, description, versionRowId, versionNumber,
+  menu, permission, screenKind, params }] }`. The React shell builds its navigation from this and routes `/app/s/<key>[/<id>]` to
+  the screen kind the definition names (`settingsBook`, `list`, `workItem`, `step`, `record`; schema `docs/design/screen.schema.json`).
+- `GET /api/v1/process/step-instances/{id}` — one read for the generic step screen: the step's live state and claim
+  (`state, outcome, assignedRoleCode, claimedByActorId, claimedByDisplayName, claimExpiresAt, isClaimant, witnessedBy…, committedAt`),
+  its `draft`, its member, its due date, and `definition` — the step node lifted from the pinned procedure document (`title,
+  instruction, role, roleCode, capture, outcomes, evidence, signoff, deviation, due, record, produces, advances`). Authorised as
+  the draft read (`WorkRequest.Read` on the run's request); a read by anyone but the claimant is logged (#68).
+- `POST /api/v1/definitions/documents` accepts `document.kind` = `procedure`, `workflow` or `screen`; the kinds are a table in
+  `DefinitionEndpoints.cs` (schema file, definition kind, add/approve procedures, whether expressions compile). A screen document
+  compiles nothing: the schema is the whole check and the stored form is the document.
+
 ## 9. The PWA shell
 
 **The definitions screen (W5, 2026-09-12; decisions #119, #120, #122).** `/definitions.html` + `definitions.js`, with

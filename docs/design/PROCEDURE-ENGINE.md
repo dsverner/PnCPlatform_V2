@@ -371,6 +371,19 @@ correctly.
 
 ---
 
+## 8a. Screens — drawn from the document, never written per procedure (W8, #165)
+
+The procedure document produces its screens as well as its runs. Two components in code serve every procedure: the **work
+item** draws a procedure instance's block tree (a parallel block's branches side by side as the tracks, the other blocks as
+rows, holds with a release, foreach members named) and the workflow document's states as the stage bar, with the transitions
+from the current state as buttons; the **step** draws a step's `instruction`, its `capture` fields by type (a picker for `ref`
+and `set`), its `evidence` kinds as file inputs, its `outcomes` as commit buttons, its `signoff` (witness) and the acts a person
+performs — claim, release, take over, witness, save the draft, commit, check in a field capture. A `Program.Screen` definition
+names the kind and its data; nothing in it is procedure-specific. Where a step needs a richer surface (a settings comparison,
+a test-sheet grid, a waveform), that surface is written once as a kind and a step names it — a handful across the program.
+Proved 2026-09-15 with the owner's four-step settings-change procedure (`examples/settings-change-simple.procedure.json`),
+authored and run end to end with no screen work.
+
 ## 9. The worked example — the settings change
 
 `examples/settings-change.procedure.json`, v0.2. Fourteen steps; four things the legacy system
