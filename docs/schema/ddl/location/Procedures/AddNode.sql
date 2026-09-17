@@ -39,7 +39,7 @@ BEGIN
                                             WHERE [ChildNodeTypeCode] = @NodeTypeCode AND [IsActive] = 1)
                                THEN 0 ELSE 1 END;
     -- #175: the code is checked before anything is written, and an empty one is simply no code
-    EXEC [location].[AssertNodeCode] @Caller = N'location.AddNode', @Code = @Code OUTPUT;
+    EXEC [location].[AssertNodeCode] @Caller = N'location.AddNode', @Code = @Code OUTPUT, @ParentEntityId = @ParentEntityId;
     SET @Code = NULLIF(@Code, N'');
 
     DECLARE @path NVARCHAR(900), @depth TINYINT, @parentFloc NVARCHAR(400);

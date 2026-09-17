@@ -66,7 +66,7 @@ BEGIN
     DECLARE @newCode NVARCHAR(40) = @oldCode, @newFloc NVARCHAR(400) = @oldFloc, @codeChanged BIT = 0;
     IF @Code IS NOT NULL
     BEGIN
-        EXEC [location].[AssertNodeCode] @Caller = N'location.RenameNode', @Code = @Code OUTPUT;
+        EXEC [location].[AssertNodeCode] @Caller = N'location.RenameNode', @Code = @Code OUTPUT, @ParentEntityId = @parent, @SelfEntityId = @EntityId;
         SET @newCode = NULLIF(@Code, N'');
         -- NULL-safe comparison: INTERSECT treats two NULLs as equal, which is what "the code did not change" means
         IF NOT EXISTS (SELECT @newCode INTERSECT SELECT @oldCode) SET @codeChanged = 1;

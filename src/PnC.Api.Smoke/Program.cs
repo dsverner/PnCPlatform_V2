@@ -1107,6 +1107,17 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
             var (k175_e3s, _) = await Post(admin, "api/v1/location/AddNode", new { NodeTypeCode = "EquipmentPosition", ParentEntityId = k175_yard, Name = "another T3", Code = "T3" });
             Must(k175_e1s == HttpStatusCode.Conflict && k175_e2s == HttpStatusCode.Conflict && k175_e3s != HttpStatusCode.OK,
                 $"#175: a code is one segment — the separator is refused ({(int)k175_e1s} {k175_e1b?["detail"]}), so is a space ({(int)k175_e2s}), and a sibling may not repeat one ({(int)k175_e3s})");
+            // #177 (2026-09-17): a duplicate code is refused in the platform's words, naming the node that holds it. The
+            // owner met SQL Server's instead — "Cannot insert duplicate key row ... unique index 'UX_Node_ParentCode'.
+            // The duplicate key value is (20d4c714-..., 4416)" — which names neither the code nor the station holding it.
+            var (k177_d1s, k177_d1b) = await Post(admin, "api/v1/location/AddNode", new { NodeTypeCode = "EquipmentPosition", ParentEntityId = k175_yard, Name = "another T3", Code = "T3" });
+            var k177_msg = k177_d1b?["detail"]?.ToString() ?? "";
+            // and saving a node without changing its code is not a collision with itself
+            var (k177_s1s, _) = await Post(admin, "api/v1/location/RenameNode", new { EntityId = k175_t3, Name = "Transformer T3", Code = "T3" });
+            Must(k177_d1s == HttpStatusCode.Conflict && k177_msg.Contains("already used by") && k177_msg.Contains("Transformer T3")
+                 && !k177_msg.Contains("UX_Node_") && k177_s1s == HttpStatusCode.OK,
+                $"#177: a duplicate code names the node that holds it ({(int)k177_d1s} {k177_msg}), and a node keeping its own code is not a collision with itself ({(int)k177_s1s})");
+
 
             // the FLOC follows a code change, for the node and everything beneath it
             var (k175_r1s, k175_r1b) = await Post(admin, "api/v1/location/RenameNode", new { EntityId = k175_yard, Name = "230 kV yard (HQ side)", Code = "Y230HQ" });
