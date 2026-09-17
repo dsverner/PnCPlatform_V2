@@ -16,7 +16,7 @@ export interface Command {
   transition?: string; requiresReason?: boolean; url?: string; when?: When; permission?: string
 }
 export interface SettingsBookParams {
-  view: string; stationsView?: string; stationColumn: string; stateColumn: string
+  view: string; stationsView?: string; stationsNodeType?: string; stationColumn: string; stateColumn: string
   states: { value: string; label: string; badgeFrom?: string; badgeLabel?: string }[]
   deviceColumn?: string; rowKey?: string; orderBy?: string
   groupings?: { key: string; label: string; empty?: string; showInstead?: string[] }[]

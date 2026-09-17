@@ -1,65 +1,332 @@
 {
-  "g": 1, "kind": "screen", "key": "SETTINGS_BOOK", "name": "Settings",
+  "g": 1,
+  "kind": "screen",
+  "key": "SETTINGS_BOOK",
+  "name": "Settings",
   "description": "The settings book: a location, its settings records grouped by scheme, a row that unfolds to its card and filed settings text, the state toggle, the commands of the legacy main window (#157, #163, #165).",
-  "menu": { "group": "Settings book", "label": "Settings", "order": 10 },
+  "menu": {
+    "group": "Settings book",
+    "label": "Settings",
+    "order": 10
+  },
   "permission": "ConfigurationFile.Read",
   "screenKind": "settingsBook",
   "params": {
     "view": "document.vSettingsRecord",
     "stationsView": "location.vNode",
-    "stationColumn": "StationNodeEntityId",
+    "stationsNodeType": "Building",
+    "stationColumn": "BuildingNodeEntityId",
     "stateColumn": "GridState",
     "states": [
-      { "value": "Active", "label": "Active", "badgeFrom": "Outstanding", "badgeLabel": "outstanding request" },
-      { "value": "Outstanding", "label": "Outstanding" },
-      { "value": "Archived", "label": "Archived" }
+      {
+        "value": "Active",
+        "label": "Active",
+        "badgeFrom": "Outstanding",
+        "badgeLabel": "outstanding request"
+      },
+      {
+        "value": "Outstanding",
+        "label": "Outstanding"
+      },
+      {
+        "value": "Archived",
+        "label": "Archived"
+      }
     ],
     "deviceColumn": "DeviceEntityId",
     "rowKey": "RevisionRowId",
     "orderBy": "-CalculatedAt",
     "groupings": [
-      { "key": "SchemeName", "label": "Scheme", "empty": "(no scheme yet)", "showInstead": ["PanelName"] },
-      { "key": "PanelName", "label": "Equipment", "empty": "(no equipment)", "showInstead": ["SchemeName"] },
-      { "key": "none", "label": "No grouping", "showInstead": ["SchemeName", "PanelName"] }
+      {
+        "key": "SchemeName",
+        "label": "Scheme",
+        "empty": "(no scheme yet)",
+        "showInstead": [
+          "PanelName"
+        ]
+      },
+      {
+        "key": "PanelName",
+        "label": "Equipment",
+        "empty": "(no equipment)",
+        "showInstead": [
+          "SchemeName"
+        ]
+      },
+      {
+        "key": "none",
+        "label": "No grouping",
+        "showInstead": [
+          "SchemeName",
+          "PanelName"
+        ]
+      }
     ],
     "leadColumns": [
-      { "key": "Functions", "label": "Functions", "fallback": "PositionName" },
-      { "key": "DeviceName", "label": "Device", "format": "legacyFree" },
-      { "key": "RevisionLabel", "label": "Rev" }
+      {
+        "key": "Functions",
+        "label": "Functions",
+        "fallback": "PositionName"
+      },
+      {
+        "key": "DeviceName",
+        "label": "Device",
+        "format": "legacyFree"
+      },
+      {
+        "key": "RevisionLabel",
+        "label": "Rev"
+      }
     ],
-    "defaultColumns": ["ModelCode", "ManufacturerName", "FirmwareVersion", "SerialNumber", "VoltageClassCode", "WorkRequestTitle", "WorkTypeKey", "CalculatedAt", "VerifiedAt", "LifecycleState", "FileKind"],
+    "defaultColumns": [
+      "ModelCode",
+      "ManufacturerName",
+      "FirmwareVersion",
+      "SerialNumber",
+      "VoltageClassCode",
+      "WorkRequestTitle",
+      "WorkTypeKey",
+      "CalculatedAt",
+      "VerifiedAt",
+      "LifecycleState",
+      "FileKind"
+    ],
     "labels": {
-      "StationName": "Location", "SchemeName": "Scheme", "PanelName": "Equipment", "PositionName": "Position", "ModelCode": "Model", "ModelName": "Model name",
-      "ManufacturerName": "Manufacturer", "FirmwareVersion": "Software version", "SerialNumber": "Serial number", "VoltageClassCode": "Voltage", "WorkRequestTitle": "Change request",
-      "WorkTypeKey": "Action type", "CalculatedAt": "Calculated", "VerifiedAt": "Verified", "LifecycleState": "Lifecycle", "FileKind": "File kind", "GridState": "State", "StationNumber": "Station no.",
-      "ParseStatus": "Parsed", "InServiceFrom": "In service from", "InServiceTo": "In service to", "ReturnToServiceAt": "Returned to service", "CalculatedByDisplayName": "Calculated by", "Technology": "Technology", "AssetStatus": "Device status"
+      "BuildingName": "Location",
+      "StationName": "Station",
+      "SchemeName": "Scheme",
+      "PanelName": "Equipment",
+      "PositionName": "Position",
+      "ModelCode": "Model",
+      "ModelName": "Model name",
+      "ManufacturerName": "Manufacturer",
+      "FirmwareVersion": "Software version",
+      "SerialNumber": "Serial number",
+      "VoltageClassCode": "Voltage",
+      "WorkRequestTitle": "Change request",
+      "WorkTypeKey": "Action type",
+      "CalculatedAt": "Calculated",
+      "VerifiedAt": "Verified",
+      "LifecycleState": "Lifecycle",
+      "FileKind": "File kind",
+      "GridState": "State",
+      "StationNumber": "Station no.",
+      "ParseStatus": "Parsed",
+      "InServiceFrom": "In service from",
+      "InServiceTo": "In service to",
+      "ReturnToServiceAt": "Returned to service",
+      "CalculatedByDisplayName": "Calculated by",
+      "Technology": "Technology",
+      "AssetStatus": "Device status"
     },
-    "formats": { "CalculatedAt": "date", "VerifiedAt": "date", "InServiceFrom": "date", "InServiceTo": "date", "ReturnToServiceAt": "date", "WorkRequestTitle": "legacyFree", "LifecycleState": "state" },
-    "hiddenColumns": ["RowSeq", "RevisionRowId", "DeviceEntityId", "LifecycleWorkflowInstanceEntityId", "DocumentEntityId", "PackageRevisionRowId", "PackageSequence", "WorkRequestEntityId", "ProcedureInstanceEntityId", "RtsStepInstanceEntityId", "RtsStepState", "ModelId", "PositionNodeEntityId", "PanelNodeEntityId", "StationNodeEntityId", "SchemeEntityId", "InServiceFromQuality"],
-    "textFilterColumns": ["SchemeName", "PanelName", "StationName", "PositionName"],
+    "formats": {
+      "CalculatedAt": "date",
+      "VerifiedAt": "date",
+      "InServiceFrom": "date",
+      "InServiceTo": "date",
+      "ReturnToServiceAt": "date",
+      "WorkRequestTitle": "legacyFree",
+      "LifecycleState": "state"
+    },
+    "hiddenColumns": [
+      "RowSeq",
+      "RevisionRowId",
+      "DeviceEntityId",
+      "LifecycleWorkflowInstanceEntityId",
+      "DocumentEntityId",
+      "PackageRevisionRowId",
+      "PackageSequence",
+      "WorkRequestEntityId",
+      "ProcedureInstanceEntityId",
+      "RtsStepInstanceEntityId",
+      "RtsStepState",
+      "ModelId",
+      "PositionNodeEntityId",
+      "PanelNodeEntityId",
+      "BuildingNodeEntityId",
+      "StationNodeEntityId",
+      "SchemeEntityId",
+      "InServiceFromQuality"
+    ],
+    "textFilterColumns": [
+      "SchemeName",
+      "PanelName",
+      "BuildingName",
+      "StationName",
+      "PositionName"
+    ],
     "card": {
       "facts": [
-        { "key": "DeviceName", "label": "Device", "format": "legacyFree" }, { "key": "ModelCode", "label": "Model" }, { "key": "ModelName", "label": "Model name" }, { "key": "ManufacturerName", "label": "Manufacturer" },
-        { "key": "FirmwareVersion", "label": "Software version" }, { "key": "SerialNumber", "label": "Serial number" }, { "key": "Functions", "label": "Functions", "fallback": "PositionName" },
-        { "key": "StationName", "label": "Location" }, { "key": "SchemeName", "label": "Scheme" }, { "key": "PanelName", "label": "Equipment" }, { "key": "PositionName", "label": "Position" },
-        { "key": "CalculatedAt", "label": "Calculated", "format": "when" }, { "key": "CalculatedByDisplayName", "label": "Calculated by" }, { "key": "VerifiedAt", "label": "Verified", "format": "when" },
-        { "key": "InServiceFrom", "label": "In service from", "format": "date" }, { "key": "InServiceTo", "label": "In service to", "format": "date" },
-        { "key": "WorkRequestTitle", "label": "Change request", "format": "legacyFree" }, { "key": "WorkTypeKey", "label": "Action type" }, { "key": "LifecycleState", "label": "Lifecycle", "format": "state" }
+        {
+          "key": "DeviceName",
+          "label": "Device",
+          "format": "legacyFree"
+        },
+        {
+          "key": "ModelCode",
+          "label": "Model"
+        },
+        {
+          "key": "ModelName",
+          "label": "Model name"
+        },
+        {
+          "key": "ManufacturerName",
+          "label": "Manufacturer"
+        },
+        {
+          "key": "FirmwareVersion",
+          "label": "Software version"
+        },
+        {
+          "key": "SerialNumber",
+          "label": "Serial number"
+        },
+        {
+          "key": "Functions",
+          "label": "Functions",
+          "fallback": "PositionName"
+        },
+        {
+          "key": "BuildingName",
+          "label": "Location"
+        },
+        {
+          "key": "SchemeName",
+          "label": "Scheme"
+        },
+        {
+          "key": "PanelName",
+          "label": "Equipment"
+        },
+        {
+          "key": "PositionName",
+          "label": "Position"
+        },
+        {
+          "key": "CalculatedAt",
+          "label": "Calculated",
+          "format": "when"
+        },
+        {
+          "key": "CalculatedByDisplayName",
+          "label": "Calculated by"
+        },
+        {
+          "key": "VerifiedAt",
+          "label": "Verified",
+          "format": "when"
+        },
+        {
+          "key": "InServiceFrom",
+          "label": "In service from",
+          "format": "date"
+        },
+        {
+          "key": "InServiceTo",
+          "label": "In service to",
+          "format": "date"
+        },
+        {
+          "key": "WorkRequestTitle",
+          "label": "Change request",
+          "format": "legacyFree"
+        },
+        {
+          "key": "WorkTypeKey",
+          "label": "Action type"
+        },
+        {
+          "key": "LifecycleState",
+          "label": "Lifecycle",
+          "format": "state"
+        }
       ],
       "textFrom": "revisionFile",
       "links": [
-        { "label": "Open the record", "action": "openScreen", "screen": "SETTINGS_RECORD", "param": "RevisionRowId" },
-        { "label": "Change request", "action": "openScreen", "screen": "WORK_ITEM", "param": "WorkRequestEntityId", "when": { "WorkRequestEntityId": ["*"] } }
+        {
+          "label": "Open the record",
+          "action": "openScreen",
+          "screen": "SETTINGS_RECORD",
+          "param": "RevisionRowId"
+        },
+        {
+          "label": "Change request",
+          "action": "openScreen",
+          "screen": "WORK_ITEM",
+          "param": "WorkRequestEntityId",
+          "when": {
+            "WorkRequestEntityId": [
+              "*"
+            ]
+          }
+        }
       ]
     },
     "commands": [
-      { "label": "Open the record", "action": "openScreen", "screen": "SETTINGS_RECORD", "param": "RevisionRowId" },
-      { "label": "Change request", "action": "openScreen", "screen": "WORK_ITEM", "param": "WorkRequestEntityId", "when": { "WorkRequestEntityId": ["*"] } },
-      { "label": "Set verified date", "action": "openStep", "param": "RtsStepInstanceEntityId", "when": { "RtsStepState": ["Ready", "Active"] }, "permission": "Record.Modify" },
-      { "label": "Request change", "action": "raiseRequest", "workflowKey": "SETTINGS_CHANGE_REQUEST", "workType": "SETTINGS_CHANGE", "scopeKind": "Asset", "scopeColumn": "DeviceEntityId", "titleFrom": "DeviceName", "when": { "GridState": "Active" }, "permission": "WorkRequest.Modify" },
-      { "label": "New setting here", "action": "raiseRequest", "workflowKey": "SETTINGS_CHANGE_REQUEST", "workType": "SETTINGS_ADD", "scopeKind": "Node", "scopeColumn": "PositionNodeEntityId", "titleFrom": "PositionName", "when": { "PositionNodeEntityId": ["*"] }, "permission": "WorkRequest.Modify" },
-      { "label": "Compare revisions", "action": "url", "url": "/app/s/SETTINGS_RECORD/{RevisionRowId}#compare" }
+      {
+        "label": "Open the record",
+        "action": "openScreen",
+        "screen": "SETTINGS_RECORD",
+        "param": "RevisionRowId"
+      },
+      {
+        "label": "Change request",
+        "action": "openScreen",
+        "screen": "WORK_ITEM",
+        "param": "WorkRequestEntityId",
+        "when": {
+          "WorkRequestEntityId": [
+            "*"
+          ]
+        }
+      },
+      {
+        "label": "Set verified date",
+        "action": "openStep",
+        "param": "RtsStepInstanceEntityId",
+        "when": {
+          "RtsStepState": [
+            "Ready",
+            "Active"
+          ]
+        },
+        "permission": "Record.Modify"
+      },
+      {
+        "label": "Request change",
+        "action": "raiseRequest",
+        "workflowKey": "SETTINGS_CHANGE_REQUEST",
+        "workType": "SETTINGS_CHANGE",
+        "scopeKind": "Asset",
+        "scopeColumn": "DeviceEntityId",
+        "titleFrom": "DeviceName",
+        "when": {
+          "GridState": "Active"
+        },
+        "permission": "WorkRequest.Modify"
+      },
+      {
+        "label": "New setting here",
+        "action": "raiseRequest",
+        "workflowKey": "SETTINGS_CHANGE_REQUEST",
+        "workType": "SETTINGS_ADD",
+        "scopeKind": "Node",
+        "scopeColumn": "PositionNodeEntityId",
+        "titleFrom": "PositionName",
+        "when": {
+          "PositionNodeEntityId": [
+            "*"
+          ]
+        },
+        "permission": "WorkRequest.Modify"
+      },
+      {
+        "label": "Compare revisions",
+        "action": "url",
+        "url": "/app/s/SETTINGS_RECORD/{RevisionRowId}#compare"
+      }
     ],
-    "report": "/report.html?StationNodeEntityId={StationNodeEntityId}&GridState={GridState}"
+    "report": "/report.html?BuildingNodeEntityId={BuildingNodeEntityId}&GridState={GridState}"
   }
 }

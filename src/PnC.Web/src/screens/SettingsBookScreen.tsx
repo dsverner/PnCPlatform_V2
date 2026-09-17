@@ -38,7 +38,11 @@ export default function SettingsBookScreen({ screen, params: p }: { screen: Scre
   const [raise, setRaise] = useState<RaiseOpts | null>(null)
 
   // ---- the location list (legacy: the active location; round 4: a list first, the estate only by an explicit choice)
-  const stationsQ = useViewAll(stSchema, stView, { NodeTypeCode: 'Station' }, 'Name')
+  // #179: WHICH node type is the definition's, because after #178 the unit a person picks is the BUILDING, not the
+  // station — Eel River is one station with two buildings and only the building tells its 230 kV records from its
+  // 138 kV ones. The list still reads location.vNode and still filters the grid by one column; both are named by the
+  // definition, so moving the list another level costs no code here.
+  const stationsQ = useViewAll(stSchema, stView, { NodeTypeCode: p.stationsNodeType ?? 'Station' }, 'Name')
   const stations = stationsQ.data ?? []
   const stationRows = stations.filter((x) => !stationFilter || String(x.Name).toLowerCase().includes(stationFilter.toLowerCase()))
   const stationName = stations.find((x) => String(x.EntityId).toLowerCase() === station.toLowerCase())?.Name

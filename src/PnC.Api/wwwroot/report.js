@@ -10,14 +10,19 @@
   const shown = (name) => legacyFree(name);
   const gridState = q.GridState || "Active";
 
+  // #179: the report is per location, and after #178 a location is a BUILDING. The address may still name a station,
+  // because links and bookmarks made before this change carry one and both are ordinary columns of the same view.
+  const locCol = q.BuildingNodeEntityId ? "BuildingNodeEntityId" : "StationNodeEntityId";
+  const locId = q.BuildingNodeEntityId || q.StationNodeEntityId;
+
   async function load() {
-    if (!q.StationNodeEntityId) { setStatus("status", "No location in the address (report.html?StationNodeEntityId=…&GridState=Active).", true); return; }
+    if (!locId) { setStatus("status", "No location in the address (report.html?BuildingNodeEntityId=…&GridState=Active).", true); return; }
     setStatus("status", "Loading " + gridState + " records…");
     let rows = [];
-    try { rows = await fetchAll("/api/v1/document/vSettingsRecord?GridState=" + encodeURIComponent(gridState) + "&StationNodeEntityId=" + encodeURIComponent(q.StationNodeEntityId) + "&orderBy=DeviceName"); }
+    try { rows = await fetchAll("/api/v1/document/vSettingsRecord?GridState=" + encodeURIComponent(gridState) + "&" + locCol + "=" + encodeURIComponent(locId) + "&orderBy=DeviceName"); }
     catch (e) { setStatus("status", "Could not load: " + (e.status || "") + " " + e.message, true); return; }
-    let station = rows.length ? { name: rows[0].StationName, no: rows[0].StationNumber } : null;
-    if (!station) { try { const n = (await getJson("/api/v1/location/vNode?EntityId=" + encodeURIComponent(q.StationNodeEntityId))).rows[0]; station = { name: n ? n.Name : "?", no: "" }; } catch (e) { station = { name: "?", no: "" }; } }
+    let station = rows.length ? { name: locCol === "BuildingNodeEntityId" ? rows[0].BuildingName : rows[0].StationName, no: "" } : null;
+    if (!station) { try { const n = (await getJson("/api/v1/location/vNode?EntityId=" + encodeURIComponent(locId))).rows[0]; station = { name: n ? n.Name : "?", no: "" }; } catch (e) { station = { name: "?", no: "" }; } }
     $("title").textContent = "Location report — " + station.name;
     document.title = station.name + " · " + gridState + " settings · P&C Platform";
     const head = $("head"); head.textContent = "";

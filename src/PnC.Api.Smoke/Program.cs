@@ -1118,6 +1118,22 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
                  && !k177_msg.Contains("UX_Node_") && k177_s1s == HttpStatusCode.OK,
                 $"#177: a duplicate code names the node that holds it ({(int)k177_d1s} {k177_msg}), and a node keeping its own code is not a collision with itself ({(int)k177_s1s})");
 
+            // ======== #179 (2026-09-17): the settings book lists BUILDINGS, not stations. The owner, having found that the legacy
+            // LOCATION was a building all along (#178): "It would be helpful for the engineers and techs if the 'Locations' list
+            // box at the left, actually displayed the BDGx Names and filtered the data on those." So document.vSettingsRecord
+            // carries the building the device stands in, read off the same ancestors the station is read off, and the screen
+            // filters on it. A station with one building answers the same either way — which is what keeps every other
+            // location reading as it always did.
+            var (k179_a1s, k179_a1b) = await Get(admin, $"api/v1/document/vSettingsRecord?GridState=Active&StationNodeEntityId={station}&take=500");
+            var k179_byStation = (k179_a1b?["rows"] as JsonArray) ?? [];
+            var k179_bld = k179_byStation.FirstOrDefault()?["BuildingNodeEntityId"]?.ToString();
+            var (k179_a2s, k179_a2b) = await Get(admin, $"api/v1/document/vSettingsRecord?GridState=Active&BuildingNodeEntityId={k179_bld}&take=500");
+            var k179_byBuilding = (k179_a2b?["rows"] as JsonArray) ?? [];
+            var k179_named = k179_byBuilding.All(r => !string.IsNullOrWhiteSpace(r?["BuildingName"]?.ToString()));
+            Must(k179_a1s == HttpStatusCode.OK && k179_a2s == HttpStatusCode.OK && k179_bld is not null
+                 && k179_byBuilding.Count == k179_byStation.Count && k179_byStation.Count > 0 && k179_named,
+                $"#179: a settings record names the building it stands in, and a station with one building answers the same by either ({k179_byStation.Count} by station, {k179_byBuilding.Count} by building, named {k179_named})");
+
 
             // the FLOC follows a code change, for the node and everything beneath it
             var (k175_r1s, k175_r1b) = await Post(admin, "api/v1/location/RenameNode", new { EntityId = k175_yard, Name = "230 kV yard (HQ side)", Code = "Y230HQ" });

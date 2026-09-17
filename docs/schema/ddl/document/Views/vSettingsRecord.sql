@@ -57,6 +57,8 @@ SELECT r.[RowSeq],
        dp.[Name]                    AS [PositionName],
        pnl.[EntityId]               AS [PanelNodeEntityId],
        pnl.[Name]                   AS [PanelName],
+       bld.[BuildingEntityId]       AS [BuildingNodeEntityId],
+       bld.[BuildingName],
        st.[StationEntityId]         AS [StationNodeEntityId],
        st.[StationName],
        stno.[KeyValue]              AS [StationNumber],
@@ -107,6 +109,15 @@ OUTER APPLY (SELECT TOP (1) x.[StationEntityId], x.[StationName]
              FROM (VALUES (1, pnl.[EntityId], pnl.[NodeTypeCode], pnl.[Name]), (2, h2.[EntityId], h2.[NodeTypeCode], h2.[Name]),
                           (3, h3.[EntityId], h3.[NodeTypeCode], h3.[Name]), (4, h4.[EntityId], h4.[NodeTypeCode], h4.[Name])) x ([o], [StationEntityId], [T], [StationName])
              WHERE x.[T] = N'Station' ORDER BY x.[o]) st
+-- #179 (2026-09-17): the BUILDING the device stands in, read off the same four ancestors the station is read off, so it
+-- costs one more pass over rows already in hand and not a join. The owner, 2026-09-17: the settings book's location list
+-- should be the buildings, because after #178 that is the unit an engineer picks — Eel River is one station with two
+-- buildings, and only the building tells the 230 kV records from the 138 kV ones. Nearest-first like the station, so a
+-- Room between the panel and the building would not break it.
+OUTER APPLY (SELECT TOP (1) x.[BuildingEntityId], x.[BuildingName]
+             FROM (VALUES (1, pnl.[EntityId], pnl.[NodeTypeCode], pnl.[Name]), (2, h2.[EntityId], h2.[NodeTypeCode], h2.[Name]),
+                          (3, h3.[EntityId], h3.[NodeTypeCode], h3.[Name]), (4, h4.[EntityId], h4.[NodeTypeCode], h4.[Name])) x ([o], [BuildingEntityId], [T], [BuildingName])
+             WHERE x.[T] = N'Building' ORDER BY x.[o]) bld
 OUTER APPLY (SELECT TOP (1) k.[KeyValue] FROM [location].[AlternateKey] k WHERE k.[ValidTo] IS NULL AND k.[IsDeleted] = 0 AND k.[SubjectEntityId] = st.[StationEntityId] AND k.[KeyKindCode] = N'StationNumber' ORDER BY k.[IsPrimaryLabel] DESC, k.[RowSeq]) stno
 OUTER APPLY (SELECT STRING_AGG(f.[AnsiCode], N', ') WITHIN GROUP (ORDER BY f.[IsPrincipal] DESC, f.[AnsiCode]) AS [Functions]
              FROM [location].[Node] pf JOIN [scheme].[CommissionedFunction] f ON f.[ProtectionFunctionNodeEntityId] = pf.[EntityId]
