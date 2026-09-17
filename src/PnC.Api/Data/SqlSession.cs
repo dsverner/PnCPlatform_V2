@@ -145,16 +145,29 @@ public sealed class SqlSession : IAsyncDisposable
         // the SQL of vSettingsRecord (GridState = 'Archived') measured 42–54 s on QA against 0.6–1.7 s for the whole view; only
         // the read scope stays in SQL, where it belongs (IDENTITY §5)
         var materialise = MaterialiseBeforePaging.Contains(view.Key);
-        var memFilters = new List<(string Column, string Value, string SqlType)>();
+        var memFilters = new List<(string Column, string Value, string SqlType, bool Contains)>();
         foreach (var (name, value) in filters)
         {
-            var col = view.Columns.FirstOrDefault(c => c.Name.Equals(name, StringComparison.OrdinalIgnoreCase))
-                      ?? throw new ApiException(400, "unknown_column", $"'{name}' is not a column of {view.Key}.");
+            // #176: a filter named with a trailing '~' searches a text column for the value anywhere inside it — Name~=SEL-221
+            // finds "SEL-221F Z1-3=.125-64 OHMS". Every chooser needs this: nobody knows a relay's recorded name exactly. It
+            // cannot seek an index, so it is for a person typing into a search box over a few thousand rows, never for a report.
+            var contains = name.EndsWith('~');
+            var colName = contains ? name[..^1] : name;
+            var col = view.Columns.FirstOrDefault(c => c.Name.Equals(colName, StringComparison.OrdinalIgnoreCase))
+                      ?? throw new ApiException(400, "unknown_column", $"'{colName}' is not a column of {view.Key}.");
+            if (contains && !IsTextColumn(col.SqlType))
+                throw new ApiException(400, "not_searchable", $"'{col.Name}' is {col.SqlType}, not text, so it cannot be searched with '~'.");
             // an identifier predicate seeks and stays in SQL (one request, one station: 0.4–0.9 s); a predicate on a computed
             // state (GridState) is the one the optimizer mishandles, so it is applied in memory
-            if (materialise && !col.SqlType.Equals("uniqueidentifier", StringComparison.OrdinalIgnoreCase)) { if (value != "null") ConvertScalar(value, col.SqlType); memFilters.Add((col.Name, value, col.SqlType)); continue; }
+            if (materialise && !col.SqlType.Equals("uniqueidentifier", StringComparison.OrdinalIgnoreCase)) { if (value != "null" && !contains) ConvertScalar(value, col.SqlType); memFilters.Add((col.Name, value, col.SqlType, contains)); continue; }
             if (value == "null") { where.Add($"{Q(col.Name)} IS NULL"); continue; }
             var pn = $"@f{i++}";
+            if (contains)
+            {
+                cmd.Parameters.Add(new SqlParameter(pn, SqlDbType.NVarChar, -1) { Value = "%" + EscapeLike(value) + "%" });
+                where.Add($"{Q(col.Name)} LIKE {pn} ESCAPE '\\'");
+                continue;
+            }
             var sp = new SqlParameter(pn, SqlDbTypeOf(col.SqlType)) { Value = ConvertScalar(value, col.SqlType) };
             cmd.Parameters.Add(sp);
             where.Add($"{Q(col.Name)} = {pn}");
@@ -224,7 +237,7 @@ public sealed class SqlSession : IAsyncDisposable
             cmd.CommandText = body + hint;
             var all = new List<JsonObject>();
             await using (var rr = await cmd.ExecuteReaderAsync(ct))
-                while (await rr.ReadAsync(ct)) { var row = RowToJson(rr); if (memFilters.All(f => MatchesFilter(row[f.Column], f.Value, f.SqlType))) all.Add(row); }
+                while (await rr.ReadAsync(ct)) { var row = RowToJson(rr); if (memFilters.All(f => MatchesFilter(row[f.Column], f.Value, f.SqlType, f.Contains))) all.Add(row); }
             var keys = order.Select(o => (name: o.Split(' ')[0].Trim('[', ']'), desc: o.EndsWith(" DESC"))).ToList();
             var types = view.Columns.ToDictionary(c => c.Name, c => c.SqlType, StringComparer.OrdinalIgnoreCase);
             all.Sort((x, y) =>
@@ -289,12 +302,21 @@ public sealed class SqlSession : IAsyncDisposable
 
     /// <summary>SQL ordering semantics over the JSON a row was rendered to: nulls first, numbers and instants by value, text ordinal-ignore-case.</summary>
     /// <summary>An equality filter applied to a materialised row: "null" matches a null; text and identifiers compare ordinal-ignore-case; numbers by value; bits by 0/1/true/false.</summary>
-    private static bool MatchesFilter(JsonNode? v, string value, string sqlType)
+    /// <summary>A text column is one a '~' search may look inside (#176).</summary>
+    private static bool IsTextColumn(string sqlType) =>
+        sqlType.ToLowerInvariant() is "nvarchar" or "varchar" or "nchar" or "char" or "text" or "ntext";
+
+    /// <summary>The LIKE wildcards, so a person searching for "50%" finds a literal per cent rather than everything.</summary>
+    private static string EscapeLike(string v) =>
+        v.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_").Replace("[", "\\[");
+
+    private static bool MatchesFilter(JsonNode? v, string value, string sqlType, bool contains = false)
     {
         if (value == "null") return v is null;
         if (v is null) return false;
         var t = sqlType.ToLowerInvariant();
         var text = v is JsonValue jv && jv.TryGetValue<string>(out var sv) ? sv : v.ToJsonString().Trim('"');
+        if (contains) return text.Contains(value, StringComparison.OrdinalIgnoreCase);
         if (t is "bit") return (text is "true" or "1") == (value is "true" or "1" or "True");
         if (t is "int" or "bigint" or "smallint" or "tinyint" or "decimal" or "numeric" or "float" or "real" or "money")
             return decimal.TryParse(text, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var a) && decimal.TryParse(value, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var b) && a == b;

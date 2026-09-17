@@ -1014,6 +1014,73 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
             Must(sps == HttpStatusCode.OK && (spb?["rows"] as JsonArray)?.Any(r => string.Equals(r?["PrimaryAssetEntityId"]?.ToString(), line.ToString(), StringComparison.OrdinalIgnoreCase)) == true, "#170: the scheme's protects link reads back (the device sheet's 'protects … via …' line)");
         }
 
+        // ======== #176 (2026-09-17): attaching a protection to a panel a person has just built. The owner, having created a building and a
+        // panel from the Locations screen, asked "how do I associate a protection with this panel?" — the chain is panel → device position →
+        // protection function, with the relay PLACED at the position and the scheme naming that function as a member. Both writes existed as
+        // procedures and had no screen; the screens are #176's work and these checks hold their behaviour: what the platform accepts, and the
+        // refusals a person will actually meet, in the procedures' own words.
+        {
+            // a position of this fixture's own, so nothing already placed is disturbed
+            var (k176_p1s, k176_p1b) = await Post(admin, "api/v1/location/AddNode", new { NodeTypeCode = "DevicePosition", ParentEntityId = panel, Name = $"{tag} spare position", Code = "POS9" });
+            var k176_pos = Id(k176_p1b);
+            var (k176_a1s, k176_a1b) = await Post(admin, "api/v1/asset/Asset_Add", new { AssetTypeCode = "ProtectiveRelay", Name = $"{tag} spare relay", ModelId = sel, Status = "InService" });
+            var k176_relay = Id(k176_a1b);
+            var (k176_d1s, _) = await Post(admin, "api/v1/device/Device_Add", new { EntityId = k176_relay, PartNumber = $"{tag} spare relay" });
+            var (k176_pl1s, k176_pl1b) = await Post(admin, "api/v1/asset/PlaceAsset", new { AssetEntityId = k176_relay, NodeEntityId = k176_pos, PlacementKind = "Installed" });
+            var (k176_fl1s, k176_fl1b) = await Get(admin, $"api/v1/location/vFloc?NodeEntityId={k176_pos}");
+            var k176_placed = (k176_fl1b?["rows"] as JsonArray)?.FirstOrDefault();
+            Must(k176_p1s == HttpStatusCode.OK && k176_a1s == HttpStatusCode.OK && k176_d1s == HttpStatusCode.OK && k176_pl1s == HttpStatusCode.OK
+                 && string.Equals(k176_placed?["InstalledAssetEntityId"]?.ToString(), k176_relay.ToString(), StringComparison.OrdinalIgnoreCase),
+                $"#176: a relay is placed at a position a person built, and the position then reads it back ({(int)k176_pl1s} {Code(k176_pl1b)} · {k176_placed?["InstalledAssetName"]})");
+
+            // the refusals the screen must show in the procedure's own words
+            var (k176_e1s, k176_e1b) = await Post(admin, "api/v1/asset/PlaceAsset", new { AssetEntityId = k176_relay, NodeEntityId = k176_pos, CustodyLocationEntityId = k176_pos, PlacementKind = "Installed" });
+            var (k176_e2s, k176_e2b) = await Post(admin, "api/v1/asset/PlaceAsset", new { AssetEntityId = k176_relay, PlacementKind = "Installed" });
+            Must(k176_e1s == HttpStatusCode.Conflict && k176_e2s == HttpStatusCode.Conflict,
+                $"#176: a placement names exactly one of a node or a custody location — both refused ({(int)k176_e1s}), neither refused ({(int)k176_e2s} {k176_e2b?["detail"]})");
+
+            // a scheme's members are functions, assets and channels, never devices: a relay swap must leave the scheme intact
+            var (k176_m1s, k176_m1b) = await Post(admin, "api/v1/scheme/AddSchemeMember", new { SchemeEntityId = scheme, MemberKind = "Device", MemberEntityId = k176_relay, MemberRoleCode = "Member" });
+            var (k176_m2s, k176_m2b) = await Post(admin, "api/v1/scheme/AddSchemeMember", new { SchemeEntityId = scheme, MemberKind = "ProtectionFunction", MemberEntityId = k176_relay, MemberRoleCode = "Member" });
+            Must(k176_m1s != HttpStatusCode.OK && k176_m2s == HttpStatusCode.Conflict,
+                $"#176: a scheme takes functions, assets and channels and never a device ({(int)k176_m1s}), and a member kind must name a thing of that kind ({(int)k176_m2s} {k176_m2b?["detail"]})");
+
+            // a protection function under the new position, added to the scheme in a role, then withdrawn again
+            var (k176_f1s, k176_f1b) = await Post(admin, "api/v1/location/AddNode", new { NodeTypeCode = "ProtectionFunction", ParentEntityId = k176_pos, Name = "50/51 spare", Code = "5051" });
+            var k176_fn = Id(k176_f1b);
+            var (k176_m3s, k176_m3b) = await Post(admin, "api/v1/scheme/AddSchemeMember", new { SchemeEntityId = scheme, MemberKind = "ProtectionFunction", MemberEntityId = k176_fn, MemberRoleCode = "TripCircuit" });
+            var k176_member = Id(k176_m3b);
+            var (k176_v1s, k176_v1b) = await Get(admin, $"api/v1/scheme/vSchemeMember?SchemeEntityId={scheme}");
+            var k176_before = (k176_v1b?["rows"] as JsonArray)?.Count ?? 0;
+            var (k176_r1s, k176_r1b) = await Post(admin, "api/v1/scheme/SchemeMember_SoftDelete", new { EntityId = k176_member });
+            var (k176_v2s, k176_v2b) = await Get(admin, $"api/v1/scheme/vSchemeMember?SchemeEntityId={scheme}");
+            var k176_after = (k176_v2b?["rows"] as JsonArray)?.Count ?? 0;
+            Must(k176_f1s == HttpStatusCode.OK && k176_m3s == HttpStatusCode.OK && k176_r1s == HttpStatusCode.OK && k176_after == k176_before - 1,
+                $"#176: a protection function built under the position joins the scheme in a role and can be withdrawn again ({(int)k176_m3s} {Code(k176_m3b)} · {k176_before} → {k176_after} members)");
+
+            // ReadOnly may do neither
+            var (k176_q1s, _) = await Post(readOnly!, "api/v1/asset/PlaceAsset", new { AssetEntityId = k176_relay, NodeEntityId = k176_pos, PlacementKind = "Installed" });
+            var (k176_q2s, _) = await Post(readOnly!, "api/v1/scheme/AddSchemeMember", new { SchemeEntityId = scheme, MemberKind = "ProtectionFunction", MemberEntityId = k176_fn, MemberRoleCode = "Member" });
+            Must(k176_q1s == HttpStatusCode.Forbidden && k176_q2s == HttpStatusCode.Forbidden,
+                $"#176: ReadOnly places nothing ({(int)k176_q1s}) and joins nothing to a scheme ({(int)k176_q2s})");
+
+            // the chooser that finds the relay to place: a filter named with a trailing '~' searches a text column for the
+            // value ANYWHERE inside it. Without it a person would have to type an asset's recorded name exactly, which
+            // nobody knows — the registry holds names like "SEL-221F 3445 Z1-3". The wildcards are escaped, so a term
+            // containing a per cent sign searches for that character rather than matching everything; and only a text
+            // column can be searched, because "inside" means nothing to a number or an instant.
+            var k176_frag = tag[^6..] + " spare";
+            var (k176_s1s, k176_s1b) = await Get(admin, $"api/v1/asset/vAsset?Name~={Uri.EscapeDataString(k176_frag)}&take=50");
+            var k176_hits = k176_s1b?["rows"] as JsonArray;
+            var k176_found = k176_hits?.Any(r => string.Equals(r?["EntityId"]?.ToString(), k176_relay.ToString(), StringComparison.OrdinalIgnoreCase)) ?? false;
+            var (k176_s2s, k176_s2b) = await Get(admin, $"api/v1/asset/vAsset?Name~={Uri.EscapeDataString("% spare relay")}&take=50");
+            var k176_wild = (k176_s2b?["rows"] as JsonArray)?.Count ?? -1;
+            var (k176_s3s, k176_s3b) = await Get(admin, "api/v1/asset/vAsset?EntityId~=3445&take=5");
+            Must(k176_s1s == HttpStatusCode.OK && k176_found && k176_s2s == HttpStatusCode.OK && k176_wild == 0
+                 && k176_s3s == HttpStatusCode.BadRequest && Code(k176_s3b) == "not_searchable",
+                $"#176: the chooser finds a relay by any part of its name “{k176_frag}” ({k176_hits?.Count} of the registry), the LIKE wildcards are escaped so a per cent sign is a character and not everything ({k176_wild} rows), and only a text column may be searched ({(int)k176_s3s} {Code(k176_s3b)})");
+        }
+
         // ======== #175 (2026-09-17): a code on every location node, and the FLOC composed from those codes. The owner's FLOC is a path of
         // short codes — TN-4403-Y230-T3 is the Transmission division, station 4403, the 230 kV yard, transformer T3 — and the last segment
         // is the tag painted on the equipment. A node carries its own Code; the platform composes FlocCode and never lets a person type it,
@@ -1023,14 +1090,14 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
         // proves the chain starts at the first coded ancestor.)
         {
             async Task<JsonNode?> Floc(Guid? id) => (await Get(admin, $"api/v1/location/vNode?EntityId={id}")).body?["rows"]?[0];
-            var (k175_s1s, k175_s1b) = await Post(admin, "api/v1/location/RenameNode", new { EntityId = station, Name = $"{tag} station", Code = "9901" });
+            var (k175_s1s, k175_s1b) = await Post(admin, "api/v1/location/RenameNode", new { EntityId = station, Name = $"{tag} station", Code = stationNumber });
             var (k175_y1s, k175_y1b) = await Post(admin, "api/v1/location/AddNode", new { NodeTypeCode = "Yard", ParentEntityId = station, Name = "230 kV yard", Code = "Y230" });
             var k175_yard = Id(k175_y1b);
             var (k175_t1s, k175_t1b) = await Post(admin, "api/v1/location/AddNode", new { NodeTypeCode = "EquipmentPosition", ParentEntityId = k175_yard, Name = "Transformer T3", Code = "T3" });
             var k175_t3 = Id(k175_t1b);
             var k175_sRow = await Floc(station); var k175_yRow = await Floc(k175_yard); var k175_tRow = await Floc(k175_t3);
             Must(k175_s1s == HttpStatusCode.OK && k175_y1s == HttpStatusCode.OK && k175_t1s == HttpStatusCode.OK
-                 && k175_sRow?["FlocCode"]?.ToString() == "9901" && k175_yRow?["FlocCode"]?.ToString() == "9901-Y230" && k175_tRow?["FlocCode"]?.ToString() == "9901-Y230-T3"
+                 && k175_sRow?["FlocCode"]?.ToString() == stationNumber && k175_yRow?["FlocCode"]?.ToString() == $"{stationNumber}-Y230" && k175_tRow?["FlocCode"]?.ToString() == $"{stationNumber}-Y230-T3"
                  && k175_tRow?["Name"]?.ToString() == "Transformer T3" && k175_tRow?["Code"]?.ToString() == "T3",
                 $"#175: the FLOC composes down the tree from the first coded ancestor — station {k175_sRow?["FlocCode"]}, yard {k175_yRow?["FlocCode"]}, transformer {k175_tRow?["FlocCode"]}, whose name stays descriptive ({k175_tRow?["Name"]})");
 
@@ -1044,7 +1111,7 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
             // the FLOC follows a code change, for the node and everything beneath it
             var (k175_r1s, k175_r1b) = await Post(admin, "api/v1/location/RenameNode", new { EntityId = k175_yard, Name = "230 kV yard (HQ side)", Code = "Y230HQ" });
             var k175_tRow2 = await Floc(k175_t3);
-            Must(k175_r1s == HttpStatusCode.OK && k175_tRow2?["FlocCode"]?.ToString() == "9901-Y230HQ-T3",
+            Must(k175_r1s == HttpStatusCode.OK && k175_tRow2?["FlocCode"]?.ToString() == $"{stationNumber}-Y230HQ-T3",
                 $"#175: changing the yard's code rewrites the FLOC of everything beneath it — the transformer is now {k175_tRow2?["FlocCode"]} ({(int)k175_r1s} {Code(k175_r1b)})");
 
             // an untagged node has no FLOC at all; a node whose parent loses its code starts a fresh chain, never inventing the missing part

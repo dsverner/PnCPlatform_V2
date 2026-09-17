@@ -21,14 +21,28 @@
 // subtype and notes changed (location.RenameNode), and a child is withdrawn (location.Node_SoftDelete). The types
 // offered are only those ref.vLocationNodeTypeParent allows under THIS node's type — the rule lives in the database and
 // is read, never restated in the client. Every refusal shown is the procedure's own message.
+//
+// #176 (2026-09-17): a device is placed at a position from here. The owner, 2026-09-17, having built a Building and a
+// Panel at Eel River by hand: "Now how do I associate a protection with this panel?" The chain is panel → device
+// position → protection function, and the relay is *placed* at the position — asset.PlaceAsset, the one way to say
+// where an asset is (§4.4). So a position node shows what is placed at it and offers to place a device there; every
+// other node keeps the read-only list of what is placed beneath it, because asset.PlaceAsset refuses a device anywhere
+// but a DevicePosition or a custody location (50215) and the screen should not offer what the database forbids.
 import { useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router'
-import { ApiError, proc, s, view, type Row } from '@/lib/api'
+import { ApiError, fmtDate, proc, s, sqlNumber, view, type Row } from '@/lib/api'
 import { useCan, useViewAll } from '@/lib/hooks'
 import { type RecordParams, type Screen, screenPath } from '@/lib/screens'
 import { Panel, Pill, Button, Facts, Status, inputClass } from '@/components/ui/ui'
+import { AssetPicker, modelLabel, useModels } from '@/components/pickers'
 import { ClassificationPanel, NODE_KINDS, NodeLink } from './PrimaryAssetScreen'
+
+/** The node types location.vFloc treats as a position — the places a device is installed (and the only node types
+ * asset.PlaceAsset accepts for a device: it demands NodeTypeCode = 'DevicePosition' and throws 50215 otherwise). */
+const POSITION_TYPES = ['DevicePosition', 'MeteringPosition', 'NetworkSwitchPosition']
+/** asset.Placement, CK_Placement_Kind — the five kinds, in the order a person meets them. */
+const PLACEMENT_KINDS = ['Installed', 'Attached', 'Stored', 'AtVendor', 'Retained']
 
 /** location.vNode.Path is the ancestors' chain — the node's own id excluded, each id followed by '/' (#94). */
 const ancestorIds = (path: unknown) => s(path).split('/').map((x) => x.trim()).filter(Boolean)
@@ -85,7 +99,9 @@ export default function LocationScreen({ params: p, id }: { screen: Screen; para
       </div>
       <div className="grid gap-3 lg:grid-cols-2">
         <Inside node={r} canEdit={canEdit} canArchive={canArchive} />
-        <DevicesHere node={r} station={station} isStation={isStation} />
+        {POSITION_TYPES.includes(s(r.NodeTypeCode))
+          ? <PlacedHere node={r} canPlace={can('Asset.Modify')} canRetract={can('Asset.Archive')} />
+          : <DevicesHere node={r} station={station} isStation={isStation} />}
       </div>
       {/* a terminal and a scheme are asked of a station: neither question means anything for a building, a room or a panel */}
       {isStation && (
@@ -331,6 +347,8 @@ function DevicesHere({ node, station, isStation }: { node: Row; station: Row | u
       {!stationId && <Status>This node is above any station, so the devices are listed on the stations inside it.</Status>}
       {q.isError && <Status bad>Could not read the devices: {(q.error as Error).message}</Status>}
       {!!stationId && !q.isPending && !rows.length && <Status>No device is placed here.</Status>}
+      {/* #176: a device is placed at a position, never at a panel or a building — asset.PlaceAsset refuses it (50215) */}
+      {!!stationId && <Status>A device is placed at a position, not at a {s(node.NodeTypeCode).toLowerCase()} — open the position in the last column to place, move or remove one.</Status>}
       {rows.length > 0 && (
         <table className="w-full text-sm">
           <thead><tr className="border-b border-slate-700 text-left text-xs uppercase tracking-wide text-slate-400">
@@ -406,4 +424,201 @@ function SchemesHere({ stationId }: { stationId: string }) {
       </ul>
     </Panel>
   )
+}
+
+// ---------------------------------------------------------------- #176: what is placed at this position
+
+/**
+ * What is placed at this position, and how a device is placed here.
+ *
+ * The read is asset.vPlacedAsset filtered by NodeEntityId — the view written for exactly this question (the placement
+ * joined to the asset, so the name comes back with it; asset.vPlacement carries ids and no name at all). Its columns:
+ * EntityId (the placement), NodeEntityId, AssetEntityId, AssetName, AssetTypeCode, AssetStatus, VoltageClassCode,
+ * ModelId, ManufacturerEntityId, CommissionedAt, PlacementKind, CustodyLocationEntityId, WorkRequestEntityId,
+ * PlacedFrom, PlacedTo.
+ *
+ * The write is asset.PlaceAsset (Asset.Modify) — the one way to say where an asset is. It writes the placement as an
+ * Add, or as a Revise that closes the asset's prior fact, and for a device it writes the Installed / Removed lifecycle
+ * events in the same transaction, so the two never disagree (§5.4).
+ */
+function PlacedHere({ node, canPlace, canRetract }: { node: Row; canPlace: boolean; canRetract: boolean }) {
+  const qc = useQueryClient()
+  const nodeId = s(node.EntityId)
+  const q = useViewAll('asset', 'vPlacedAsset', { NodeEntityId: nodeId }, 'AssetName', !!nodeId)
+  const { byId } = useModels()
+  const rows = q.data ?? []
+  const refresh = () => { qc.invalidateQueries({ queryKey: ['view', 'asset'] }); qc.invalidateQueries({ queryKey: ['placementOf'] }); qc.invalidateQueries({ queryKey: ['view', 'location'] }) }
+  return (
+    <Panel title={`Placed here · ${q.isPending ? '…' : rows.length}`}>
+      {q.isError && <Status bad>Could not read what is placed here: {(q.error as Error).message}</Status>}
+      {!q.isPending && !rows.length && <Status>Nothing is placed at this position.</Status>}
+      <ul className="space-y-2 text-sm">
+        {rows.map((x) => (
+          <PlacedRow key={s(x.EntityId)} x={x} model={byId.get(s(x.ModelId).toLowerCase())} nodeName={s(node.Name)}
+            canPlace={canPlace} canRetract={canRetract} onDone={refresh} />))}
+      </ul>
+      {canPlace
+        ? <PlaceForm node={node} onDone={refresh} />
+        : <div className="mt-3 border-t border-slate-800 pt-2"><Status>Placing a device needs Asset.Modify.</Status></div>}
+    </Panel>
+  )
+}
+
+/**
+ * One placed asset, and the three things that can be done to it — all of them the database's own, none invented:
+ *  - change the kind: asset.PlaceAsset at this same node with another PlacementKind. A device that was Installed and
+ *    becomes anything else gets its Removed lifecycle event written in the same transaction.
+ *  - send it to custody: asset.PlaceAsset with @CustodyLocationEntityId instead of @NodeEntityId. This is how a
+ *    placement at a position ENDS: asset.Placement demands exactly one of the two (CK_Placement_OneLocation, and 50211
+ *    in the procedure), so an asset is never nowhere. There is no "unplace" and none is offered.
+ *  - recorded in error: asset.Placement_SoftDelete (Asset.Archive). Decision 71 — a soft delete closes the belief only
+ *    and leaves ValidTo untouched. It says the placement was never true, not that the relay was taken out; the wording
+ *    on the button says so, because the two are different facts and the second one is the custody move above.
+ */
+function PlacedRow({ x, model, nodeName, canPlace, canRetract, onDone }: {
+  x: Row; model: Row | undefined; nodeName: string; canPlace: boolean; canRetract: boolean; onDone: () => void }) {
+  const [open, setOpen] = useState(false)
+  const [kind, setKind] = useState(s(x.PlacementKind))
+  const [custody, setCustody] = useState('')
+  const [confirm, setConfirm] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null)
+  const custodyQ = useViewAll('location', 'vCustodyLocation', {}, 'Name', open)
+  const run = async (body: Row, said: string) => {
+    setBusy(true)
+    try { await proc('asset', 'PlaceAsset', body); setMsg({ text: said }); setOpen(false); onDone() }
+    catch (e) { setMsg({ text: e instanceof ApiError ? e.message : String(e), bad: true }) } finally { setBusy(false) }
+  }
+  const retract = async () => {
+    setBusy(true)
+    try { await proc('asset', 'Placement_SoftDelete', { EntityId: x.EntityId }); setMsg({ text: `The record of ${s(x.AssetName)} at ${nodeName} is withdrawn.` }); setConfirm(false); onDone() }
+    catch (e) { setMsg({ text: e instanceof ApiError ? e.message : String(e), bad: true }) } finally { setBusy(false) }
+  }
+  return (
+    <li className="rounded border border-slate-800 p-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-slate-200">{s(x.AssetName)}</span>
+        <span className="text-xs text-slate-500">{modelLabel(model) || s(x.AssetTypeCode)}</span>
+        <Pill tone={x.PlacementKind === 'Installed' ? 'good' : 'neutral'}>{s(x.PlacementKind)}</Pill>
+        {x.AssetStatus ? <span className="text-xs text-slate-500">{s(x.AssetStatus)}</span> : null}
+        {x.PlacedFrom ? <span className="text-xs text-slate-500">since {fmtDate(x.PlacedFrom)}</span> : null}
+        {(canPlace || canRetract) && <Button kind="mini" disabled={busy} onClick={() => { setMsg(null); setOpen(!open) }}>{open ? 'done' : 'change…'}</Button>}
+      </div>
+      {open && (
+        <div className="mt-2 space-y-2 border-t border-slate-800 pt-2">
+          {canPlace && (
+            <div className="flex flex-wrap items-end gap-2">
+              <label className="flex flex-col gap-1 text-xs text-slate-400">Kind
+                <select className={`${inputClass} w-36`} value={kind} disabled={busy} onChange={(e) => setKind(e.target.value)}>
+                  {PLACEMENT_KINDS.map((k) => <option key={k} value={k}>{k}</option>)}
+                </select></label>
+              <Button kind="mini" disabled={busy || kind === s(x.PlacementKind)}
+                onClick={() => void run({ AssetEntityId: x.AssetEntityId, NodeEntityId: x.NodeEntityId, PlacementKind: kind },
+                  `${s(x.AssetName)} is now ${kind.toLowerCase()} at ${nodeName}.`)}>Change the kind</Button>
+            </div>)}
+          {canPlace && (
+            <div className="flex flex-wrap items-end gap-2">
+              <label className="flex flex-col gap-1 text-xs text-slate-400">Or send it to
+                <select className={`${inputClass} w-56`} value={custody} disabled={busy} onChange={(e) => setCustody(e.target.value)}>
+                  <option value="">— a custody location —</option>
+                  {(custodyQ.data ?? []).map((c) => <option key={s(c.EntityId)} value={s(c.EntityId)}>{s(c.Name)}{c.CustodyKind ? ` · ${s(c.CustodyKind)}` : ''}</option>)}
+                </select></label>
+              <Button kind="mini" disabled={busy || !custody}
+                onClick={() => void run({ AssetEntityId: x.AssetEntityId, CustodyLocationEntityId: custody, PlacementKind: 'Stored' },
+                  `${s(x.AssetName)} is stored in custody; the position is free.`)}>Remove to custody</Button>
+              <Status>This is how a placement here ends — an asset is at a node or in a custody location, never nowhere.</Status>
+            </div>)}
+          {canRetract && (confirm
+            ? <div className="flex flex-wrap items-center gap-2 text-xs text-amber-300">Withdraw the record that {s(x.AssetName)} is here — it was entered in error?
+                <Button kind="mini" disabled={busy} onClick={() => void retract()}>yes, withdraw the record</Button>
+                <Button kind="mini" disabled={busy} onClick={() => setConfirm(false)}>keep it</Button></div>
+            : <Button kind="mini" disabled={busy} onClick={() => setConfirm(true)}>recorded in error…</Button>)}
+        </div>)}
+      {msg && <div className="mt-1"><Status bad={msg.bad}>{msg.text}</Status></div>}
+    </li>
+  )
+}
+
+/**
+ * Place a device at this position. asset.PlaceAsset, with @NodeEntityId (never both locations — 50211) and a
+ * @PlacementKind defaulting to Installed, because that is what a technician is doing when they stand at the panel.
+ *
+ * Every refusal is the procedure's own words. The one a person actually hits is the device category against the
+ * position subtype (§5.7), and the two numbers behind it are different questions:
+ *   50216 — the categories differ AND the actor holds no PlacementOverride grant. A reason cannot help; the message
+ *           says what is missing and the entry stays as it is.
+ *   50217 — the actor holds the grant but gave no @OverrideReason. That one is answerable here: the reason box opens,
+ *           the chosen device and kind stay, and the same Place button tries again with the reason, which the
+ *           procedure logs through audit.LogAction as an Override.
+ * The others (50212 not a current asset, 50213 a routed asset has a route and not a placement, 50214 not a current
+ * node, 50215 a device belongs at a DevicePosition) are shown as they come.
+ *
+ * Nothing is pre-empted in the client — in particular the position's filtered unique index
+ * (UX_Placement_InstalledAtNode: one Installed asset per node) is left to say no, and the API returns it as a 409.
+ */
+function PlaceForm({ node, onDone }: { node: Row; onDone: () => void }) {
+  const [picked, setPicked] = useState<Row | null>(null)
+  const [kind, setKind] = useState('Installed')
+  const [notes, setNotes] = useState('')
+  const [reason, setReason] = useState('')
+  const [askReason, setAskReason] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [round, setRound] = useState(0)
+  const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null)
+  const place = async () => {
+    if (!picked) return
+    setBusy(true)
+    try {
+      await proc('asset', 'PlaceAsset', {
+        AssetEntityId: picked.EntityId, NodeEntityId: node.EntityId, PlacementKind: kind,
+        Notes: notes.trim() || null, OverrideReason: reason.trim() || null,
+      })
+      setMsg({ text: `${s(picked.Name)} is ${kind.toLowerCase()} at ${s(node.Name)}.` })
+      setPicked(null); setNotes(''); setReason(''); setAskReason(false); setRound(round + 1); onDone()
+    } catch (e) {
+      setMsg({ text: e instanceof ApiError ? e.message : String(e), bad: true })
+      if (sqlNumber(e) === 50217) setAskReason(true)          // the grant is held; the reason is what is missing
+    } finally { setBusy(false) }
+  }
+  return (
+    <div className="mt-3 space-y-2 border-t border-slate-800 pt-2 text-sm">
+      <div className="flex flex-wrap items-end gap-2">
+        <AssetPicker value={picked} onChange={(a) => { setPicked(a); setMsg(null) }} label="Place a device" autoFocusKey={`place-${round}`}
+          note="any part of the name; two of the same name are told apart by the model" disabled={busy} />
+        <label className="flex flex-col gap-1 text-xs text-slate-400">as
+          <select className={`${inputClass} w-36`} value={kind} disabled={busy} onChange={(e) => setKind(e.target.value)}>
+            {PLACEMENT_KINDS.map((k) => <option key={k} value={k}>{k}</option>)}
+          </select></label>
+        <Button kind="primary" disabled={!picked || busy} onClick={() => void place()}>Place</Button>
+      </div>
+      {picked && <PlacedNow assetEntityId={s(picked.EntityId)} hereNodeEntityId={s(node.EntityId)} />}
+      <label className="flex flex-col gap-1 text-xs text-slate-400">Notes (optional — they go on the lifecycle event)
+        <textarea className={`${inputClass} w-full`} rows={1} value={notes} disabled={busy} onChange={(e) => setNotes(e.target.value)} /></label>
+      {askReason && (
+        <label className="flex flex-col gap-1 text-xs text-amber-300">Override reason — the device's category and this position's subtype differ; the reason is logged with your name
+          <input className={`${inputClass} w-full`} value={reason} disabled={busy} placeholder="why this device goes in this position"
+            onChange={(e) => setReason(e.target.value)} /></label>)}
+      {msg && <Status bad={msg.bad}>{msg.text}</Status>}
+    </div>
+  )
+}
+
+/** Where the chosen asset is recorded now (asset.vPlacement by AssetEntityId, then the node's or custody location's
+ * name). Not a warning and not a pre-emption of a rule: asset.PlaceAsset revises an asset's existing placement rather
+ * than refusing it, so placing a relay that is installed elsewhere MOVES it and writes its Removed event. A person
+ * should see that before they press the button, not discover it after. */
+function PlacedNow({ assetEntityId, hereNodeEntityId }: { assetEntityId: string; hereNodeEntityId: string }) {
+  const q = useQuery({ queryKey: ['placementOf', assetEntityId], enabled: !!assetEntityId, staleTime: 30_000, queryFn: async () => {
+    const p = (await view('asset', 'vPlacement', { AssetEntityId: assetEntityId }, { take: 1 })).rows[0]
+    if (!p) return null
+    const where = p.NodeEntityId
+      ? (await view('location', 'vNode', { EntityId: s(p.NodeEntityId) }, { take: 1 })).rows[0]
+      : (await view('location', 'vCustodyLocation', { EntityId: s(p.CustodyLocationEntityId) }, { take: 1 })).rows[0]
+    return { ...p, WhereName: s(where?.Name), WhereFloc: s(where?.FlocCode) } as Row
+  } })
+  if (q.isPending || !q.data) return null
+  const p = q.data
+  if (s(p.NodeEntityId).toLowerCase() === hereNodeEntityId.toLowerCase())
+    return <Status>It is already recorded here as {s(p.PlacementKind)}.</Status>
+  return <Status>It is recorded now as {s(p.PlacementKind)} at {s(p.WhereName) || 'a place you cannot read'}{p.WhereFloc ? ` (${s(p.WhereFloc)})` : ''} — placing it here moves it, and its removal from there is written in the same transaction.</Status>
 }

@@ -1,5 +1,6 @@
 // The platform's API as the front end sees it (docs/design/API.md). Two shapes serve everything: a view read
-// `GET /api/v1/<schema>/<view>?<Column>=<value>&orderBy=&skip=&take=` (equality filters only; the read scope is the
+// `GET /api/v1/<schema>/<view>?<Column>=<value>&orderBy=&skip=&take=` (equality filters, or `<Column>~=` to search a
+// text column for the value anywhere inside it, #176; the read scope is the
 // database's) and a procedure call `POST /api/v1/<schema>/<procedure>` with the parameters as the JSON body. Plus the
 // hand-written endpoints: /health, /api/v1/me, the process engine (/api/v1/process/...), definitions, files.
 // DEV act-as identity: the X-PnC-Dev-User header from localStorage (decision #85), the same key the plain pages used,
@@ -43,7 +44,10 @@ export async function getText(url: string): Promise<string> {
 export type Row = Record<string, unknown>
 export interface ViewPage { view: string; skip: number; take: number; scope: string; rows: Row[] }
 
-/** One page of a view. `filters` are equality filters on the view's columns; `orderBy` "Col" or "-Col". */
+/**
+ * One page of a view. `filters` are equality filters on the view's columns; `orderBy` "Col" or "-Col".
+ * A filter key ending in `~` searches a text column for the value anywhere inside it: `{'Name~': '3445'}` (#176).
+ */
 export function view(schema: string, name: string, filters: Record<string, string | null | undefined> = {}, opts: { orderBy?: string; skip?: number; take?: number } = {}) {
   const p = new URLSearchParams()
   for (const [k, v] of Object.entries(filters)) if (v !== undefined && v !== null && v !== '') p.set(k, String(v))
@@ -71,6 +75,15 @@ export interface Me { user: { userPrincipalName: string; entityId?: string }; pe
 export const me = () => getJson<Me>('/api/v1/me')
 export interface Health { environment: string; release: string; database: string; catalogLoadedAt: string }
 export const health = () => getJson<Health>('/health')
+
+/** The SQL error number behind a refusal, when there is one. The API returns a THROW (>= 50000) and a constraint
+ * violation (2627 / 2601 / 547) as 409 with the procedure's own message and `sqlNumber` in the body (Endpoints/Problems.cs),
+ * which is how a screen tells one refusal from another without reading the message's words. Null for anything else. */
+export function sqlNumber(e: unknown): number | null {
+  if (!(e instanceof ApiError) || !e.body || typeof e.body !== 'object') return null
+  const n = (e.body as { sqlNumber?: unknown }).sqlNumber
+  return typeof n === 'number' ? n : null
+}
 
 export const fmtDate = (v: unknown) => (v ? new Date(String(v)).toLocaleDateString() : '')
 export const fmtWhen = (v: unknown) => (v ? new Date(String(v)).toLocaleString() : '')
