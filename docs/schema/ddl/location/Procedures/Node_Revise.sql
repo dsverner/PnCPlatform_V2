@@ -13,6 +13,8 @@ CREATE PROCEDURE [location].[Node_Revise]
     @RegionSplitOfEntityId UNIQUEIDENTIFIER = NULL,
     @WorkRequestEntityId UNIQUEIDENTIFIER = NULL,
     @Notes NVARCHAR(MAX) = NULL,
+    @Code NVARCHAR(40) = NULL,
+    @FlocCode NVARCHAR(400) = NULL,
     @ValidFrom DATETIMEOFFSET(7) = NULL,
     @ValidFromQuality TINYINT = 0,
     @ActorId UNIQUEIDENTIFIER = NULL,
@@ -32,9 +34,9 @@ BEGIN
     UPDATE [location].[Node] SET [ValidTo] = @ValidFrom, [ModifiedBy] = @ActorId, [ModifiedAt] = @now
     WHERE [EntityId] = @EntityId AND [IsDeleted] = 0 AND [ValidTo] IS NULL AND [ValidFrom] <= @ValidFrom;
     DECLARE @out TABLE ([RowId] UNIQUEIDENTIFIER);
-    INSERT [location].[Node] ([EntityId], [ValidFrom], [ValidFromQuality], [CreatedBy], [CreatedAt], [ModifiedBy], [ModifiedAt], [MigrationRunId], [NodeTypeCode], [ParentEntityId], [Path], [Depth], [SiblingOrder], [Name], [SubtypeCode], [Location], [Extent], [RegionSplitOfEntityId], [WorkRequestEntityId], [Notes])
+    INSERT [location].[Node] ([EntityId], [ValidFrom], [ValidFromQuality], [CreatedBy], [CreatedAt], [ModifiedBy], [ModifiedAt], [MigrationRunId], [NodeTypeCode], [ParentEntityId], [Path], [Depth], [SiblingOrder], [Name], [SubtypeCode], [Location], [Extent], [RegionSplitOfEntityId], [WorkRequestEntityId], [Notes], [Code], [FlocCode])
     OUTPUT inserted.[RowId] INTO @out
-    VALUES (@EntityId, @ValidFrom, @ValidFromQuality, @ActorId, @now, @ActorId, @now, @MigrationRunId, @NodeTypeCode, @ParentEntityId, @Path, @Depth, @SiblingOrder, @Name, @SubtypeCode, @Location, @Extent, @RegionSplitOfEntityId, @WorkRequestEntityId, @Notes);
+    VALUES (@EntityId, @ValidFrom, @ValidFromQuality, @ActorId, @now, @ActorId, @now, @MigrationRunId, @NodeTypeCode, @ParentEntityId, @Path, @Depth, @SiblingOrder, @Name, @SubtypeCode, @Location, @Extent, @RegionSplitOfEntityId, @WorkRequestEntityId, @Notes, @Code, @FlocCode);
     SELECT @RowId = [RowId] FROM @out;
     COMMIT TRANSACTION;
 END;

@@ -3,6 +3,10 @@
 -- (ref.LocationNodeTypeParent), refuses a subtype outside the type's enumeration list, and
 -- computes Path / Depth from the parent (Path = the parent's Path + the parent's EntityId + '/';
 -- a Region's Path is '/'). Writes through the generated location.Node_Add.
+-- #175 (2026-09-17): @Code is the node's FLOC segment (TN, 4403, Y230, T3). It is checked by
+-- location.AssertNodeCode and the FLOC is composed from the parent's by location.fComposeFloc, exactly as
+-- Path and Depth are computed from the parent here — one rule, one place. Omitted or empty means the node has
+-- no code, and therefore no FLOC; the platform never invents a missing segment.
 CREATE PROCEDURE [location].[AddNode]
     @NodeTypeCode NVARCHAR(40),
     @ParentEntityId UNIQUEIDENTIFIER = NULL,
@@ -13,6 +17,7 @@ CREATE PROCEDURE [location].[AddNode]
     @Extent GEOGRAPHY = NULL,
     @RegionSplitOfEntityId UNIQUEIDENTIFIER = NULL,
     @Notes NVARCHAR(MAX) = NULL,
+    @Code NVARCHAR(40) = NULL,
     @ValidFrom DATETIMEOFFSET(7) = NULL,
     @ValidFromQuality TINYINT = 0,
     @ActorId UNIQUEIDENTIFIER = NULL,
@@ -33,7 +38,11 @@ BEGIN
     DECLARE @isRoot BIT = CASE WHEN EXISTS (SELECT 1 FROM [ref].[LocationNodeTypeParent]
                                             WHERE [ChildNodeTypeCode] = @NodeTypeCode AND [IsActive] = 1)
                                THEN 0 ELSE 1 END;
-    DECLARE @path NVARCHAR(900), @depth TINYINT;
+    -- #175: the code is checked before anything is written, and an empty one is simply no code
+    EXEC [location].[AssertNodeCode] @Caller = N'location.AddNode', @Code = @Code OUTPUT;
+    SET @Code = NULLIF(@Code, N'');
+
+    DECLARE @path NVARCHAR(900), @depth TINYINT, @parentFloc NVARCHAR(400);
     IF @isRoot = 1 AND @ParentEntityId IS NULL
     BEGIN
         SELECT @path = N'/', @depth = 0;
@@ -42,7 +51,7 @@ BEGIN
     BEGIN
         IF @ParentEntityId IS NULL THROW 50202, N'location.AddNode: this node type has an allowed parent, so a parent is required (§3.2).', 1;
         DECLARE @parentType NVARCHAR(40), @parentPath NVARCHAR(900), @parentDepth TINYINT;
-        SELECT @parentType = [NodeTypeCode], @parentPath = [Path], @parentDepth = [Depth]
+        SELECT @parentType = [NodeTypeCode], @parentPath = [Path], @parentDepth = [Depth], @parentFloc = [FlocCode]
         FROM [location].[vNode] WHERE [EntityId] = @ParentEntityId;
         IF @parentType IS NULL THROW 50203, N'location.AddNode: the parent is not a current node.', 1;
         IF NOT EXISTS (SELECT 1 FROM [ref].[LocationNodeTypeParent]
@@ -68,10 +77,13 @@ BEGIN
         END;
     END;
 
+    -- #175: the FLOC is composed, never given — a root's parent FLOC is NULL, so its own code stands alone
+    DECLARE @floc NVARCHAR(400) = [location].[fComposeFloc](@parentFloc, @Code);
+
     EXEC [location].[Node_Add]
         @NodeTypeCode = @NodeTypeCode, @ParentEntityId = @ParentEntityId, @Path = @path, @Depth = @depth,
         @SiblingOrder = @SiblingOrder, @Name = @Name, @SubtypeCode = @SubtypeCode, @Location = @Location, @Extent = @Extent,
-        @RegionSplitOfEntityId = @RegionSplitOfEntityId, @Notes = @Notes,
+        @RegionSplitOfEntityId = @RegionSplitOfEntityId, @Notes = @Notes, @Code = @Code, @FlocCode = @floc,
         @ValidFrom = @ValidFrom, @ValidFromQuality = @ValidFromQuality, @ActorId = @ActorId, @MigrationRunId = @MigrationRunId,
         @EntityId = @EntityId OUTPUT, @RowId = @RowId OUTPUT;
 END;

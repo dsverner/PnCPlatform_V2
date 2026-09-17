@@ -1014,6 +1014,56 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
             Must(sps == HttpStatusCode.OK && (spb?["rows"] as JsonArray)?.Any(r => string.Equals(r?["PrimaryAssetEntityId"]?.ToString(), line.ToString(), StringComparison.OrdinalIgnoreCase)) == true, "#170: the scheme's protects link reads back (the device sheet's 'protects … via …' line)");
         }
 
+        // ======== #175 (2026-09-17): a code on every location node, and the FLOC composed from those codes. The owner's FLOC is a path of
+        // short codes — TN-4403-Y230-T3 is the Transmission division, station 4403, the 230 kV yard, transformer T3 — and the last segment
+        // is the tag painted on the equipment. A node carries its own Code; the platform composes FlocCode and never lets a person type it,
+        // so it stays true when a node is renamed or moved. The chain is the unbroken run of coded ancestors ending at the node: a node
+        // with no code has no FLOC at all, and a node whose parent has none starts a fresh chain rather than inventing the missing part.
+        // (The fixture's division is a seeded node shared with other checks, so it is left uncoded here — which is exactly the case that
+        // proves the chain starts at the first coded ancestor.)
+        {
+            async Task<JsonNode?> Floc(Guid? id) => (await Get(admin, $"api/v1/location/vNode?EntityId={id}")).body?["rows"]?[0];
+            var (k175_s1s, k175_s1b) = await Post(admin, "api/v1/location/RenameNode", new { EntityId = station, Name = $"{tag} station", Code = "9901" });
+            var (k175_y1s, k175_y1b) = await Post(admin, "api/v1/location/AddNode", new { NodeTypeCode = "Yard", ParentEntityId = station, Name = "230 kV yard", Code = "Y230" });
+            var k175_yard = Id(k175_y1b);
+            var (k175_t1s, k175_t1b) = await Post(admin, "api/v1/location/AddNode", new { NodeTypeCode = "EquipmentPosition", ParentEntityId = k175_yard, Name = "Transformer T3", Code = "T3" });
+            var k175_t3 = Id(k175_t1b);
+            var k175_sRow = await Floc(station); var k175_yRow = await Floc(k175_yard); var k175_tRow = await Floc(k175_t3);
+            Must(k175_s1s == HttpStatusCode.OK && k175_y1s == HttpStatusCode.OK && k175_t1s == HttpStatusCode.OK
+                 && k175_sRow?["FlocCode"]?.ToString() == "9901" && k175_yRow?["FlocCode"]?.ToString() == "9901-Y230" && k175_tRow?["FlocCode"]?.ToString() == "9901-Y230-T3"
+                 && k175_tRow?["Name"]?.ToString() == "Transformer T3" && k175_tRow?["Code"]?.ToString() == "T3",
+                $"#175: the FLOC composes down the tree from the first coded ancestor — station {k175_sRow?["FlocCode"]}, yard {k175_yRow?["FlocCode"]}, transformer {k175_tRow?["FlocCode"]}, whose name stays descriptive ({k175_tRow?["Name"]})");
+
+            // a code is one segment: the separator and whitespace are refused, and one parent's children may not share a code
+            var (k175_e1s, k175_e1b) = await Post(admin, "api/v1/location/AddNode", new { NodeTypeCode = "EquipmentPosition", ParentEntityId = k175_yard, Name = "bad", Code = "T-4" });
+            var (k175_e2s, _) = await Post(admin, "api/v1/location/AddNode", new { NodeTypeCode = "EquipmentPosition", ParentEntityId = k175_yard, Name = "bad", Code = "T 4" });
+            var (k175_e3s, _) = await Post(admin, "api/v1/location/AddNode", new { NodeTypeCode = "EquipmentPosition", ParentEntityId = k175_yard, Name = "another T3", Code = "T3" });
+            Must(k175_e1s == HttpStatusCode.Conflict && k175_e2s == HttpStatusCode.Conflict && k175_e3s != HttpStatusCode.OK,
+                $"#175: a code is one segment — the separator is refused ({(int)k175_e1s} {k175_e1b?["detail"]}), so is a space ({(int)k175_e2s}), and a sibling may not repeat one ({(int)k175_e3s})");
+
+            // the FLOC follows a code change, for the node and everything beneath it
+            var (k175_r1s, k175_r1b) = await Post(admin, "api/v1/location/RenameNode", new { EntityId = k175_yard, Name = "230 kV yard (HQ side)", Code = "Y230HQ" });
+            var k175_tRow2 = await Floc(k175_t3);
+            Must(k175_r1s == HttpStatusCode.OK && k175_tRow2?["FlocCode"]?.ToString() == "9901-Y230HQ-T3",
+                $"#175: changing the yard's code rewrites the FLOC of everything beneath it — the transformer is now {k175_tRow2?["FlocCode"]} ({(int)k175_r1s} {Code(k175_r1b)})");
+
+            // an untagged node has no FLOC at all; a node whose parent loses its code starts a fresh chain, never inventing the missing part
+            var (k175_u1s, k175_u1b) = await Post(admin, "api/v1/location/AddNode", new { NodeTypeCode = "EquipmentPosition", ParentEntityId = k175_yard, Name = "not yet tagged" });
+            var k175_uRow = await Floc(Id(k175_u1b));
+            var (k175_c1s, _) = await Post(admin, "api/v1/location/RenameNode", new { EntityId = k175_yard, Name = "230 kV yard (HQ side)", Code = "" });
+            var k175_yRow3 = await Floc(k175_yard); var k175_tRow3 = await Floc(k175_t3);
+            Must(k175_u1s == HttpStatusCode.OK && k175_uRow?["FlocCode"] is null && k175_c1s == HttpStatusCode.OK
+                 && k175_yRow3?["FlocCode"] is null && k175_tRow3?["FlocCode"]?.ToString() == "T3",
+                $"#175: an untagged node has no FLOC ({k175_uRow?["FlocCode"] ?? "none"}); withdrawing the yard's code leaves the yard with none ({k175_yRow3?["FlocCode"] ?? "none"}) and restarts the chain below it ({k175_tRow3?["FlocCode"]}) rather than inventing the missing segment");
+
+            // the migrated stations carry their station number as their code (Seed_location_StationCodes)
+            var (k175_m1s, k175_m1b) = await Get(admin, "api/v1/location/vNode?NodeTypeCode=Station&take=500");
+            var k175_rows = k175_m1b?["rows"] as JsonArray;
+            var k175_coded = k175_rows?.Count(r => !string.IsNullOrWhiteSpace(r?["Code"]?.ToString())) ?? 0;
+            Must(k175_m1s == HttpStatusCode.OK && k175_coded >= 240,
+                $"#175: the migrated stations carry their station number as their code ({k175_coded} of {k175_rows?.Count} stations)");
+        }
+
         // ======== #171 (2026-09-16) and #173 (2026-09-17): classifications and compliance, as the owner corrected them on seeing it.
         // Applicability is the asset type's: a bus is not PRC-023 applicable and carries no rating. The BES Cyber Asset flag is not a
         // person's entry but a derivation — a programmable device (Microprocessor or IEC61850) protecting a BES element — so the

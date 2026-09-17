@@ -9,6 +9,10 @@
 --
 -- The EXISTS is served by IX_Node_Parent and measures 0.05s across the whole tree, which is why this
 -- is a view rather than a stored count that would have to be maintained.
+--
+-- #175 (2026-09-17): Code and FlocCode come through in the table's own column order, so the tree can show the
+-- FLOC segment beside the name and the whole composed FLOC without a second read. A node with no code has no
+-- FLOC, and neither is invented — the gap is what the screen shows.
 CREATE VIEW [location].[vNodeTree] AS
 SELECT n.[RowSeq],
        n.[RowId],
@@ -24,6 +28,8 @@ SELECT n.[RowSeq],
        n.[SubtypeCode],
        n.[RegionSplitOfEntityId],
        n.[Notes],
+       n.[Code],
+       n.[FlocCode],
        HasChildren = CASE WHEN EXISTS (SELECT 1 FROM [location].[vNode] c WHERE c.[ParentEntityId] = n.[EntityId])
                           THEN CAST(1 AS BIT) ELSE CAST(0 AS BIT) END
 FROM [location].[vNode] n;

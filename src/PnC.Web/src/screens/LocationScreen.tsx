@@ -8,6 +8,13 @@
 // here — neither question means anything for a room or a panel, so neither is asked there.
 // Plain React (the #167 rule); the LOCATION screen definition names location.vNode and this component reads it.
 //
+// #175 (2026-09-17): every level of the tree carries a Code — its one segment of the functional location — and the
+// database composes the whole FLOC from the run of coded ancestors (location.Node.Code, location.Node.FlocCode; both on
+// location.vNode). The owner, 2026-09-17: "for each of the various levels, ie. Y230, T3 etc. can we have a field 'code'
+// which contains the code used in the FLOC and then many a Name and/or Description etc." So: Code is the segment
+// (`Y230`), Name stays the descriptive label ("230 kV yard"), Notes stays the description. The FLOC itself is shown and
+// never typed — composing it is what keeps it true when a node moves.
+//
 // #174 (2026-09-17): the tree is built here, by hand. The owner, 2026-09-17: "lets start building out the terminal
 // equipment FLOCS for Eel River… I believe that the application needs to be able to create these… for now, lets work on
 // user functionality." So: a child is added inside this node (location.AddNode), the node itself is renamed or its
@@ -52,10 +59,11 @@ export default function LocationScreen({ params: p, id }: { screen: Screen; para
   const canEdit = can('Node.Modify'); const canArchive = can('Node.Archive')
   const ancestors = ancestorsQ.data ?? []
   const station = isStation ? r : ancestors.find((a) => s(a.NodeTypeCode) === 'Station')
+  const note = flocNote(r, ancestors)
   return (
     <div className="space-y-3">
       <header className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2"><h1 className="text-lg font-semibold text-slate-100">{s(r.Name)}</h1><Pill tone="accent">{s(r.NodeTypeCode)}</Pill>{r.SubtypeCode ? <Pill>{s(r.SubtypeCode)}</Pill> : null}</div>
+        <div className="flex flex-wrap items-center gap-2"><h1 className="text-lg font-semibold text-slate-100">{s(r.Name)}</h1>{s(r.FlocCode) ? <FlocTag floc={s(r.FlocCode)} /> : null}<Pill tone="accent">{s(r.NodeTypeCode)}</Pill>{r.SubtypeCode ? <Pill>{s(r.SubtypeCode)}</Pill> : null}</div>
         <div className="flex gap-2"><Button onClick={() => navigate(-1)}>Close</Button></div>
       </header>
       <div className="grid gap-3 lg:grid-cols-2">
@@ -66,9 +74,10 @@ export default function LocationScreen({ params: p, id }: { screen: Screen; para
               ['Where it sits', ancestorsQ.isPending ? '…' : ancestors.length
                 ? <span>{ancestors.map((a, i) => <span key={s(a.EntityId)}>{i > 0 ? ' › ' : ''}<NodeLink id={s(a.EntityId)} name={s(a.Name)} /><span className="ml-1 text-xs text-slate-500">{s(a.NodeTypeCode)}</span></span>)}</span>
                 : 'the top of the tree']]} />
+            {note && <Status>{note}</Status>}
             {canEdit
               ? <NodeForm key={s(r.EntityId)} r={r} />
-              : <Facts cols={1} pairs={[['Name', s(r.Name)], ['Subtype', s(r.SubtypeCode) || '—'], ['Notes', s(r.Notes) || '—']]} />}
+              : <Facts cols={1} pairs={[['Code', s(r.Code) || '—'], ['Name', s(r.Name)], ['Subtype', s(r.SubtypeCode) || '—'], ['Notes', s(r.Notes) || '—']]} />}
           </div>
         </Panel>
         <ClassificationPanel title="Applicability classifications" subjectKind="Node" subjectEntityId={s(r.EntityId)} editable={can('Asset.Modify')} kinds={NODE_KINDS}
@@ -86,6 +95,55 @@ export default function LocationScreen({ params: p, id }: { screen: Screen; para
         </div>)}
     </div>
   )
+}
+
+/** The composed functional location, as a person reads it off the equipment (location.vNode.FlocCode). Monospace and
+ * select-all, so one click takes the whole tag; the copy button disappears rather than misbehaves where the clipboard
+ * is refused. Never editable: the database composes it from the codes down the tree (#175). */
+function FlocTag({ floc }: { floc: string }) {
+  const [copied, setCopied] = useState(false); const [canCopy, setCanCopy] = useState(true)
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(floc); setCopied(true); window.setTimeout(() => setCopied(false), 1500) }
+    catch { setCanCopy(false) }
+  }
+  return (
+    <span className="flex items-center gap-1">
+      <code title="The functional location — composed by the platform from the code at each level, never typed"
+        className="select-all rounded border border-slate-700 bg-slate-950 px-2 py-0.5 font-mono text-sm tracking-wide text-sky-200">{floc}</code>
+      {canCopy && <Button kind="mini" onClick={() => void copy()}>{copied ? 'copied' : 'copy'}</Button>}
+    </span>
+  )
+}
+
+/** Why there is no FLOC, in plain words, said once. The rule (#175, ruled 2026-09-17): a node with no Code has no FLOC;
+ * otherwise the FLOC is the unbroken run of coded ancestors ending here, so a coded node under an uncoded parent gets
+ * only the part below that parent — never a guessed segment. Both cases are read off the ancestor chain already loaded
+ * for "Where it sits". Nothing is said when the FLOC is whole: no code is the normal state across the estate today and
+ * the screen does not nag about it. */
+function flocNote(r: Row, ancestors: Row[]): string | null {
+  if (!s(r.Code)) return 'No code yet — the FLOC needs one.'
+  const parent = ancestors[ancestors.length - 1]
+  if (parent && !s(parent.Code)) return `Partial — ${s(parent.Name)} has no code, so this is only the part below it.`
+  return null
+}
+
+/** A node in a list: its code first where it has one, then its name as the link — `Y230 · 230 kV yard`. A node with no
+ * code shows its name alone, with nothing in the code's place (#175). */
+export function CodeName({ id, code, name }: { id: string; code: string; name: string }) {
+  if (!code) return <NodeLink id={id} name={name} />
+  return (
+    <span className="inline-flex items-baseline gap-1">
+      <span className="font-mono text-slate-300">{code}</span><span className="text-slate-600">·</span>
+      <NodeLink id={id} name={name} />
+    </span>)
+}
+
+/** Children in the order a person reads a tag list: the coded ones first, by code, then the uncoded by name. */
+function byCodeThenName(a: Row, b: Row) {
+  const ac = s(a.Code), bc = s(b.Code)
+  if (ac && bc) return ac.localeCompare(bc, undefined, { numeric: true }) || s(a.Name).localeCompare(s(b.Name))
+  if (ac !== bc) return ac ? -1 : 1
+  return s(a.Name).localeCompare(s(b.Name))
 }
 
 /** Every location node type and the subtype enumeration attached to it, if it has one (ref.vLocationNodeType —
@@ -117,18 +175,23 @@ function SubtypeBox({ nodeTypeCode, value, onChange, disabled }: { nodeTypeCode:
   return <input className={`${inputClass} w-64`} value={value} disabled={disabled} onChange={(e) => onChange(e.target.value)} placeholder="optional" />
 }
 
-/** The node's own fields — its name, its subtype and its notes. location.RenameNode, which keeps the node where it is:
- * the generated Node_Revise takes Path and Depth, which a client must never compute. A change saves at once, audited. */
+/** The node's own fields — its code, its name, its subtype and its notes. location.RenameNode, which keeps the node
+ * where it is: the generated Node_Revise takes Path and Depth, which a client must never compute. A change saves at
+ * once, audited.
+ * #175: the Code goes through the same call. It is sent as a string always — never JSON null, which the dispatcher
+ * reads as "not given" (SqlSession.cs) and which would leave a code impossible to remove; an empty string clears it.
+ * What a code may contain is the procedure's rule, not this screen's: a code holding '-' or whitespace is refused
+ * there and the refusal shown here, as #174 already does for a bad subtype. */
 function NodeForm({ r }: { r: Row }) {
   const qc = useQueryClient()
-  const [f, setF] = useState({ Name: s(r.Name), SubtypeCode: s(r.SubtypeCode), Notes: s(r.Notes) })
+  const [f, setF] = useState({ Code: s(r.Code), Name: s(r.Name), SubtypeCode: s(r.SubtypeCode), Notes: s(r.Notes) })
   const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null); const [busy, setBusy] = useState(false)
-  const dirty = f.Name !== s(r.Name) || f.SubtypeCode !== s(r.SubtypeCode) || f.Notes !== s(r.Notes)
+  const dirty = f.Code !== s(r.Code) || f.Name !== s(r.Name) || f.SubtypeCode !== s(r.SubtypeCode) || f.Notes !== s(r.Notes)
   const save = async () => {
     if (!f.Name.trim()) { setMsg({ text: 'A location needs a name.', bad: true }); return }
     setBusy(true)
     try {
-      await proc('location', 'RenameNode', { EntityId: r.EntityId, Name: f.Name.trim(), SubtypeCode: f.SubtypeCode.trim() || null, Notes: f.Notes.trim() || null })
+      await proc('location', 'RenameNode', { EntityId: r.EntityId, Code: f.Code.trim(), Name: f.Name.trim(), SubtypeCode: f.SubtypeCode.trim() || null, Notes: f.Notes.trim() || null })
       setMsg({ text: `${f.Name.trim()} saved.` }); refreshTree(qc)
     } catch (e) { setMsg({ text: e instanceof ApiError ? e.message : String(e), bad: true }) } finally { setBusy(false) }
   }
@@ -136,6 +199,8 @@ function NodeForm({ r }: { r: Row }) {
     <div className="space-y-2 text-sm">
       {msg && <Status bad={msg.bad}>{msg.text}</Status>}
       <div className="grid grid-cols-[8rem_1fr] items-start gap-2">
+        <label className="text-slate-400">Code</label>
+        <input className={`${inputClass} w-32 font-mono`} value={f.Code} disabled={busy} onChange={(e) => setF({ ...f, Code: e.target.value })} placeholder="e.g. Y230" />
         <label className="text-slate-400">Name</label>
         <input className={`${inputClass} w-64`} value={f.Name} disabled={busy} onChange={(e) => setF({ ...f, Name: e.target.value })} placeholder="e.g. 345 kV Yard" />
         <label className="text-slate-400">Subtype</label>
@@ -144,6 +209,7 @@ function NodeForm({ r }: { r: Row }) {
         <textarea className={`${inputClass} w-full`} rows={2} value={f.Notes} disabled={busy} onChange={(e) => setF({ ...f, Notes: e.target.value })} />
       </div>
       <Button kind="primary" disabled={!dirty || busy} onClick={() => void save()}>Save</Button>
+      <Status>The code is this level's one segment of the FLOC; the FLOC itself is composed from the codes above and is never typed. The name is the descriptive label and the notes the description.</Status>
     </div>
   )
 }
@@ -160,7 +226,7 @@ function refreshTree(qc: ReturnType<typeof useQueryClient>) {
 function Inside({ node, canEdit, canArchive }: { node: Row; canEdit: boolean; canArchive: boolean }) {
   const qc = useQueryClient()
   const q = useViewAll('location', 'vNode', { ParentEntityId: s(node.EntityId) }, 'Name', !!node.EntityId)
-  const rows = q.data ?? []
+  const rows = [...(q.data ?? [])].sort(byCodeThenName)
   const [confirmId, setConfirmId] = useState(''); const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null)
   const remove = async (n: Row) => {
@@ -177,7 +243,7 @@ function Inside({ node, canEdit, canArchive }: { node: Row; canEdit: boolean; ca
       <ul className="space-y-1 text-sm">
         {rows.map((n) => (
           <li key={s(n.EntityId)} className="flex flex-wrap items-center gap-2">
-            <NodeLink id={s(n.EntityId)} name={s(n.Name)} />
+            <CodeName id={s(n.EntityId)} code={s(n.Code)} name={s(n.Name)} />
             <span className="text-xs text-slate-500">{s(n.NodeTypeCode)}{n.SubtypeCode ? ' · ' + s(n.SubtypeCode) : ''}</span>
             {canArchive && (confirmId === s(n.EntityId)
               ? <span className="flex items-center gap-1 text-xs text-amber-300">withdraw {s(n.Name)}?
@@ -195,16 +261,18 @@ function Inside({ node, canEdit, canArchive }: { node: Row; canEdit: boolean; ca
 /** Add a location inside this one. The types offered are exactly those ref.vLocationNodeTypeParent allows under this
  * node's type — a Yard under a Station, a Bay under a Yard, an EquipmentPosition under a Bay — so the screen never
  * restates the rule the database holds. location.AddNode checks it again and its refusal is what is shown.
- * Siblings are entered in a run: after a successful add the type and subtype stay chosen, the name clears and takes the
- * cursor back, so the next yard or bay is one field and one key. */
+ * Siblings are entered in a run: after a successful add the type and subtype stay chosen, the name and code clear and
+ * the cursor goes back to the code, so the next yard or bay is two fields and one key.
+ * #175: the code is entered beside the name and in front of it — a person working from a tag list types `Y230` first
+ * and "230 kV yard" after — and goes to location.AddNode as @Code. */
 function AddChild({ node }: { node: Row }) {
   const qc = useQueryClient()
   const parentType = s(node.NodeTypeCode)
   const rulesQ = useViewAll('ref', 'vLocationNodeTypeParent', { ParentNodeTypeCode: parentType }, 'ChildNodeTypeCode', !!parentType)
   const { byCode, isPending: typesPending } = useNodeTypes()
-  const [type, setType] = useState(''); const [name, setName] = useState(''); const [sub, setSub] = useState(''); const [notes, setNotes] = useState('')
+  const [type, setType] = useState(''); const [name, setName] = useState(''); const [code, setCode] = useState(''); const [sub, setSub] = useState(''); const [notes, setNotes] = useState('')
   const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null); const [busy, setBusy] = useState(false)
-  const nameRef = useRef<HTMLInputElement>(null)
+  const nameRef = useRef<HTMLInputElement>(null); const codeRef = useRef<HTMLInputElement>(null)
   const options = (rulesQ.data ?? [])
     .map((x) => ({ code: s(x.ChildNodeTypeCode), name: s(byCode.get(s(x.ChildNodeTypeCode))?.Name) || s(x.ChildNodeTypeCode), required: !!x.IsRequired }))
     .sort((a, b) => (Number(b.required) - Number(a.required)) || a.name.localeCompare(b.name))
@@ -216,14 +284,14 @@ function AddChild({ node }: { node: Row }) {
       <Status>Nothing may be recorded inside a {s(byCode.get(parentType)?.Name) || parentType} — it is the bottom of the tree.</Status>
     </div>)
   const add = async () => {
-    const nm = name.trim()
+    const nm = name.trim(); const cd = code.trim()
     if (!nm) { setMsg({ text: 'A name is needed.', bad: true }); nameRef.current?.focus(); return }
     setBusy(true)
     try {
-      await proc('location', 'AddNode', { NodeTypeCode: chosen, ParentEntityId: node.EntityId, Name: nm, SubtypeCode: sub.trim() || null, Notes: notes.trim() || null })
-      setMsg({ text: `${nm} added inside ${s(node.Name)}.` })
-      setType(chosen); setName(''); setNotes(''); refreshTree(qc)
-    } catch (e) { setMsg({ text: e instanceof ApiError ? e.message : String(e), bad: true }) } finally { setBusy(false); nameRef.current?.focus() }
+      await proc('location', 'AddNode', { NodeTypeCode: chosen, ParentEntityId: node.EntityId, Code: cd, Name: nm, SubtypeCode: sub.trim() || null, Notes: notes.trim() || null })
+      setMsg({ text: `${cd ? cd + ' · ' : ''}${nm} added inside ${s(node.Name)}.` })
+      setType(chosen); setName(''); setCode(''); setNotes(''); refreshTree(qc)
+    } catch (e) { setMsg({ text: e instanceof ApiError ? e.message : String(e), bad: true }) } finally { setBusy(false); codeRef.current?.focus() }
   }
   return (
     <div className="mt-3 space-y-2 border-t border-slate-800 pt-2 text-sm">
@@ -232,6 +300,9 @@ function AddChild({ node }: { node: Row }) {
           <select className={`${inputClass} w-44`} value={chosen} disabled={busy} onChange={(e) => { setType(e.target.value); setSub('') }}>
             {options.map((o) => <option key={o.code} value={o.code}>{o.name}</option>)}
           </select></label>
+        <label className="flex flex-col gap-1 text-xs text-slate-400">code
+          <input ref={codeRef} className={`${inputClass} w-24 font-mono`} value={code} disabled={busy} placeholder="Y230"
+            onChange={(e) => setCode(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void add() } }} /></label>
         <label className="flex flex-col gap-1 text-xs text-slate-400">called
           <input ref={nameRef} className={`${inputClass} w-56`} value={name} disabled={busy} placeholder="e.g. 345 kV Yard"
             onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void add() } }} /></label>
