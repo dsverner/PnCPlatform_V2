@@ -101,8 +101,12 @@ SELECT N'device.classification.' + k.[ClassificationKindCode], N'Fixed', N'devic
 FROM [ref].[ClassificationKind] k WHERE k.[IsActive] = 1
   AND EXISTS (SELECT 1 FROM OPENJSON(ISNULL(k.[SubjectKinds], N'[]')) WHERE [value] = N'Device')
 UNION ALL
--- inherited from the station the device stands at (its Installed placement, then location.fStationOf)
-SELECT N'device.station.classification.' + k.[ClassificationKindCode], N'Fixed', N'device.station.classification.' + k.[ClassificationKindCode], NULL,
+-- #173 (2026-09-17): inherited from where the device stands — its Installed placement, then the nearest node at or above
+-- it that carries the classification (location.fNearestClassified). This replaces device.station.classification.<Kind>:
+-- the owner, 2026-09-17, on the CIP requirements following from the impact rating "of building that the device is in" —
+-- a rating on the building beats one on the station, and a group that models rooms or panels can classify there instead.
+-- The generator condition is unchanged: a kind that is recorded against a Station is what a location inherits.
+SELECT N'device.location.classification.' + k.[ClassificationKindCode], N'Fixed', N'device.location.classification.' + k.[ClassificationKindCode], NULL,
        N'asset', N'vClassification', N'ClassificationValue', N'Text', NULL, N'Device', N'BiTemporal', NULL, NULL, NULL, NULL
 FROM [ref].[ClassificationKind] k WHERE k.[IsActive] = 1
   AND EXISTS (SELECT 1 FROM OPENJSON(ISNULL(k.[SubjectKinds], N'[]')) WHERE [value] = N'Station')

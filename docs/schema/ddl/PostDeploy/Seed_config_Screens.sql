@@ -3,6 +3,34 @@
 -- edited it (a version whose ChangeNote does not start with 'seed') or the same payload is already Effective.
 IF OBJECT_ID(N'[config].[AddDefinition]') IS NULL RETURN;   -- bootstrap (tables-only) publish
 GO
+-- location.screen.json
+DECLARE @author UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000001', @approver UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000002';
+DECLARE @e UNIQUEIDENTIFIER, @v UNIQUEIDENTIFIER, @no INT, @payload NVARCHAR(MAX) = N'{"g":1,"kind":"screen","key":"LOCATION","name":"Location","description":"One node of the location tree — a region, a station, a building, a room, a panel or a position: where it sits, its CIP-002 impact rating (recorded here because a location carries it and every BES Cyber Asset in it inherits it — the owner, 2026-09-17), what is inside it and the devices placed there; a station also shows the primary assets with a terminal here and the schemes here (#173, the STATION screen generalised). Plain code; the definition names its data.","permission":"Asset.Read","screenKind":"record","params":{"view":"location.vNode","key":"EntityId"}}';
+DECLARE @note NVARCHAR(200) = N'seed 6020d6f4194a82f6';
+SELECT @e = EntityId FROM [config].[Definition] WHERE [DefinitionKind] = N'Program.Screen' AND [DefinitionKey] = N'LOCATION' AND [IsDeleted] = 0;
+IF @e IS NULL
+    EXEC [config].[AddDefinition] @DefinitionKind = N'Program.Screen', @DefinitionKey = N'LOCATION', @Name = N'Location', @Description = N'One node of the location tree — a region, a station, a building, a room, a panel or a position: where it sits, its CIP-002 impact rating (recorded here because a location carries it and every BES Cyber Asset in it inherits it — the owner, 2026-09-17), what is inside it and the devices placed there; a station also shows the primary assets with a terminal here and the schemes here (#173, the STATION screen generalised). Plain code; the definition names its data.', @ActorId = @author, @EntityId = @e OUTPUT;
+IF NOT EXISTS (SELECT 1 FROM [config].[vDefinitionVersion] WHERE [DefinitionEntityId] = @e AND [ChangeNote] NOT LIKE N'seed %')      -- untouched by an Administrator
+   AND NOT EXISTS (SELECT 1 FROM [config].[vDefinitionVersion] WHERE [DefinitionEntityId] = @e AND [Status] = N'Effective' AND [ChangeNote] = @note)
+BEGIN
+    EXEC [config].[AddDefinitionVersion] @DefinitionKey = N'LOCATION', @DefinitionKind = N'Program.Screen', @ChangeNote = @note, @PayloadText = @payload, @ActorId = @author, @VersionRowId = @v OUTPUT, @VersionNumber = @no OUTPUT;
+    EXEC [config].[ApproveDefinitionVersion] @VersionRowId = @v, @ActorId = @approver;
+END
+GO
+-- locations.screen.json
+DECLARE @author UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000001', @approver UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000002';
+DECLARE @e UNIQUEIDENTIFIER, @v UNIQUEIDENTIFIER, @no INT, @payload NVARCHAR(MAX) = N'{"g":1,"kind":"screen","key":"LOCATIONS","name":"Locations","description":"The stations, each with the buildings inside it; a name opens the location, where its CIP-002 impact rating is recorded (#173). The definition names the data — the stations of location.vNode; the page adds each station''s buildings, which no single view carries.","menu":{"group":"Assets and schemes","label":"Locations","order":16},"permission":"Asset.Read","screenKind":"list","params":{"view":"location.vNode","fixedFilters":{"NodeTypeCode":"Station"},"orderBy":"Name","rowKey":"EntityId","columns":[{"key":"Name","label":"Station"},{"key":"SubtypeCode","label":"Subtype"},{"key":"Notes","label":"Notes"}],"rowOpen":{"label":"Open the location","action":"openScreen","screen":"LOCATION","param":"EntityId"}}}';
+DECLARE @note NVARCHAR(200) = N'seed bc0c4590762cd0b8';
+SELECT @e = EntityId FROM [config].[Definition] WHERE [DefinitionKind] = N'Program.Screen' AND [DefinitionKey] = N'LOCATIONS' AND [IsDeleted] = 0;
+IF @e IS NULL
+    EXEC [config].[AddDefinition] @DefinitionKind = N'Program.Screen', @DefinitionKey = N'LOCATIONS', @Name = N'Locations', @Description = N'The stations, each with the buildings inside it; a name opens the location, where its CIP-002 impact rating is recorded (#173). The definition names the data — the stations of location.vNode; the page adds each station''s buildings, which no single view carries.', @ActorId = @author, @EntityId = @e OUTPUT;
+IF NOT EXISTS (SELECT 1 FROM [config].[vDefinitionVersion] WHERE [DefinitionEntityId] = @e AND [ChangeNote] NOT LIKE N'seed %')      -- untouched by an Administrator
+   AND NOT EXISTS (SELECT 1 FROM [config].[vDefinitionVersion] WHERE [DefinitionEntityId] = @e AND [Status] = N'Effective' AND [ChangeNote] = @note)
+BEGIN
+    EXEC [config].[AddDefinitionVersion] @DefinitionKey = N'LOCATIONS', @DefinitionKind = N'Program.Screen', @ChangeNote = @note, @PayloadText = @payload, @ActorId = @author, @VersionRowId = @v OUTPUT, @VersionNumber = @no OUTPUT;
+    EXEC [config].[ApproveDefinitionVersion] @VersionRowId = @v, @ActorId = @approver;
+END
+GO
 -- primary-asset.screen.json
 DECLARE @author UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000001', @approver UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000002';
 DECLARE @e UNIQUEIDENTIFIER, @v UNIQUEIDENTIFIER, @no INT, @payload NVARCHAR(MAX) = N'{"g":1,"kind":"screen","key":"PRIMARY_ASSET","name":"Primary asset","description":"One primary asset — a line, transformer, bus, breaker, generator, capacitor, reactor or the system: where it is, the schemes that protect it, and its applicability classifications (CIP impact, BES status, NPCC BPS, A-10, PRC-023) recorded by a person with the list or study they came from (#170). Plain code; the definition names its data.","permission":"Asset.Read","screenKind":"record","params":{"view":"asset.vPrimaryAsset","key":"EntityId"}}';
@@ -98,20 +126,6 @@ IF NOT EXISTS (SELECT 1 FROM [config].[vDefinitionVersion] WHERE [DefinitionEnti
    AND NOT EXISTS (SELECT 1 FROM [config].[vDefinitionVersion] WHERE [DefinitionEntityId] = @e AND [Status] = N'Effective' AND [ChangeNote] = @note)
 BEGIN
     EXEC [config].[AddDefinitionVersion] @DefinitionKey = N'SETTINGS_RECORD', @DefinitionKind = N'Program.Screen', @ChangeNote = @note, @PayloadText = @payload, @ActorId = @author, @VersionRowId = @v OUTPUT, @VersionNumber = @no OUTPUT;
-    EXEC [config].[ApproveDefinitionVersion] @VersionRowId = @v, @ActorId = @approver;
-END
-GO
--- station.screen.json
-DECLARE @author UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000001', @approver UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000002';
-DECLARE @e UNIQUEIDENTIFIER, @v UNIQUEIDENTIFIER, @no INT, @payload NVARCHAR(MAX) = N'{"g":1,"kind":"screen","key":"STATION","name":"Station","description":"One station: its CIP-002 impact rating — recorded here because it is the station''s, and every BES Cyber Asset at it inherits it (the owner, 2026-09-16) — with the primary assets that have a terminal here and the schemes here (#171). Plain code; the definition names its data.","permission":"Asset.Read","screenKind":"record","params":{"view":"location.vNode","key":"EntityId"}}';
-DECLARE @note NVARCHAR(200) = N'seed bb90101460d970c8';
-SELECT @e = EntityId FROM [config].[Definition] WHERE [DefinitionKind] = N'Program.Screen' AND [DefinitionKey] = N'STATION' AND [IsDeleted] = 0;
-IF @e IS NULL
-    EXEC [config].[AddDefinition] @DefinitionKind = N'Program.Screen', @DefinitionKey = N'STATION', @Name = N'Station', @Description = N'One station: its CIP-002 impact rating — recorded here because it is the station''s, and every BES Cyber Asset at it inherits it (the owner, 2026-09-16) — with the primary assets that have a terminal here and the schemes here (#171). Plain code; the definition names its data.', @ActorId = @author, @EntityId = @e OUTPUT;
-IF NOT EXISTS (SELECT 1 FROM [config].[vDefinitionVersion] WHERE [DefinitionEntityId] = @e AND [ChangeNote] NOT LIKE N'seed %')      -- untouched by an Administrator
-   AND NOT EXISTS (SELECT 1 FROM [config].[vDefinitionVersion] WHERE [DefinitionEntityId] = @e AND [Status] = N'Effective' AND [ChangeNote] = @note)
-BEGIN
-    EXEC [config].[AddDefinitionVersion] @DefinitionKey = N'STATION', @DefinitionKind = N'Program.Screen', @ChangeNote = @note, @PayloadText = @payload, @ActorId = @author, @VersionRowId = @v OUTPUT, @VersionNumber = @no OUTPUT;
     EXEC [config].[ApproveDefinitionVersion] @VersionRowId = @v, @ActorId = @approver;
 END
 GO

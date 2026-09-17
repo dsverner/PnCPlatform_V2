@@ -5,7 +5,7 @@ CREATE PROCEDURE [compliance].[RuleEvaluationRun_Append]
     @Trigger NVARCHAR(20),
     @StartedAt DATETIMEOFFSET(7),
     @CompletedAt DATETIMEOFFSET(7) = NULL,
-    @ActorId UNIQUEIDENTIFIER = NULL,   -- #171: the session's actor when not supplied (personnel.ResolveActor below), like every other write
+    @ActorId UNIQUEIDENTIFIER,
     @SubjectsScoped INT = NULL,
     @InstancesOpened INT = NULL,
     @InstancesClosed INT = NULL,

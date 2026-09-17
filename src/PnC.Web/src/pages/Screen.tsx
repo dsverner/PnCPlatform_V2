@@ -9,7 +9,8 @@ import StepScreen from '@/screens/StepScreen'
 import RecordScreen from '@/screens/RecordScreen'
 import SchemeScreen from '@/screens/SchemeScreen'
 import PrimaryAssetScreen from '@/screens/PrimaryAssetScreen'
-import StationScreen from '@/screens/StationScreen'
+import LocationScreen from '@/screens/LocationScreen'
+import LocationsScreen from '@/screens/LocationsScreen'
 
 export default function ScreenPage() {
   const { key = '', id } = useParams()
@@ -24,7 +25,8 @@ export default function ScreenPage() {
 function ScreenBody({ screen, id }: { screen: Screen; id?: string }) {
   switch (screen.screenKind) {
     case 'settingsBook': return <SettingsBookScreen screen={screen} params={screen.params as SettingsBookParams} />
-    case 'list': return <ListScreen screen={screen} params={screen.params as ListParams} />
+    // #173: the locations index is plain code — the generic list cannot join a station to the buildings inside it
+    case 'list': return screen.key === 'LOCATIONS' ? <LocationsScreen /> : <ListScreen screen={screen} params={screen.params as ListParams} />
     case 'workItem': return <WorkItemScreen screen={screen} params={screen.params as WorkItemParams} id={id} />
     case 'step': return <StepScreen screen={screen} params={screen.params as StepParams} id={id} />
     case 'record': {
@@ -32,7 +34,7 @@ function ScreenBody({ screen, id }: { screen: Screen; id?: string }) {
       const rp = screen.params as RecordParams
       if (rp.view === 'scheme.vScheme') return <SchemeScreen screen={screen} params={rp} id={id} />
       if (rp.view === 'asset.vPrimaryAsset') return <PrimaryAssetScreen screen={screen} params={rp} id={id} />
-      if (rp.view === 'location.vNode') return <StationScreen screen={screen} params={rp} id={id} />   // #171: the station page
+      if (rp.view === 'location.vNode') return <LocationScreen screen={screen} params={rp} id={id} />  // #173: any node of the location tree
       return <RecordScreen screen={screen} params={rp} id={id} />
     }
     default: return <Status bad>The screen kind “{screen.screenKind}” is not built yet (screen {screen.key}{id ? ', id ' + id : ''}).</Status>

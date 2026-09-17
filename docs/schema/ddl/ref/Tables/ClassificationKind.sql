@@ -17,6 +17,15 @@ CREATE TABLE [ref].[ClassificationKind] (
     [ModifiedAt]        DATETIMEOFFSET(7) NOT NULL,
     [IsActive]          BIT               NOT NULL CONSTRAINT [DF_ClassificationKind_IsActive] DEFAULT 1,
     [MigrationRunId]    UNIQUEIDENTIFIER  NULL     CONSTRAINT [FK_ClassificationKind_MigrationRun] REFERENCES [migration].[Run] ([RunId]),
+    -- #173 (2026-09-17): which asset types the kind applies to — a JSON array of ref.AssetType.AssetTypeCode. NULL means
+    -- every asset type the kind's SubjectKinds already allow; a list narrows it (the owner, 2026-09-17: a bus is not
+    -- PRC-023 applicable, so the bus page must not offer it). asset.RecordClassification enforces it (50232), and the
+    -- primary-asset screen reads it instead of a hard-coded list.
+    [AppliesToAssetTypes] NVARCHAR(400)   NULL     CONSTRAINT [CK_ClassificationKind_AppliesToAssetTypes] CHECK ([AppliesToAssetTypes] IS NULL OR ISJSON([AppliesToAssetTypes]) = 1),
+    -- The DefinitionKey of the Program.ClassificationDerivation that works this kind out, when one does (bes_cyber_asset).
+    -- A derived kind is not recorded by hand: a screen reads this to know it must offer no control, and
+    -- asset.RecordClassification refuses a hand-recorded value for it (50234).
+    [DerivedByDefinitionKey] NVARCHAR(100) NULL,
     CONSTRAINT [PK_ClassificationKind] PRIMARY KEY CLUSTERED ([ClassificationKindCode])
 ) WITH (SYSTEM_VERSIONING = ON (HISTORY_TABLE = [ref].[ClassificationKind_History]));
 GO

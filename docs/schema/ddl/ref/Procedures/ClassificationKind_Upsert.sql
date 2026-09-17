@@ -5,6 +5,8 @@ CREATE PROCEDURE [ref].[ClassificationKind_Upsert]
     @Description NVARCHAR(MAX) = NULL,
     @AllowedValuesDefinitionRowId UNIQUEIDENTIFIER = NULL,
     @SubjectKinds NVARCHAR(100) = NULL,
+    @AppliesToAssetTypes NVARCHAR(400) = NULL,
+    @DerivedByDefinitionKey NVARCHAR(100) = NULL,
     @ActorId UNIQUEIDENTIFIER = NULL,
     @MigrationRunId UNIQUEIDENTIFIER = NULL
 AS
@@ -13,7 +15,7 @@ BEGIN
     DECLARE @now DATETIMEOFFSET(7) = SYSDATETIMEOFFSET();
     IF @ActorId IS NULL EXEC [personnel].[ResolveActor] @ActorId = @ActorId OUTPUT;
     IF EXISTS (SELECT 1 FROM [ref].[ClassificationKind] t WHERE t.[ClassificationKindCode] = @ClassificationKindCode)
-        UPDATE t SET [Name] = @Name, [Description] = @Description, [AllowedValuesDefinitionRowId] = @AllowedValuesDefinitionRowId, [SubjectKinds] = @SubjectKinds, [IsActive] = 1, [ModifiedBy] = @ActorId, [ModifiedAt] = @now FROM [ref].[ClassificationKind] t WHERE t.[ClassificationKindCode] = @ClassificationKindCode;
+        UPDATE t SET [Name] = @Name, [Description] = @Description, [AllowedValuesDefinitionRowId] = @AllowedValuesDefinitionRowId, [SubjectKinds] = @SubjectKinds, [AppliesToAssetTypes] = @AppliesToAssetTypes, [DerivedByDefinitionKey] = @DerivedByDefinitionKey, [IsActive] = 1, [ModifiedBy] = @ActorId, [ModifiedAt] = @now FROM [ref].[ClassificationKind] t WHERE t.[ClassificationKindCode] = @ClassificationKindCode;
     ELSE
-        INSERT [ref].[ClassificationKind] ([ClassificationKindCode], [Name], [Description], [AllowedValuesDefinitionRowId], [SubjectKinds], [CreatedBy], [CreatedAt], [ModifiedBy], [ModifiedAt], [MigrationRunId]) VALUES (@ClassificationKindCode, @Name, @Description, @AllowedValuesDefinitionRowId, @SubjectKinds, @ActorId, @now, @ActorId, @now, @MigrationRunId);
+        INSERT [ref].[ClassificationKind] ([ClassificationKindCode], [Name], [Description], [AllowedValuesDefinitionRowId], [SubjectKinds], [AppliesToAssetTypes], [DerivedByDefinitionKey], [CreatedBy], [CreatedAt], [ModifiedBy], [ModifiedAt], [MigrationRunId]) VALUES (@ClassificationKindCode, @Name, @Description, @AllowedValuesDefinitionRowId, @SubjectKinds, @AppliesToAssetTypes, @DerivedByDefinitionKey, @ActorId, @now, @ActorId, @now, @MigrationRunId);
 END;

@@ -9,8 +9,10 @@ DECLARE @approver UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000002';
 IF NOT EXISTS (SELECT 1 FROM [personnel].[Actor] WHERE [ActorId] = @approver)
     INSERT [personnel].[Actor] ([ActorId], [ActorKind], [SystemName]) VALUES (@approver, N'System', N'Platform.SeedApprover');
 
-IF NOT EXISTS (SELECT 1 FROM [config].[Definition] d JOIN [config].[DefinitionVersion] dv ON dv.[DefinitionEntityId] = d.[EntityId] AND dv.[IsDeleted] = 0 AND dv.[Status] = N'Effective'
-               WHERE d.[DefinitionKind] = N'Program.Formula' AND d.[DefinitionKey] = N'prc023_zset' AND d.[IsDeleted] = 0)
+IF NOT EXISTS (SELECT 1 FROM [config].[Definition] d
+               JOIN [config].[DefinitionVersion] dv ON dv.[DefinitionEntityId] = d.[EntityId] AND dv.[IsDeleted] = 0 AND dv.[Status] = N'Effective'
+               WHERE d.[DefinitionKind] = N'Program.Formula' AND d.[DefinitionKey] = N'prc023_zset' AND d.[IsDeleted] = 0
+                 AND dv.[PayloadText] = N'{"g":1,"subjectKind":"Device","inputs":["device.settings.R1","device.settings.X1","device.settings.Z3%"],"expressionText":"to(device.settings.Z3%, ''ratio'') * hypot(device.settings.R1, device.settings.X1)","expression":{"op":"*","l":{"fn":"to","a":[{"fact":"device.settings.Z3%"},{"lit":"ratio","t":"text"}]},"r":{"fn":"hypot","a":[{"fact":"device.settings.R1"},{"fact":"device.settings.X1"}]}},"publishes":{"fact":"asset.formula.prc023_zset","type":"num","unit":"Ω","precision":2}}')
 BEGIN
     DECLARE @e UNIQUEIDENTIFIER, @v UNIQUEIDENTIFIER, @n INT;
     IF NOT EXISTS (SELECT 1 FROM [config].[Definition] WHERE [DefinitionKind] = N'Program.Formula' AND [DefinitionKey] = N'prc023_zset' AND [IsDeleted] = 0)
@@ -23,8 +25,10 @@ END
 GO
 DECLARE @author   UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000001';
 DECLARE @approver UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000002';
-IF NOT EXISTS (SELECT 1 FROM [config].[Definition] d JOIN [config].[DefinitionVersion] dv ON dv.[DefinitionEntityId] = d.[EntityId] AND dv.[IsDeleted] = 0 AND dv.[Status] = N'Effective'
-               WHERE d.[DefinitionKind] = N'Program.Formula' AND d.[DefinitionKey] = N'prc023_line_angle' AND d.[IsDeleted] = 0)
+IF NOT EXISTS (SELECT 1 FROM [config].[Definition] d
+               JOIN [config].[DefinitionVersion] dv ON dv.[DefinitionEntityId] = d.[EntityId] AND dv.[IsDeleted] = 0 AND dv.[Status] = N'Effective'
+               WHERE d.[DefinitionKind] = N'Program.Formula' AND d.[DefinitionKey] = N'prc023_line_angle' AND d.[IsDeleted] = 0
+                 AND dv.[PayloadText] = N'{"g":1,"subjectKind":"Device","inputs":["device.settings.R1","device.settings.X1"],"expressionText":"atan2(device.settings.X1, device.settings.R1)","expression":{"fn":"atan2","a":[{"fact":"device.settings.X1"},{"fact":"device.settings.R1"}]},"publishes":{"fact":"asset.formula.prc023_line_angle","type":"num","unit":"deg","precision":2}}')
 BEGIN
     DECLARE @e UNIQUEIDENTIFIER, @v UNIQUEIDENTIFIER, @n INT;
     IF NOT EXISTS (SELECT 1 FROM [config].[Definition] WHERE [DefinitionKind] = N'Program.Formula' AND [DefinitionKey] = N'prc023_line_angle' AND [IsDeleted] = 0)
@@ -37,8 +41,10 @@ END
 GO
 DECLARE @author   UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000001';
 DECLARE @approver UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000002';
-IF NOT EXISTS (SELECT 1 FROM [config].[Definition] d JOIN [config].[DefinitionVersion] dv ON dv.[DefinitionEntityId] = d.[EntityId] AND dv.[IsDeleted] = 0 AND dv.[Status] = N'Effective'
-               WHERE d.[DefinitionKind] = N'Program.Formula' AND d.[DefinitionKey] = N'prc023_z30' AND d.[IsDeleted] = 0)
+IF NOT EXISTS (SELECT 1 FROM [config].[Definition] d
+               JOIN [config].[DefinitionVersion] dv ON dv.[DefinitionEntityId] = d.[EntityId] AND dv.[IsDeleted] = 0 AND dv.[Status] = N'Effective'
+               WHERE d.[DefinitionKind] = N'Program.Formula' AND d.[DefinitionKey] = N'prc023_z30' AND d.[IsDeleted] = 0
+                 AND dv.[PayloadText] = N'{"g":1,"subjectKind":"Device","inputs":["asset.formula.prc023_line_angle","asset.formula.prc023_zset","device.settings.MTA"],"expressionText":"asset.formula.prc023_zset / cos(asset.formula.prc023_line_angle - device.settings.MTA) * cos(device.settings.MTA - 30deg)","expression":{"op":"*","l":{"op":"/","l":{"fact":"asset.formula.prc023_zset"},"r":{"fn":"cos","a":[{"op":"-","l":{"fact":"asset.formula.prc023_line_angle"},"r":{"fact":"device.settings.MTA"}}]}},"r":{"fn":"cos","a":[{"op":"-","l":{"fact":"device.settings.MTA"},"r":{"lit":"30","t":"num","u":"deg"}}]}},"publishes":{"fact":"asset.formula.prc023_z30","type":"num","unit":"Ω","precision":2}}')
 BEGIN
     DECLARE @e UNIQUEIDENTIFIER, @v UNIQUEIDENTIFIER, @n INT;
     IF NOT EXISTS (SELECT 1 FROM [config].[Definition] WHERE [DefinitionKind] = N'Program.Formula' AND [DefinitionKey] = N'prc023_z30' AND [IsDeleted] = 0)
@@ -51,8 +57,10 @@ END
 GO
 DECLARE @author   UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000001';
 DECLARE @approver UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000002';
-IF NOT EXISTS (SELECT 1 FROM [config].[Definition] d JOIN [config].[DefinitionVersion] dv ON dv.[DefinitionEntityId] = d.[EntityId] AND dv.[IsDeleted] = 0 AND dv.[Status] = N'Effective'
-               WHERE d.[DefinitionKind] = N'Program.Formula' AND d.[DefinitionKey] = N'prc023_trip_current' AND d.[IsDeleted] = 0)
+IF NOT EXISTS (SELECT 1 FROM [config].[Definition] d
+               JOIN [config].[DefinitionVersion] dv ON dv.[DefinitionEntityId] = d.[EntityId] AND dv.[IsDeleted] = 0 AND dv.[Status] = N'Effective'
+               WHERE d.[DefinitionKind] = N'Program.Formula' AND d.[DefinitionKey] = N'prc023_trip_current' AND d.[IsDeleted] = 0
+                 AND dv.[PayloadText] = N'{"g":1,"subjectKind":"Device","inputs":["asset.formula.prc023_z30","device.protects.terminal.voltage"],"expressionText":"0.85 * to(device.protects.terminal.voltage, ''V'') * 0.5773503 / asset.formula.prc023_z30","expression":{"op":"/","l":{"op":"*","l":{"op":"*","l":{"lit":"0.85","t":"num"},"r":{"fn":"to","a":[{"fact":"device.protects.terminal.voltage"},{"lit":"V","t":"text"}]}},"r":{"lit":"0.5773503","t":"num"}},"r":{"fact":"asset.formula.prc023_z30"}},"publishes":{"fact":"asset.formula.prc023_trip_current","type":"num","unit":"A","precision":0}}')
 BEGIN
     DECLARE @e UNIQUEIDENTIFIER, @v UNIQUEIDENTIFIER, @n INT;
     IF NOT EXISTS (SELECT 1 FROM [config].[Definition] WHERE [DefinitionKind] = N'Program.Formula' AND [DefinitionKey] = N'prc023_trip_current' AND [IsDeleted] = 0)
@@ -65,8 +73,10 @@ END
 GO
 DECLARE @author   UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000001';
 DECLARE @approver UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000002';
-IF NOT EXISTS (SELECT 1 FROM [config].[Definition] d JOIN [config].[DefinitionVersion] dv ON dv.[DefinitionEntityId] = d.[EntityId] AND dv.[IsDeleted] = 0 AND dv.[Status] = N'Effective'
-               WHERE d.[DefinitionKind] = N'Program.Formula' AND d.[DefinitionKey] = N'prc023_load_current' AND d.[IsDeleted] = 0)
+IF NOT EXISTS (SELECT 1 FROM [config].[Definition] d
+               JOIN [config].[DefinitionVersion] dv ON dv.[DefinitionEntityId] = d.[EntityId] AND dv.[IsDeleted] = 0 AND dv.[Status] = N'Effective'
+               WHERE d.[DefinitionKind] = N'Program.Formula' AND d.[DefinitionKey] = N'prc023_load_current' AND d.[IsDeleted] = 0
+                 AND dv.[PayloadText] = N'{"g":1,"subjectKind":"Device","inputs":["asset.formula.prc023_trip_current","device.settings.50H"],"expressionText":"coalesce(min(asset.formula.prc023_trip_current, device.settings.50H), asset.formula.prc023_trip_current)","expression":{"fn":"coalesce","a":[{"fn":"min","a":[{"fact":"asset.formula.prc023_trip_current"},{"fact":"device.settings.50H"}]},{"fact":"asset.formula.prc023_trip_current"}]},"publishes":{"fact":"asset.formula.prc023_load_current","type":"num","unit":"A","precision":0}}')
 BEGIN
     DECLARE @e UNIQUEIDENTIFIER, @v UNIQUEIDENTIFIER, @n INT;
     IF NOT EXISTS (SELECT 1 FROM [config].[Definition] WHERE [DefinitionKind] = N'Program.Formula' AND [DefinitionKey] = N'prc023_load_current' AND [IsDeleted] = 0)
@@ -79,8 +89,10 @@ END
 GO
 DECLARE @author   UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000001';
 DECLARE @approver UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000002';
-IF NOT EXISTS (SELECT 1 FROM [config].[Definition] d JOIN [config].[DefinitionVersion] dv ON dv.[DefinitionEntityId] = d.[EntityId] AND dv.[IsDeleted] = 0 AND dv.[Status] = N'Effective'
-               WHERE d.[DefinitionKind] = N'Program.Formula' AND d.[DefinitionKey] = N'prc023_criterion' AND d.[IsDeleted] = 0)
+IF NOT EXISTS (SELECT 1 FROM [config].[Definition] d
+               JOIN [config].[DefinitionVersion] dv ON dv.[DefinitionEntityId] = d.[EntityId] AND dv.[IsDeleted] = 0 AND dv.[Status] = N'Effective'
+               WHERE d.[DefinitionKind] = N'Program.Formula' AND d.[DefinitionKey] = N'prc023_criterion' AND d.[IsDeleted] = 0
+                 AND dv.[PayloadText] = N'{"g":1,"subjectKind":"Device","inputs":["asset.formula.prc023_load_current","asset.formula.prc023_zset","device.protects.rating","device.settings.MTA","device.settings.R1","device.settings.X1"],"expressionText":"if(coalesce(asset.formula.prc023_load_current > 1.5 * device.protects.rating[kind=''FourHour''], false), ''1'', if(coalesce(asset.formula.prc023_load_current > 1.15 * device.protects.rating[kind=''FifteenMinute''], false), ''2'', if(coalesce(asset.formula.prc023_load_current > 1.15 * device.protects.rating[kind=''PracticalLimitation''], false), ''13'', if(coalesce(asset.formula.prc023_zset <= 1.25 * hypot(device.settings.R1, device.settings.X1) and device.settings.MTA = 90deg, false), ''12'', ''None''))))","expression":{"fn":"if","a":[{"fn":"coalesce","a":[{"op":">","l":{"fact":"asset.formula.prc023_load_current"},"r":{"op":"*","l":{"lit":"1.5","t":"num"},"r":{"fact":"device.protects.rating","p":{"kind":{"lit":"FourHour","t":"text"}}}}},{"lit":false,"t":"bool"}]},{"lit":"1","t":"text"},{"fn":"if","a":[{"fn":"coalesce","a":[{"op":">","l":{"fact":"asset.formula.prc023_load_current"},"r":{"op":"*","l":{"lit":"1.15","t":"num"},"r":{"fact":"device.protects.rating","p":{"kind":{"lit":"FifteenMinute","t":"text"}}}}},{"lit":false,"t":"bool"}]},{"lit":"2","t":"text"},{"fn":"if","a":[{"fn":"coalesce","a":[{"op":">","l":{"fact":"asset.formula.prc023_load_current"},"r":{"op":"*","l":{"lit":"1.15","t":"num"},"r":{"fact":"device.protects.rating","p":{"kind":{"lit":"PracticalLimitation","t":"text"}}}}},{"lit":false,"t":"bool"}]},{"lit":"13","t":"text"},{"fn":"if","a":[{"fn":"coalesce","a":[{"op":"and","a":[{"op":"<=","l":{"fact":"asset.formula.prc023_zset"},"r":{"op":"*","l":{"lit":"1.25","t":"num"},"r":{"fn":"hypot","a":[{"fact":"device.settings.R1"},{"fact":"device.settings.X1"}]}}},{"op":"=","l":{"fact":"device.settings.MTA"},"r":{"lit":"90","t":"num","u":"deg"}}]},{"lit":false,"t":"bool"}]},{"lit":"12","t":"text"},{"lit":"None","t":"text"}]}]}]}]},"publishes":{"fact":"asset.formula.prc023_criterion","type":"text"}}')
 BEGIN
     DECLARE @e UNIQUEIDENTIFIER, @v UNIQUEIDENTIFIER, @n INT;
     IF NOT EXISTS (SELECT 1 FROM [config].[Definition] WHERE [DefinitionKind] = N'Program.Formula' AND [DefinitionKey] = N'prc023_criterion' AND [IsDeleted] = 0)

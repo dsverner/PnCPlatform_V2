@@ -58,21 +58,18 @@ BEGIN
           AND c.[ClassificationKindCode] = SUBSTRING(@factName, CHARINDEX(N'.classification.', @factName) + 16, 40)
           AND c.[IsDeleted] = 0 AND c.[ValidFrom] <= @at AND (c.[ValidTo] IS NULL OR c.[ValidTo] > @at)
         ORDER BY c.[ValidFrom] DESC, c.[RowSeq] DESC;
-    -- inherited from the station the device stands at: its Installed placement, then location.fStationOf up the tree.
-    -- The CIP impact rating lives on the station (the owner, 2026-09-16).
-    ELSE IF @factName LIKE N'device.station.classification.%'
-    BEGIN
-        DECLARE @stationNodeEntityId UNIQUEIDENTIFIER = [location].[fStationOf](
+    -- #173 (2026-09-17): inherited from where the device stands — its Installed placement, then the nearest node at or
+    -- above it that carries the classification (location.fNearestClassified, which walks ParentEntityId to the Owner).
+    -- The owner, 2026-09-17: the CIP requirements follow from the impact rating "of building that the device is in", so
+    -- a rating on the building beats one on the station, and the station's still rules while the buildings are
+    -- placeholders. This replaced device.station.classification.<Kind>, which could only read the station.
+    ELSE IF @factName LIKE N'device.location.classification.%'
+        SET @v = [location].[fNearestClassified](
             (SELECT TOP (1) p.[NodeEntityId] FROM [asset].[Placement] p
              WHERE p.[AssetEntityId] = @subjectEntityId AND p.[PlacementKind] = N'Installed' AND p.[IsDeleted] = 0
                AND p.[ValidFrom] <= @at AND (p.[ValidTo] IS NULL OR p.[ValidTo] > @at)
-             ORDER BY p.[ValidFrom] DESC, p.[RowSeq] DESC));
-        SELECT TOP (1) @v = c.[ClassificationValue] FROM [asset].[Classification] c
-        WHERE c.[SubjectKind] = N'Node' AND c.[SubjectEntityId] = @stationNodeEntityId
-          AND c.[ClassificationKindCode] = SUBSTRING(@factName, CHARINDEX(N'.classification.', @factName) + 16, 40)
-          AND c.[IsDeleted] = 0 AND c.[ValidFrom] <= @at AND (c.[ValidTo] IS NULL OR c.[ValidTo] > @at)
-        ORDER BY c.[ValidFrom] DESC, c.[RowSeq] DESC;
-    END
+             ORDER BY p.[ValidFrom] DESC, p.[RowSeq] DESC),
+            SUBSTRING(@factName, CHARINDEX(N'.classification.', @factName) + 16, 40), @at);
     -- inherited from the bus at the terminal end the scheme protects from (the NPCC A-10 test is a bus test)
     ELSE IF @factName LIKE N'device.protects.bus.classification.%'
         SELECT TOP (1) @v = c.[ClassificationValue] FROM [asset].[Classification] c

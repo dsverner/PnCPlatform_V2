@@ -5,6 +5,8 @@
 -- optionally the list or study they came from, so that a later phase's derivation (Basis = Derived) lands beside them and
 -- the obligation rules, which read the classification whatever its basis, never change. One current value per subject and
 -- kind: a new value revises the current row (the history keeps the old one); an empty value withdraws it.
+-- #173 (2026-09-17): what a subject is not bound by cannot be recorded against it — the kind must apply to the asset's
+-- type (50232), and a kind a derivation works out is not a person's entry at all (50234). Both below, after @value.
 -- Over HTTP: Asset.Modify (Node.Modify / Scheme.Modify) on the subject — SubjectKind/SubjectEntityId name the scope.
 CREATE PROCEDURE [asset].[RecordClassification]
     @SubjectKind NVARCHAR(40),
@@ -26,6 +28,32 @@ BEGIN
     BEGIN DECLARE @m1 NVARCHAR(400) = N'asset.RecordClassification: no classification kind ' + ISNULL(@ClassificationKindCode, N'(null)') + N'.'; THROW 50231, @m1, 1; END
     DECLARE @value NVARCHAR(60) = NULLIF(LTRIM(RTRIM(@ClassificationValue)), N'');
     SET @DeterminedAt = ISNULL(@DeterminedAt, @now);
+
+    -- #173 (2026-09-17): a kind a subject is not bound by is not recorded against it. Hiding the control on the screen is
+    -- not the rule; this is. ref.ClassificationKind.AppliesToAssetTypes is the JSON list of asset types the kind applies
+    -- to (NULL = every type its SubjectKinds already allow), and DerivedByDefinitionKey names the derivation that works
+    -- the kind out for itself — a derived kind is never a person's entry (asset.DeriveClassification writes those).
+    -- Both checks are skipped for an empty value: a withdrawal must always be possible, including of a value recorded
+    -- before the kind was narrowed or made derived.
+    DECLARE @appliesTo NVARCHAR(400), @derivedBy NVARCHAR(100), @assetType NVARCHAR(40);
+    SELECT @appliesTo = k.[AppliesToAssetTypes], @derivedBy = k.[DerivedByDefinitionKey]
+    FROM [ref].[ClassificationKind] k WHERE k.[ClassificationKindCode] = @ClassificationKindCode;
+    IF @value IS NOT NULL AND @derivedBy IS NOT NULL
+    BEGIN
+        DECLARE @m2 NVARCHAR(400) = N'asset.RecordClassification: ' + @ClassificationKindCode + N' is derived by ' + @derivedBy
+            + N'; record the inputs it reads instead.';
+        THROW 50234, @m2, 1;
+    END
+    IF @value IS NOT NULL AND @appliesTo IS NOT NULL AND @SubjectKind = N'Asset'
+    BEGIN
+        SELECT @assetType = a.[AssetTypeCode] FROM [asset].[vAsset] a WHERE a.[EntityId] = @SubjectEntityId;
+        IF @assetType IS NOT NULL AND NOT EXISTS (SELECT 1 FROM OPENJSON(@appliesTo) WHERE [value] = @assetType)
+        BEGIN
+            DECLARE @m3 NVARCHAR(400) = N'asset.RecordClassification: ' + @ClassificationKindCode + N' does not apply to a ' + @assetType
+                + N' (it applies to ' + ISNULL((SELECT STRING_AGG(j.[value], N', ') FROM OPENJSON(@appliesTo) j), N'no asset type') + N').';
+            THROW 50232, @m3, 1;
+        END
+    END
     SET @EntityId = (SELECT TOP (1) [EntityId] FROM [asset].[Classification]
                      WHERE [SubjectKind] = @SubjectKind AND [SubjectEntityId] = @SubjectEntityId AND [ClassificationKindCode] = @ClassificationKindCode AND [ValidTo] IS NULL AND [IsDeleted] = 0
                      ORDER BY [RowSeq] DESC);

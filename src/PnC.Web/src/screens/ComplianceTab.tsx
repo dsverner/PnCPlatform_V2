@@ -9,7 +9,7 @@ import { ApiError, fmtDate, fmtWhen, postJson, s, view, viewAll, type Row } from
 import { useCan, useViewAll } from '@/lib/hooks'
 import { screenPath } from '@/lib/screens'
 import { Panel, Pill, Button, Status, type Tone } from '@/components/ui/ui'
-import { ClassificationPanel, DEVICE_KINDS } from './PrimaryAssetScreen'
+import { ClassificationPanel, DEVICE_KINDS, NodeLink, kindApplies, useClassificationKindRef, useClassifications, type DerivedNote } from './PrimaryAssetScreen'
 
 /** The evaluator's report (src/PnC.Api/Engine/ComplianceEvaluator.cs, serialised camelCase). */
 export interface FactRead { name: string; params: string | null; value: string }
@@ -20,9 +20,15 @@ export interface Verdict {
   instanceRowId: string | null; action: 'open' | 'close' | 'unchanged' | 'none'; evidenceNote: string | null
   requirementNumber: string | null; standardCode: string | null; standardVersion: string | null
 }
+/** What a Program.ClassificationDerivation decided for one subject in this pass (#173): the value, why, and — in an
+ * Effective pass — what asset.DeriveClassification did with it (Set, RecordedStands, …; a Preview writes nothing). */
+export interface Derived {
+  key: string; kind: string; subjectKind: string; subjectEntityId: string; subjectName: string
+  value: string | null; reason: string; reads: FactRead[]; outcome: string; error: string | null
+}
 export interface EvaluationReport {
   at: string; mode: string; rules: number; subjects: number; opened: number; closed: number; unchanged: number
-  unknown: number; errors: number; verdicts: Verdict[]; ruleErrors: string[]; runId: string
+  unknown: number; errors: number; verdicts: Verdict[]; ruleErrors: string[]; runId: string; derivations: Derived[]
 }
 
 /** The PRC-023 loadability working, in the order the calculation goes (the Program.Formula seeds of #171). */
@@ -63,20 +69,68 @@ export function useProtectedAssets(schemeEntityId: string) {
   } })
 }
 
-/** The station's CIP-002 impact rating (recorded on the station node, #171 — every BES Cyber Asset at it inherits it). */
-export function useStationCip(stationEntityId: string) {
-  return useViewAll('asset', 'vClassification', { SubjectKind: 'Node', SubjectEntityId: stationEntityId, ClassificationKindCode: 'CipImpactRating' }, undefined, !!stationEntityId)
+/** The CIP-002 impact rating the rules actually read: the nearest classified ancestor-or-self of the device's placement
+ * node, not the station's (#173, the owner 2026-09-17 — "the classification … of building that the device is in"; the
+ * engine walks ParentEntityId in location.fNearestClassified). location.vNode.Path is that same chain for a screen: the
+ * ancestors' ids in order, the node's own excluded (#94), so this is three reads — the placement node, every Node-subject
+ * CipImpactRating (8 rows on DEV today), and the node that carries the winner. The deepest wins: a rating on the building
+ * beats the station's. PositionNodeEntityId comes from document.vSettingsRecord; without it the installed placement is read. */
+export function useLocationCip(positionNodeEntityId: string, deviceEntityId: string) {
+  return useQuery({ queryKey: ['locationCip', positionNodeEntityId, deviceEntityId], enabled: !!(positionNodeEntityId || deviceEntityId), staleTime: 60_000, queryFn: async () => {
+    let nodeId = positionNodeEntityId
+    if (!nodeId) nodeId = s((await view('asset', 'vPlacement', { AssetEntityId: deviceEntityId, PlacementKind: 'Installed' }, { take: 1 })).rows[0]?.NodeEntityId)
+    if (!nodeId) return null
+    const node = (await view('location', 'vNode', { EntityId: nodeId }, { take: 1 })).rows[0]
+    if (!node) return null
+    const cls = await viewAll('asset', 'vClassification', { SubjectKind: 'Node', ClassificationKindCode: 'CipImpactRating' })
+    const byNode = new Map(cls.map((c) => [s(c.SubjectEntityId).toLowerCase(), c]))
+    const chain = [...s(node.Path).split('/').map((x) => x.trim()).filter(Boolean), s(node.EntityId)]
+    for (let i = chain.length - 1; i >= 0; i--) {
+      const c = byNode.get(chain[i].toLowerCase())
+      if (!c) continue
+      const carrier = chain[i].toLowerCase() === s(node.EntityId).toLowerCase() ? node : (await view('location', 'vNode', { EntityId: chain[i] }, { take: 1 })).rows[0]
+      return { value: s(c.ClassificationValue), at: c.DeterminedAt, nodeId: chain[i], nodeName: s(carrier?.Name), nodeType: s(carrier?.NodeTypeCode) }
+    }
+    return { value: '', at: null, nodeId: '', nodeName: '', nodeType: '' }
+  } })
+}
+
+/** The BES Cyber Asset line (#173). The value is the platform's, written by a derivation the evaluator runs — so until a
+ * derived row exists this says only that no pass has run and lists the inputs as facts; it never announces the verdict
+ * itself. After an Evaluate now the report's `derivations` array is the authority: its value, its reason, its outcome. */
+function besCyberAssetNote(r: Row, protectedAssets: Row[] | undefined, current: Row | undefined, report: EvaluationReport | null): DerivedNote {
+  const d = (report?.derivations ?? []).find((x) => x.kind === 'BesCyberAsset' && s(x.subjectEntityId).toLowerCase() === s(r.DeviceEntityId).toLowerCase())
+  if (d?.error) return { label: `could not be evaluated: ${d.error}`, reason: d.error }
+  if (current) return { reason: d?.reason }                       // a derived row stands; its reason is the pass's, if one has run
+  if (d && !d.value) return { label: `undetermined — ${d.reason}` }
+  if (d?.value) return { label: `${d.value} — the preview decided this; press Commit to record it (${d.reason})` }
+  return { label: `not yet evaluated — press Evaluate now. The inputs: ${besCyberAssetInputs(r, protectedAssets)}.` }
+}
+
+/** The facts the derivation reads, stated as facts and nothing more (the technology and each protected element's BES status). */
+function besCyberAssetInputs(r: Row, protectedAssets: Row[] | undefined): string {
+  const tech = s(r.Technology)                                    // document.vSettingsRecord carries the model's Technology
+  const parts = [tech ? `${tech.toLowerCase()}-based` : 'the technology is not recorded']
+  if (!r.SchemeEntityId) parts.push('the device is in no scheme, so nothing protected is known')
+  else if (!protectedAssets) parts.push('what it protects is still loading')
+  else if (!protectedAssets.length) parts.push('the scheme protects nothing that is recorded yet')
+  else parts.push(...protectedAssets.map((a) => `${s(a.Name)} is ${a.BesStatus ? s(a.BesStatus) : 'of no recorded BES status'}`))
+  return parts.join('; ')
 }
 
 export default function ComplianceTab({ r }: { r: Row }) {
   const can = useCan()
   const device = s(r.DeviceEntityId)
+  const protectsQ = useProtectedAssets(s(r.SchemeEntityId))     // shared by query key with the Inherited panel below
+  const clsQ = useClassifications('Asset', device)              // shared by query key with the panel's own read
   const [report, setReport] = useState<EvaluationReport | null>(null)
+  const bca = (clsQ.data ?? []).find((c) => s(c.ClassificationKindCode) === 'BesCyberAsset')
   return (
     <div className="space-y-3">
       <div className="grid gap-3 lg:grid-cols-2">
         <ClassificationPanel title="This device" subjectKind="Asset" subjectEntityId={device} editable={can('Asset.Modify')} kinds={DEVICE_KINDS}
-          note="Recorded on the device itself: whether it is a BES Cyber Asset and whether it has external routable connectivity. The CIP-002 procedure derives these in a later phase; the impact rating is the station's, beside it." />
+          reasons={{ BesCyberAsset: besCyberAssetNote(r, protectsQ.data, bca, report) }}
+          note="Whether the device is a BES Cyber Asset is derived, not judged (the owner, 2026-09-17): a microprocessor-based device protecting a BES element is one, so it is stated here with its basis and no control. External routable connectivity is recorded by hand until a network-analysis module can determine it. The impact rating is the location's, beside it." />
         <Inherited r={r} />
       </div>
       <Obligations r={r} report={report} />
@@ -85,13 +139,17 @@ export default function ComplianceTab({ r }: { r: Row }) {
   )
 }
 
-/** What the device inherits: the station's CIP impact rating, and the protected primary asset's BES / PRC-023 and the bus's NPCC. */
+/** What the device inherits: the location's CIP impact rating, and the protected primary asset's BES / PRC-023 and the bus's NPCC.
+ * #173: a classification that does not apply to the protected asset's type is not shown at all — a bus has no PRC-023 line. */
 function Inherited({ r }: { r: Row }) {
   const navigate = useNavigate()
-  const stationId = s(r.StationNodeEntityId)
-  const cipQ = useStationCip(stationId)
+  const cipQ = useLocationCip(s(r.PositionNodeEntityId), s(r.DeviceEntityId))
   const protectsQ = useProtectedAssets(s(r.SchemeEntityId))
-  const cip = cipQ.data?.[0]
+  const kindRefQ = useClassificationKindRef()
+  const kindRef = (code: string) => (kindRefQ.data ?? []).find((k) => s(k.ClassificationKindCode) === code)
+  const inherited = (a: Row) => ([['BesStatus', 'BES status', a.BesStatus], ['Prc023', 'PRC-023', a.Prc023]] as [string, string, unknown][])
+    .filter(([code]) => kindApplies(kindRef(code), s(a.AssetTypeCode)))
+  const cip = cipQ.data
   const link = (screen: string, id: string, label: string) => (
     <a className="text-sky-300 underline" href={screenPath(screen, id)} onClick={(e) => { e.preventDefault(); navigate(screenPath(screen, id)) }}>{label}</a>)
   const rows = protectsQ.data ?? []
@@ -99,12 +157,14 @@ function Inherited({ r }: { r: Row }) {
     <Panel title="Inherited">
       <dl className="space-y-2 text-sm">
         <div className="grid grid-cols-[13rem_1fr] items-start gap-2">
-          <dt className="text-slate-400">Station CIP impact rating</dt>
+          <dt className="text-slate-400">CIP impact rating (location)</dt>
           <dd className="min-w-0">
-            {stationId ? <>{cipQ.isPending ? <span className="text-slate-500">…</span> : cip ? <Pill tone={s(cip.ClassificationValue) === 'High' ? 'bad' : s(cip.ClassificationValue) === 'Medium' ? 'warn' : 'neutral'}>{s(cip.ClassificationValue)}</Pill> : <span className="text-slate-500">not recorded</span>}
-              <span className="ml-2">{link('STATION', stationId, s(r.StationName) || 'the station')}</span></>
-              : <span className="text-slate-500">no station for this device</span>}
-            <div className="text-xs text-slate-600">CIP-002: recorded on the station; every BES Cyber Asset at it inherits it.</div>
+            {cipQ.isPending ? <span className="text-slate-500">…</span>
+              : !cip ? <span className="text-slate-500">the device is not placed anywhere, so it inherits no rating</span>
+              : cip.value ? <><Pill tone={cip.value === 'High' ? 'bad' : cip.value === 'Medium' ? 'warn' : 'neutral'}>{cip.value}</Pill>
+                  <span className="ml-2">— recorded on <NodeLink id={cip.nodeId} name={cip.nodeName} /> <span className="text-xs text-slate-500">{cip.nodeType}{cip.at ? ' · ' + fmtWhen(cip.at) : ''}</span></span></>
+              : <span className="text-slate-500">not recorded on this device's position or on anything above it</span>}
+            <div className="text-xs text-slate-600">CIP-002: the nearest classified location of the device's placement, the position itself included — a rating on the building beats the station's, which is what the rules read (#173).</div>
           </dd>
         </div>
         <div className="grid grid-cols-[13rem_1fr] items-start gap-2">
@@ -117,10 +177,11 @@ function Inherited({ r }: { r: Row }) {
                   <li key={s(a.EntityId)}>
                     {link('PRIMARY_ASSET', s(a.EntityId), s(a.Name))} <span className="text-xs text-slate-500">{s(a.AssetTypeName).toLowerCase()}{a.ZoneRole !== 'Primary' ? ' · ' + s(a.ZoneRole).toLowerCase() : ''}</span>
                     <div className="ml-3 text-xs text-slate-400">
-                      BES status: {a.BesStatus ? s(a.BesStatus) : <span className="text-slate-500">not recorded</span>} · PRC-023: {a.Prc023 ? s(a.Prc023) : <span className="text-slate-500">not recorded</span>}
+                      {inherited(a).map(([code, label, value], i) => <span key={code}>{i > 0 ? ' · ' : ''}{label}: {value ? s(value) : <span className="text-slate-500">not recorded</span>}</span>)}
+                      {!inherited(a).length && <span className="text-slate-500">no applicability classification applies to a {s(a.AssetTypeName).toLowerCase()}</span>}
                     </div>
                     <div className="ml-3 text-xs text-slate-400">
-                      {a.HasTerminal ? <>from terminal {s(a.TerminalNo)} · {a.TerminalStationId ? link('STATION', s(a.TerminalStationId), s(a.TerminalStation)) : s(a.TerminalStation)} · {a.BusName ? <>bus {s(a.BusName)} — NPCC {s(a.BusNpcc) || 'not recorded'}</> : 'no bus linked at that end'}</>
+                      {a.HasTerminal ? <>from terminal {s(a.TerminalNo)} · {a.TerminalStationId ? link('LOCATION', s(a.TerminalStationId), s(a.TerminalStation)) : s(a.TerminalStation)} · {a.BusName ? <>bus {s(a.BusName)} — NPCC {s(a.BusNpcc) || 'not recorded'}</> : 'no bus linked at that end'}</>
                         : <span className="text-slate-500">the protects link names no terminal end, so no bus NPCC is inherited</span>}
                     </div>
                   </li>))}</ul>}
@@ -208,9 +269,32 @@ function Evaluate({ device, report, setReport }: { device: string; report: Evalu
           <Status>{report.mode} · {fmtWhen(report.at)} · {report.rules} rule(s) over {report.subjects} subject(s) — {report.opened} opened, {report.closed} closed, {report.unchanged} unchanged, {report.unknown} unknown, {report.errors} error(s). Run {s(report.runId).slice(0, 8)}.</Status>
           {report.ruleErrors.length > 0 && <div className="rounded border border-red-800 bg-red-900/30 p-2 text-xs text-red-200"><div className="font-semibold">Rules that could not be evaluated</div><ul className="mt-1 space-y-0.5">{report.ruleErrors.map((e, i) => <li key={i}>{e}</li>)}</ul></div>}
           {!report.verdicts.length && <Status>No rule applies to this device.</Status>}
-          <ul className="space-y-2">{report.verdicts.map((v, i) => <li key={v.ruleKey + i}><VerdictCard v={v} /></li>)}</ul>
+          <Verdicts verdicts={report.verdicts} />
         </div>)}
     </Panel>
+  )
+}
+
+/** #173 (the owner, 2026-09-17: "a standard a device is not bound by must not appear"): the rules that bind — the ones that
+ * evaluated true — and the ones still undetermined, with what is missing; the rules that evaluated false collapse to one
+ * line, opened by the engineer who wants to see why. An error is shown: it is not a decision that the rule does not bind. */
+function Verdicts({ verdicts }: { verdicts: Verdict[] }) {
+  const [showFalse, setShowFalse] = useState(false)
+  const binding = verdicts.filter((v) => v.result !== 'false')
+  const notBinding = verdicts.filter((v) => v.result === 'false')
+  return (
+    <div className="space-y-2">
+      {!!binding.length && <ul className="space-y-2">{binding.map((v, i) => <li key={v.ruleKey + i}><VerdictCard v={v} /></li>)}</ul>}
+      {!binding.length && !!verdicts.length && <Status>No standard binds this device, and none is undetermined.</Status>}
+      {!!notBinding.length && (
+        <div className="rounded border border-slate-800 bg-slate-950 p-2 text-sm">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-slate-400">{notBinding.length} standard{notBinding.length === 1 ? '' : 's'} do{notBinding.length === 1 ? 'es' : ''} not apply to this device</span>
+            <Button kind="mini" onClick={() => setShowFalse(!showFalse)}>{showFalse ? 'hide them' : 'show them'}</Button>
+          </div>
+          {showFalse && <ul className="mt-2 space-y-2">{notBinding.map((v, i) => <li key={v.ruleKey + i}><VerdictCard v={v} /></li>)}</ul>}
+        </div>)}
+    </div>
   )
 }
 
@@ -229,7 +313,7 @@ function VerdictCard({ v }: { v: Verdict }) {
         <Button kind="mini" onClick={() => setOpen(!open)}>{open ? 'hide the reads' : `${reads.length} read(s)`}</Button>
       </div>
       {v.error && <div className="mt-1 text-xs text-red-300">{v.error}</div>}
-      {(v.unknowns ?? []).length > 0 && <div className="mt-1 text-xs text-amber-300">unknown: {v.unknowns.join(', ')}</div>}
+      {(v.unknowns ?? []).length > 0 && <div className="mt-1 text-xs text-amber-300">undetermined until these are known: {v.unknowns.join(', ')}</div>}
       {v.evidenceNote && <div className="mt-1 text-xs text-slate-500">evidence: {v.evidenceNote}</div>}
       {working.length > 0 && (
         <div className="mt-1">

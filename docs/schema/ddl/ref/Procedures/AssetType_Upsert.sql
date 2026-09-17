@@ -8,6 +8,7 @@ CREATE PROCEDURE [ref].[AssetType_Upsert]
     @IsRouted BIT = 0,
     @IsAssembly BIT = 0,
     @DefaultTemplateDefinitionEntityId UNIQUEIDENTIFIER = NULL,
+    @CarriesRating BIT = NULL,
     @ActorId UNIQUEIDENTIFIER = NULL,
     @MigrationRunId UNIQUEIDENTIFIER = NULL
 AS
@@ -16,7 +17,7 @@ BEGIN
     DECLARE @now DATETIMEOFFSET(7) = SYSDATETIMEOFFSET();
     IF @ActorId IS NULL EXEC [personnel].[ResolveActor] @ActorId = @ActorId OUTPUT;
     IF EXISTS (SELECT 1 FROM [ref].[AssetType] t WHERE t.[AssetTypeCode] = @AssetTypeCode)
-        UPDATE t SET [Name] = @Name, [Description] = @Description, [AssetClassCode] = @AssetClassCode, [IsDevice] = @IsDevice, [IsRouted] = @IsRouted, [IsAssembly] = @IsAssembly, [DefaultTemplateDefinitionEntityId] = @DefaultTemplateDefinitionEntityId, [IsActive] = 1, [ModifiedBy] = @ActorId, [ModifiedAt] = @now FROM [ref].[AssetType] t WHERE t.[AssetTypeCode] = @AssetTypeCode;
+        UPDATE t SET [Name] = @Name, [Description] = @Description, [AssetClassCode] = @AssetClassCode, [IsDevice] = @IsDevice, [IsRouted] = @IsRouted, [IsAssembly] = @IsAssembly, [DefaultTemplateDefinitionEntityId] = @DefaultTemplateDefinitionEntityId, [CarriesRating] = @CarriesRating, [IsActive] = 1, [ModifiedBy] = @ActorId, [ModifiedAt] = @now FROM [ref].[AssetType] t WHERE t.[AssetTypeCode] = @AssetTypeCode;
     ELSE
-        INSERT [ref].[AssetType] ([AssetTypeCode], [Name], [Description], [AssetClassCode], [IsDevice], [IsRouted], [IsAssembly], [DefaultTemplateDefinitionEntityId], [CreatedBy], [CreatedAt], [ModifiedBy], [ModifiedAt], [MigrationRunId]) VALUES (@AssetTypeCode, @Name, @Description, @AssetClassCode, @IsDevice, @IsRouted, @IsAssembly, @DefaultTemplateDefinitionEntityId, @ActorId, @now, @ActorId, @now, @MigrationRunId);
+        INSERT [ref].[AssetType] ([AssetTypeCode], [Name], [Description], [AssetClassCode], [IsDevice], [IsRouted], [IsAssembly], [DefaultTemplateDefinitionEntityId], [CarriesRating], [CreatedBy], [CreatedAt], [ModifiedBy], [ModifiedAt], [MigrationRunId]) VALUES (@AssetTypeCode, @Name, @Description, @AssetClassCode, @IsDevice, @IsRouted, @IsAssembly, @DefaultTemplateDefinitionEntityId, @CarriesRating, @ActorId, @now, @ActorId, @now, @MigrationRunId);
 END;

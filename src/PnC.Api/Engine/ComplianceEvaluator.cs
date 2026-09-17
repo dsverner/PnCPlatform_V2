@@ -27,7 +27,11 @@ public sealed record Verdict(string RuleKey, string RuleName, Guid RuleVersionRo
     string? EvidenceNote, string? RequirementNumber, string? StandardCode, string? StandardVersion);
 
 public sealed record EvaluationReport(DateTimeOffset At, string Mode, int Rules, int Subjects, int Opened, int Closed, int Unchanged, int Unknown, int Errors,
-    IReadOnlyList<Verdict> Verdicts, IReadOnlyList<string> RuleErrors, Guid RunId);
+    IReadOnlyList<Verdict> Verdicts, IReadOnlyList<string> RuleErrors, Guid RunId, IReadOnlyList<Derived> Derivations);
+
+/// <summary>What a Program.ClassificationDerivation decided for one subject: the value, why, and what the database did with it.</summary>
+public sealed record Derived(string Key, string Kind, string SubjectKind, Guid SubjectEntityId, string SubjectName, string? Value, string Reason,
+    IReadOnlyList<FactRead> Reads, string Outcome, string? Error);
 
 public sealed class ComplianceEvaluator(SqlSession s, Catalog catalog, ILogger log)
 {
@@ -35,6 +39,9 @@ public sealed class ComplianceEvaluator(SqlSession s, Catalog catalog, ILogger l
         JsonObject Scope, string ScopeKey, string Cadence, string? EvidenceNote, string[] Record, string? RequirementNumber, string? StandardCode, string? StandardVersion);
 
     sealed record Formula(string Key, JsonObject Expression, string? Type, string? Unit, int? Precision);
+
+    sealed record Derivation(string Key, string Name, Guid VersionRowId, string Kind, string[] SubjectKinds,
+        IReadOnlyList<(JsonObject When, string WhenText, string Value)> Cases, string? Else);
 
     /// <summary>Evaluate every effective rule for the given subject (or the candidates). Mode Preview writes nothing.</summary>
     public async Task<EvaluationReport> EvaluateAsync(string? subjectKind, Guid? subjectEntityId, string mode, string trigger, CancellationToken ct)
@@ -46,7 +53,9 @@ public sealed class ComplianceEvaluator(SqlSession s, Catalog catalog, ILogger l
         var ruleErrors = new List<string>();
         var rules = await LoadRulesAsync(cat, ruleErrors, ct);
         var formulas = await LoadFormulasAsync(ct);
+        var derivations = await LoadDerivationsAsync(cat, ruleErrors, ct);
         var verdicts = new List<Verdict>();
+        var derived = new List<Derived>();
         int opened = 0, closed = 0, unchanged = 0, unknown = 0, errors = 0;
 
         // subjects per kind
@@ -71,7 +80,7 @@ public sealed class ComplianceEvaluator(SqlSession s, Catalog catalog, ILogger l
 
         var perRule = rules.ToDictionary(r => r.VersionRowId, _ => (scoped: 0, opened: 0, closed: 0, unchanged: 0));
         // the run row first: an instance references its run (FK), so the row exists before the first write; completed with the counts at the end
-        await s.ExecuteProcedureAsync(Proc("RuleEvaluationRun_Append"), new JsonObject
+        await s.ExecuteProcedureAsync(Proc("StartEvaluationRun"), new JsonObject
         {
             ["RuleDefinitionVersionRowId"] = rules.Count == 1 ? rules[0].VersionRowId.ToString() : null, ["Mode"] = mode, ["Trigger"] = trigger,
             ["StartedAt"] = now.ToString("o"), ["RunId"] = runId.ToString(),
@@ -79,11 +88,15 @@ public sealed class ComplianceEvaluator(SqlSession s, Catalog catalog, ILogger l
         foreach (var (kind, list) in subjects)
         {
             var kindRules = rules.Where(r => r.SubjectKinds.Contains(kind, StringComparer.Ordinal)).ToList();
-            if (kindRules.Count == 0) continue;
+            var kindDerivations = derivations.Where(d => d.SubjectKinds.Contains(kind, StringComparer.Ordinal)).ToList();
+            if (kindRules.Count == 0 && kindDerivations.Count == 0) continue;
             foreach (var (id, name) in list)
             {
                 var subject = new Ref(id.ToString(), kind);
                 var reader = new TracingFormulaReader(new DbFactReader(s.Connection, null), formulas);
+                // the derivations first: a rule's scope reads the classification they write, in this same pass
+                foreach (var d in kindDerivations)
+                    derived.Add(await DeriveAsync(d, subject, kind, id, name, reader, mode, now, ct));
                 foreach (var group in kindRules.GroupBy(r => r.ScopeKey, StringComparer.Ordinal))
                 {
                     reader.Reads.Clear();
@@ -156,10 +169,11 @@ public sealed class ComplianceEvaluator(SqlSession s, Catalog catalog, ILogger l
             ["RunId"] = runId.ToString(), ["CompletedAt"] = completed.ToString("o"), ["SubjectsScoped"] = perRule.Values.Sum(c => c.scoped),
             ["InstancesOpened"] = opened, ["InstancesClosed"] = closed, ["InstancesUnchanged"] = unchanged,
         }, ct);
-        return new EvaluationReport(now, mode, rules.Count, subjects.Values.Sum(l => l.Count), opened, closed, unchanged, unknown, errors, verdicts, ruleErrors, runId);
+        return new EvaluationReport(now, mode, rules.Count, subjects.Values.Sum(l => l.Count), opened, closed, unchanged, unknown, errors, verdicts, ruleErrors, runId, derived);
     }
 
     ProcInfo Proc(string name) => catalog.Procedure("compliance", name) ?? throw new ApiException(500, "internal", $"compliance.{name} is not in the catalogue.");
+    ProcInfo Proc2(string schema, string name) => catalog.Procedure(schema, name) ?? throw new ApiException(500, "internal", $"{schema}.{name} is not in the catalogue.");
 
     sealed record OpenRow(Guid RowId, Guid EntityId, DateTimeOffset PeriodStartAt, DateTimeOffset? PeriodEndAt);
 
@@ -266,6 +280,80 @@ public sealed class ComplianceEvaluator(SqlSession s, Catalog catalog, ILogger l
             catch (Exception e) when (e is not OperationCanceledException) { errors.Add($"{key}: {e.Message}"); }
         }
         return list;
+    }
+
+    /// <summary>The effective Program.ClassificationDerivation documents. A case's expression is checked against the catalogue
+    /// the way a rule's scope is, so a derivation that names a fact the platform does not have is reported, not run.</summary>
+    async Task<List<Derivation>> LoadDerivationsAsync(Catalogue cat, List<string> errors, CancellationToken ct)
+    {
+        var rows = await s.RowsAsync("""
+            SELECT d.DefinitionKey, d.Name, dv.RowId, dv.PayloadText FROM config.vDefinition d
+            JOIN config.vDefinitionVersion dv ON dv.DefinitionEntityId = d.EntityId AND dv.Status = N'Effective'
+            WHERE d.DefinitionKind = N'Program.ClassificationDerivation'
+            """, new Dictionary<string, object?>(), ct);
+        var list = new List<Derivation>();
+        foreach (var r in rows.Select(x => (JsonObject)x!))
+        {
+            var key = r["DefinitionKey"]!.GetValue<string>();
+            try
+            {
+                var payload = (JsonObject)JsonNode.Parse(r["PayloadText"]!.GetValue<string>())!;
+                var kind = payload["kind"]?.GetValue<string>() ?? throw new FormulaException("bad_document", "the derivation names no classification kind");
+                var kinds = (payload["subjectKinds"] as JsonArray)?.Select(k => k!.GetValue<string>()).ToArray() ?? ["Device"];
+                var cases = new List<(JsonObject, string, string)>();
+                foreach (var c in (payload["cases"] as JsonArray) ?? [])
+                {
+                    var co = (JsonObject)c!;
+                    var when = co["when"] as JsonObject ?? Parser.Parse(co["whenText"]!.GetValue<string>());
+                    new Checker(cat).Check(when, new Dictionary<string, FormulaType>(), kinds.FirstOrDefault());
+                    cases.Add((when, co["whenText"]?.GetValue<string>() ?? Printer.Print(when), co["value"]!.GetValue<string>()));
+                }
+                list.Add(new Derivation(key, r["Name"]!.GetValue<string>(), Guid.Parse(r["RowId"]!.GetValue<string>()), kind, kinds, cases,
+                    payload["else"]?.GetValue<string>()));
+            }
+            catch (Exception e) when (e is not OperationCanceledException) { errors.Add($"{key}: {e.Message}"); }
+        }
+        return list;
+    }
+
+    /// <summary>Evaluate one derivation for one subject and, in Effective mode, write what it decided.
+    /// FORMULA-GRAMMAR grammar-1: the first case that is true gives the value; when none is true and any is Unknown the answer is
+    /// Unknown (not the else), so a device whose protected element carries no BES status is left undetermined rather than declared
+    /// Not BCA. A value a person recorded is never overwritten (asset.DeriveClassification returns RecordedStands).</summary>
+    async Task<Derived> DeriveAsync(Derivation d, Ref subject, string kind, Guid id, string name, TracingFormulaReader reader,
+                                    string mode, DateTimeOffset now, CancellationToken ct)
+    {
+        reader.Reads.Clear();
+        string? value = null, error = null, reason;
+        var sawUnknown = false;
+        try
+        {
+            foreach (var (when, whenText, v) in d.Cases)
+            {
+                var r = Evaluator.Evaluate(when, reader, subject, now);
+                if (r.Value is true) { value = v; reason = whenText; goto decided; }
+                if (r.Value is not false) sawUnknown = true;
+            }
+            value = sawUnknown ? null : d.Else;
+            reason = sawUnknown ? "undetermined: " + string.Join(", ", reader.Reads.Where(x => x.Value == "unknown").Select(x => x.Name).Distinct())
+                                : "no case matched";
+            goto decided;
+        }
+        catch (Exception e) when (e is not OperationCanceledException) { error = e.Message; reason = "the derivation could not be evaluated"; }
+    decided:
+        var reads = reader.Reads.GroupBy(x => (x.Name, x.Params)).Select(g => g.Last()).ToList();
+        var outcome = "Preview";
+        if (error is null && mode == "Effective")
+        {
+            var res = await s.ExecuteProcedureAsync(Proc2("asset", "DeriveClassification"), new JsonObject
+            {
+                ["SubjectKind"] = "Asset",                 // a device is an Asset subject (asset.Classification's CHECK)
+                ["SubjectEntityId"] = id.ToString(), ["ClassificationKindCode"] = d.Kind, ["ClassificationValue"] = value,
+                ["DerivationDefinitionVersionRowId"] = d.VersionRowId.ToString(), ["DeterminedAt"] = now.ToString("o"),
+            }, ct);
+            outcome = res["Outcome"]?.GetValue<string>() ?? "Set";
+        }
+        return new Derived(d.Key, d.Kind, kind, id, name, value, reason!, reads, outcome, error);
     }
 
     async Task<Dictionary<string, Formula>> LoadFormulasAsync(CancellationToken ct)

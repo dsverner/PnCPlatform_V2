@@ -49,4 +49,5 @@
 :r .\Seed_location_Divisions.sql
 :r .\Seed_compliance_Standards_NB.sql
 :r .\Seed_config_Formulas_PRC023.sql
+:r .\Seed_config_ClassificationDerivations.sql
 :r .\Seed_config_ObligationRules.sql

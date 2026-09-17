@@ -995,73 +995,109 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
             Must(pas == HttpStatusCode.OK && prow?["AssetTypeCode"]?.ToString() == "Line" && (prow?["TerminalNodeIds"]?.ToString() ?? "").Contains(station.ToString()!, StringComparison.OrdinalIgnoreCase) && prow?["Classifications"] is null,
                 $"#170: the primary-asset read model shows the line with its terminal and no classification yet ({prow?["AssetTypeName"]}, terminals {prow?["Stations"]})");
             var (k1s, k1b) = await Post(hydro!, "api/v1/asset/RecordClassification", new { SubjectKind = "Asset", SubjectEntityId = line, ClassificationKindCode = "CipImpactRating", ClassificationValue = "Medium" });
-            var (k2s, k2b) = await Post(admin, "api/v1/asset/RecordClassification", new { SubjectKind = "Asset", SubjectEntityId = line, ClassificationKindCode = "NpccBulkPowerSystem", ClassificationValue = "BPS" });
+            var (k2s, k2b) = await Post(admin, "api/v1/asset/RecordClassification", new { SubjectKind = "Asset", SubjectEntityId = line, ClassificationKindCode = "Prc023", ClassificationValue = "Listed" });   // #173: NPCC is a bus kind, so a line is listed for PRC-023 instead
             var (k3s, k3b) = await Post(admin, "api/v1/asset/RecordClassification", new { SubjectKind = "Asset", SubjectEntityId = line, ClassificationKindCode = "CipImpactRating", ClassificationValue = "High" });
             Must(k2s == HttpStatusCode.OK && k3s == HttpStatusCode.OK, $"#170: classifications recorded and revised as the Administrator ({(int)k2s} {Code(k2b)} · {(int)k3s} {Code(k3b)}); the subtree-scoped engineer → {(int)k1s} {Code(k1b)}");
             var (k4s, k4b) = await Post(readOnly!, "api/v1/asset/RecordClassification", new { SubjectKind = "Asset", SubjectEntityId = line, ClassificationKindCode = "Prc023", ClassificationValue = "Listed" });
             var (k5s, k5b) = await Post(admin, "api/v1/asset/RecordClassification", new { SubjectKind = "Asset", SubjectEntityId = line, ClassificationKindCode = "NoSuchKind", ClassificationValue = "x" });
             Must(k4s == HttpStatusCode.Forbidden && k5s == HttpStatusCode.Conflict, $"#170: ReadOnly may not record ({(int)k4s}); an unknown kind is refused in the procedure's words ({(int)k5s} {k5b?["detail"]})");
-            var (k6s, _) = await Post(admin, "api/v1/asset/RecordClassification", new { SubjectKind = "Asset", SubjectEntityId = line, ClassificationKindCode = "NpccBulkPowerSystem", ClassificationValue = "" });
+            var (k6s, _) = await Post(admin, "api/v1/asset/RecordClassification", new { SubjectKind = "Asset", SubjectEntityId = line, ClassificationKindCode = "Prc023", ClassificationValue = "" });
             var (kcls, kclb) = await Get(admin, $"api/v1/asset/vClassification?SubjectEntityId={line}");
             var crow = (kclb?["rows"] as JsonArray)?.ToDictionary(r => r?["ClassificationKindCode"]?.ToString() ?? "", r => r) ?? new();
             var (pas2, pab2) = await Get(admin, $"api/v1/asset/vPrimaryAsset?EntityId={line}");
             Must(k6s == HttpStatusCode.OK && crow.Count == 1 && crow.GetValueOrDefault("CipImpactRating")?["ClassificationValue"]?.ToString() == "High" && crow["CipImpactRating"]?["Basis"]?.ToString() == "Recorded"
                  && (pab2?["rows"] as JsonArray)?.FirstOrDefault()?["Classifications"]?.ToString() == "CipImpactRating=High",
-                $"#170: one current classification after the BPS value was withdrawn — CIP High, Recorded, the read model summarises it ({(pab2?["rows"] as JsonArray)?.FirstOrDefault()?["Classifications"]})");
+                $"#170: one current classification after the PRC-023 listing was withdrawn — CIP High, Recorded, the read model summarises it ({(pab2?["rows"] as JsonArray)?.FirstOrDefault()?["Classifications"]})");
             var (his, hib) = await Get(admin, $"api/v1/asset/vClassificationHistory?SubjectEntityId={line}");
             Must(his == HttpStatusCode.OK && ((hib?["rows"] as JsonArray)?.Count ?? 0) >= 3, $"#170: the history keeps the revised and withdrawn values ({(hib?["rows"] as JsonArray)?.Count} rows)");
             var (sps, spb) = await Get(admin, $"api/v1/scheme/vSchemeProtects?SchemeEntityId={scheme}");
             Must(sps == HttpStatusCode.OK && (spb?["rows"] as JsonArray)?.Any(r => string.Equals(r?["PrimaryAssetEntityId"]?.ToString(), line.ToString(), StringComparison.OrdinalIgnoreCase)) == true, "#170: the scheme's protects link reads back (the device sheet's 'protects … via …' line)");
         }
 
-        // ======== #171 (2026-09-16): classifications and compliance. A rating on the fixture line (hand-entered until the ratings connector
-        // exists); the BDD15B recorded as a BES Cyber Asset and the fixture station rated Medium (the owner: the BCA flag is the device's,
-        // the impact rating is the station's); the evaluator previews (writes nothing), then commits: the CIP obligations open on the relay,
-        // PRC-023 R1 opens once the line's terminal is 230 kV (4.2.1.1) with the criterion 'None' recorded (an electromechanical relay has
-        // no Z3%); a second pass changes nothing; the BCA withdrawn closes the CIP obligations; ReadOnly may preview but not commit.
+        // ======== #171 (2026-09-16) and #173 (2026-09-17): classifications and compliance, as the owner corrected them on seeing it.
+        // Applicability is the asset type's: a bus is not PRC-023 applicable and carries no rating. The BES Cyber Asset flag is not a
+        // person's entry but a derivation — a programmable device (Microprocessor or IEC61850) protecting a BES element — so the
+        // SEL-421 becomes a BCA and the electromechanical BDD15B does not, and no CIP standard binds the BDD15B at all. The CIP impact
+        // rating is the location's: recorded on the building the device is in, and the nearest classified ancestor rules, so a value on
+        // the building beats one on the station. PRC-023 R1 opens on the 230 kV terminal with its criterion recorded.
         {
-            var line171 = Id((await Get(admin, $"api/v1/asset/vPrimaryAsset?Name={Uri.EscapeDataString($"{tag} line 0001")}")).body?["rows"]?[0]);
-            var (k171_r1s, k171_r1b) = await Post(admin, "api/v1/asset/AssetRating_Add", new { AssetEntityId = line171, RatingKind = "FourHour", Season = "Summer", Amperes = 1000, Source = "smoke fixture" });
-            var (k171_r2s, k171_r2b) = await Post(admin, "api/v1/asset/AssetRating_Add", new { AssetEntityId = line171, RatingKind = "FourHour", Season = "Winter", Amperes = 1200, Source = "smoke fixture" });
-            var (k171_r3s, k171_r3b) = await Post(readOnly!, "api/v1/asset/AssetRating_Add", new { AssetEntityId = line171, RatingKind = "FifteenMinute", Season = "All", Amperes = 1500 });
-            var (k171_rvs, k171_rvb) = await Get(admin, $"api/v1/asset/vAssetRating?AssetEntityId={line171}");
-            Must(line171 is not null && k171_r1s == HttpStatusCode.OK && k171_r2s == HttpStatusCode.OK && k171_r3s == HttpStatusCode.Forbidden && (k171_rvb?["rows"] as JsonArray)?.Count == 2,
-                $"#171: two seasonal 4-hour ratings entered on the line, ReadOnly refused ({(int)k171_r1s} {Code(k171_r1b)} · {(int)k171_r2s} {Code(k171_r2b)} · {(int)k171_r3s} · {(k171_rvb?["rows"] as JsonArray)?.Count} rows read back)");
-            var (k171_b1s, k171_b1b) = await Post(admin, "api/v1/asset/RecordClassification", new { SubjectKind = "Asset", SubjectEntityId = devBdd, ClassificationKindCode = "BesCyberAsset", ClassificationValue = "BCA" });
-            var (k171_b2s, k171_b2b) = await Post(admin, "api/v1/asset/RecordClassification", new { SubjectKind = "Node", SubjectEntityId = station, ClassificationKindCode = "CipImpactRating", ClassificationValue = "Medium" });
-            Must(k171_b1s == HttpStatusCode.OK && k171_b2s == HttpStatusCode.OK, $"#171: the relay recorded as a BES Cyber Asset and the station rated Medium ({(int)k171_b1s} {Code(k171_b1b)} · {(int)k171_b2s} {Code(k171_b2b)})");
-            var (k171_p1s, k171_p1b) = await Post(admin, "api/v1/compliance/evaluate", new { subjectEntityId = devBdd, mode = "Preview" });
-            var k171_v1 = (k171_p1b?["verdicts"] as JsonArray) ?? new JsonArray();
-            var k171_cipTrue = k171_v1.Count(v => (v?["ruleKey"]?.ToString() ?? "").StartsWith("cip", StringComparison.Ordinal) && v?["result"]?.ToString() == "true");
-            var k171_prcR1 = k171_v1.FirstOrDefault(v => v?["ruleKey"]?.ToString() == "prc023_r1");
-            var (k171_o0s, k171_o0b) = await Get(admin, $"api/v1/compliance/vObligationSubject?SubjectEntityId={devBdd}");
-            Must(k171_p1s == HttpStatusCode.OK && k171_cipTrue == 12 && k171_prcR1?["result"]?.ToString() == "unknown" && (k171_p1b?["opened"]?.GetValue<int>() ?? -1) == 12 && ((k171_o0b?["rows"] as JsonArray)?.Count ?? -1) == 0,
-                $"#171: the preview finds 12 CIP rules true (CIP-005 R1 waits for the routable-connectivity value) and PRC-023 R1 unknown (the terminal has no voltage yet and the line is not classified for PRC-023) and writes nothing ({(int)k171_p1s} {Code(k171_p1b)} · {k171_cipTrue} true · R1 {k171_prcR1?["result"]} · {(k171_o0b?["rows"] as JsonArray)?.Count} instances; rule errors: {k171_p1b?["ruleErrors"]})");
-            var term171 = Id((await Get(admin, $"api/v1/asset/vAssetTerminalDetail?AssetEntityId={line171}")).body?["rows"]?[0], "TerminalEntityId");
-            var (k171_t1s, k171_t1b) = await Post(admin, "api/v1/asset/AssetTerminal_Revise", new { EntityId = term171, AssetEntityId = line171, TerminalNo = 1, StationNodeEntityId = station, VoltageClassCode = "230kV" });
-            var (k171_e1s, k171_e1b) = await Post(admin, "api/v1/compliance/evaluate", new { subjectEntityId = devBdd, mode = "Effective" });
-            var (k171_o1s, k171_o1b) = await Get(admin, $"api/v1/compliance/vObligationSubject?SubjectEntityId={devBdd}");
-            var k171_open1 = (k171_o1b?["rows"] as JsonArray)?.Where(r => r?["Status"]?.ToString() == "Open").ToList() ?? new();
-            var k171_prcRow = k171_open1.FirstOrDefault(r => r?["RuleDefinitionKey"]?.ToString() == "prc023_r1");
-            Must(k171_t1s == HttpStatusCode.OK && k171_e1s == HttpStatusCode.OK && (k171_e1b?["opened"]?.GetValue<int>() ?? -1) == 13 && k171_open1.Count == 13 && k171_prcRow is not null && k171_prcRow?["StandardCode"]?.ToString() == "PRC-023",
-                $"#171: the terminal made 230 kV, the commit opens 13 obligations — 12 CIP and PRC-023 R1 — on the relay ({(int)k171_t1s} {Code(k171_t1b)} · {(int)k171_e1s} {Code(k171_e1b)} opened {k171_e1b?["opened"]} · {k171_open1.Count} open; rule errors: {k171_e1b?["ruleErrors"]})");
-            var (k171_f1s, k171_f1b) = await Get(admin, $"api/v1/compliance/vObligationInstanceFact?ObligationInstanceRowId={k171_prcRow?["RowId"]}");
-            var k171_facts = (k171_f1b?["rows"] as JsonArray)?.GroupBy(r => r?["FactName"]?.ToString() ?? "").ToDictionary(g => g.Key, g => g.Last()?["ValueAsRead"]?.ToString() ?? "") ?? new();
-            Must(k171_f1s == HttpStatusCode.OK && k171_facts.GetValueOrDefault("asset.formula.prc023_criterion") == "None" && k171_facts.GetValueOrDefault("device.protects.terminal.voltage", "").StartsWith("230", StringComparison.Ordinal) && k171_facts.ContainsKey("device.protects.rating[kind=FourHour]"),
-                $"#171: the k171_facts read are the obligation's evidence trail — the criterion 'None' (no Z3% on an electromechanical relay), the terminal's 230 kV, the 4-hour rating ({k171_facts.Count} k171_facts: {string.Join(", ", k171_facts.Take(6).Select(kv => kv.Key + "=" + kv.Value))})");
-            var (k171_e2s, k171_e2b) = await Post(admin, "api/v1/compliance/evaluate", new { subjectEntityId = devBdd, mode = "Effective" });
-            Must(k171_e2s == HttpStatusCode.OK && (k171_e2b?["opened"]?.GetValue<int>() ?? -1) == 0 && (k171_e2b?["closed"]?.GetValue<int>() ?? -1) == 0, $"#171: a second pass changes nothing ({(int)k171_e2s} opened {k171_e2b?["opened"]} closed {k171_e2b?["closed"]})");
-            var (k171_b3s, _) = await Post(admin, "api/v1/asset/RecordClassification", new { SubjectKind = "Asset", SubjectEntityId = devBdd, ClassificationKindCode = "BesCyberAsset", ClassificationValue = "Not BCA" });   // a withdrawn value is Unknown and leaves the obligation as it is; a recorded Not BCA closes it
-            var (k171_e3s, k171_e3b) = await Post(admin, "api/v1/compliance/evaluate", new { subjectEntityId = devBdd, mode = "Effective" });
-            var (k171_o3s, k171_o3b) = await Get(admin, $"api/v1/compliance/vObligationSubject?SubjectEntityId={devBdd}");
-            var k171_open3 = (k171_o3b?["rows"] as JsonArray)?.Count(r => r?["Status"]?.ToString() == "Open") ?? -1;
-            Must(k171_b3s == HttpStatusCode.OK && k171_e3s == HttpStatusCode.OK && (k171_e3b?["closed"]?.GetValue<int>() ?? -1) == 12 && k171_open3 == 1,
-                $"#171: the relay recorded as Not BCA closes the 12 CIP obligations (NotApplicable) and leaves PRC-023 R1 open ({(int)k171_e3s} closed {k171_e3b?["closed"]} · {k171_open3} open)");
-            var (k171_p2s, _) = await Post(readOnly!, "api/v1/compliance/evaluate", new { subjectEntityId = devBdd, mode = "Preview" });
-            var (k171_p3s, _) = await Post(readOnly!, "api/v1/compliance/evaluate", new { subjectEntityId = devBdd, mode = "Effective" });
-            Must(k171_p2s == HttpStatusCode.OK && k171_p3s == HttpStatusCode.Forbidden, $"#171: ReadOnly may preview ({(int)k171_p2s}) but not commit ({(int)k171_p3s})");
-            var (k171_rns, k171_rnb) = await Get(admin, "api/v1/compliance/vRuleEvaluationRun?Mode=Effective&take=5");
-            Must(k171_rns == HttpStatusCode.OK && ((k171_rnb?["rows"] as JsonArray)?.Count ?? 0) >= 1, $"#171: the evaluation runs are on record ({(k171_rnb?["rows"] as JsonArray)?.Count} of the latest)");
+            var k173_line = Id((await Get(admin, $"api/v1/asset/vPrimaryAsset?Name={Uri.EscapeDataString($"{tag} line 0001")}")).body?["rows"]?[0]);
+            var (k173_bas, k173_bab) = await Post(admin, "api/v1/asset/Asset_Add", new { AssetTypeCode = "Bus", Name = $"{tag} 230 kV bus", Status = "InService" });
+            var k173_bus = Id(k173_bab);
+
+            // (a) a rating belongs to a circuit: the line carries one, the bus does not, ReadOnly may not enter one
+            var (k173_r1s, k173_r1b) = await Post(admin, "api/v1/asset/RecordAssetRating", new { AssetEntityId = k173_line, RatingKind = "FourHour", Season = "Summer", Amperes = 1000, Source = "smoke fixture" });
+            var (k173_r2s, k173_r2b) = await Post(admin, "api/v1/asset/RecordAssetRating", new { AssetEntityId = k173_line, RatingKind = "FourHour", Season = "Winter", Amperes = 1200, Source = "smoke fixture" });
+            var (k173_r3s, _) = await Post(readOnly!, "api/v1/asset/RecordAssetRating", new { AssetEntityId = k173_line, RatingKind = "FifteenMinute", Season = "All", Amperes = 1500 });
+            var (k173_r4s, k173_r4b) = await Post(admin, "api/v1/asset/RecordAssetRating", new { AssetEntityId = k173_bus, RatingKind = "FourHour", Season = "Summer", Amperes = 1000 });
+            var (k173_rvs, k173_rvb) = await Get(admin, $"api/v1/asset/vAssetRatingDetail?AssetEntityId={k173_line}");
+            Must(k173_bas == HttpStatusCode.OK && k173_r1s == HttpStatusCode.OK && k173_r2s == HttpStatusCode.OK && k173_r3s == HttpStatusCode.Forbidden
+                 && k173_r4s == HttpStatusCode.Conflict && (k173_rvb?["rows"] as JsonArray)?.Count == 2,
+                $"#173: the line carries two seasonal 4-hour ratings, a bus carries none ({(int)k173_r4s} {k173_r4b?["detail"]}), ReadOnly is refused ({(int)k173_r3s}); {(k173_rvb?["rows"] as JsonArray)?.Count} read back");
+
+            // (b) PRC-023 is a circuit's standard: the line may be listed, the bus may not
+            var (k173_p1s, k173_p1b) = await Post(admin, "api/v1/asset/RecordClassification", new { SubjectKind = "Asset", SubjectEntityId = k173_bus, ClassificationKindCode = "Prc023", ClassificationValue = "Listed" });
+            var (k173_p2s, k173_p2b) = await Post(admin, "api/v1/asset/RecordClassification", new { SubjectKind = "Asset", SubjectEntityId = k173_line, ClassificationKindCode = "Prc023", ClassificationValue = "Listed" });
+            Must(k173_p1s == HttpStatusCode.Conflict && k173_p2s == HttpStatusCode.OK,
+                $"#173: PRC-023 does not apply to a bus ({(int)k173_p1s} {k173_p1b?["detail"]}) and does to a line ({(int)k173_p2s} {Code(k173_p2b)})");
+
+            // (c) the BES Cyber Asset flag is derived, never recorded; its inputs are recorded instead
+            var (k173_h1s, k173_h1b) = await Post(admin, "api/v1/asset/RecordClassification", new { SubjectKind = "Asset", SubjectEntityId = devSel, ClassificationKindCode = "BesCyberAsset", ClassificationValue = "BCA" });
+            var (k173_b1s, _) = await Post(admin, "api/v1/asset/RecordClassification", new { SubjectKind = "Asset", SubjectEntityId = k173_line, ClassificationKindCode = "BesStatus", ClassificationValue = "BES" });
+            var (k173_c1s, _) = await Post(admin, "api/v1/asset/RecordClassification", new { SubjectKind = "Node", SubjectEntityId = building, ClassificationKindCode = "CipImpactRating", ClassificationValue = "Medium" });
+            var (k173_v1s, k173_v1b) = await Post(admin, "api/v1/compliance/evaluate", new { subjectEntityId = devSel, mode = "Preview" });
+            var k173_d1 = (k173_v1b?["derivations"] as JsonArray)?.FirstOrDefault(d => d?["kind"]?.ToString() == "BesCyberAsset");
+            var (k173_cl0s, k173_cl0b) = await Get(admin, $"api/v1/asset/vClassification?SubjectEntityId={devSel}");
+            Must(k173_h1s == HttpStatusCode.Conflict && k173_b1s == HttpStatusCode.OK && k173_c1s == HttpStatusCode.OK && k173_v1s == HttpStatusCode.OK
+                 && k173_d1?["value"]?.ToString() == "BCA" && ((k173_cl0b?["rows"] as JsonArray)?.Count ?? -1) == 0,
+                $"#173: a person may not record the BES Cyber Asset flag ({(int)k173_h1s} {k173_h1b?["detail"]}); the preview derives it BCA for the microprocessor relay and writes nothing ({k173_d1?["value"]} · {k173_d1?["reason"]} · {(k173_cl0b?["rows"] as JsonArray)?.Count} rows)");
+
+            // (d) committed: the derived flag is written with Basis Derived, and the standards that bind open
+            var k173_term = Id((await Get(admin, $"api/v1/asset/vAssetTerminalDetail?AssetEntityId={k173_line}")).body?["rows"]?[0], "TerminalEntityId");
+            var (k173_t1s, _) = await Post(admin, "api/v1/asset/AssetTerminal_Revise", new { EntityId = k173_term, AssetEntityId = k173_line, TerminalNo = 1, StationNodeEntityId = station, VoltageClassCode = "230kV" });
+            var (k173_e1s, k173_e1b) = await Post(admin, "api/v1/compliance/evaluate", new { subjectEntityId = devSel, mode = "Effective" });
+            var (k173_cl1s, k173_cl1b) = await Get(admin, $"api/v1/asset/vClassification?SubjectEntityId={devSel}");
+            var k173_bca = (k173_cl1b?["rows"] as JsonArray)?.FirstOrDefault(r => r?["ClassificationKindCode"]?.ToString() == "BesCyberAsset");
+            var (k173_o1s, k173_o1b) = await Get(admin, $"api/v1/compliance/vObligationSubject?SubjectEntityId={devSel}");
+            var k173_open = (k173_o1b?["rows"] as JsonArray)?.Where(r => r?["Status"]?.ToString() == "Open").ToList() ?? new();
+            var k173_prc = k173_open.FirstOrDefault(r => r?["RuleDefinitionKey"]?.ToString() == "prc023_r1");
+            Must(k173_t1s == HttpStatusCode.OK && k173_e1s == HttpStatusCode.OK && k173_bca?["ClassificationValue"]?.ToString() == "BCA" && k173_bca?["Basis"]?.ToString() == "Derived"
+                 && k173_open.Count == 13 && k173_prc is not null,
+                $"#173: the commit writes the derived BCA (Basis {k173_bca?["Basis"]}) and opens the 13 standards that bind the SEL-421 — 12 CIP and PRC-023 R1 ({k173_open.Count} open; rule errors: {k173_e1b?["ruleErrors"]})");
+
+            // (e) the owner's rule: a standard a device is not bound by does not appear against it. An electromechanical relay holds no
+            // cyber asset, so the derivation says Not BCA and not one CIP obligation stands against the BDD15B.
+            var (k173_e2s, k173_e2b) = await Post(admin, "api/v1/compliance/evaluate", new { subjectEntityId = devBdd, mode = "Effective" });
+            var k173_d2 = (k173_e2b?["derivations"] as JsonArray)?.FirstOrDefault(d => d?["kind"]?.ToString() == "BesCyberAsset");
+            var (k173_o2s, k173_o2b) = await Get(admin, $"api/v1/compliance/vObligationSubject?SubjectEntityId={devBdd}");
+            var k173_cipRows = (k173_o2b?["rows"] as JsonArray)?.Count(r => (r?["StandardCode"]?.ToString() ?? "").StartsWith("CIP", StringComparison.Ordinal)) ?? -1;
+            Must(k173_e2s == HttpStatusCode.OK && k173_d2?["value"]?.ToString() == "Not BCA" && k173_cipRows == 0,
+                $"#173: the electromechanical relay is derived Not BCA ({k173_d2?["reason"]}) and no CIP standard appears against it ({k173_cipRows} CIP rows)");
+
+            // (f) the nearest classified location rules: the station says Low, the building the device is in says Medium
+            var (k173_c2s, _) = await Post(admin, "api/v1/asset/RecordClassification", new { SubjectKind = "Node", SubjectEntityId = station, ClassificationKindCode = "CipImpactRating", ClassificationValue = "Low" });
+            var (k173_v2s, k173_v2b) = await Post(admin, "api/v1/compliance/evaluate", new { subjectEntityId = devSel, mode = "Preview" });
+            var k173_cipV = (k173_v2b?["verdicts"] as JsonArray)?.FirstOrDefault(v => v?["ruleKey"]?.ToString() == "cip007_r1");
+            var k173_read = (k173_cipV?["reads"] as JsonArray)?.FirstOrDefault(r => r?["name"]?.ToString() == "device.location.classification.CipImpactRating");
+            Must(k173_c2s == HttpStatusCode.OK && k173_v2s == HttpStatusCode.OK && k173_read?["value"]?.ToString() == "Medium" && k173_cipV?["result"]?.ToString() == "true",
+                $"#173: the building's Medium rules over the station's Low — the device reads {k173_read?["value"]} and CIP-007 R1 still binds ({k173_cipV?["result"]})");
+
+            // (g) a second pass changes nothing; ReadOnly may preview but not commit; the runs are on record
+            var (k173_e3s, k173_e3b) = await Post(admin, "api/v1/compliance/evaluate", new { subjectEntityId = devSel, mode = "Effective" });
+            var (k173_q1s, _) = await Post(readOnly!, "api/v1/compliance/evaluate", new { subjectEntityId = devSel, mode = "Preview" });
+            var (k173_q2s, _) = await Post(readOnly!, "api/v1/compliance/evaluate", new { subjectEntityId = devSel, mode = "Effective" });
+            var (k173_rns, k173_rnb) = await Get(admin, "api/v1/compliance/vRuleEvaluationRun?Mode=Effective&take=5");
+            Must(k173_e3s == HttpStatusCode.OK && (k173_e3b?["opened"]?.GetValue<int>() ?? -1) == 0 && (k173_e3b?["closed"]?.GetValue<int>() ?? -1) == 0
+                 && k173_q1s == HttpStatusCode.OK && k173_q2s == HttpStatusCode.Forbidden && ((k173_rnb?["rows"] as JsonArray)?.Count ?? 0) >= 1,
+                $"#173: a second pass changes nothing (opened {k173_e3b?["opened"]}, closed {k173_e3b?["closed"]}); ReadOnly previews ({(int)k173_q1s}) but does not commit ({(int)k173_q2s}); the runs are on record");
+
+            // (h) the evidence trail of the PRC-023 obligation: the settings, the derived quantities, the ratings and the criterion
+            var (k173_f1s, k173_f1b) = await Get(admin, $"api/v1/compliance/vObligationInstanceFact?ObligationInstanceRowId={k173_prc?["RowId"]}");
+            var k173_facts = (k173_f1b?["rows"] as JsonArray)?.GroupBy(r => r?["FactName"]?.ToString() ?? "").ToDictionary(g => g.Key, g => g.Last()?["ValueAsRead"]?.ToString() ?? "") ?? new();
+            Must(k173_f1s == HttpStatusCode.OK && k173_facts.ContainsKey("asset.formula.prc023_criterion")
+                 && k173_facts.GetValueOrDefault("device.protects.terminal.voltage", "").StartsWith("230", StringComparison.Ordinal)
+                 && k173_facts.ContainsKey("device.protects.rating[kind=FourHour]"),
+                $"#173: the obligation's evidence trail names the terminal's voltage, the ratings read and the criterion chosen ({k173_facts.Count} facts, criterion {k173_facts.GetValueOrDefault("asset.formula.prc023_criterion")})");
         }
 
         // ======== #168 increment 2 (2026-09-16): the settings edited in the platform, the file written by it — the owner's four-step

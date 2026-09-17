@@ -16,7 +16,7 @@ import { Panel, Pill, stateTone, Button, Facts, Status, Field, Tabs, inputClass 
 import { DataGrid, type Column } from '@/components/ui/data-grid'
 import DeviceSettings, { useTemplate, isRatio } from './DeviceSettings'
 import ComplianceTab, { useProtectedAssets } from './ComplianceTab'
-import { StationLink } from './PrimaryAssetScreen'
+import { NodeLink } from './PrimaryAssetScreen'
 
 const CHARACTERISTIC_SCHEMA = 'SETTINGS_RECORD'   // CharacteristicSchema.RecordTemplate seeded for the settings record (#167)
 
@@ -55,7 +55,7 @@ export default function RecordScreen({ params: p, id }: { screen: Screen; params
       <Status>Revision {s(r.RevisionStatus)} · lifecycle {s(r.LifecycleState) || '—'} · {s(r.FileKind)} {s(r.ParseStatus)}</Status>
       <div className="grid gap-3 lg:grid-cols-3">
         <Panel title="Device"><Facts cols={1} pairs={[['Device', legacyFree(r.DeviceName)], ['Model', s(r.ModelCode) + (r.ModelName ? ' — ' + r.ModelName : '')], ['Manufacturer', s(r.ManufacturerName)], ['Technology', s(r.Technology)], ['Software version', s(r.FirmwareVersion)], ['Serial number', s(r.SerialNumber)], ['Voltage', s(r.VoltageClassCode)], ['Functions', s(r.Functions || r.PositionName)]]} /></Panel>
-        <Panel title="Where"><Facts cols={1} pairs={[['Location', <span><StationLink id={s(r.StationNodeEntityId)} name={s(r.StationName)} />{r.StationNumber ? ' · ' + r.StationNumber : ''}</span>],
+        <Panel title="Where"><Facts cols={1} pairs={[['Location', <span><NodeLink id={s(r.StationNodeEntityId)} name={s(r.StationName)} />{r.StationNumber ? ' · ' + r.StationNumber : ''}</span>],
           ['Scheme', r.SchemeEntityId ? <a className="text-sky-300 underline" href={screenPath('SCHEME', s(r.SchemeEntityId))} onClick={(e) => { e.preventDefault(); navigate(screenPath('SCHEME', s(r.SchemeEntityId))) }}>{s(r.SchemeName)}</a> : s(r.SchemeName)],
           ['Protects', <Protects schemeEntityId={s(r.SchemeEntityId)} />], ['Equipment', s(r.PanelName)], ['Position', s(r.PositionName)]]} /></Panel>
         <Panel title="Dates and state"><Facts cols={1} pairs={[['Calculated', fmtWhen(r.CalculatedAt) + (r.CalculatedByDisplayName ? ' by ' + r.CalculatedByDisplayName : '')], ['Verified', fmtWhen(r.VerifiedAt)], ['In service', r.InServiceFrom ? fmtWhen(r.InServiceFrom) + (r.InServiceTo ? ' – ' + fmtWhen(r.InServiceTo) : ' – now') : 'not in service'], ['Change request', legacyFree(r.WorkRequestTitle)], ['Action type', s(r.WorkTypeKey)], ['Lifecycle', s(r.LifecycleState)], ['Revision', s(r.RevisionLabel) + ' · ' + s(r.RevisionStatus)]]} /></Panel>

@@ -15,22 +15,40 @@ import { useCan, useViewAll } from '@/lib/hooks'
 import { type RecordParams, type Screen, screenPath } from '@/lib/screens'
 import { Panel, Pill, Button, Facts, Status, inputClass } from '@/components/ui/ui'
 
-/** The kinds and the values in the standards' own words (a later phase's derivation writes the same values with Basis Derived).
- * NPCC BPS applies to a bus only — the A-10 test is a bus test; every other element inherits it at its terminals.
+/** The kinds and the values in the standards' own words. The **values** are still the client's; **which kinds apply** is
+ * reference data (#173, the owner 2026-09-17: "a bus is not PRC-023 applicable and has no rating") —
+ * `ref.vClassificationKind.AppliesToAssetTypes` (a JSON array of AssetTypeCode, NULL = every type) decides, and
+ * `DerivedByDefinitionKey` (non-null) says the platform derives the kind, so no screen offers a control for it.
  * #171 (2026-09-16): each kind names the subject it is recorded against (ref.ClassificationKind.SubjectKinds seeds the same
- * list). The CIP impact rating left the primary asset — it is the station's, and the device inherits it from where it sits. */
-export const CLASSIFICATION_KINDS: { code: string; label: string; values: string[]; help: string; busOnly?: boolean; subject: 'asset' | 'station' | 'device' }[] = [
+ * list). The CIP impact rating left the primary asset — it is the location's, and the device inherits it from where it sits. */
+export const CLASSIFICATION_KINDS: { code: string; label: string; values: string[]; help: string; subject: 'asset' | 'node' | 'device' }[] = [
   { code: 'BesStatus', label: 'BES status', values: ['BES', 'Not BES'], help: 'Bulk Electric System element (NERC definition)', subject: 'asset' },
-  { code: 'CipImpactRating', label: 'CIP impact rating', values: ['High', 'Medium', 'Low', 'None'], help: 'CIP-002: the impact rating of the station — every BES Cyber Asset at it inherits it', subject: 'station' },
-  { code: 'NpccBulkPowerSystem', label: 'NPCC bulk power system', values: ['BPS', 'Not BPS'], help: 'This bus declared BPS (or not) by the entity\'s A-10 study; the NPCC directories then apply to the protections at it', busOnly: true, subject: 'asset' },
+  { code: 'CipImpactRating', label: 'CIP impact rating', values: ['High', 'Medium', 'Low', 'None'], help: 'CIP-002: the impact rating of this location — every BES Cyber Asset in it inherits it', subject: 'node' },
+  { code: 'NpccBulkPowerSystem', label: 'NPCC bulk power system', values: ['BPS', 'Not BPS'], help: 'This bus declared BPS (or not) by the entity\'s A-10 study; the NPCC directories then apply to the protections at it', subject: 'asset' },
   { code: 'Prc023', label: 'PRC-023', values: ['Listed', 'Not listed'], help: 'On the entity\'s PRC-023 list of impactful lines: the relay loadability calculation applies', subject: 'asset' },
-  { code: 'BesCyberAsset', label: 'BES Cyber Asset', values: ['BCA', 'Not BCA'], help: 'CIP-002: this device is a BES Cyber Asset (recorded per device in this phase; the CIP-002 procedure derives it later)', subject: 'device' },
-  { code: 'ExternalRoutableConnectivity', label: 'External routable connectivity', values: ['ERC', 'No ERC'], help: 'CIP-005: the device is reachable by a routable protocol from outside the electronic security perimeter', subject: 'device' },
+  { code: 'BesCyberAsset', label: 'BES Cyber Asset', values: ['BCA', 'Not BCA'], help: 'CIP-002: a microprocessor-based device protecting a BES element is a BES Cyber Asset — the platform derives it; it is not recorded by hand', subject: 'device' },
+  { code: 'ExternalRoutableConnectivity', label: 'External routable connectivity', values: ['ERC', 'No ERC'], help: 'CIP-005: the device is reachable by a routable protocol from outside the electronic security perimeter — recorded by hand until a network-analysis module can determine it (the owner, 2026-09-17)', subject: 'device' },
 ]
-/** The kinds each screen records: the primary asset's, the station's, the device's (#171). */
+/** The kinds each screen records: the primary asset's, the location node's, the device's (#171). */
 export const PRIMARY_ASSET_KINDS = ['BesStatus', 'NpccBulkPowerSystem', 'Prc023']
-export const STATION_KINDS = ['CipImpactRating']
+export const NODE_KINDS = ['CipImpactRating']
 export const DEVICE_KINDS = ['BesCyberAsset', 'ExternalRoutableConnectivity']
+
+/** The reference data behind the two rules above (#173). Read once and shared by query key; a kind or type the reference
+ * does not carry falls back to "it applies", so the screens keep working before the seed reaches a database. */
+export const useClassificationKindRef = () => useViewAll('ref', 'vClassificationKind', {}, 'ClassificationKindCode')
+export const useAssetTypeRef = () => useViewAll('ref', 'vAssetType', {}, 'AssetTypeCode')
+export const bit = (v: unknown) => v === true || v === 1 || v === '1' || String(v).toLowerCase() === 'true'
+/** ref.ClassificationKind.AppliesToAssetTypes: a JSON array of AssetTypeCode; NULL — or a column not yet in the view — = every type. */
+export function kindApplies(kindRef: Row | undefined, assetTypeCode?: string): boolean {
+  if (!assetTypeCode || !kindRef || !('AppliesToAssetTypes' in kindRef)) return true
+  const raw = s(kindRef.AppliesToAssetTypes); if (!raw) return true
+  try { const list: unknown = JSON.parse(raw); return Array.isArray(list) ? list.some((x) => String(x).toLowerCase() === assetTypeCode.toLowerCase()) : true } catch { return true }
+}
+/** ref.ClassificationKind.DerivedByDefinitionKey: non-null = the platform derives the kind, so no screen offers a control. */
+export const derivedBy = (kindRef: Row | undefined) => (kindRef && 'DerivedByDefinitionKey' in kindRef ? s(kindRef.DerivedByDefinitionKey) : '')
+/** ref.AssetType.CarriesRating: a bus, breaker or generator carries no Facility Rating, so its page has no Ratings panel. */
+export const carriesRating = (typeRef: Row | undefined) => (typeRef && 'CarriesRating' in typeRef ? bit(typeRef.CarriesRating) : true)
 const ZONES = ['Primary', 'Backup', 'BreakerFailure']   // the owner, 2026-09-16: Primary, Backup, Breaker Failure
 const STATUSES = ['Planned', 'InService', 'OutOfService', 'Retired']
 
@@ -40,20 +58,28 @@ export function useClassifications(subjectKind: string, subjectEntityId: string)
 const useTerminals = (assetId: string) => useViewAll('asset', 'vAssetTerminalDetail', { AssetEntityId: assetId }, 'TerminalNo', !!assetId)
 
 /** The classification panel: one row per kind that applies to this subject; editable when the person may modify it.
- * `kinds` names the codes this screen records (#171: the primary asset's, the station's, the device's); without it every
- * kind that is not bus-only is shown, as before. */
-export function ClassificationPanel({ subjectKind, subjectEntityId, editable, assetTypeCode, kinds: kindCodes, title, note }: { subjectKind: string; subjectEntityId: string; editable: boolean; assetTypeCode?: string; kinds?: string[]; title?: string; note?: string }) {
+ * `kinds` names the codes this screen records (#171: the primary asset's, the location node's, the device's).
+ * #173: a kind the asset type does not carry is not shown at all (ref.ClassificationKind.AppliesToAssetTypes), and a
+ * derived kind (DerivedByDefinitionKey) is a stated result with its reason and no control — every caller obeys both,
+ * because both are decided here. `reasons` lets a caller put the derivation's own words beside the value: `reason` sits
+ * after the value, and `label` replaces the whole line while no derived value has been written — the panel never says why
+ * a value is what it is, nor what it would be, on its own. */
+export interface DerivedNote { label?: string; reason?: string }
+export function ClassificationPanel({ subjectKind, subjectEntityId, editable, assetTypeCode, kinds: kindCodes, title, note, reasons }: { subjectKind: string; subjectEntityId: string; editable: boolean; assetTypeCode?: string; kinds?: string[]; title?: string; note?: string; reasons?: Record<string, DerivedNote> }) {
   const qc = useQueryClient()
   const q = useClassifications(subjectKind, subjectEntityId)
+  const kindRefQ = useClassificationKindRef()
   const terminalsQ = useTerminals(assetTypeCode && assetTypeCode !== 'Bus' ? subjectEntityId : '')
-  // the station's CIP-002 rating for each terminal's station (#171: it is no longer the primary asset's; it is shown, not edited, here)
+  // the location's CIP-002 rating for each terminal's station (#171: it is no longer the primary asset's; it is shown, not edited, here)
   const stationCipQ = useViewAll('asset', 'vClassification', { SubjectKind: 'Node', ClassificationKindCode: 'CipImpactRating' }, undefined, !!assetTypeCode && assetTypeCode !== 'Bus')
   const rows = q.data ?? []
   const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null)
   const current = (code: string) => rows.find((r) => s(r.ClassificationKindCode) === code)
-  const kinds = kindCodes
-    ? kindCodes.map((c) => CLASSIFICATION_KINDS.find((k) => k.code === c)).filter((k): k is (typeof CLASSIFICATION_KINDS)[number] => !!k).filter((k) => !k.busOnly || assetTypeCode === 'Bus')
-    : CLASSIFICATION_KINDS.filter((k) => k.subject === 'asset' && (!k.busOnly || assetTypeCode === 'Bus' || !assetTypeCode))
+  const kindRef = (code: string) => (kindRefQ.data ?? []).find((k) => s(k.ClassificationKindCode) === code)
+  const kinds = (kindCodes
+    ? kindCodes.map((c) => CLASSIFICATION_KINDS.find((k) => k.code === c)).filter((k): k is (typeof CLASSIFICATION_KINDS)[number] => !!k)
+    : CLASSIFICATION_KINDS.filter((k) => k.subject === 'asset'))
+    .filter((k) => kindApplies(kindRef(k.code), assetTypeCode))
   const stationCip = (nodeId: unknown) => s((stationCipQ.data ?? []).find((c) => s(c.SubjectEntityId).toLowerCase() === s(nodeId).toLowerCase())?.ClassificationValue)
   const recordOnBus = async (busId: string, busName: string, bps: boolean) => {
     try {
@@ -73,16 +99,22 @@ export function ClassificationPanel({ subjectKind, subjectEntityId, editable, as
       {msg && <Status bad={msg.bad}>{msg.text}</Status>}
       <dl className="grid grid-cols-1 gap-x-6 gap-y-2 text-sm">
         {kinds.map((k) => { const c = current(k.code); const v = c ? s(c.ClassificationValue) : ''
+          // #173: a derived kind is a statement, not a judgement — the value, what it was derived from, and why
+          const derived = !!derivedBy(kindRef(k.code)); const why = reasons?.[k.code]?.reason; const absent = reasons?.[k.code]?.label
           return (
             <div key={k.code} className="grid grid-cols-[13rem_1fr] items-start gap-2">
               <dt className="text-slate-400" title={k.help}>{k.label}</dt>
               <dd className="min-w-0">
-                {editable
+                {derived
+                  ? c
+                    ? <span className="text-slate-100">{v}{` — ${s(c.Basis) === 'Derived' ? 'derived' : 'recorded'}${why ? ': ' + why : ''}`}</span>
+                    : <span className="text-slate-500">{absent ?? `not determined${why ? ' — ' + why : ''}`}</span>
+                  : editable
                   ? <select className={`${inputClass} w-48`} value={v} onChange={(e) => void record(k.code, e.target.value)}>
                       <option value="">— not recorded —</option>{k.values.map((x) => <option key={x} value={x}>{x}</option>)}
                     </select>
                   : <span className={v ? 'text-slate-100' : 'text-slate-500'}>{v || 'not recorded'}</span>}
-                {c && <span className="ml-2 text-xs text-slate-500">{s(c.Basis)} · {fmtWhen(c.DeterminedAt)}{c.ReferenceDocumentRevisionRowId ? ' · from a filed list' : ''}</span>}
+                {c && <span className="ml-2 text-xs text-slate-500">{derived ? fmtWhen(c.DeterminedAt) : `${s(c.Basis)} · ${fmtWhen(c.DeterminedAt)}`}{c.ReferenceDocumentRevisionRowId ? ' · from a filed list' : ''}</span>}
                 <div className="text-xs text-slate-600">{k.help}</div>
               </dd>
             </div>) })}
@@ -107,7 +139,7 @@ export function ClassificationPanel({ subjectKind, subjectEntityId, editable, as
             <dd className="min-w-0 text-slate-200">
               {(terminalsQ.data ?? []).length ? (terminalsQ.data ?? []).map((t) => (
                 <div key={s(t.TerminalEntityId)} className="flex flex-wrap items-center gap-2">
-                  <span>Terminal {s(t.TerminalNo)} · <StationLink id={s(t.StationNodeEntityId)} name={s(t.StationName)} /></span>
+                  <span>Terminal {s(t.TerminalNo)} · <NodeLink id={s(t.StationNodeEntityId)} name={s(t.StationName)} /></span>
                   <span className="text-xs text-slate-500">{stationCipQ.isPending ? '…' : stationCip(t.StationNodeEntityId) || 'not recorded on the station'}</span>
                 </div>)) : <span className="text-slate-500">no terminals yet</span>}
               <div className="text-xs text-slate-600">Recorded on the station (the owner, 2026-09-16): every BES Cyber Asset at it inherits it. Open the station to record it.</div>
@@ -119,11 +151,11 @@ export function ClassificationPanel({ subjectKind, subjectEntityId, editable, as
   )
 }
 
-/** A station's name as a link to its page (#171). */
-export function StationLink({ id, name }: { id: string; name: string }) {
+/** A location node's name as a link to its page (#171; #173: the LOCATION screen takes any node type, not stations only). */
+export function NodeLink({ id, name }: { id: string; name: string }) {
   const navigate = useNavigate()
   if (!id) return <span>{name || '—'}</span>
-  return <a className="text-sky-300 underline" href={screenPath('STATION', id)} onClick={(e) => { e.preventDefault(); navigate(screenPath('STATION', id)) }}>{name || id.slice(0, 8)}</a>
+  return <a className="text-sky-300 underline" href={screenPath('LOCATION', id)} onClick={(e) => { e.preventDefault(); navigate(screenPath('LOCATION', id)) }}>{name || id.slice(0, 8)}</a>
 }
 
 /** The line ratings the PRC-023 criteria are judged against (#171). Hand-entered until the ratings connector exists: the
@@ -232,7 +264,7 @@ function Terminals({ r, readOnly = false }: { r: Row; readOnly?: boolean }) {
   const voltageOptions = (voltagesQ.data ?? []).map((v) => <option key={s(v.VoltageClassCode)} value={s(v.VoltageClassCode)}>{v.NominalKv != null ? `${Number(v.NominalKv)} kV` : s(v.VoltageClassCode)}</option>)
   const bussesAt = (stationId: unknown) => (bussesQ.data ?? []).filter((b) => s(b.TerminalNodeIds).toLowerCase().includes(s(stationId).toLowerCase()) && s(b.EntityId) !== s(r.EntityId))
   const revise = (x: Row, patch: Row, text: string) => run(() => proc('asset', 'AssetTerminal_Revise', { EntityId: x.TerminalEntityId, AssetEntityId: r.EntityId, TerminalNo: x.TerminalNo, StationNodeEntityId: x.StationNodeEntityId, VoltageClassCode: x.VoltageClassCode ?? null, BusAssetEntityId: x.BusAssetEntityId ?? null, ...patch }), text)
-  if (readOnly) return <span>{rows.length ? rows.map((x, i) => <span key={s(x.TerminalEntityId)}>{i > 0 ? ' – ' : ''}<StationLink id={s(x.StationNodeEntityId)} name={s(x.StationName)} />{x.VoltageClassCode ? <span className="ml-1 text-xs text-slate-400">{s(x.VoltageClassCode)}</span> : null}</span>) : '—'}</span>
+  if (readOnly) return <span>{rows.length ? rows.map((x, i) => <span key={s(x.TerminalEntityId)}>{i > 0 ? ' – ' : ''}<NodeLink id={s(x.StationNodeEntityId)} name={s(x.StationName)} />{x.VoltageClassCode ? <span className="ml-1 text-xs text-slate-400">{s(x.VoltageClassCode)}</span> : null}</span>) : '—'}</span>
   return (
     <div className="space-y-1">
       {rows.map((x) => (
@@ -245,7 +277,7 @@ function Terminals({ r, readOnly = false }: { r: Row; readOnly?: boolean }) {
           {r.AssetTypeCode !== 'Bus' && <select className={`${inputClass} w-56`} value={s(x.BusAssetEntityId).toLowerCase()} disabled={busy} title="the bus this terminal connects to (the NPCC A-10 declaration is the bus's)" onChange={(e) => void revise(x, { BusAssetEntityId: e.target.value || null }, `terminal ${s(x.TerminalNo)}: bus ${bussesAt(x.StationNodeEntityId).find((b) => s(b.EntityId).toLowerCase() === e.target.value)?.Name ?? 'none'}.`)}>
             <option value="">— bus at {s(x.StationName)} —</option>{bussesAt(x.StationNodeEntityId).map((b) => <option key={s(b.EntityId)} value={s(b.EntityId).toLowerCase()}>{s(b.Name)}{b.Classifications ? ` (${s(b.Classifications).replace('NpccBulkPowerSystem=', 'NPCC ')})` : ''}</option>)}
           </select>}
-          <StationLink id={s(x.StationNodeEntityId)} name="the station" />
+          <NodeLink id={s(x.StationNodeEntityId)} name="the station" />
           <Button kind="mini" disabled={busy} onClick={() => void run(() => proc('asset', 'AssetTerminal_SoftDelete', { EntityId: x.TerminalEntityId }), `terminal ${s(x.TerminalNo)} removed.`)}>remove</Button>
         </div>))}
       <div className="flex flex-wrap items-center gap-2">
@@ -329,6 +361,7 @@ function AssignRow({ t, pick, zone, busy, exclude, onPick, onZone, onAssign }: {
 export default function PrimaryAssetScreen({ params: p, id }: { screen: Screen; params: RecordParams; id?: string }) {
   const navigate = useNavigate(); const can = useCan()
   const rowQ = useViewAll('asset', 'vPrimaryAsset', { [p.key]: id ?? '' }, undefined, !!id)
+  const typesQ = useAssetTypeRef()
   const r = rowQ.data?.[0]
   if (!id) return <Status bad>No primary asset in the address.</Status>
   if (rowQ.isPending) return <Status>Loading the primary asset…</Status>
@@ -347,7 +380,9 @@ export default function PrimaryAssetScreen({ params: p, id }: { screen: Screen; 
         <ProtectedBy r={r} editable={can('Scheme.Modify')} />
       </div>
       <ClassificationPanel subjectKind="Asset" subjectEntityId={s(r.EntityId)} editable={editable} assetTypeCode={s(r.AssetTypeCode)} kinds={PRIMARY_ASSET_KINDS} />
-      <Ratings r={r} editable={editable} />
+      {/* #173 (the owner, 2026-09-17): a bus has no rating — the Ratings panel belongs to the asset types that carry one
+          (ref.AssetType.CarriesRating), because the rating exists to answer PRC-023 R1's criteria 1, 2 and 13. */}
+      {!typesQ.isPending && carriesRating((typesQ.data ?? []).find((t) => s(t.AssetTypeCode) === s(r.AssetTypeCode))) && <Ratings r={r} editable={editable} />}
     </div>
   )
 }

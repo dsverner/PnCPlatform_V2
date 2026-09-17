@@ -1,0 +1,42 @@
+{
+  "g": 1,
+  "kind": "screen",
+  "key": "LOCATIONS",
+  "name": "Locations",
+  "description": "The stations, each with the buildings inside it; a name opens the location, where its CIP-002 impact rating is recorded (#173). The definition names the data — the stations of location.vNode; the page adds each station's buildings, which no single view carries.",
+  "menu": {
+    "group": "Assets and schemes",
+    "label": "Locations",
+    "order": 16
+  },
+  "permission": "Asset.Read",
+  "screenKind": "list",
+  "params": {
+    "view": "location.vNode",
+    "fixedFilters": {
+      "NodeTypeCode": "Station"
+    },
+    "orderBy": "Name",
+    "rowKey": "EntityId",
+    "columns": [
+      {
+        "key": "Name",
+        "label": "Station"
+      },
+      {
+        "key": "SubtypeCode",
+        "label": "Subtype"
+      },
+      {
+        "key": "Notes",
+        "label": "Notes"
+      }
+    ],
+    "rowOpen": {
+      "label": "Open the location",
+      "action": "openScreen",
+      "screen": "LOCATION",
+      "param": "EntityId"
+    }
+  }
+}

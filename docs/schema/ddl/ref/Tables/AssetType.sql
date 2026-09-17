@@ -19,6 +19,14 @@ CREATE TABLE [ref].[AssetType] (
     [ModifiedAt]        DATETIMEOFFSET(7) NOT NULL,
     [IsActive]          BIT               NOT NULL CONSTRAINT [DF_AssetType_IsActive] DEFAULT 1,
     [MigrationRunId]    UNIQUEIDENTIFIER  NULL     CONSTRAINT [FK_AssetType_MigrationRun] REFERENCES [migration].[Run] ([RunId]),
+    -- #173 (2026-09-17): does an asset of this type carry a Facility Rating (asset.AssetRating)? Set for Line and
+    -- Transformer only: the rating exists to answer PRC-023 R1's criteria 1, 2 and 13, which measure a circuit's rating.
+    -- A bus, a breaker or the system itself has no rating here, so the page offers no Ratings panel and
+    -- asset.RecordAssetRating refuses one (50235).
+    -- #173: does an asset of this type carry a Facility Rating in amperes (asset.AssetRating)? Line and Transformer do - they are
+    -- the circuits PRC-023 R1's criteria 1, 2 and 13 measure. NULL and 0 both mean it does not: the column is nullable because
+    -- ref.AssetType is system-versioned and SQL Server will not add a NOT NULL column to a history table that already has rows.
+    [CarriesRating]     BIT               NULL,
     CONSTRAINT [PK_AssetType] PRIMARY KEY CLUSTERED ([AssetTypeCode])
 ) WITH (SYSTEM_VERSIONING = ON (HISTORY_TABLE = [ref].[AssetType_History]));
 GO

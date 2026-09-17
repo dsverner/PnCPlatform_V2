@@ -14,6 +14,7 @@ import io, json, os, subprocess, sys, tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "docs", "schema", "ddl", "PostDeploy")
+NL = chr(13) + chr(10)   # the repo's SQL files are CRLF (written as chr() so no editor or heredoc can eat the escape)
 
 # The standard versions in force in New Brunswick (Seed_compliance_Standards_NB.sql; read from https://nbeub.ca/reliability-standards).
 # A rule names its requirement by (standard, version label, number) — compliance.fResolveRequirement — so these labels must
@@ -24,7 +25,7 @@ VERSIONS = {   # the NB appendix labels in force on 2026-09-16 (nbeub.ca): the l
     "CIP-007": "CIP-007-6-NB-0", "CIP-010": "CIP-010-4-NB-0", "CIP-011": "CIP-011-3-NB-0",
 }
 
-CIP_SCOPE = "device.classification.BesCyberAsset = 'BCA' and device.station.classification.CipImpactRating in {'High', 'Medium'}"
+CIP_SCOPE = "device.classification.BesCyberAsset = 'BCA' and device.location.classification.CipImpactRating in {'High', 'Medium'}"
 CIP_ERC_SCOPE = CIP_SCOPE + " and device.classification.ExternalRoutableConnectivity = 'ERC'"
 CIP_NOTE = ("The platform holds no record kind for this requirement in this phase; the evidence is kept outside the platform. "
             "The obligation is listed so the device's sheet shows what applies to it (owner, 2026-09-16).")
@@ -66,6 +67,21 @@ PRC_RULES = [
     ("prc023_r5", "PRC-023", "R5", "asset.formula.prc023_criterion = '12'", "every calendar_year",
      "PRC-023-6 R5 (NB appendix): a circuit set by criterion 12 is on the list provided to the Northeast Power Coordinating "
      "Council at least once each calendar year, no more than 15 months between reports."),
+]
+
+# (key, name, kind, subject, [(when text, value)], else value, description) — Program.ClassificationDerivation
+# (FORMULA-GRAMMAR grammar-1 host shapes): the first `when` that is true gives the value; when none is true and any is
+# Unknown the answer is Unknown, not the else — so a device whose protected element has no BES status recorded is left
+# undetermined rather than declared Not BCA.
+DERIVATIONS = [
+    ("bes_cyber_asset", "BES Cyber Asset (CIP-002)", "BesCyberAsset", "Device",
+     [("device.technology in {'Microprocessor', 'IEC61850'} and device.protects.classification.BesStatus = 'BES'", "BCA")],
+     "Not BCA",
+     "The owner, 2026-09-17: the BES Cyber Asset determination results from whether the device is a microprocessor based device "
+     "and whether the primary asset it protects is BES. A programmable device (ref.Model.Technology Microprocessor or IEC61850 - "
+     "an electromechanical or static relay holds no cyber asset) protecting a BES element is a BCA. The full CIP-002 evaluation, "
+     "which rates a terminal and gives every cyber asset in it that rating, is a later phase and will replace this derivation's "
+     "cases, not the mechanism. Undetermined while the protected element's BES status is unrecorded."),
 ]
 
 # (key, name, unit, precision, expression text, description)
@@ -135,17 +151,24 @@ IF NOT EXISTS (SELECT 1 FROM [personnel].[Actor] WHERE [ActorId] = @approver)
 """
 
 
-def definition_block(kind, key, name, description, payload):
+def definition_block(kind, key, name, description, payload, note="seed (#171)"):
+    """One definition and its effective version. The guard is the payload, not the key: when this generator's payload differs from
+    the definition's effective version — a rule's scope corrected, a formula's expression changed — a NEW version is added and
+    approved, which is what the platform's own rule says a change to a definition is (SCHEMA-DESIGN §2.2: a version is never
+    edited in place, and the history keeps what was effective when). An unchanged payload does nothing at all, so the seed stays
+    idempotent across deploys."""
     p = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
     return f"""
-IF NOT EXISTS (SELECT 1 FROM [config].[Definition] d JOIN [config].[DefinitionVersion] dv ON dv.[DefinitionEntityId] = d.[EntityId] AND dv.[IsDeleted] = 0 AND dv.[Status] = N'Effective'
-               WHERE d.[DefinitionKind] = N'{kind}' AND d.[DefinitionKey] = {sql_str(key)} AND d.[IsDeleted] = 0)
+IF NOT EXISTS (SELECT 1 FROM [config].[Definition] d
+               JOIN [config].[DefinitionVersion] dv ON dv.[DefinitionEntityId] = d.[EntityId] AND dv.[IsDeleted] = 0 AND dv.[Status] = N'Effective'
+               WHERE d.[DefinitionKind] = N'{kind}' AND d.[DefinitionKey] = {sql_str(key)} AND d.[IsDeleted] = 0
+                 AND dv.[PayloadText] = {sql_str(p)})
 BEGIN
     DECLARE @e UNIQUEIDENTIFIER, @v UNIQUEIDENTIFIER, @n INT;
     IF NOT EXISTS (SELECT 1 FROM [config].[Definition] WHERE [DefinitionKind] = N'{kind}' AND [DefinitionKey] = {sql_str(key)} AND [IsDeleted] = 0)
         EXEC [config].[AddDefinition] @DefinitionKind = N'{kind}', @DefinitionKey = {sql_str(key)}, @Name = {sql_str(name)},
              @Description = {sql_str(description)}, @ActorId = @author, @EntityId = @e OUTPUT;
-    EXEC [config].[AddDefinitionVersion] @DefinitionKey = {sql_str(key)}, @DefinitionKind = N'{kind}', @ChangeNote = N'seed (#171)',
+    EXEC [config].[AddDefinitionVersion] @DefinitionKey = {sql_str(key)}, @DefinitionKind = N'{kind}', @ChangeNote = {sql_str(note)},
          @PayloadText = {sql_str(p)}, @ActorId = @author, @VersionRowId = @v OUTPUT, @VersionNumber = @n OUTPUT;
     EXEC [config].[ApproveDefinitionVersion] @VersionRowId = @v, @ActorId = @approver;
 END
@@ -156,6 +179,9 @@ DECLARE @approver UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000002';"""
 
 def main():
     items = [{"id": "f:" + k, "kind": "expression", "text": t} for (k, _, _, _, t, _) in FORMULAS]
+    for (k, _, _, _, cases, _, _) in DERIVATIONS:
+        for n, (when, _v) in enumerate(cases):
+            items.append({"id": f"d:{k}:{n}", "kind": "expression", "text": when})
     for (k, _, _, scope, cad, _) in CIP_RULES + PRC_RULES:
         items.append({"id": "r:" + k, "kind": "expression", "text": scope})
         items.append({"id": "c:" + k, "kind": "cadence", "text": cad})
@@ -173,6 +199,15 @@ def main():
         sql += definition_block("Program.Formula", k, name, desc, payload)
     io.open(os.path.join(OUT, "Seed_config_Formulas_PRC023.sql"), "w", encoding="utf-8", newline="\r\n").write(sql + "\n")
 
+    # derivations - what the platform works out for itself (#173)
+    sql = HEADER.format(what="The classification derivations (Program.ClassificationDerivation): what the platform works out for itself rather than asking a person. The BES Cyber Asset flag is the first - the owner's rule of 2026-09-17; the drop-down is gone from the device's sheet.")
+    for (k, name, kind, subject, cases, els, desc) in DERIVATIONS:
+        payload = {"g": 1, "kind": kind, "subjectKinds": [subject],
+                   "cases": [{"whenText": w, "when": out[f"d:{k}:{n}"]["ast"], "value": v} for n, (w, v) in enumerate(cases)],
+                   "else": els}
+        sql += definition_block("Program.ClassificationDerivation", k, name, desc, payload, "seed (#173)")
+    io.open(os.path.join(OUT, "Seed_config_ClassificationDerivations.sql"), "w", encoding="utf-8", newline=NL).write(sql + chr(10))
+
     # rules
     sql = HEADER.format(what="The obligation rules (Program.ObligationRule, subject Device): the CIP requirement set for a BES Cyber Asset at a High or Medium impact station (the owner's starter list, 2026-09-16), and PRC-023-6 R1 / R3 / R4 / R5 on the terminals it applies to. The requirement is named by (standard, version in force in NB, number) and must resolve at seed time.")
     for (k, std, num, scope, cad, note) in CIP_RULES + PRC_RULES:
@@ -188,7 +223,7 @@ def main():
         name = f"{ver} {num}" + (" — BES Cyber Asset at a High/Medium station" if std.startswith("CIP") else " — transmission relay loadability")
         sql += definition_block("Program.ObligationRule", k, name, note, payload)
     io.open(os.path.join(OUT, "Seed_config_ObligationRules.sql"), "w", encoding="utf-8", newline="\r\n").write(sql + "\n")
-    print("wrote Seed_config_Formulas_PRC023.sql (%d formulas) and Seed_config_ObligationRules.sql (%d rules)" % (len(FORMULAS), len(CIP_RULES) + len(PRC_RULES)))
+    print("wrote %d formulas, %d derivations, %d rules" % (len(FORMULAS), len(DERIVATIONS), len(CIP_RULES) + len(PRC_RULES)))
 
 
 if __name__ == "__main__":

@@ -5,15 +5,19 @@
 -- A line is not routed here yet (a routed asset has no placement, asset.PlaceAsset 50213); when the TLM project joins,
 -- the line becomes routed and its terminals come from there. The system itself is the asset a RAS / system-protection
 -- scheme protects. Idempotent through ref.AssetType_Upsert.
+-- #173 (2026-09-17): CarriesRating says whether an asset of the type carries a Facility Rating (asset.AssetRating).
+-- Line and Transformer only: the ratings exist to answer PRC-023 R1's criteria 1, 2 and 13, which measure a circuit's
+-- rating (the owner, 2026-09-17: the bus page must offer no Ratings panel). A capacitor, reactor or generator has a
+-- rating in reality; when the group wants those here it is one flag each, not a schema change.
 IF OBJECT_ID(N'[ref].[AssetType_Upsert]') IS NULL RETURN;   -- bootstrap (tables-only) publish
 GO
 DECLARE @actor UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000001';
-EXEC [ref].[AssetType_Upsert] @AssetTypeCode = N'Line', @Name = N'Transmission line', @Description = N'A transmission or distribution line (placed at its home station in this phase; routed when the TLM project supplies its structures)', @AssetClassCode = N'Primary', @IsDevice = 0, @IsRouted = 0, @ActorId = @actor;
-EXEC [ref].[AssetType_Upsert] @AssetTypeCode = N'Transformer', @Name = N'Transformer', @Description = N'A power transformer (or autotransformer)', @AssetClassCode = N'Primary', @IsDevice = 0, @ActorId = @actor;
-EXEC [ref].[AssetType_Upsert] @AssetTypeCode = N'Bus', @Name = N'Bus', @Description = N'A station bus (the subject of the NPCC A-10 impactful-bus list)', @AssetClassCode = N'Primary', @IsDevice = 0, @ActorId = @actor;
-EXEC [ref].[AssetType_Upsert] @AssetTypeCode = N'Breaker', @Name = N'Circuit breaker', @Description = N'A circuit breaker (the subject of breaker-failure protection)', @AssetClassCode = N'Primary', @IsDevice = 0, @ActorId = @actor;
-EXEC [ref].[AssetType_Upsert] @AssetTypeCode = N'Generator', @Name = N'Generator', @Description = N'A generating unit', @AssetClassCode = N'Primary', @IsDevice = 0, @ActorId = @actor;
-EXEC [ref].[AssetType_Upsert] @AssetTypeCode = N'Capacitor', @Name = N'Capacitor bank', @Description = N'A shunt or series capacitor bank', @AssetClassCode = N'Primary', @IsDevice = 0, @ActorId = @actor;
-EXEC [ref].[AssetType_Upsert] @AssetTypeCode = N'Reactor', @Name = N'Reactor', @Description = N'A shunt or series reactor', @AssetClassCode = N'Primary', @IsDevice = 0, @ActorId = @actor;
-EXEC [ref].[AssetType_Upsert] @AssetTypeCode = N'System', @Name = N'Power system', @Description = N'The system itself — what a remedial action scheme or other system-protection scheme protects (the owner, 2026-09-16: a system protection has no single primary element)', @AssetClassCode = N'Primary', @IsDevice = 0, @ActorId = @actor;
+EXEC [ref].[AssetType_Upsert] @AssetTypeCode = N'Line', @Name = N'Transmission line', @Description = N'A transmission or distribution line (placed at its home station in this phase; routed when the TLM project supplies its structures)', @AssetClassCode = N'Primary', @IsDevice = 0, @IsRouted = 0, @CarriesRating = 1, @ActorId = @actor;
+EXEC [ref].[AssetType_Upsert] @AssetTypeCode = N'Transformer', @Name = N'Transformer', @Description = N'A power transformer (or autotransformer)', @AssetClassCode = N'Primary', @IsDevice = 0, @CarriesRating = 1, @ActorId = @actor;
+EXEC [ref].[AssetType_Upsert] @AssetTypeCode = N'Bus', @Name = N'Bus', @Description = N'A station bus (the subject of the NPCC A-10 impactful-bus list)', @AssetClassCode = N'Primary', @IsDevice = 0, @CarriesRating = 0, @ActorId = @actor;
+EXEC [ref].[AssetType_Upsert] @AssetTypeCode = N'Breaker', @Name = N'Circuit breaker', @Description = N'A circuit breaker (the subject of breaker-failure protection)', @AssetClassCode = N'Primary', @IsDevice = 0, @CarriesRating = 0, @ActorId = @actor;
+EXEC [ref].[AssetType_Upsert] @AssetTypeCode = N'Generator', @Name = N'Generator', @Description = N'A generating unit', @AssetClassCode = N'Primary', @IsDevice = 0, @CarriesRating = 0, @ActorId = @actor;
+EXEC [ref].[AssetType_Upsert] @AssetTypeCode = N'Capacitor', @Name = N'Capacitor bank', @Description = N'A shunt or series capacitor bank', @AssetClassCode = N'Primary', @IsDevice = 0, @CarriesRating = 0, @ActorId = @actor;
+EXEC [ref].[AssetType_Upsert] @AssetTypeCode = N'Reactor', @Name = N'Reactor', @Description = N'A shunt or series reactor', @AssetClassCode = N'Primary', @IsDevice = 0, @CarriesRating = 0, @ActorId = @actor;
+EXEC [ref].[AssetType_Upsert] @AssetTypeCode = N'System', @Name = N'Power system', @Description = N'The system itself — what a remedial action scheme or other system-protection scheme protects (the owner, 2026-09-16: a system protection has no single primary element)', @AssetClassCode = N'Primary', @IsDevice = 0, @CarriesRating = 0, @ActorId = @actor;
 GO
