@@ -22,6 +22,13 @@ USING (VALUES
     (N'ProtectionFunction', N'DevicePosition'),
     (N'TerminalBlock',      N'DevicePosition'),
     (N'Stud',               N'TerminalBlock'),
+    -- #174 (2026-09-17), the owner: "For the client that I am dealing with, the Bay concept doesn't exist. Transformers, PTs,
+    -- CTs etc. would each be labelled onsite and then the FLOC would match that tag, so the FLOC for T3 would be
+    -- TN-4134-Y230-T3 with no bay reference at all." So equipment (and a junction box) sits directly in the yard. The bay
+    -- pairs are kept here but deactivated below rather than deleted: a site that does use bays is one UPDATE away, and no
+    -- bay has ever been created in this estate (0 rows, checked 2026-09-17).
+    (N'EquipmentPosition',  N'Yard'),
+    (N'JunctionBox',        N'Yard'),
     (N'Bay',                N'Yard'),
     (N'EquipmentPosition',  N'Bay'),
     (N'JunctionBox',        N'Bay'),
@@ -34,4 +41,11 @@ ON t.[ChildNodeTypeCode] = s.[ChildNodeTypeCode] AND t.[ParentNodeTypeCode] = s.
 WHEN NOT MATCHED BY TARGET
     THEN INSERT ([ChildNodeTypeCode], [ParentNodeTypeCode], [IsRequired], [CreatedBy], [CreatedAt], [ModifiedBy], [ModifiedAt])
          VALUES (s.[ChildNodeTypeCode], s.[ParentNodeTypeCode], 0, @actor, @now, @actor, @now);
+GO
+GO
+-- #174: the bay level is not used by this client (see the note above). Deactivated, not removed.
+UPDATE [ref].[LocationNodeTypeParent]
+   SET [IsActive] = 0, [ModifiedBy] = '00000000-0000-0000-0000-000000000001', [ModifiedAt] = SYSDATETIMEOFFSET()
+ WHERE [IsActive] = 1
+   AND ([ChildNodeTypeCode] = N'Bay' OR [ParentNodeTypeCode] = N'Bay');
 GO

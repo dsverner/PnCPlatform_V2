@@ -114,6 +114,7 @@
     "location.AddAdjacency":               "Node.Modify",
     "location.AddNode":                    "Node.Modify",
     "location.MoveNode":                   "Node.Modify",
+    "location.RenameNode":                 "Node.Modify",
     "migration.CompleteRun":               null,
     "migration.Run_Append":                null,
     "network.AddLayerNodeEndpoint":        "Node.Modify",
