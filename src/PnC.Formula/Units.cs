@@ -20,6 +20,8 @@ public static class Units
         ["m"] = new("Length", null, null), ["ft"] = new("Length", "m", 0.3048m), ["in"] = new("Length", "m", 0.0254m),
         ["km"] = new("Length", "m", 1000m), ["mi"] = new("Length", "m", 1609.344m),
         ["°C"] = new("Temperature", null, null),
+        ["deg"] = new("Angle", null, null),
+
         ["ohm/mi"] = new("Other", null, null),
     };
 
@@ -81,8 +83,12 @@ public static class Units
         {
             if (Products.TryGetValue((d1, d2), out var p) && p is not null) return (true, p);
             if (Products.TryGetValue((d2, d1), out var q) && q is not null) return (true, q);
+            // #171: Ratio is dimensionless, so it scales rather than combines — Ratio * X = X, X * Ratio = X
+            if (d1 == "Ratio") return (true, d2);
+            if (d2 == "Ratio") return (true, d1);
             return (false, null);
         }
+        if (d2 == "Ratio" && d1 != "Ratio") return (true, d1);   // #171: X / Ratio = X (Ratio / Ratio stays dimensionless)
         return Quotients.TryGetValue((d1, d2), out var r) ? (true, r) : (false, null);
     }
 

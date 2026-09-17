@@ -16,13 +16,21 @@ import { type RecordParams, type Screen, screenPath } from '@/lib/screens'
 import { Panel, Pill, Button, Facts, Status, inputClass } from '@/components/ui/ui'
 
 /** The kinds and the values in the standards' own words (a later phase's derivation writes the same values with Basis Derived).
- * NPCC BPS applies to a bus only — the A-10 test is a bus test; every other element inherits it at its terminals. */
-export const CLASSIFICATION_KINDS: { code: string; label: string; values: string[]; help: string; busOnly?: boolean }[] = [
-  { code: 'BesStatus', label: 'BES status', values: ['BES', 'Not BES'], help: 'Bulk Electric System element (NERC definition)' },
-  { code: 'CipImpactRating', label: 'CIP impact rating', values: ['High', 'Medium', 'Low', 'None'], help: 'CIP-002: the impact rating of the BES asset this element belongs to; the cyber systems protecting it follow' },
-  { code: 'NpccBulkPowerSystem', label: 'NPCC bulk power system', values: ['BPS', 'Not BPS'], help: 'This bus declared BPS (or not) by the entity\'s A-10 study; the NPCC directories then apply to the protections at it', busOnly: true },
-  { code: 'Prc023', label: 'PRC-023', values: ['Listed', 'Not listed'], help: 'On the entity\'s PRC-023 list of impactful lines: the relay loadability calculation applies' },
+ * NPCC BPS applies to a bus only — the A-10 test is a bus test; every other element inherits it at its terminals.
+ * #171 (2026-09-16): each kind names the subject it is recorded against (ref.ClassificationKind.SubjectKinds seeds the same
+ * list). The CIP impact rating left the primary asset — it is the station's, and the device inherits it from where it sits. */
+export const CLASSIFICATION_KINDS: { code: string; label: string; values: string[]; help: string; busOnly?: boolean; subject: 'asset' | 'station' | 'device' }[] = [
+  { code: 'BesStatus', label: 'BES status', values: ['BES', 'Not BES'], help: 'Bulk Electric System element (NERC definition)', subject: 'asset' },
+  { code: 'CipImpactRating', label: 'CIP impact rating', values: ['High', 'Medium', 'Low', 'None'], help: 'CIP-002: the impact rating of the station — every BES Cyber Asset at it inherits it', subject: 'station' },
+  { code: 'NpccBulkPowerSystem', label: 'NPCC bulk power system', values: ['BPS', 'Not BPS'], help: 'This bus declared BPS (or not) by the entity\'s A-10 study; the NPCC directories then apply to the protections at it', busOnly: true, subject: 'asset' },
+  { code: 'Prc023', label: 'PRC-023', values: ['Listed', 'Not listed'], help: 'On the entity\'s PRC-023 list of impactful lines: the relay loadability calculation applies', subject: 'asset' },
+  { code: 'BesCyberAsset', label: 'BES Cyber Asset', values: ['BCA', 'Not BCA'], help: 'CIP-002: this device is a BES Cyber Asset (recorded per device in this phase; the CIP-002 procedure derives it later)', subject: 'device' },
+  { code: 'ExternalRoutableConnectivity', label: 'External routable connectivity', values: ['ERC', 'No ERC'], help: 'CIP-005: the device is reachable by a routable protocol from outside the electronic security perimeter', subject: 'device' },
 ]
+/** The kinds each screen records: the primary asset's, the station's, the device's (#171). */
+export const PRIMARY_ASSET_KINDS = ['BesStatus', 'NpccBulkPowerSystem', 'Prc023']
+export const STATION_KINDS = ['CipImpactRating']
+export const DEVICE_KINDS = ['BesCyberAsset', 'ExternalRoutableConnectivity']
 const ZONES = ['Primary', 'Backup', 'BreakerFailure']   // the owner, 2026-09-16: Primary, Backup, Breaker Failure
 const STATUSES = ['Planned', 'InService', 'OutOfService', 'Retired']
 
@@ -31,15 +39,22 @@ export function useClassifications(subjectKind: string, subjectEntityId: string)
 }
 const useTerminals = (assetId: string) => useViewAll('asset', 'vAssetTerminalDetail', { AssetEntityId: assetId }, 'TerminalNo', !!assetId)
 
-/** The classification panel: one row per kind that applies to this type; editable when the person may modify the subject. */
-export function ClassificationPanel({ subjectKind, subjectEntityId, editable, assetTypeCode }: { subjectKind: string; subjectEntityId: string; editable: boolean; assetTypeCode?: string }) {
+/** The classification panel: one row per kind that applies to this subject; editable when the person may modify it.
+ * `kinds` names the codes this screen records (#171: the primary asset's, the station's, the device's); without it every
+ * kind that is not bus-only is shown, as before. */
+export function ClassificationPanel({ subjectKind, subjectEntityId, editable, assetTypeCode, kinds: kindCodes, title, note }: { subjectKind: string; subjectEntityId: string; editable: boolean; assetTypeCode?: string; kinds?: string[]; title?: string; note?: string }) {
   const qc = useQueryClient()
   const q = useClassifications(subjectKind, subjectEntityId)
   const terminalsQ = useTerminals(assetTypeCode && assetTypeCode !== 'Bus' ? subjectEntityId : '')
+  // the station's CIP-002 rating for each terminal's station (#171: it is no longer the primary asset's; it is shown, not edited, here)
+  const stationCipQ = useViewAll('asset', 'vClassification', { SubjectKind: 'Node', ClassificationKindCode: 'CipImpactRating' }, undefined, !!assetTypeCode && assetTypeCode !== 'Bus')
   const rows = q.data ?? []
   const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null)
   const current = (code: string) => rows.find((r) => s(r.ClassificationKindCode) === code)
-  const kinds = CLASSIFICATION_KINDS.filter((k) => !k.busOnly || assetTypeCode === 'Bus' || !assetTypeCode)
+  const kinds = kindCodes
+    ? kindCodes.map((c) => CLASSIFICATION_KINDS.find((k) => k.code === c)).filter((k): k is (typeof CLASSIFICATION_KINDS)[number] => !!k).filter((k) => !k.busOnly || assetTypeCode === 'Bus')
+    : CLASSIFICATION_KINDS.filter((k) => k.subject === 'asset' && (!k.busOnly || assetTypeCode === 'Bus' || !assetTypeCode))
+  const stationCip = (nodeId: unknown) => s((stationCipQ.data ?? []).find((c) => s(c.SubjectEntityId).toLowerCase() === s(nodeId).toLowerCase())?.ClassificationValue)
   const recordOnBus = async (busId: string, busName: string, bps: boolean) => {
     try {
       await proc('asset', 'RecordClassification', { SubjectKind: 'Asset', SubjectEntityId: busId, ClassificationKindCode: 'NpccBulkPowerSystem', ClassificationValue: bps ? 'BPS' : 'Not BPS' })
@@ -54,7 +69,7 @@ export function ClassificationPanel({ subjectKind, subjectEntityId, editable, as
     } catch (e) { setMsg({ text: e instanceof ApiError ? e.message : String(e), bad: true }) }
   }
   return (
-    <Panel title="Applicability classifications">
+    <Panel title={title ?? 'Applicability classifications'}>
       {msg && <Status bad={msg.bad}>{msg.text}</Status>}
       <dl className="grid grid-cols-1 gap-x-6 gap-y-2 text-sm">
         {kinds.map((k) => { const c = current(k.code); const v = c ? s(c.ClassificationValue) : ''
@@ -85,8 +100,84 @@ export function ClassificationPanel({ subjectKind, subjectEntityId, editable, as
               <div className="text-xs text-slate-600">Ticked: the bus at that end is declared BPS by the A-10 study; unticked after a tick: Not BPS. The declaration is the bus's and shows on every element connected to it.</div>
             </dd>
           </div>)}
+        {assetTypeCode && assetTypeCode !== 'Bus' && (
+          /* #171: the CIP-002 impact rating is the station's, not this asset's — shown per terminal, edited on the station page */
+          <div className="grid grid-cols-[13rem_1fr] items-start gap-2">
+            <dt className="text-slate-400" title="CIP-002: the impact rating is the station's; this asset's terminals sit at these stations">CIP impact rating (station)</dt>
+            <dd className="min-w-0 text-slate-200">
+              {(terminalsQ.data ?? []).length ? (terminalsQ.data ?? []).map((t) => (
+                <div key={s(t.TerminalEntityId)} className="flex flex-wrap items-center gap-2">
+                  <span>Terminal {s(t.TerminalNo)} · <StationLink id={s(t.StationNodeEntityId)} name={s(t.StationName)} /></span>
+                  <span className="text-xs text-slate-500">{stationCipQ.isPending ? '…' : stationCip(t.StationNodeEntityId) || 'not recorded on the station'}</span>
+                </div>)) : <span className="text-slate-500">no terminals yet</span>}
+              <div className="text-xs text-slate-600">Recorded on the station (the owner, 2026-09-16): every BES Cyber Asset at it inherits it. Open the station to record it.</div>
+            </dd>
+          </div>)}
       </dl>
-      <Status>{editable ? 'Recorded by you from the entity\'s own CIP-002 evaluation, A-10 study (the BPS declaration, on busses) and PRC-023 list (this phase); the platform derives them in a later phase and keeps both. A value saves at once, audited.' : 'Recorded values; the platform derives them in a later phase.'}</Status>
+      <Status>{note ?? (editable ? 'Recorded by you from the entity\'s own CIP-002 evaluation, A-10 study (the BPS declaration, on busses) and PRC-023 list (this phase); the platform derives them in a later phase and keeps both. A value saves at once, audited.' : 'Recorded values; the platform derives them in a later phase.')}</Status>
+    </Panel>
+  )
+}
+
+/** A station's name as a link to its page (#171). */
+export function StationLink({ id, name }: { id: string; name: string }) {
+  const navigate = useNavigate()
+  if (!id) return <span>{name || '—'}</span>
+  return <a className="text-sky-300 underline" href={screenPath('STATION', id)} onClick={(e) => { e.preventDefault(); navigate(screenPath('STATION', id)) }}>{name || id.slice(0, 8)}</a>
+}
+
+/** The line ratings the PRC-023 criteria are judged against (#171). Hand-entered until the ratings connector exists: the
+ * owner, 2026-09-16 — "make room for the given values in our application", the DMZ connector comes later and writes its own
+ * SourceSystem. asset.AssetRating_Add / _Revise / _SoftDelete; a change saves at once, audited. */
+const RATING_KINDS: [string, string][] = [
+  ['Continuous', 'continuous'], ['FourHour', '4-hour'], ['FifteenMinute', '15-minute'], ['PracticalLimitation', 'practical limitation, R3'],
+]
+const SEASONS = ['Summer', 'Winter', 'Spring', 'Fall', 'All']
+function Ratings({ r, editable }: { r: Row; editable: boolean }) {
+  const qc = useQueryClient()
+  const q = useViewAll('asset', 'vAssetRatingDetail', { AssetEntityId: s(r.EntityId) }, 'RatingKind', !!r.EntityId)
+  const rows = q.data ?? []
+  const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null); const [busy, setBusy] = useState(false)
+  const [add, setAdd] = useState({ RatingKind: '', Season: 'Summer', Amperes: '' })
+  const run = async (what: () => Promise<unknown>, text: string) => {
+    setBusy(true)
+    try { await what(); setMsg({ text }); qc.invalidateQueries({ queryKey: ['view', 'asset', 'vAssetRatingDetail'] }) }
+    catch (e) { setMsg({ text: e instanceof ApiError ? e.message : String(e), bad: true }) } finally { setBusy(false) }
+  }
+  const label = (k: unknown) => RATING_KINDS.find(([c]) => c === s(k))?.[1] ?? s(k)
+  // the revise proc takes every column (as AssetTerminal_Revise does); the patch names what changed
+  const revise = (x: Row, patch: Row, text: string) => run(() => proc('asset', 'AssetRating_Revise', {
+    EntityId: x.RatingEntityId, AssetEntityId: r.EntityId, RatingKind: x.RatingKind, Season: x.Season,
+    Amperes: x.Amperes, Source: x.Source ?? null, Notes: x.Notes ?? null, ...patch }), text)
+  return (
+    <Panel title={`Ratings · ${q.isPending ? '…' : rows.length}`}>
+      {msg && <Status bad={msg.bad}>{msg.text}</Status>}
+      <div className="space-y-1 text-sm">
+        {rows.map((x) => (
+          <div key={s(x.RatingEntityId)} className="flex flex-wrap items-center gap-2">
+            {editable ? <>
+              <select className={`${inputClass} w-48`} value={s(x.RatingKind)} disabled={busy} onChange={(e) => void revise(x, { RatingKind: e.target.value }, `${label(e.target.value)} rating saved.`)}>{RATING_KINDS.map(([c, l]) => <option key={c} value={c}>{l}</option>)}</select>
+              <select className={`${inputClass} w-28`} value={s(x.Season)} disabled={busy} onChange={(e) => void revise(x, { Season: e.target.value }, `${label(x.RatingKind)} ${e.target.value} saved.`)}>{SEASONS.map((v) => <option key={v}>{v}</option>)}</select>
+              <input className={`${inputClass} w-28`} type="number" defaultValue={s(x.Amperes)} disabled={busy} title="amperes" onBlur={(e) => { if (e.target.value !== s(x.Amperes) && e.target.value !== '') void revise(x, { Amperes: Number(e.target.value) }, `${label(x.RatingKind)} ${s(x.Season)}: ${e.target.value} A saved.`) }} />
+              <span className="text-xs text-slate-500">A</span>
+              <input className={`${inputClass} w-64`} defaultValue={s(x.Source)} disabled={busy} placeholder="the document or system the value came from" onBlur={(e) => { if (e.target.value !== s(x.Source)) void revise(x, { Source: e.target.value || null }, `${label(x.RatingKind)} ${s(x.Season)}: source saved.`) }} />
+              <span className="text-xs text-slate-500">{s(x.SourceSystem)}</span>
+              <Button kind="mini" disabled={busy} onClick={() => void run(() => proc('asset', 'AssetRating_SoftDelete', { EntityId: x.RatingEntityId }), `${label(x.RatingKind)} ${s(x.Season)} removed.`)}>remove</Button>
+            </> : <span>{label(x.RatingKind)} · {s(x.Season)} · {s(x.Amperes)} A{x.Source ? ` · ${s(x.Source)}` : ''} <span className="text-xs text-slate-500">{s(x.SourceSystem)}</span></span>}
+          </div>))}
+        {!rows.length && !q.isPending && <div className="text-xs text-slate-500">No rating recorded. PRC-023 criteria 1, 2 and 13 are judged against the 4-hour, 15-minute and practical-limitation ratings; without them those criteria are skipped.</div>}
+        {editable && (
+          <div className="flex flex-wrap items-center gap-2">
+            <select className={`${inputClass} w-48`} value={add.RatingKind} disabled={busy} onChange={(e) => setAdd({ ...add, RatingKind: e.target.value })}><option value="">— a rating kind —</option>{RATING_KINDS.map(([c, l]) => <option key={c} value={c}>{l}</option>)}</select>
+            <select className={`${inputClass} w-28`} value={add.Season} disabled={busy} onChange={(e) => setAdd({ ...add, Season: e.target.value })}>{SEASONS.map((v) => <option key={v}>{v}</option>)}</select>
+            <input className={`${inputClass} w-28`} type="number" value={add.Amperes} disabled={busy} placeholder="amperes" onChange={(e) => setAdd({ ...add, Amperes: e.target.value })} />
+            <Button kind="mini" disabled={busy || !add.RatingKind || !add.Amperes} onClick={() => void run(async () => {
+              await proc('asset', 'AssetRating_Add', { AssetEntityId: r.EntityId, RatingKind: add.RatingKind, Season: add.Season, Amperes: Number(add.Amperes) })
+              setAdd({ RatingKind: '', Season: 'Summer', Amperes: '' })
+            }, `${label(add.RatingKind)} ${add.Season}: ${add.Amperes} A added.`)}>+ rating</Button>
+          </div>)}
+      </div>
+      <Status>Entered by hand until the ratings connector exists (the values will then come from the ratings database).</Status>
     </Panel>
   )
 }
@@ -141,7 +232,7 @@ function Terminals({ r, readOnly = false }: { r: Row; readOnly?: boolean }) {
   const voltageOptions = (voltagesQ.data ?? []).map((v) => <option key={s(v.VoltageClassCode)} value={s(v.VoltageClassCode)}>{v.NominalKv != null ? `${Number(v.NominalKv)} kV` : s(v.VoltageClassCode)}</option>)
   const bussesAt = (stationId: unknown) => (bussesQ.data ?? []).filter((b) => s(b.TerminalNodeIds).toLowerCase().includes(s(stationId).toLowerCase()) && s(b.EntityId) !== s(r.EntityId))
   const revise = (x: Row, patch: Row, text: string) => run(() => proc('asset', 'AssetTerminal_Revise', { EntityId: x.TerminalEntityId, AssetEntityId: r.EntityId, TerminalNo: x.TerminalNo, StationNodeEntityId: x.StationNodeEntityId, VoltageClassCode: x.VoltageClassCode ?? null, BusAssetEntityId: x.BusAssetEntityId ?? null, ...patch }), text)
-  if (readOnly) return <span>{rows.length ? rows.map((x, i) => <span key={s(x.TerminalEntityId)}>{i > 0 ? ' – ' : ''}{s(x.StationName)}{x.VoltageClassCode ? <span className="ml-1 text-xs text-slate-400">{s(x.VoltageClassCode)}</span> : null}</span>) : '—'}</span>
+  if (readOnly) return <span>{rows.length ? rows.map((x, i) => <span key={s(x.TerminalEntityId)}>{i > 0 ? ' – ' : ''}<StationLink id={s(x.StationNodeEntityId)} name={s(x.StationName)} />{x.VoltageClassCode ? <span className="ml-1 text-xs text-slate-400">{s(x.VoltageClassCode)}</span> : null}</span>) : '—'}</span>
   return (
     <div className="space-y-1">
       {rows.map((x) => (
@@ -154,6 +245,7 @@ function Terminals({ r, readOnly = false }: { r: Row; readOnly?: boolean }) {
           {r.AssetTypeCode !== 'Bus' && <select className={`${inputClass} w-56`} value={s(x.BusAssetEntityId).toLowerCase()} disabled={busy} title="the bus this terminal connects to (the NPCC A-10 declaration is the bus's)" onChange={(e) => void revise(x, { BusAssetEntityId: e.target.value || null }, `terminal ${s(x.TerminalNo)}: bus ${bussesAt(x.StationNodeEntityId).find((b) => s(b.EntityId).toLowerCase() === e.target.value)?.Name ?? 'none'}.`)}>
             <option value="">— bus at {s(x.StationName)} —</option>{bussesAt(x.StationNodeEntityId).map((b) => <option key={s(b.EntityId)} value={s(b.EntityId).toLowerCase()}>{s(b.Name)}{b.Classifications ? ` (${s(b.Classifications).replace('NpccBulkPowerSystem=', 'NPCC ')})` : ''}</option>)}
           </select>}
+          <StationLink id={s(x.StationNodeEntityId)} name="the station" />
           <Button kind="mini" disabled={busy} onClick={() => void run(() => proc('asset', 'AssetTerminal_SoftDelete', { EntityId: x.TerminalEntityId }), `terminal ${s(x.TerminalNo)} removed.`)}>remove</Button>
         </div>))}
       <div className="flex flex-wrap items-center gap-2">
@@ -254,7 +346,8 @@ export default function PrimaryAssetScreen({ params: p, id }: { screen: Screen; 
           <Status>A thin record for this phase: a name, a type and its terminals — one station for a capacitor or reactor, two for a transformer, two or more for a line — each with its voltage and the bus it connects to. Connectivity, impedances and, for a line, its route and structures come from the power-system model (the TLM project) in a later phase.</Status></Panel>
         <ProtectedBy r={r} editable={can('Scheme.Modify')} />
       </div>
-      <ClassificationPanel subjectKind="Asset" subjectEntityId={s(r.EntityId)} editable={editable} assetTypeCode={s(r.AssetTypeCode)} />
+      <ClassificationPanel subjectKind="Asset" subjectEntityId={s(r.EntityId)} editable={editable} assetTypeCode={s(r.AssetTypeCode)} kinds={PRIMARY_ASSET_KINDS} />
+      <Ratings r={r} editable={editable} />
     </div>
   )
 }

@@ -101,6 +101,20 @@ BEGIN
     EXEC [config].[ApproveDefinitionVersion] @VersionRowId = @v, @ActorId = @approver;
 END
 GO
+-- station.screen.json
+DECLARE @author UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000001', @approver UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000002';
+DECLARE @e UNIQUEIDENTIFIER, @v UNIQUEIDENTIFIER, @no INT, @payload NVARCHAR(MAX) = N'{"g":1,"kind":"screen","key":"STATION","name":"Station","description":"One station: its CIP-002 impact rating — recorded here because it is the station''s, and every BES Cyber Asset at it inherits it (the owner, 2026-09-16) — with the primary assets that have a terminal here and the schemes here (#171). Plain code; the definition names its data.","permission":"Asset.Read","screenKind":"record","params":{"view":"location.vNode","key":"EntityId"}}';
+DECLARE @note NVARCHAR(200) = N'seed bb90101460d970c8';
+SELECT @e = EntityId FROM [config].[Definition] WHERE [DefinitionKind] = N'Program.Screen' AND [DefinitionKey] = N'STATION' AND [IsDeleted] = 0;
+IF @e IS NULL
+    EXEC [config].[AddDefinition] @DefinitionKind = N'Program.Screen', @DefinitionKey = N'STATION', @Name = N'Station', @Description = N'One station: its CIP-002 impact rating — recorded here because it is the station''s, and every BES Cyber Asset at it inherits it (the owner, 2026-09-16) — with the primary assets that have a terminal here and the schemes here (#171). Plain code; the definition names its data.', @ActorId = @author, @EntityId = @e OUTPUT;
+IF NOT EXISTS (SELECT 1 FROM [config].[vDefinitionVersion] WHERE [DefinitionEntityId] = @e AND [ChangeNote] NOT LIKE N'seed %')      -- untouched by an Administrator
+   AND NOT EXISTS (SELECT 1 FROM [config].[vDefinitionVersion] WHERE [DefinitionEntityId] = @e AND [Status] = N'Effective' AND [ChangeNote] = @note)
+BEGIN
+    EXEC [config].[AddDefinitionVersion] @DefinitionKey = N'STATION', @DefinitionKind = N'Program.Screen', @ChangeNote = @note, @PayloadText = @payload, @ActorId = @author, @VersionRowId = @v OUTPUT, @VersionNumber = @no OUTPUT;
+    EXEC [config].[ApproveDefinitionVersion] @VersionRowId = @v, @ActorId = @approver;
+END
+GO
 -- step.screen.json
 DECLARE @author UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000001', @approver UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000002';
 DECLARE @e UNIQUEIDENTIFIER, @v UNIQUEIDENTIFIER, @no INT, @payload NVARCHAR(MAX) = N'{"g":1,"kind":"screen","key":"STEP","name":"Step","description":"One step of any procedure, drawn from its definition: instruction, capture fields, evidence, outcomes, sign-off; claim, draft, witness, commit, check in (#165). The pickers for reference fields name the view to choose from.","permission":"WorkRequest.Read","screenKind":"step","params":{"refViews":{"Asset":{"view":"asset.vAsset","label":"Name"},"Device":{"view":"asset.vAsset","label":"Name"},"Scheme":{"view":"scheme.vScheme","label":"Name"},"Node":{"view":"location.vNode","label":"Name"}}}}';

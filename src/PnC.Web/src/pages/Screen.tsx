@@ -9,6 +9,7 @@ import StepScreen from '@/screens/StepScreen'
 import RecordScreen from '@/screens/RecordScreen'
 import SchemeScreen from '@/screens/SchemeScreen'
 import PrimaryAssetScreen from '@/screens/PrimaryAssetScreen'
+import StationScreen from '@/screens/StationScreen'
 
 export default function ScreenPage() {
   const { key = '', id } = useParams()
@@ -31,6 +32,7 @@ function ScreenBody({ screen, id }: { screen: Screen; id?: string }) {
       const rp = screen.params as RecordParams
       if (rp.view === 'scheme.vScheme') return <SchemeScreen screen={screen} params={rp} id={id} />
       if (rp.view === 'asset.vPrimaryAsset') return <PrimaryAssetScreen screen={screen} params={rp} id={id} />
+      if (rp.view === 'location.vNode') return <StationScreen screen={screen} params={rp} id={id} />   // #171: the station page
       return <RecordScreen screen={screen} params={rp} id={id} />
     }
     default: return <Status bad>The screen kind “{screen.screenKind}” is not built yet (screen {screen.key}{id ? ', id ' + id : ''}).</Status>

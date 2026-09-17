@@ -98,5 +98,10 @@
  "platform.backup.last.Full": {
   "type": "date",
   "subject": "Platform"
+ },
+ "device.settings.Z3%": {
+  "type": "num",
+  "unit": "Ω",
+  "subject": "Device"
  }
 }

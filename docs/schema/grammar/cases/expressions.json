@@ -3029,5 +3029,382 @@
   "text": "any(scheme.members[role='Relay'], m m.x)",
   "subject": "dev1",
   "error": "syntax"
+ },
+ {
+  "id": "name-percent",
+  "text": "device.settings.Z3%",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "fact": "device.settings.Z3%"
+  },
+  "type": "num[Ω]",
+  "value": {
+   "num": "13.9",
+   "u": "Ω"
+  }
+ },
+ {
+  "id": "name-percent-compare",
+  "text": "device.settings.Z3% > 10 Ω",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "op": ">",
+   "l": {
+    "fact": "device.settings.Z3%"
+   },
+   "r": {
+    "lit": "10",
+    "t": "num",
+    "u": "Ω"
+   }
+  },
+  "type": "bool",
+  "value": {
+   "bool": true
+  }
+ },
+ {
+  "id": "ratio-to-product",
+  "text": "to(150 %, 'ratio') * 10 Ω",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "op": "*",
+   "l": {
+    "a": [
+     {
+      "lit": "150",
+      "t": "num",
+      "u": "%"
+     },
+     {
+      "lit": "ratio",
+      "t": "text"
+     }
+    ],
+    "fn": "to"
+   },
+   "r": {
+    "lit": "10",
+    "t": "num",
+    "u": "Ω"
+   }
+  },
+  "type": "num[Ω]",
+  "value": {
+   "num": "15",
+   "u": "Ω"
+  }
+ },
+ {
+  "id": "ratio-product",
+  "text": "150 % * 10 Ω",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "op": "*",
+   "l": {
+    "lit": "150",
+    "t": "num",
+    "u": "%"
+   },
+   "r": {
+    "lit": "10",
+    "t": "num",
+    "u": "Ω"
+   }
+  },
+  "type": "num[Ω]",
+  "value": {
+   "num": "15",
+   "u": "Ω"
+  }
+ },
+ {
+  "id": "ratio-product-right",
+  "text": "10 Ω * 150 %",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "op": "*",
+   "l": {
+    "lit": "10",
+    "t": "num",
+    "u": "Ω"
+   },
+   "r": {
+    "lit": "150",
+    "t": "num",
+    "u": "%"
+   }
+  },
+  "type": "num[Ω]",
+  "value": {
+   "num": "15",
+   "u": "Ω"
+  }
+ },
+ {
+  "id": "ratio-quotient",
+  "text": "10 Ω / 50 %",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "op": "/",
+   "l": {
+    "lit": "10",
+    "t": "num",
+    "u": "Ω"
+   },
+   "r": {
+    "lit": "50",
+    "t": "num",
+    "u": "%"
+   }
+  },
+  "type": "num[Ω]",
+  "value": {
+   "num": "20",
+   "u": "Ω"
+  }
+ },
+ {
+  "id": "ratio-over-ratio",
+  "text": "150 % / 50 %",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "op": "/",
+   "l": {
+    "lit": "150",
+    "t": "num",
+    "u": "%"
+   },
+   "r": {
+    "lit": "50",
+    "t": "num",
+    "u": "%"
+   }
+  },
+  "type": "num",
+  "value": {
+   "num": "3"
+  }
+ },
+ {
+  "id": "ratio-scales-to-base",
+  "text": "13.8 kV * 150 %",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "op": "*",
+   "l": {
+    "lit": "13.8",
+    "t": "num",
+    "u": "kV"
+   },
+   "r": {
+    "lit": "150",
+    "t": "num",
+    "u": "%"
+   }
+  },
+  "type": "num[V]",
+  "value": {
+   "num": "20700",
+   "u": "V"
+  }
+ },
+ {
+  "id": "fn-hypot",
+  "text": "hypot(13.90 Ω, 79.96 Ω)",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "a": [
+    {
+     "lit": "13.9",
+     "t": "num",
+     "u": "Ω"
+    },
+    {
+     "lit": "79.96",
+     "t": "num",
+     "u": "Ω"
+    }
+   ],
+   "fn": "hypot"
+  },
+  "type": "num[Ω]",
+  "value": {
+   "num": "81.1591744659838",
+   "u": "Ω"
+  }
+ },
+ {
+  "id": "fn-hypot-converts",
+  "text": "hypot(3000 V, 4 kV)",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "a": [
+    {
+     "lit": "3000",
+     "t": "num",
+     "u": "V"
+    },
+    {
+     "lit": "4",
+     "t": "num",
+     "u": "kV"
+    }
+   ],
+   "fn": "hypot"
+  },
+  "type": "num[V]",
+  "value": {
+   "num": "5000",
+   "u": "V"
+  }
+ },
+ {
+  "id": "fn-hypot-unknown",
+  "text": "hypot(unknown, 1 Ω)",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "a": [
+    {
+     "lit": null
+    },
+    {
+     "lit": "1",
+     "t": "num",
+     "u": "Ω"
+    }
+   ],
+   "fn": "hypot"
+  },
+  "type": "num[Ω]",
+  "value": {
+   "unknown": true
+  }
+ },
+ {
+  "id": "fn-atan2",
+  "text": "atan2(79.96 Ω, 13.90 Ω)",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "a": [
+    {
+     "lit": "79.96",
+     "t": "num",
+     "u": "Ω"
+    },
+    {
+     "lit": "13.9",
+     "t": "num",
+     "u": "Ω"
+    }
+   ],
+   "fn": "atan2"
+  },
+  "type": "num[deg]",
+  "value": {
+   "num": "80.1384267054036",
+   "u": "deg"
+  }
+ },
+ {
+  "id": "fn-cos",
+  "text": "cos(60 deg)",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "a": [
+    {
+     "lit": "60",
+     "t": "num",
+     "u": "deg"
+    }
+   ],
+   "fn": "cos"
+  },
+  "type": "num",
+  "value": {
+   "num": "0.5"
+  }
+ },
+ {
+  "id": "fn-cos-dimensionless",
+  "text": "cos(60)",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "a": [
+    {
+     "lit": "60",
+     "t": "num"
+    }
+   ],
+   "fn": "cos"
+  },
+  "type": "num",
+  "value": {
+   "num": "0.5"
+  }
+ },
+ {
+  "id": "fn-sin",
+  "text": "sin(30 deg)",
+  "subject": "dev1",
+  "ast": {
+   "g": 1,
+   "a": [
+    {
+     "lit": "30",
+     "t": "num",
+     "u": "deg"
+    }
+   ],
+   "fn": "sin"
+  },
+  "type": "num",
+  "value": {
+   "num": "0.5"
+  }
+ },
+ {
+  "id": "fn-cos-dimension",
+  "text": "cos(1 Ω)",
+  "subject": "dev1",
+  "error": "dimension_mismatch"
+ },
+ {
+  "id": "fn-hypot-dimension",
+  "text": "hypot(1 Ω, 1 A)",
+  "subject": "dev1",
+  "error": "dimension_mismatch"
+ },
+ {
+  "id": "fn-hypot-arity",
+  "text": "hypot(1 Ω)",
+  "subject": "dev1",
+  "error": "arity"
+ },
+ {
+  "id": "fn-atan2-dimension",
+  "text": "atan2(1 Ω, 1 A)",
+  "subject": "dev1",
+  "error": "dimension_mismatch"
+ },
+ {
+  "id": "fn-not-a-function",
+  "text": "tan(1 deg)",
+  "subject": "dev1",
+  "error": "unknown_function"
  }
 ]

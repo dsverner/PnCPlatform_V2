@@ -21,7 +21,9 @@ public static class Lexer
         @"|(?<text>'(?:[^']|'')*')" +
         @"|(?<atvar>@[A-Za-z_][A-Za-z0-9_]*)" +
         @"|(?<dollar>\$[A-Za-z_][A-Za-z0-9_]*|\$)" +
-        @"|(?<name>[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+)*)" +
+        // a name may end in '%' directly attached (#171: SEL-221F zone-reach setting codes Z1%, Z2%, Z3%);
+        // the '%' stays inside the final segment, so device.settings.Z3% is one fact name
+        @"|(?<name>[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+)*%?)" +
         @"|(?<unit>[Ω°%][A-Za-z]*)" +
         @"|(?<op>->|<=|>=|<>|[-+*/^=<>(),{}\[\]:.]))", RegexOptions.Compiled | RegexOptions.CultureInvariant);
 

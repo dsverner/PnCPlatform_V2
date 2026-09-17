@@ -13,7 +13,7 @@ Values at evaluation: bool | UNKNOWN | Quantity | str | datetime | Duration | Re
 Deterministic, side-effect free: the only instant is the `at` argument. Stdlib only.
 """
 from __future__ import annotations
-import json, re, calendar
+import json, re, calendar, math
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
 from datetime import datetime, timedelta, timezone
@@ -43,6 +43,7 @@ UNITS = {
     "m": ("Length", None, None), "ft": ("Length", "m", Decimal("0.3048")), "in": ("Length", "m", Decimal("0.0254")),
     "km": ("Length", "m", Decimal(1000)), "mi": ("Length", "m", Decimal("1609.344")),      # km, mi, min seeded 2026-09-05 for the grammar
     "°C": ("Temperature", None, None),
+    "deg": ("Angle", None, None),                    # #168: relay angle settings (SEL-221F MTA)
     "ohm/mi": ("Other", None, None),
 }
 DURATION_UNITS = ("y", "mo", "w", "d", "h")           # calendar/day durations; Time-dimension numbers also serve as durations
@@ -140,7 +141,7 @@ _TOKEN = re.compile(r"""
   | (?P<text>'(?:[^']|'')*')
   | (?P<atvar>@[A-Za-z_][A-Za-z0-9_]*)
   | (?P<dollar>\$[A-Za-z_][A-Za-z0-9_]*|\$)
-  | (?P<name>[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+)*)
+  | (?P<name>[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+)*%?)   # '%' may end a name: setting codes Z1% Z2% Z3% (#171)
   | (?P<unit>[Ω°%][A-Za-z]*)
   | (?P<op>->|<=|>=|<>|[-+*/^=<>(),{}\[\]:.])
 """, re.X)
@@ -793,6 +794,19 @@ class Checker:
             return ts[0] if ts[0].kind != "unknown" else next((t for t in ts if t.kind != "unknown"), T_UNKNOWN)
         if fn in ("abs", "floor", "ceil"):
             arity(1); self.expect(ts[0], "num", fn); return ts[0]
+        if fn == "hypot":                                 # #171: PRC-023 reach geometry - sqrt(a^2 + b^2) over one dimension, result in a's unit
+            arity(2); self.expect(ts[0], "num", fn); self.expect(ts[1], "num", fn)
+            self.same(ts[0], ts[1], fn, allow_unknown=True)
+            return ts[0] if ts[0].kind != "unknown" else ts[1]
+        if fn in ("cos", "sin"):                          # #171: an Angle (deg), or a dimensionless number taken as degrees
+            arity(1); self.expect(ts[0], "num", fn)
+            if ts[0].kind == "num" and ts[0].dim is not None and ts[0].dim != "Angle":
+                raise FormulaError("dimension_mismatch", f"{fn}() needs an angle or a dimensionless number, got {ts[0]}")
+            return num_type()
+        if fn == "atan2":                                 # #171: atan2(y, x) over one dimension, result an Angle in degrees
+            arity(2); self.expect(ts[0], "num", fn); self.expect(ts[1], "num", fn)
+            self.same(ts[0], ts[1], fn, allow_unknown=True)
+            return num_type("deg")
         if fn == "round":
             arity(2); self.expect(ts[0], "num", fn); self.dimless(ts[1], fn); return ts[0]
         if fn == "if":
@@ -938,13 +952,22 @@ class Checker:
             return Type("num", None, None, base)          # x / x -> dimensionless (Ratio)
         if op == "*":
             d = PRODUCTS.get((l.dim, r.dim)) or PRODUCTS.get((r.dim, l.dim))
+            if d is None:                                 # #171: Ratio is dimensionless, so it scales: Ratio * X = X, X * Ratio = X
+                d = r.dim if l.dim == "Ratio" else l.dim if r.dim == "Ratio" else None
         else:
             d = QUOTIENTS.get((l.dim, r.dim))
+            if d is None and r.dim == "Ratio" and l.dim != "Ratio":
+                d = l.dim                                 # #171: X / Ratio = X (Ratio / Ratio is the x / x rule above)
             if d is None and l.dim == "Impedance" and r.dim == "Length":
                 return Type("num", "Other", f"{l.unit}/{r.unit}", base)
         if d is None:
             raise FormulaError("dimension_mismatch", f"'{op}' over {l.dim} and {r.dim} has no named dimension")
         return Type("num", d, _base_unit_of(d), base)
+
+
+def _from_double(x):
+    """A float result as a Decimal of fifteen significant digits - what C#'s (decimal) cast keeps (#171)."""
+    return Decimal(f"{x:.15g}")
 
 
 def _base_unit_of(dim):
@@ -1242,6 +1265,30 @@ class Evaluator:
         if fn == "round":
             q = Decimal(1).scaleb(-int(a[1].value))
             return Quantity(a[0].value.quantize(q, rounding="ROUND_HALF_UP"), a[0].unit, a[0].base)      # half away from zero: T-SQL ROUND, C# MidpointRounding.AwayFromZero
+        # #171: the three geometry functions. Computed in IEEE-754 double and kept to fifteen significant
+        # digits - the precision C#'s (decimal) cast keeps - so cos(60 deg) is exactly 0.5.
+        if fn == "hypot":
+            p, q = a
+            bv = q.value if (p.unit == q.unit or p.unit is None or q.unit is None) else convert(q.value, q.unit, p.unit)
+            if bv is None:
+                return self.unk("hypot: unit conversion")
+            d0, d1 = float(p.value), float(bv)
+            return Quantity(_from_double(math.sqrt(d0 * d0 + d1 * d1)), p.unit or q.unit, p.base or q.base)
+        if fn in ("cos", "sin"):
+            q = a[0]
+            deg = q.value if q.unit is None else convert(q.value, q.unit, "deg")
+            if deg is None:
+                return self.unk(f"{fn}: angle conversion")
+            rad = float(deg) * math.pi / 180.0
+            return Quantity(_from_double(math.cos(rad) if fn == "cos" else math.sin(rad)))
+        if fn == "atan2":
+            y, x = a
+            xv = x.value if (y.unit == x.unit or y.unit is None or x.unit is None) else convert(x.value, x.unit, y.unit)
+            if xv is None:
+                return self.unk("atan2: unit conversion")
+            if y.value == 0 and xv == 0:
+                return self.unk("atan2: both arguments zero")
+            return Quantity(_from_double(math.atan2(float(y.value), float(xv)) * 180.0 / math.pi), "deg")
         if fn == "to":
             v = convert(a[0].value, a[0].unit, a[1])
             return self.unk("to: conversion") if v is None else Quantity(v, a[1], a[0].base)
@@ -1365,8 +1412,12 @@ def _unit_product(u1, u2, op):
         return None
     if op == "*":
         d = PRODUCTS.get((d1, d2)) or PRODUCTS.get((d2, d1))
+        if d is None:                                     # #171: Ratio * X = X, X * Ratio = X
+            d = d2 if d1 == "Ratio" else d1 if d2 == "Ratio" else None
     else:
         d = QUOTIENTS.get((d1, d2))
+        if d is None and d2 == "Ratio" and d1 != "Ratio":
+            d = d1                                        # #171: X / Ratio = X
         if d is None and d1 == "Impedance" and d2 == "Length":
             return f"{u1}/{u2}"
     return _base_unit_of(d) if d else None

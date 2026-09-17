@@ -13,6 +13,7 @@ BEGIN
     FROM [compliance].[fPayloadFactNames](@PayloadText) f
     LEFT JOIN [compliance].[vFactCatalogue] c ON c.[FactName] = f.[FactName]
     WHERE c.[FactName] IS NULL
+      AND f.[FactName] <> ISNULL(JSON_VALUE(@PayloadText, '$.publishes.fact'), N'')   -- #171: a formula's own published name (FORMULA-GRAMMAR §7 "publishes") is not a reference
       -- PROCEDURE-ENGINE §7 (W3): procedure.<name> and input.<name> are declared by the procedure document itself;
       -- process.ValidateProcedureDocument checks them against its produces and inputs
       AND NOT (@DefinitionKind = N'Program.Procedure' AND (f.[FactName] LIKE N'procedure.%' OR f.[FactName] LIKE N'input.%'));

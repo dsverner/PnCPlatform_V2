@@ -55,7 +55,7 @@ precedence rules make redundant do not change the canonical form.
 | text | `'single quoted'`, doubled quote to escape `''` | |
 | boolean | `true`, `false` | |
 | datetime | `2026-09-05`, `2026-09-05T14:30`, `2026-09-05T14:30:00-03:00` | ISO 8601; a date without offset is the platform's configured offset at authoring, stored with the offset |
-| name | `device.settings.50P1P`, `scheme.members`, `station.classification.BesStatus` | dotted; a segment may start with a digit after the first dot (setting codes like `50P1P`); case-sensitive |
+| name | `device.settings.50P1P`, `scheme.members`, `station.classification.BesStatus`, `device.settings.Z3%` | dotted; a segment may start with a digit after the first dot (setting codes like `50P1P`); may end in `%` directly attached, which belongs to the name (setting codes like `Z1%`, `Z2%`, `Z3%`); case-sensitive |
 | parameters | `name[key='text', key2=12]` | after a fact name; keys are bare names, values literals |
 | variable | `x`, `value`, `$` | bound by `any`/`all`/`select` or by the host (§7) |
 | keywords | `and or not in like matches is unknown at every from within of once calendar_year calendar_quarter calendar_month` | case-insensitive |
@@ -112,6 +112,10 @@ asof        := 'at' '(' expr ')'                   -- a DateTime expression; def
   single-valued Reference fact (`record.last[…].record.occurred_at`) yields a single value.
 - `device.settings.50P1P at (@at - 1 y)` — the fact as it stood one year before the run's instant.
   `@at` is the only clock; `now()` does not exist.
+- `device.settings.Z3%` — a name may **end in `%`** when the `%` is attached with no space, because
+  catalogue fact names do (the SEL-221F zone reaches are `Z1%`, `Z2%`, `Z3%`). The `%` stays inside
+  the last segment of the name. After a *number* `%` is still the unit (`150 %` is a Ratio), and a
+  `%` with a space before it is still the unit; only a name it touches absorbs it.
 
 ### 4.3 Comparison
 
@@ -146,10 +150,20 @@ Current * Impedance = Voltage          Power / Voltage = Current
 ApparentPower / Voltage = Current      Energy / Time = Power
 Impedance / Length = Other (per-length impedance; unit as written, e.g. ohm/mi)
 Length * Frequency = Other             X / X = Ratio (dimensionless)
+Ratio * X = X                          X * Ratio = X          X / Ratio = X
 ```
 
 `Ratio` is dimensionless; `pu` and `%` convert through `ratio`. `Other` never combines. Two
 `Other` units are the same dimension only if the same unit code.
+
+Because `Ratio` is dimensionless it **scales** rather than combines: `Ratio * X`, `X * Ratio` and
+`X / Ratio` all keep `X`'s dimension, and the result is in that dimension's base unit like every
+other product. `Ratio / Ratio` stays dimensionless (it is the `X / X` rule), and `Ratio / X` has no
+named dimension. The value rule is the one the evaluator already applies to every product: **both
+operands go to their base unit first**, so the Ratio operand is converted to `ratio` before
+multiplying — `150 % * 10 Ω` is `15 Ω`, `1.5 ratio * 10 Ω` is `15 Ω`, `10 Ω / 50 %` is `20 Ω`, and
+`13.8 kV * 150 %` is `20700 V` (base unit `V`, not `kV`). A dimensioned term multiplied by a
+*dimensionless* number is the separate, older rule and keeps its own unit.
 
 Bases: a `PerUnit` term combines with a `PerUnit` term; `Primary` with `Primary`; `Secondary`
 with `Secondary`; a base-less term combines with any. `base(x, 'Primary', ratio)` converts a
@@ -182,6 +196,9 @@ unless another element is `true`, and `all` Unknown unless another is `false` (K
 |---|---|---|
 | `abs(x)` | Number → Number | keeps |
 | `round(x, n)`, `floor(x)`, `ceil(x)` | Number → Number | keeps; `n` dimensionless integer; `round` is half away from zero (T-SQL `ROUND`, C# `MidpointRounding.AwayFromZero`) |
+| `hypot(a, b)` | Numbers of one dimension → Number | `a`'s unit; `b` is converted to it first; √(a² + b²) |
+| `cos(x)`, `sin(x)` | Number (Angle, or dimensionless) → Number | dimensionless result; a dimensionless argument is taken as degrees; any other dimension is `dimension_mismatch` |
+| `atan2(y, x)` | Numbers of one dimension → Number | result an Angle in `deg`, in (−180, 180]; `x` is converted to `y`'s unit first; both zero → Unknown |
 | `min(a, b, …)`, `max(a, b, …)` | Numbers of one dimension, or Dates, or Durations | first operand's unit |
 | `clamp(x, lo, hi)` | Numbers of one dimension | `x`'s unit |
 | `coalesce(a, b, …)` | one type | first non-Unknown |
@@ -196,6 +213,13 @@ unless another element is `true`, and `all` Unknown unless another is `false` (K
 | `decode(pattern, t, group)` | regex with capture → Text | Unknown when no match |
 | `map(x, {k: v, …}, default?)` | any → any | table lookup; no match → `default` or Unknown |
 | `number(t)`, `text(x)` | explicit conversion | `number` fails → Unknown; the only text↔number path |
+
+`hypot`, `cos`, `sin` and `atan2` are the reach geometry a PRC-023 loadability formula needs (#171,
+2026-09-16). They are computed in IEEE-754 double and returned as a decimal, which carries fifteen
+significant digits of that double — so `cos(60 deg)` is exactly `0.5`. An angle whose sine or cosine
+is mathematically zero comes back as a value near `1e-16`, not `0`: compare such a result with a
+tolerance, never with `= 0`. Every other function in this table is exact decimal arithmetic.
+As with all functions, an Unknown argument makes the call Unknown.
 
 Everything else is a `Program.Formula` that publishes a fact. There are no user-defined functions.
 

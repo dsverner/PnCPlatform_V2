@@ -57,6 +57,12 @@ FROM (VALUES
     (N'platform.baseline',       N'Fixed', N'platform.baseline',       NULL, N'platform',   N'vRelease',              N'ReleaseId',        N'Reference',   NULL, N'Platform',           N'AppendOnly', NULL, N'Release', NULL),
     (N'operation.lightning_nearby', N'Fixed', N'operation.lightning_nearby', NULL, N'event', N'vLightningStrike',     N'StrikeId',         N'Set',         NULL, N'ProtectionOperation', N'AppendOnly', NULL, N'LightningStrike', N'["km","minutes"]'),
     (N'operation.lightning_count',  N'Fixed', N'operation.lightning_count',  NULL, N'event', N'vLightningStrike',     N'StrikeId',         N'Integer',     NULL, N'ProtectionOperation', N'AppendOnly', NULL, NULL, N'["km","minutes"]'),
+    -- #171 (2026-09-16): what the device's scheme protects — resolved by compliance.fDeviceProtects (the scheme through the
+    -- device's own membership or a protection function under its position, then the current SchemeProtects link, Primary first).
+    -- The rating is parameterised by kind (Continuous | FourHour | FifteenMinute | PracticalLimitation) and read in compliance.fFactRead.
+    (N'device.protects.name',            N'Fixed', N'device.protects.name',            NULL, N'asset', N'vAsset',       N'Name',      N'Text',    NULL,   N'Device', N'ValidTime',  NULL, NULL, NULL),
+    (N'device.protects.terminal.voltage',N'Fixed', N'device.protects.terminal.voltage',NULL, N'ref',   N'vVoltageClass',N'NominalKv', N'Decimal', N'kV',  N'Device', N'BiTemporal', NULL, NULL, NULL),
+    (N'device.protects.rating',          N'Fixed', N'device.protects.rating',          NULL, N'asset', N'vAssetRating', N'Amperes',   N'Decimal', N'A',   N'Device', N'BiTemporal', NULL, NULL, N'["kind"]'),
     -- PROCEDURE-ENGINE §7 "Facts the engine publishes" (#67), entered in W3 so a canonical procedure document passes
     -- compliance.ValidateProgramFacts; the reads (compliance.fFactRead) arrive with the interpreter in W4 (decision #101).
     -- step.capture takes its type from the document (DataType Any here; the checker types it from the document).
@@ -75,14 +81,42 @@ FROM (VALUES
     (N'package.revisions',      N'Engine', N'package.revisions',      NULL, N'document', N'vSettingsIssuePackageItem', N'RevisionRowId', N'Set', NULL, N'SettingsIssuePackage', N'ValidTime', NULL, N'ConfigurationFileRevision', NULL),
     (N'package.revision_count', N'Engine', N'package.revision_count', NULL, N'document', N'vSettingsIssuePackageItem', N'RevisionRowId', N'Integer', NULL, N'SettingsIssuePackage', N'ValidTime', NULL, NULL, NULL)
 ) AS f ([FactName], [FactSource], [FactKey], [DefinitionEntityId], [SourceSchema], [SourceObject], [SourceColumn], [DataType], [UnitCode], [SubjectKind], [TemporalClass], [PublishedByDefinitionVersionRowId], [ReferenceKind], [Parameters])
+-- #171 (2026-09-16): the classification facts, one per kind per subject the kind applies to —
+-- ref.ClassificationKind.SubjectKinds is the JSON array of Station / Asset / Device. Before this every kind produced a
+-- station row and a line row whether or not it was ever recorded there. A kind with no SubjectKinds produces no fact.
 UNION ALL
 SELECT N'station.classification.' + k.[ClassificationKindCode], N'Fixed', N'station.classification.' + k.[ClassificationKindCode], NULL,
        N'asset', N'vClassification', N'ClassificationValue', N'Text', NULL, N'Station', N'BiTemporal', NULL, NULL, NULL, NULL
 FROM [ref].[ClassificationKind] k WHERE k.[IsActive] = 1
+  AND EXISTS (SELECT 1 FROM OPENJSON(ISNULL(k.[SubjectKinds], N'[]')) WHERE [value] = N'Station')
 UNION ALL
 SELECT N'line.classification.' + k.[ClassificationKindCode], N'Fixed', N'line.classification.' + k.[ClassificationKindCode], NULL,
        N'asset', N'vClassification', N'ClassificationValue', N'Text', NULL, N'Line', N'BiTemporal', NULL, NULL, NULL, NULL
 FROM [ref].[ClassificationKind] k WHERE k.[IsActive] = 1
+  AND EXISTS (SELECT 1 FROM OPENJSON(ISNULL(k.[SubjectKinds], N'[]')) WHERE [value] = N'Asset')
+UNION ALL
+-- the device's own classification (the BES Cyber Asset flag, external routable connectivity)
+SELECT N'device.classification.' + k.[ClassificationKindCode], N'Fixed', N'device.classification.' + k.[ClassificationKindCode], NULL,
+       N'asset', N'vClassification', N'ClassificationValue', N'Text', NULL, N'Device', N'BiTemporal', NULL, NULL, NULL, NULL
+FROM [ref].[ClassificationKind] k WHERE k.[IsActive] = 1
+  AND EXISTS (SELECT 1 FROM OPENJSON(ISNULL(k.[SubjectKinds], N'[]')) WHERE [value] = N'Device')
+UNION ALL
+-- inherited from the station the device stands at (its Installed placement, then location.fStationOf)
+SELECT N'device.station.classification.' + k.[ClassificationKindCode], N'Fixed', N'device.station.classification.' + k.[ClassificationKindCode], NULL,
+       N'asset', N'vClassification', N'ClassificationValue', N'Text', NULL, N'Device', N'BiTemporal', NULL, NULL, NULL, NULL
+FROM [ref].[ClassificationKind] k WHERE k.[IsActive] = 1
+  AND EXISTS (SELECT 1 FROM OPENJSON(ISNULL(k.[SubjectKinds], N'[]')) WHERE [value] = N'Station')
+UNION ALL
+-- inherited from the primary asset the device's scheme protects, and from the bus at that terminal end
+SELECT N'device.protects.classification.' + k.[ClassificationKindCode], N'Fixed', N'device.protects.classification.' + k.[ClassificationKindCode], NULL,
+       N'asset', N'vClassification', N'ClassificationValue', N'Text', NULL, N'Device', N'BiTemporal', NULL, NULL, NULL, NULL
+FROM [ref].[ClassificationKind] k WHERE k.[IsActive] = 1
+  AND EXISTS (SELECT 1 FROM OPENJSON(ISNULL(k.[SubjectKinds], N'[]')) WHERE [value] = N'Asset')
+UNION ALL
+SELECT N'device.protects.bus.classification.' + k.[ClassificationKindCode], N'Fixed', N'device.protects.bus.classification.' + k.[ClassificationKindCode], NULL,
+       N'asset', N'vClassification', N'ClassificationValue', N'Text', NULL, N'Device', N'BiTemporal', NULL, NULL, NULL, NULL
+FROM [ref].[ClassificationKind] k WHERE k.[IsActive] = 1
+  AND EXISTS (SELECT 1 FROM OPENJSON(ISNULL(k.[SubjectKinds], N'[]')) WHERE [value] = N'Asset')
 UNION ALL
 -- published characteristics: every IsCatalogueFact on the effective version of an asset template
 SELECT n.[Prefix] + cd.[CharacteristicKey], N'Characteristic', cd.[CharacteristicKey], dv.[DefinitionEntityId],
@@ -118,7 +152,7 @@ SELECT N'asset.formula.' + d.[DefinitionKey], N'Formula', d.[DefinitionKey], d.[
        N'config', N'vDefinitionVersion', N'PayloadText',
        -- FORMULA-GRAMMAR.md §7: a grammar-1 formula declares what it publishes; a grammar-0 formula is Boolean
        CASE JSON_VALUE(dv.[PayloadText], '$.publishes.type') WHEN N'num' THEN N'Decimal' WHEN N'text' THEN N'Text' WHEN N'date' THEN N'DateTime' ELSE N'Boolean' END,
-       JSON_VALUE(dv.[PayloadText], '$.publishes.unit'), N'Asset', N'Versioned', dv.[RowId], JSON_VALUE(dv.[PayloadText], '$.publishes.base'), NULL, NULL
+       JSON_VALUE(dv.[PayloadText], '$.publishes.unit'), COALESCE(JSON_VALUE(dv.[PayloadText], '$.subjectKind'), N'Asset'), N'Versioned', dv.[RowId], JSON_VALUE(dv.[PayloadText], '$.publishes.base'), NULL, NULL
 FROM [config].[Definition] d
 JOIN [config].[DefinitionVersion] dv ON dv.[DefinitionEntityId] = d.[EntityId] AND dv.[IsDeleted] = 0
 WHERE d.[IsDeleted] = 0 AND d.[DefinitionKind] = N'Program.Formula'

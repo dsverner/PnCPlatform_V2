@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- #171: the seed generators' compiler. Reads a JSON spec of expression / cadence texts and prints each one's canonical
+       grammar-1 AST, so a Program.Formula or Program.ObligationRule seed carries both the text a person reads and the AST
+       the platform evaluates, compiled by the platform's own parser (never hand-written). -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>PnC.Tools.FormulaCompile</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\PnC.Formula\PnC.Formula.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -34,6 +34,7 @@ var unseen = map.Validate(catalog);
 var authz = new AuthorizationService();
 builder.Services.AddSingleton(catalog);
 builder.Services.AddHostedService<PnC.Api.Engine.SweepService>();   // W4: the scheduled sweep (PROCEDURE-ENGINE §4.1)
+builder.Services.AddHostedService<PnC.Api.Engine.ComplianceService>();   // #171: the scheduled compliance pass (obligation rules over their candidates)
 
 if (authMode.Equals("Windows", StringComparison.OrdinalIgnoreCase))
     builder.Services.AddAuthentication(IISDefaults.AuthenticationScheme);
@@ -71,6 +72,7 @@ foreach (var v in app.Configuration.GetSection("Api:MaterialiseBeforePaging").Ge
 DefinitionEndpoints.Map(app, catalog, map, authz);
 FileEndpoints.Map(app, authz);                                           // W7: the file download (#144)
 SettingsEndpoints.Map(app, authz);                                       // #168: the rendered settings text
+ComplianceEndpoints.Map(app, catalog, authz);                            // #171: the obligation-rule evaluator (preview / effective)
 ProcessEndpoints.Map(app, catalog, map, authz, connectionString);   // W4: the procedure engine   // W3: fixed routes before the generic {schema}/{procedure}
 ApiEndpoints.Map(app, catalog, map, authz, app.Environment.EnvironmentName, connectionString);
 // the React shell (#163): every /app/* route the browser asks for is the one page; the router picks the screen

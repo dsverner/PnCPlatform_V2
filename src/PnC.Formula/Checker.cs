@@ -196,6 +196,25 @@ public sealed class Checker
             return ts[0].Kind != "unknown" ? ts[0] : ts.FirstOrDefault(t => t.Kind != "unknown") ?? FormulaType.UnknownT;
         }
         if (fn is "abs" or "floor" or "ceil") { Arity(1); Expect(ts[0], "num", fn); return ts[0]; }
+        if (fn == "hypot")   // #171: PRC-023 reach geometry — sqrt(a² + b²) over one dimension, result in a's unit
+        {
+            Arity(2); Expect(ts[0], "num", fn); Expect(ts[1], "num", fn);
+            Same(ts[0], ts[1], fn, allowUnknown: true);
+            return ts[0].Kind != "unknown" ? ts[0] : ts[1];
+        }
+        if (fn is "cos" or "sin")   // #171: an Angle (deg), or a dimensionless number taken as degrees
+        {
+            Arity(1); Expect(ts[0], "num", fn);
+            if (ts[0].Kind == "num" && ts[0].Dim is not null && ts[0].Dim != "Angle")
+                throw new FormulaException(ErrorCodes.DimensionMismatch, $"{fn}() needs an angle or a dimensionless number, got {ts[0]}");
+            return FormulaType.Num();
+        }
+        if (fn == "atan2")   // #171: atan2(y, x) over one dimension, result an Angle in degrees
+        {
+            Arity(2); Expect(ts[0], "num", fn); Expect(ts[1], "num", fn);
+            Same(ts[0], ts[1], fn, allowUnknown: true);
+            return FormulaType.Num("deg");
+        }
         if (fn == "round") { Arity(2); Expect(ts[0], "num", fn); Dimless(ts[1], fn); return ts[0]; }
         if (fn == "if")
         {

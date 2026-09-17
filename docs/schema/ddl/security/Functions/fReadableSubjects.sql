@@ -45,8 +45,17 @@ scope_nodes AS (
     SELECT DISTINCT n.[EntityId], r.[ScopeAssetClassCode], r.[ScopeDeviceCategory]
     FROM held r
     JOIN [location].[Node] sn ON sn.[EntityId] = r.[ScopeNodeEntityId] AND sn.[IsDeleted] = 0 AND sn.[ValidTo] IS NULL
-    -- "under sn": sn itself, or a Path that continues with sn's own id (a node's Path holds its ancestors only)
-    JOIN [location].[Node] n ON n.[IsDeleted] = 0 AND n.[ValidTo] IS NULL AND (n.[EntityId] = sn.[EntityId] OR n.[Path] LIKE sn.[Path] + CONVERT(NVARCHAR(36), sn.[EntityId]) + N'/%')
+    -- "under sn": sn itself, or a Path that continues with sn's own id (a node's Path holds its ancestors only).
+    -- Two seekable branches, not one join with an OR: a predicate of the form (a = b OR c LIKE d) can use neither
+    -- index, so the optimiser joined location.Node to itself in full — a spool over 12 000 rows for every candidate,
+    -- measured at 19 s for one grant on DEV (2026-09-17, #171's verification). Each branch alone seeks
+    -- (IX_Node_Entity for the node itself, IX_Node_Path for the prefix) and the union is the same set.
+    CROSS APPLY (SELECT [EntityId] FROM [location].[Node] self
+                 WHERE self.[EntityId] = sn.[EntityId] AND self.[IsDeleted] = 0 AND self.[ValidTo] IS NULL
+                 UNION
+                 SELECT [EntityId] FROM [location].[Node] below
+                 WHERE below.[IsDeleted] = 0 AND below.[ValidTo] IS NULL
+                   AND below.[Path] LIKE sn.[Path] + CONVERT(NVARCHAR(36), sn.[EntityId]) + N'/%') n
     WHERE r.[ScopeKind] = N'NodeSubtree'
 ),
 -- assets placed under those nodes, with the grant's filters
@@ -82,25 +91,34 @@ readable_assets AS (
 readable_workrequests AS (
     SELECT [EntityId] FROM [work].[WorkRequestRegistry] WHERE EXISTS (SELECT 1 FROM is_global)
     UNION SELECT r.[ScopeWorkRequestEntityId] FROM held r WHERE r.[ScopeKind] = N'WorkRequest'
-    UNION SELECT w.[EntityId] FROM [work].[WorkRequest] w
+    -- one branch per readable set, not one predicate with ORs (see scope_nodes: an OR of IN-subqueries costs a scan and a spool each)
+    UNION SELECT w.[EntityId] FROM [work].[WorkRequest] w JOIN scope_nodes q ON q.[EntityId] = w.[ScopeEntityId]
           WHERE w.[IsDeleted] = 0 AND w.[ValidTo] IS NULL
-            AND (w.[ScopeEntityId] IN (SELECT [EntityId] FROM scope_nodes) OR w.[ScopeEntityId] IN (SELECT [AssetEntityId] FROM scope_assets)
-                 OR w.[ScopeEntityId] IN (SELECT [SubjectEntityId] FROM owned))
+    UNION SELECT w.[EntityId] FROM [work].[WorkRequest] w JOIN scope_assets q ON q.[AssetEntityId] = w.[ScopeEntityId]
+          WHERE w.[IsDeleted] = 0 AND w.[ValidTo] IS NULL
+    UNION SELECT w.[EntityId] FROM [work].[WorkRequest] w JOIN owned q ON q.[SubjectEntityId] = w.[ScopeEntityId]
+          WHERE w.[IsDeleted] = 0 AND w.[ValidTo] IS NULL
 ),
 readable_records AS (
     SELECT [EntityId] FROM [record].[RecordRegistry] WHERE EXISTS (SELECT 1 FROM is_global)
-    UNION SELECT rc.[EntityId] FROM [record].[Record] rc
+    -- one branch per readable set (see scope_nodes); the four ORs together made this the slowest branch of the function
+    UNION SELECT rc.[EntityId] FROM [record].[Record] rc JOIN scope_nodes q ON q.[EntityId] = rc.[SubjectEntityId]
           WHERE rc.[IsDeleted] = 0 AND rc.[ValidTo] IS NULL
-            AND (rc.[SubjectEntityId] IN (SELECT [EntityId] FROM scope_nodes) OR rc.[SubjectEntityId] IN (SELECT [AssetEntityId] FROM scope_assets)
-                 OR rc.[SubjectEntityId] IN (SELECT [SubjectEntityId] FROM owned)
-                 OR rc.[WorkRequestEntityId] IN (SELECT r.[ScopeWorkRequestEntityId] FROM held r WHERE r.[ScopeKind] = N'WorkRequest'))
+    UNION SELECT rc.[EntityId] FROM [record].[Record] rc JOIN scope_assets q ON q.[AssetEntityId] = rc.[SubjectEntityId]
+          WHERE rc.[IsDeleted] = 0 AND rc.[ValidTo] IS NULL
+    UNION SELECT rc.[EntityId] FROM [record].[Record] rc JOIN owned q ON q.[SubjectEntityId] = rc.[SubjectEntityId]
+          WHERE rc.[IsDeleted] = 0 AND rc.[ValidTo] IS NULL
+    UNION SELECT rc.[EntityId] FROM [record].[Record] rc
+          JOIN held r ON r.[ScopeKind] = N'WorkRequest' AND r.[ScopeWorkRequestEntityId] = rc.[WorkRequestEntityId]
+          WHERE rc.[IsDeleted] = 0 AND rc.[ValidTo] IS NULL
 ),
 readable_schemes AS (
     SELECT [EntityId] FROM [scheme].[SchemeRegistry] WHERE EXISTS (SELECT 1 FROM is_global)
-    UNION SELECT m.[SchemeEntityId] FROM [scheme].[SchemeMember] m
-          WHERE m.[IsDeleted] = 0 AND m.[ValidFrom] <= @at AND (m.[ValidTo] IS NULL OR m.[ValidTo] > @at)
-            AND ((m.[MemberKind] = N'Asset' AND m.[MemberEntityId] IN (SELECT [AssetEntityId] FROM scope_assets))
-              OR (m.[MemberKind] = N'ProtectionFunction' AND m.[MemberEntityId] IN (SELECT [EntityId] FROM scope_nodes)))
+    -- one branch per member kind (see scope_nodes); each seeks IX_SchemeMember_Member on (MemberKind, MemberEntityId)
+    UNION SELECT m.[SchemeEntityId] FROM [scheme].[SchemeMember] m JOIN scope_assets q ON q.[AssetEntityId] = m.[MemberEntityId]
+          WHERE m.[MemberKind] = N'Asset' AND m.[IsDeleted] = 0 AND m.[ValidFrom] <= @at AND (m.[ValidTo] IS NULL OR m.[ValidTo] > @at)
+    UNION SELECT m.[SchemeEntityId] FROM [scheme].[SchemeMember] m JOIN scope_nodes q ON q.[EntityId] = m.[MemberEntityId]
+          WHERE m.[MemberKind] = N'ProtectionFunction' AND m.[IsDeleted] = 0 AND m.[ValidFrom] <= @at AND (m.[ValidTo] IS NULL OR m.[ValidTo] > @at)
 )
 SELECT [EntityId] AS [SubjectEntityId] FROM readable_nodes        WHERE @subjectKind = N'Node'
 UNION ALL SELECT [EntityId] FROM readable_assets                  WHERE @subjectKind = N'Asset'

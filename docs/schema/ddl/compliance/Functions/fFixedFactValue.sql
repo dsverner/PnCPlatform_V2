@@ -50,6 +50,50 @@ BEGIN
           AND c.[ClassificationKindCode] = SUBSTRING(@factName, CHARINDEX(N'.classification.', @factName) + 16, 40)
           AND c.[IsDeleted] = 0 AND c.[ValidFrom] <= @at AND (c.[ValidTo] IS NULL OR c.[ValidTo] > @at)
         ORDER BY c.[ValidFrom] DESC, c.[RowSeq] DESC;
+    -- #171 (2026-09-16): the device's own classification — asset.Classification with SubjectKind Asset on the relay
+    -- itself (the BES Cyber Asset flag and external routable connectivity are recorded there, by a person in this phase)
+    ELSE IF @factName LIKE N'device.classification.%'
+        SELECT TOP (1) @v = c.[ClassificationValue] FROM [asset].[Classification] c
+        WHERE c.[SubjectKind] = N'Asset' AND c.[SubjectEntityId] = @subjectEntityId
+          AND c.[ClassificationKindCode] = SUBSTRING(@factName, CHARINDEX(N'.classification.', @factName) + 16, 40)
+          AND c.[IsDeleted] = 0 AND c.[ValidFrom] <= @at AND (c.[ValidTo] IS NULL OR c.[ValidTo] > @at)
+        ORDER BY c.[ValidFrom] DESC, c.[RowSeq] DESC;
+    -- inherited from the station the device stands at: its Installed placement, then location.fStationOf up the tree.
+    -- The CIP impact rating lives on the station (the owner, 2026-09-16).
+    ELSE IF @factName LIKE N'device.station.classification.%'
+    BEGIN
+        DECLARE @stationNodeEntityId UNIQUEIDENTIFIER = [location].[fStationOf](
+            (SELECT TOP (1) p.[NodeEntityId] FROM [asset].[Placement] p
+             WHERE p.[AssetEntityId] = @subjectEntityId AND p.[PlacementKind] = N'Installed' AND p.[IsDeleted] = 0
+               AND p.[ValidFrom] <= @at AND (p.[ValidTo] IS NULL OR p.[ValidTo] > @at)
+             ORDER BY p.[ValidFrom] DESC, p.[RowSeq] DESC));
+        SELECT TOP (1) @v = c.[ClassificationValue] FROM [asset].[Classification] c
+        WHERE c.[SubjectKind] = N'Node' AND c.[SubjectEntityId] = @stationNodeEntityId
+          AND c.[ClassificationKindCode] = SUBSTRING(@factName, CHARINDEX(N'.classification.', @factName) + 16, 40)
+          AND c.[IsDeleted] = 0 AND c.[ValidFrom] <= @at AND (c.[ValidTo] IS NULL OR c.[ValidTo] > @at)
+        ORDER BY c.[ValidFrom] DESC, c.[RowSeq] DESC;
+    END
+    -- inherited from the bus at the terminal end the scheme protects from (the NPCC A-10 test is a bus test)
+    ELSE IF @factName LIKE N'device.protects.bus.classification.%'
+        SELECT TOP (1) @v = c.[ClassificationValue] FROM [asset].[Classification] c
+        WHERE c.[SubjectKind] = N'Asset'
+          AND c.[SubjectEntityId] = (SELECT TOP (1) dp.[BusAssetEntityId] FROM [compliance].[fDeviceProtects](@subjectEntityId, @at) dp)
+          AND c.[ClassificationKindCode] = SUBSTRING(@factName, CHARINDEX(N'.classification.', @factName) + 16, 40)
+          AND c.[IsDeleted] = 0 AND c.[ValidFrom] <= @at AND (c.[ValidTo] IS NULL OR c.[ValidTo] > @at)
+        ORDER BY c.[ValidFrom] DESC, c.[RowSeq] DESC;
+    -- inherited from the primary asset the device's scheme protects (BES status, the PRC-023 list)
+    ELSE IF @factName LIKE N'device.protects.classification.%'
+        SELECT TOP (1) @v = c.[ClassificationValue] FROM [asset].[Classification] c
+        WHERE c.[SubjectKind] = N'Asset'
+          AND c.[SubjectEntityId] = (SELECT TOP (1) dp.[PrimaryAssetEntityId] FROM [compliance].[fDeviceProtects](@subjectEntityId, @at) dp)
+          AND c.[ClassificationKindCode] = SUBSTRING(@factName, CHARINDEX(N'.classification.', @factName) + 16, 40)
+          AND c.[IsDeleted] = 0 AND c.[ValidFrom] <= @at AND (c.[ValidTo] IS NULL OR c.[ValidTo] > @at)
+        ORDER BY c.[ValidFrom] DESC, c.[RowSeq] DESC;
+    -- the voltage at that terminal end, in kV (the catalogue row carries the unit); the terminal's voltage class, not the asset's
+    ELSE IF @factName = N'device.protects.terminal.voltage'
+        SELECT TOP (1) @v = CONVERT(NVARCHAR(400), dp.[NominalKv]) FROM [compliance].[fDeviceProtects](@subjectEntityId, @at) dp;
+    ELSE IF @factName = N'device.protects.name'
+        SELECT TOP (1) @v = dp.[PrimaryAssetName] FROM [compliance].[fDeviceProtects](@subjectEntityId, @at) dp;
     ELSE IF @factName LIKE N'platform.backup.last.%'
         -- §15.2: the completion instant of the last succeeded backup of that kind, at or before @at
         SELECT @v = CONVERT(NVARCHAR(40), MAX(b.[CompletedAt]), 127) FROM [audit].[BackupRun] b

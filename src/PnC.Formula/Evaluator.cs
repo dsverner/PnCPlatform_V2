@@ -202,6 +202,10 @@ public sealed class Evaluator
         return Unk($"operator {op}");
     }
 
+    /// <summary>b's value in a's unit; null when the two cannot be converted (as '+' and comparison do).</summary>
+    static decimal? SameUnitAs(Quantity a, Quantity b)
+        => (a.Unit == b.Unit || a.Unit is null || b.Unit is null) ? b.Value : Units.Convert(b.Value, b.Unit, a.Unit);
+
     static decimal Power(decimal x, decimal y)
     {
         if (y == decimal.Truncate(y) && Math.Abs(y) <= 64)
@@ -341,6 +345,33 @@ public sealed class Evaluator
             case "floor": { var q = (Quantity)a[0]; return q with { Value = decimal.Floor(q.Value) }; }
             case "ceil": { var q = (Quantity)a[0]; return q with { Value = decimal.Ceiling(q.Value) }; }
             case "round": { var q = (Quantity)a[0]; return q with { Value = Math.Round(q.Value, (int)((Quantity)a[1]).Value, MidpointRounding.AwayFromZero) }; }
+            // #171: the three geometry functions. Computed in IEEE-754 double and returned as a decimal, which
+            // carries 15 significant digits of the double — so cos(60 deg) is exactly 0.5.
+            case "hypot":
+            {
+                var p = (Quantity)a[0]; var q2 = (Quantity)a[1];
+                var bv = SameUnitAs(p, q2);
+                if (bv is null) return Unk("hypot: unit conversion");
+                var d0 = (double)p.Value; var d1 = (double)bv.Value;
+                return new Quantity((decimal)Math.Sqrt(d0 * d0 + d1 * d1), p.Unit ?? q2.Unit, p.Base ?? q2.Base);
+            }
+            case "cos":
+            case "sin":
+            {
+                var q = (Quantity)a[0];
+                var deg = q.Unit is null ? q.Value : Units.Convert(q.Value, q.Unit, "deg");
+                if (deg is null) return Unk($"{fn}: angle conversion");
+                var rad = (double)deg.Value * Math.PI / 180.0;
+                return new Quantity((decimal)(fn == "cos" ? Math.Cos(rad) : Math.Sin(rad)));
+            }
+            case "atan2":
+            {
+                var y = (Quantity)a[0]; var x = (Quantity)a[1];
+                var xv = SameUnitAs(y, x);
+                if (xv is null) return Unk("atan2: unit conversion");
+                if (y.Value == 0 && xv.Value == 0) return Unk("atan2: both arguments zero");
+                return new Quantity((decimal)(Math.Atan2((double)y.Value, (double)xv.Value) * 180.0 / Math.PI), "deg");
+            }
             case "to":
             {
                 var q = (Quantity)a[0]; var u = (string)a[1];

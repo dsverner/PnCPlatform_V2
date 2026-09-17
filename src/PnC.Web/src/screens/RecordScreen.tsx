@@ -15,6 +15,8 @@ import { type RecordParams, type Screen, splitView, screenPath } from '@/lib/scr
 import { Panel, Pill, stateTone, Button, Facts, Status, Field, Tabs, inputClass } from '@/components/ui/ui'
 import { DataGrid, type Column } from '@/components/ui/data-grid'
 import DeviceSettings, { useTemplate, isRatio } from './DeviceSettings'
+import ComplianceTab, { useProtectedAssets } from './ComplianceTab'
+import { StationLink } from './PrimaryAssetScreen'
 
 const CHARACTERISTIC_SCHEMA = 'SETTINGS_RECORD'   // CharacteristicSchema.RecordTemplate seeded for the settings record (#167)
 
@@ -53,12 +55,12 @@ export default function RecordScreen({ params: p, id }: { screen: Screen; params
       <Status>Revision {s(r.RevisionStatus)} · lifecycle {s(r.LifecycleState) || '—'} · {s(r.FileKind)} {s(r.ParseStatus)}</Status>
       <div className="grid gap-3 lg:grid-cols-3">
         <Panel title="Device"><Facts cols={1} pairs={[['Device', legacyFree(r.DeviceName)], ['Model', s(r.ModelCode) + (r.ModelName ? ' — ' + r.ModelName : '')], ['Manufacturer', s(r.ManufacturerName)], ['Technology', s(r.Technology)], ['Software version', s(r.FirmwareVersion)], ['Serial number', s(r.SerialNumber)], ['Voltage', s(r.VoltageClassCode)], ['Functions', s(r.Functions || r.PositionName)]]} /></Panel>
-        <Panel title="Where"><Facts cols={1} pairs={[['Location', s(r.StationName) + (r.StationNumber ? ' · ' + r.StationNumber : '')],
+        <Panel title="Where"><Facts cols={1} pairs={[['Location', <span><StationLink id={s(r.StationNodeEntityId)} name={s(r.StationName)} />{r.StationNumber ? ' · ' + r.StationNumber : ''}</span>],
           ['Scheme', r.SchemeEntityId ? <a className="text-sky-300 underline" href={screenPath('SCHEME', s(r.SchemeEntityId))} onClick={(e) => { e.preventDefault(); navigate(screenPath('SCHEME', s(r.SchemeEntityId))) }}>{s(r.SchemeName)}</a> : s(r.SchemeName)],
           ['Protects', <Protects schemeEntityId={s(r.SchemeEntityId)} />], ['Equipment', s(r.PanelName)], ['Position', s(r.PositionName)]]} /></Panel>
         <Panel title="Dates and state"><Facts cols={1} pairs={[['Calculated', fmtWhen(r.CalculatedAt) + (r.CalculatedByDisplayName ? ' by ' + r.CalculatedByDisplayName : '')], ['Verified', fmtWhen(r.VerifiedAt)], ['In service', r.InServiceFrom ? fmtWhen(r.InServiceFrom) + (r.InServiceTo ? ' – ' + fmtWhen(r.InServiceTo) : ' – now') : 'not in service'], ['Change request', legacyFree(r.WorkRequestTitle)], ['Action type', s(r.WorkTypeKey)], ['Lifecycle', s(r.LifecycleState)], ['Revision', s(r.RevisionLabel) + ' · ' + s(r.RevisionStatus)]]} /></Panel>
       </div>
-      <Tabs value={section} onChange={setSection} tabs={[{ key: 'settings', label: 'Settings' }, { key: 'classification', label: 'Classification' }, { key: 'notes', label: 'Notes' }, { key: 'text', label: 'Text as filed' }, { key: 'files', label: 'Files and records' }, ...(others.length ? [{ key: 'compare', label: 'Compare' }] : [])]} />
+      <Tabs value={section} onChange={setSection} tabs={[{ key: 'settings', label: 'Settings' }, { key: 'classification', label: 'Classification' }, { key: 'compliance', label: 'Compliance' }, { key: 'notes', label: 'Notes' }, { key: 'text', label: 'Text as filed' }, { key: 'files', label: 'Files and records' }, ...(others.length ? [{ key: 'compare', label: 'Compare' }] : [])]} />
       {section === 'settings' && (template
         /* #168: the template's view of the device — functions, inputs, settings by function — when the model has one */
         ? <DeviceSettings r={r} revision={revision} filedText={textQ.data?.text ?? null} editable={r.GridState === 'Outstanding' && can('ConfigurationFile.Modify')} />
@@ -67,6 +69,8 @@ export default function RecordScreen({ params: p, id }: { screen: Screen; params
           </Panel>)}
       {/* an outstanding record is editable (owner, 2026-09-15); in service or archived is the record */}
       {section === 'classification' && <Characteristics r={r} revision={revision} editable={r.GridState === 'Outstanding' && can('Record.Modify')} hideGroups={template?.rows.some(isRatio) ? ['Instrument transformers'] : []} />}
+      {/* #171: what the device is, what it inherits from the station and the protected asset, its obligations and the evaluator's working */}
+      {section === 'compliance' && <ComplianceTab r={r} />}
       {section === 'notes' && <Notes r={r} revision={revision} />}
       {section === 'text' && (
         <Panel title="Settings text as filed">
@@ -87,17 +91,7 @@ export default function RecordScreen({ params: p, id }: { screen: Screen; params
 /** #170: what the device's scheme protects, with the primary assets' applicability classifications — the device inherits them (the owner, 2026-09-16). */
 function Protects({ schemeEntityId }: { schemeEntityId: string }) {
   const navigate = useNavigate()
-  const q = useQuery({ queryKey: ['schemeProtectsNamed', schemeEntityId], enabled: !!schemeEntityId, staleTime: 60_000, queryFn: async () => {
-    const links = await viewAll('scheme', 'vSchemeProtects', { SchemeEntityId: schemeEntityId })
-    const out: Row[] = []
-    for (const l of links) {
-      const a = (await view('asset', 'vPrimaryAsset', { EntityId: s(l.PrimaryAssetEntityId) }, { take: 1 })).rows[0]; if (!a) continue
-      // the end this scheme protects from, and the bus there: the NPCC A-10 declaration is the bus's (the owner, 2026-09-16)
-      const term = l.AssetTerminalEntityId ? (await view('asset', 'vAssetTerminalDetail', { TerminalEntityId: s(l.AssetTerminalEntityId) }, { take: 1 })).rows[0] : null
-      out.push({ ...a, ZoneRole: l.ZoneRole, TerminalNo: term?.TerminalNo, TerminalStation: term?.StationName, BusName: term?.BusName, BusNpcc: term?.BusNpcc, HasTerminal: !!term })
-    }
-    return out
-  } })
+  const q = useProtectedAssets(schemeEntityId)   // #171: one lookup, shared with the Compliance tab
   if (!schemeEntityId) return <span className="text-slate-500">—</span>
   if (q.isPending) return <span className="text-slate-500">…</span>
   const rows = q.data ?? []

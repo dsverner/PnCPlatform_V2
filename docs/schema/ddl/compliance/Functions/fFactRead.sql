@@ -107,6 +107,23 @@ BEGIN
         RETURN @out;
     END
 
+    -- ------------------------------------------------------------------ what the device protects (#171)
+    IF @factName = N'device.protects.rating'
+    BEGIN
+        -- the highest rating of the kind asked for over the protected asset's seasons, in amperes (the catalogue row
+        -- carries the unit). Unknown when none is recorded: the ratings are entered by hand until the connector to the
+        -- other group's ratings database exists (the owner, 2026-09-16 — "make room for the given values in our
+        -- application… create the connector later"). $.kind is one of Continuous | FourHour | FifteenMinute |
+        -- PracticalLimitation; absent means the highest of any kind.
+        SET @p = JSON_VALUE(@params, '$.kind');
+        SELECT @v = CONVERT(NVARCHAR(400), MAX(r.[Amperes]))
+        FROM [asset].[AssetRating] r
+        JOIN [compliance].[fDeviceProtects](@subjectEntityId, @at) dp ON dp.[PrimaryAssetEntityId] = r.[AssetEntityId]
+        WHERE r.[IsDeleted] = 0 AND r.[ValidFrom] <= @at AND (r.[ValidTo] IS NULL OR r.[ValidTo] > @at)
+          AND (@p IS NULL OR @p = N'*' OR r.[RatingKind] = @p);
+        RETURN [compliance].[fTypedValue](@dataType, @v, @unit, @base, @refKind, @factName);
+    END
+
     -- ------------------------------------------------------------------ channel and ownership
     IF @factName = N'channel.route'
     BEGIN

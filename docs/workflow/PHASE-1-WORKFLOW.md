@@ -802,6 +802,18 @@ the release with SBOM and `release.json`.
 
 **Depends on.** W5, W6, W7. **Estimate.** H: 24–40 h · G: 63–100 h.
 
+- **2026-09-16 (night) — classifications and compliance on the SEL-221F (#171).** The owner's four answers, one at a time: the BES
+  Cyber Asset flag is the device's and a person's for now (CIP-002 later); the CIP impact rating is the station's; the CIP requirement
+  set is the owner's starter list (CIP-004 R2/R4, CIP-005 R1 with routable connectivity, CIP-006 R1, CIP-007 R1–R5, CIP-010 R1–R3,
+  CIP-011 R1), the evidence kept outside the platform; PRC-023 R1 criteria used in the order 1, 2, 13, 12 with the standard's own text
+  (PRC-023-6, NB appendix unchanged); line ratings come from another group's database through a DMZ connector later — "make room for
+  the given values in our application". Built: the rating table on the primary asset (hand-entered, the connector's landing place),
+  the device and station classification kinds, the device facts through its scheme's protects link, four grammar functions and the
+  Ratio rule, the standards in force in NB with their requirements quoted, the rules and formulas as definitions generated from one
+  table through the platform's own parser, the evaluator (preview, then commit; a scheduled pass), the Compliance tab on the device
+  sheet, the STATION screen. Proven on relay 3445 at Eel River: the loadability working (58.40 Ω reach, 36.55 Ω at 30°, 3 088 A at
+  0.85 pu) and PRC-023 R1 open on its 230 kV terminal; the CIP rules wait for the BCA flag and the station rating the owner records.
+
 ---
 
 ## 2. Coverage

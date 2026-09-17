@@ -4,6 +4,10 @@ CREATE TABLE [ref].[ClassificationKind] (
     [Name]              NVARCHAR(200)     NOT NULL,
     [Description]       NVARCHAR(MAX)     NULL,
     [AllowedValuesDefinitionRowId] UNIQUEIDENTIFIER NULL CONSTRAINT [FK_ClassificationKind_AllowedValues] REFERENCES [config].[DefinitionVersion] ([RowId]),
+    -- #171 (2026-09-16): what the kind is recorded against — a JSON array of subject kinds: N'Station' (a location.Node
+    -- station), N'Asset' (a primary asset or a bus) and N'Device'. compliance.vFactCatalogue generates one classification
+    -- fact per kind per subject it applies to, so a station rating no longer appears as a line fact and the other way about.
+    [SubjectKinds]      NVARCHAR(100)     NULL     CONSTRAINT [CK_ClassificationKind_SubjectKinds] CHECK ([SubjectKinds] IS NULL OR ISJSON([SubjectKinds]) = 1),
     [SysStart]          DATETIME2(7) GENERATED ALWAYS AS ROW START HIDDEN NOT NULL,
     [SysEnd]            DATETIME2(7) GENERATED ALWAYS AS ROW END   HIDDEN NOT NULL,
     PERIOD FOR SYSTEM_TIME ([SysStart], [SysEnd]),
