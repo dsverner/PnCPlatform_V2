@@ -14,7 +14,7 @@ import { settingsText } from '@/lib/actions'
 import { type RecordParams, type Screen, splitView, screenPath } from '@/lib/screens'
 import { Panel, Pill, stateTone, Button, Facts, Status, Field, Tabs, inputClass } from '@/components/ui/ui'
 import { DataGrid, type Column } from '@/components/ui/data-grid'
-import DeviceSettings, { useTemplate, isRatio } from './DeviceSettings'
+import DeviceSettings, { useTemplate, isRatio, BasisPanel } from './DeviceSettings'
 import ComplianceTab, { useProtectedAssets } from './ComplianceTab'
 import { NodeLink } from './PrimaryAssetScreen'
 
@@ -57,7 +57,11 @@ export default function RecordScreen({ params: p, id }: { screen: Screen; params
       <Tabs value={section} onChange={setSection} tabs={[{ key: 'settings', label: 'Settings' }, { key: 'record', label: 'Record' }, { key: 'classification', label: 'Classification' }, { key: 'compliance', label: 'Compliance' }, { key: 'notes', label: 'Notes' }, { key: 'text', label: 'Text as filed' }, { key: 'files', label: 'Files and records' }, ...(others.length ? [{ key: 'compare', label: 'Compare' }] : [])]} />
       {section === 'settings' && (template
         /* #168: the template's view of the device — functions, inputs, settings by function — when the model has one */
-        ? <DeviceSettings r={r} revision={revision} filedText={textQ.data?.text ?? null} editable={r.GridState === 'Outstanding' && can('ConfigurationFile.Modify')} />
+        ? <>
+            {/* #192: a draft based on another request's draft — its drift and re-base sit first, being what the engineer must act on */}
+            {r.GridState === 'Outstanding' && !!r.BasedOnRevisionRowId && <BasisPanel r={r} revision={revision} editable={can('ConfigurationFile.Modify')} />}
+            <DeviceSettings r={r} revision={revision} filedText={textQ.data?.text ?? null} editable={r.GridState === 'Outstanding' && can('ConfigurationFile.Modify')} />
+          </>
         : <Panel title={parsed.length ? `Settings · ${parsed.length} parsed from the ${s(r.FileKind)} file` : r.FileKind === 'NativeSettings' ? 'Settings · the native (vendor) file is stored as is; no reader exists for it yet (#113)' : 'Settings · no parsed settings; the text as filed is the record'}>
             {parsed.length > 0 ? <DataGrid rows={parsed} columns={PARSED_COLS} rowKey={(x) => s(x.SettingCode) + '|' + s(x.GroupNumber)} /> : <Status>No settings template for this model yet; the text as filed is the record.</Status>}
           </Panel>)}

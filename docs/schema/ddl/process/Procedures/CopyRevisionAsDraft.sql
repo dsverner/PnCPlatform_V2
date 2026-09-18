@@ -84,7 +84,10 @@ BEGIN
     DECLARE @seq INT = 1 + (SELECT COUNT(*) FROM [document].[SettingsIssuePackageItem] WHERE [PackageRevisionRowId] = @PackageRevisionRowId AND [IsDeleted] = 0 AND [ValidTo] IS NULL), @ie UNIQUEIDENTIFIER, @ir UNIQUEIDENTIFIER;
     EXEC [document].[SettingsIssuePackageItem_Add] @PackageRevisionRowId = @PackageRevisionRowId, @ConfigurationFileRevisionRowId = @RevisionRowId, @Sequence = @seq, @ActorId = @ActorId, @EntityId = @ie OUTPUT, @RowId = @ir OUTPUT;
     IF @basisEntity IS NOT NULL
+    BEGIN
         EXEC [document].[RevisionLink_Add] @RevisionRowId = @RevisionRowId, @LinkKind = N'BasedOn', @SubjectKind = N'DocumentRevision', @SubjectEntityId = @basisEntity, @ActorId = @ActorId;
+        EXEC [process].[WriteBasisSnapshot] @RevisionRowId = @RevisionRowId, @BasisRevisionRowId = @basisEntity, @ActorId = @ActorId;   -- #192: the basis as frozen
+    END
     DECLARE @detail NVARCHAR(MAX) = CONCAT(N'{"action":"', CASE WHEN @SourceRevisionRowId IS NULL THEN N'first-draft-from-template' WHEN @basisEntity IS NOT NULL THEN N'draft-based-on-open-draft' ELSE N'revision-copied-as-draft' END, N'","source":"', ISNULL(LOWER(CONVERT(NVARCHAR(36), @SourceRevisionRowId)), N''), N'","draft":"', LOWER(CONVERT(NVARCHAR(36), @RevisionRowId)), N'","package":"', LOWER(CONVERT(NVARCHAR(36), @PackageRevisionRowId)), N'"}');
     EXEC [audit].[LogAction] @ActionKindCode = N'Administrative', @SubjectSchema = N'document', @SubjectTable = N'ConfigurationFile', @SubjectEntityId = @DeviceEntityId, @SubjectRowId = @RevisionRowId,
          @ActorId = @ActorId, @Detail = @detail, @OccurredAt = @now;

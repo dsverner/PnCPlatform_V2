@@ -182,6 +182,33 @@ BEGIN
              @TemplateDefinitionVersionRowId = @version, @ActorId = @ActorId, @EntityId = @RecordEntityId OUTPUT, @RowId = @recRow OUTPUT;
     END
 
+    -- #192 (2026-09-18): a draft based on another request's draft is BLOCKED at the check, the approval, the issue and the
+    -- baseline while its basis has changed since the draft was taken (process.fBasisDrift) — the owner: flagged, and not
+    -- allowed through until re-based. The refusal names the settings so the engineer knows what to look at.
+    IF @pkg IS NOT NULL AND ((@recordKind = N'EngineeringCheck' AND @Outcome = N'Pass') OR (@recordKind = N'Approval' AND @Outcome = N'Approved') OR @recordKind IN (N'SettingsIssue', N'Baseline'))
+    BEGIN
+        DECLARE @dRev UNIQUEIDENTIFIER, @dDev UNIQUEIDENTIFIER, @dN INT, @dCodes NVARCHAR(400), @dTitle NVARCHAR(200), @dName NVARCHAR(200), @dMsg NVARCHAR(800);
+        DECLARE dcx CURSOR LOCAL FAST_FORWARD FOR
+            SELECT cf.[RevisionRowId], cf.[DeviceEntityId] FROM [document].[SettingsIssuePackageItem] it JOIN [document].[ConfigurationFile] cf ON cf.[RevisionRowId] = it.[ConfigurationFileRevisionRowId] AND cf.[IsDeleted] = 0
+            WHERE it.[PackageRevisionRowId] = @pkg AND it.[IsDeleted] = 0 AND it.[ValidTo] IS NULL AND cf.[CaptureKind] = N'Designed'
+              AND EXISTS (SELECT 1 FROM [document].[RevisionLink] l WHERE l.[RevisionRowId] = cf.[RevisionRowId] AND l.[LinkKind] = N'BasedOn' AND l.[ValidTo] IS NULL AND l.[IsDeleted] = 0);
+        OPEN dcx; FETCH NEXT FROM dcx INTO @dRev, @dDev;
+        WHILE @@FETCH_STATUS = 0
+        BEGIN
+            SELECT @dN = COUNT(*), @dCodes = STRING_AGG([SettingCode], N', ') WITHIN GROUP (ORDER BY [SettingCode]) FROM [process].[fBasisDrift](@dRev) WHERE [Outcome] IN (N'take', N'agree', N'conflict');
+            IF @dN > 0
+            BEGIN
+                SELECT TOP (1) @dTitle = sr.[BasedOnWorkRequestTitle] FROM [document].[vSettingsRecord] sr WHERE sr.[RevisionRowId] = @dRev;
+                SELECT @dName = [Name] FROM [asset].[vAsset] WHERE [EntityId] = @dDev;
+                SET @dMsg = CONCAT(N'process.CommitStep: ', ISNULL(@dName, N'the device'), N' is based on "', ISNULL(@dTitle, N'another request'), N'", which has changed since this draft was taken (', @dN, N' setting', CASE WHEN @dN = 1 THEN N'' ELSE N's' END, N': ', LEFT(@dCodes, 300), N'); re-base it first.');
+                CLOSE dcx; DEALLOCATE dcx;
+                THROW 50251, @dMsg, 1;
+            END
+            FETCH NEXT FROM dcx INTO @dRev, @dDev;
+        END
+        CLOSE dcx; DEALLOCATE dcx;
+    END
+
     -- ---- 8 kind-specific rows (§5.1)
     IF @recordKind = N'ConfigurationFileRevision'
     BEGIN

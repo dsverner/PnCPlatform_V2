@@ -1568,6 +1568,31 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
                     await RunStep(tech, "INSTALL", new { outcome = "Done", capture = new { installedAt = DateTime.UtcNow.ToString("o"), commissioningNote = "#191 B" } }, devBdd);
                     var stepB = await ReadyStep("COMPLETE", null, 2);
                     var (cbs, _) = await Post(admin, $"api/v1/process/step-instances/{stepB}/claim", new { });
+                    // ======== #192 (2026-09-18): A changes after B was taken from it — B is flagged, blocked, and re-based
+                    async Task<(JsonArray rows, JsonNode? head)> Drift(Guid? rev) { var (_, b) = await Post(admin, "api/v1/process/BasisDrift", new { RevisionRowId = rev, DeviceEntityId = devBdd }); var rs = b?["results"] as JsonArray; var attention = new JsonArray(); foreach (var x in (rs?[0] as JsonArray) ?? new JsonArray()) if (x?["Outcome"]?.ToString() is "take" or "agree" or "conflict") attention.Add(x?.DeepClone()); return (attention, (rs?[1] as JsonArray)?.FirstOrDefault()); }   // only the rows that need attention: a row where only mine moved is not drift
+                    var (ea2, _) = await Post(admin, "api/v1/process/SetParsedSetting", new { ConfigurationFileRevisionRowId = draftA, DeviceEntityId = devBdd, SettingCode = "SLOPE", RawValue = "38 %" });
+                    var (dr1, dh1) = await Drift(draftB); var d1 = dr1.FirstOrDefault();
+                    Must(ea2 == HttpStatusCode.OK && dr1.Count == 1 && d1?["SettingCode"]?.ToString() == "SLOPE" && d1?["ThenValue"]?.ToString() == "35 %" && d1?["NowValue"]?.ToString() == "38 %" && d1?["MineValue"]?.ToString() == "35 %" && d1?["Outcome"]?.ToString() == "take" && dh1?["HasFrozenBasis"]?.ToString() == "1",
+                        $"#192: A moved SLOPE to 38 % after B was taken — B's drift is one row: then {d1?["ThenValue"]}, theirs {d1?["NowValue"]}, mine {d1?["MineValue"]}, outcome {d1?["Outcome"]}; a frozen basis exists ({dh1?["HasFrozenBasis"]})");
+                    var (bl1s, bl1b) = await Post(admin, $"api/v1/process/step-instances/{stepB}/commit", new { outcome = "Done" });
+                    Must(bl1s != HttpStatusCode.OK && (bl1b?["detail"]?.ToString() ?? "").Contains("changed since") && (bl1b?["detail"]?.ToString() ?? "").Contains("SLOPE"),
+                        $"#192: B's baseline is refused while its basis has changed ({(int)bl1s} {Code(bl1b)}: {bl1b?["detail"]})");
+                    var (rb1s, rb1b) = await Post(admin, "api/v1/process/RebaseDraft", new { RevisionRowId = draftB, DeviceEntityId = devBdd });
+                    var afterRb1 = await Parsed(draftB); var (dr2, _) = await Drift(draftB);
+                    Must(rb1s == HttpStatusCode.OK && rb1b?["Applied"]?.ToString() == "1" && afterRb1.GetValueOrDefault("SLOPE") == "38 %" && dr2.Count == 0,
+                        $"#192: re-based — theirs applied ({rb1b?["Applied"]}), B reads SLOPE {afterRb1.GetValueOrDefault("SLOPE")}, no drift left ({dr2.Count})");
+                    // a conflict: both moved, differently — decided by the engineer, never merged silently
+                    await Post(admin, "api/v1/process/SetParsedSetting", new { ConfigurationFileRevisionRowId = draftA, DeviceEntityId = devBdd, SettingCode = "SLOPE", RawValue = "40 %" });
+                    await Post(admin, "api/v1/process/SetParsedSetting", new { ConfigurationFileRevisionRowId = draftB, DeviceEntityId = devBdd, SettingCode = "SLOPE", RawValue = "39 %" });
+                    var (dr3, _) = await Drift(draftB); var d3 = dr3.FirstOrDefault();
+                    var (rb2s, rb2b) = await Post(admin, "api/v1/process/RebaseDraft", new { RevisionRowId = draftB, DeviceEntityId = devBdd });
+                    var (rb3s, _) = await Post(readOnly!, "api/v1/process/RebaseDraft", new { RevisionRowId = draftB, DeviceEntityId = devBdd, Decisions = "{\"SLOPE\":\"mine\"}" });
+                    var (rb4s, rb4b) = await Post(admin, "api/v1/process/RebaseDraft", new { RevisionRowId = draftB, DeviceEntityId = devBdd, Decisions = "{\"SLOPE\":\"mine\"}" });
+                    var afterRb4 = await Parsed(draftB); var (dr4, _) = await Drift(draftB);
+                    Must(d3?["Outcome"]?.ToString() == "conflict" && rb2s != HttpStatusCode.OK && (rb2b?["detail"]?.ToString() ?? "").Contains("SLOPE") && rb3s == HttpStatusCode.Forbidden
+                         && rb4s == HttpStatusCode.OK && rb4b?["Kept"]?.ToString() == "1" && afterRb4.GetValueOrDefault("SLOPE") == "39 %" && dr4.Count == 0,
+                        $"#192: A 40 % vs B 39 % is a conflict ({d3?["Outcome"]}); a re-base without a decision is refused ({(int)rb2s}: {rb2b?["detail"]}); ReadOnly refused ({(int)rb3s}); decided \"mine\" → kept ({rb4b?["Kept"]}), B reads {afterRb4.GetValueOrDefault("SLOPE")}, no drift ({dr4.Count})");
+                    // and now the #191 ordering rule is what stands between B and service
                     var (rbs, rbb) = await Post(admin, $"api/v1/process/step-instances/{stepB}/commit", new { outcome = "Done" });
                     Must(cbs == HttpStatusCode.OK && rbs != HttpStatusCode.OK && (rbb?["detail"]?.ToString() ?? "").Contains("not yet in service"),
                         $"#191: B cannot go in service before A — refused ({(int)rbs} {Code(rbb)}: {rbb?["detail"]})");

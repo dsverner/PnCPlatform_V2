@@ -7,7 +7,7 @@ import { useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getText, proc, view, viewAll, s, ApiError, type Row } from '@/lib/api'
 import { useViewAll } from '@/lib/hooks'
-import { Panel, Pill, Tabs, Status } from '@/components/ui/ui'
+import { Panel, Pill, Tabs, Status, Button } from '@/components/ui/ui'
 import { DataGrid, type Column } from '@/components/ui/data-grid'
 
 export interface Template { definitionEntityId: string; versionRowId: string; name: string; rows: Row[]; ansi: Map<string, string> }
@@ -129,4 +129,60 @@ export default function DeviceSettings({ r, revision, filedText, editable = fals
     </>
   )
 }
+/**
+ * #192: the draft's basis, above the settings — the thing the engineer must act on before the check, the approval, the
+ * issue and the baseline will pass. Reads process.BasisDrift (then / theirs now / mine per setting). No drift: one quiet
+ * line. Drift: the rows, a theirs/mine choice on each conflict, and Re-base (process.RebaseDraft), disabled until every
+ * conflict is decided. Nothing is merged silently; each applied value is an audited edit.
+ */
+export function BasisPanel({ r, revision, editable }: { r: Row; revision: string; editable: boolean }) {
+  const qc = useQueryClient()
+  const [decisions, setDecisions] = useState<Record<string, 'mine' | 'theirs'>>({})
+  const [busy, setBusy] = useState(false); const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null)
+  const q = useQuery({ queryKey: ['basisDrift', revision], enabled: !!revision, staleTime: 15_000, queryFn: () => proc<{ results?: Row[][] }>('process', 'BasisDrift', { RevisionRowId: revision, DeviceEntityId: s(r.DeviceEntityId) }) })
+  const rows = q.data?.results?.[0] ?? []; const head = q.data?.results?.[1]?.[0]
+  const drift = rows.filter((x) => ['take', 'agree', 'conflict'].includes(s(x.Outcome)))
+  const conflicts = drift.filter((x) => s(x.Outcome) === 'conflict')
+  const undecided = conflicts.filter((x) => !decisions[s(x.SettingCode)])
+  if (q.isPending) return null
+  if (q.isError) return <Status bad>Could not read the basis: {(q.error as Error).message}</Status>
+  const title = s(head?.BasisTitle) || 'the request it is based on'
+  if (!drift.length) return <Status>Based on {title} — unchanged since this draft was taken{head?.HasFrozenBasis ? '' : ' (no frozen basis yet; the first re-base takes one)'}.</Status>
+  const rebase = async () => {
+    setBusy(true); setMsg(null)
+    try {
+      const out = await proc<Row>('process', 'RebaseDraft', { RevisionRowId: revision, DeviceEntityId: s(r.DeviceEntityId), Decisions: JSON.stringify(decisions) })
+      setMsg({ text: `Re-based: ${s(out.Applied)} value(s) taken from ${title}, ${s(out.Kept)} kept as yours.` }); setDecisions({})
+      qc.invalidateQueries({ queryKey: ['basisDrift', revision] }); qc.invalidateQueries({ queryKey: ['view', 'document'] }); qc.invalidateQueries({ queryKey: ['settingsText', revision] })
+    } catch (e) { setMsg({ text: e instanceof ApiError ? e.message : String(e), bad: true }) } finally { setBusy(false) }
+  }
+  return (
+    <Panel title={`${title} has changed since this draft was taken · ${drift.length} setting${drift.length === 1 ? '' : 's'}`} className="border-amber-700/60">
+      <Status>{head?.HasFrozenBasis ? 'Then is the basis as it stood when this draft was taken; theirs is the basis now; mine is this draft.' : 'This draft was taken before the basis was frozen, so every difference between the basis now and this draft is shown as a conflict to decide once; the re-base then freezes the basis.'} The check, the approval, the issue and the baseline refuse this draft until it is re-based.</Status>
+      <table className="mt-2 w-full text-sm">
+        <thead><tr className="text-left text-xs uppercase tracking-wide text-slate-500"><th className="py-1">Setting</th><th>Then</th><th>Theirs now</th><th>Mine</th><th>Outcome</th></tr></thead>
+        <tbody>
+          {drift.map((x) => { const code = s(x.SettingCode); const o = s(x.Outcome)
+            return (
+              <tr key={code + '|' + s(x.GroupNumber)} className="border-t border-slate-800">
+                <td className="py-1">{s(x.SettingName) || code} <span className="text-xs text-slate-500">{code}{x.GroupNumber && s(x.GroupNumber) !== '1' ? ` · group ${s(x.GroupNumber)}` : ''}</span></td>
+                <td className="font-mono text-slate-400">{s(x.ThenValue) || '—'}</td><td className="font-mono">{s(x.NowValue) || '—'}</td><td className="font-mono">{s(x.MineValue) || '—'}</td>
+                <td>{o === 'take' ? <span className="text-sky-300">theirs will apply</span> : o === 'agree' ? <span className="text-slate-400">both changed to the same value</span>
+                  : <span className="flex flex-wrap items-center gap-2 text-amber-200">conflict
+                      <label className="flex items-center gap-1 text-xs text-slate-300"><input type="radio" name={`d-${code}`} disabled={!editable || busy} checked={decisions[code] === 'theirs'} onChange={() => setDecisions({ ...decisions, [code]: 'theirs' })} /> theirs</label>
+                      <label className="flex items-center gap-1 text-xs text-slate-300"><input type="radio" name={`d-${code}`} disabled={!editable || busy} checked={decisions[code] === 'mine'} onChange={() => setDecisions({ ...decisions, [code]: 'mine' })} /> mine</label>
+                    </span>}</td>
+              </tr>) })}
+        </tbody>
+      </table>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <Button kind="primary" disabled={!editable || busy || undecided.length > 0} title={undecided.length ? `decide ${undecided.map((x) => s(x.SettingCode)).join(', ')} first` : undefined} onClick={() => void rebase()}>Re-base — apply their changes</Button>
+        {!editable && <span className="text-xs text-slate-500">re-basing needs ConfigurationFile.Modify on an outstanding record</span>}
+        {undecided.length > 0 && editable && <span className="text-xs text-slate-500">{undecided.length} conflict{undecided.length === 1 ? '' : 's'} to decide</span>}
+      </div>
+      {msg && <Status bad={msg.bad}>{msg.text}</Status>}
+    </Panel>
+  )
+}
+
 export { isRatio }
