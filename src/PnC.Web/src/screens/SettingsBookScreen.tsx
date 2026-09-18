@@ -122,10 +122,11 @@ export default function SettingsBookScreen({ screen, params: p }: { screen: Scre
       {locationsHidden
         ? <aside className="no-print shrink-0"><Button kind="mini" onClick={toggleLocations} title="show the locations">›</Button></aside>
         : (
-        <aside className="no-print w-60 shrink-0">
+        /* #190 follow-up: the list follows the window's height (it was capped at 70vh) and stays put while the grid scrolls */
+        <aside className="no-print w-60 shrink-0 self-start sticky top-4">
           <Panel title="Locations" actions={<Button kind="mini" onClick={toggleLocations} title="hide the locations">‹</Button>}>
             <input className={`${inputClass} mb-2 w-full`} placeholder="filter locations…" value={stationFilter} onChange={(e) => setStationFilter(e.target.value)} />
-            <ul className="max-h-[70vh] overflow-y-auto text-sm">
+            <ul className="max-h-[calc(100vh-12rem)] overflow-y-auto text-sm">
               {stationRows.map((x) => { const id = String(x.EntityId); const sel = id.toLowerCase() === station.toLowerCase()
                 return <li key={id}><button type="button" onClick={() => choose(id)} className={`block w-full truncate rounded px-2 py-1 text-left ${sel ? 'bg-slate-800 text-sky-300' : 'text-slate-300 hover:bg-slate-800/60'}`}>{String(x.Name)}</button></li> })}
               <li className="mt-2 border-t border-slate-800 pt-2"><button type="button" onClick={() => choose('*')} className={`block w-full rounded px-2 py-1 text-left ${station === '*' ? 'bg-slate-800 text-sky-300' : 'text-slate-400 hover:bg-slate-800/60'}`}>Whole estate (every location)</button></li>
