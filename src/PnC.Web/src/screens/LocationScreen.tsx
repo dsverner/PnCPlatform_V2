@@ -36,7 +36,7 @@ import { useCan, useViewAll } from '@/lib/hooks'
 import { type RecordParams, type Screen, screenPath } from '@/lib/screens'
 import { Panel, Pill, Button, Facts, Status, inputClass } from '@/components/ui/ui'
 import { AssetPicker, modelLabel, useModels } from '@/components/pickers'
-import { ClassificationPanel, NODE_KINDS, NodeLink } from './PrimaryAssetScreen'
+import { ClassificationPanel, NODE_KINDS, NodeLink, bit } from './PrimaryAssetScreen'
 
 /** The node types location.vFloc treats as a position — the places a device is installed (and the only node types
  * asset.PlaceAsset accepts for a device: it demands NodeTypeCode = 'DevicePosition' and throws 50215 otherwise). */
@@ -164,6 +164,14 @@ function byCodeThenName(a: Row, b: Row) {
 
 /** Every location node type and the subtype enumeration attached to it, if it has one (ref.vLocationNodeType —
  * NodeTypeCode, Name, SubtypeListDefinitionRowId). One read, shared by every caller through the query cache. */
+/** #180: does a node of this type add a segment to the FLOC? A protection function does not — the owner ruled that a
+ * relay's tag ends at the position it stands in (TN-4134-BDG1-PNL12-21A), because the elements inside a microprocessor
+ * relay would make a schematic drawing unreadable. ref.LocationNodeType.CarriesFlocSegment is the answer, and
+ * location.AssertNodeCode refuses a code on such a type whatever a screen does. NULL means yes, for a type seeded
+ * before the column existed. */
+export const carriesFlocSegment = (typeRef: Row | undefined) =>
+  !(typeRef && 'CarriesFlocSegment' in typeRef && bit(typeRef.CarriesFlocSegment) === false)
+
 function useNodeTypes() {
   const q = useViewAll('ref', 'vLocationNodeType', {}, 'Name')
   const byCode = new Map((q.data ?? []).map((t) => [s(t.NodeTypeCode), t]))
@@ -293,6 +301,8 @@ function AddChild({ node }: { node: Row }) {
     .map((x) => ({ code: s(x.ChildNodeTypeCode), name: s(byCode.get(s(x.ChildNodeTypeCode))?.Name) || s(x.ChildNodeTypeCode), required: !!x.IsRequired }))
     .sort((a, b) => (Number(b.required) - Number(a.required)) || a.name.localeCompare(b.name))
   const chosen = options.some((o) => o.code === type) ? type : (options[0]?.code ?? '')
+  // #180: a type whose nodes are not part of the tag is not asked for a code
+  const takesCode = carriesFlocSegment(byCode.get(chosen))
   if (rulesQ.isPending || typesPending) return <p className="mt-3 border-t border-slate-800 pt-2 text-xs text-slate-500">…</p>
   if (rulesQ.isError) return <div className="mt-3 border-t border-slate-800 pt-2"><Status bad>Could not read what may go inside: {(rulesQ.error as Error).message}</Status></div>
   if (!options.length) return (
@@ -304,8 +314,8 @@ function AddChild({ node }: { node: Row }) {
     if (!nm) { setMsg({ text: 'A name is needed.', bad: true }); nameRef.current?.focus(); return }
     setBusy(true)
     try {
-      await proc('location', 'AddNode', { NodeTypeCode: chosen, ParentEntityId: node.EntityId, Code: cd, Name: nm, SubtypeCode: sub.trim() || null, Notes: notes.trim() || null })
-      setMsg({ text: `${cd ? cd + ' · ' : ''}${nm} added inside ${s(node.Name)}.` })
+      await proc('location', 'AddNode', { NodeTypeCode: chosen, ParentEntityId: node.EntityId, Code: takesCode ? cd : '', Name: nm, SubtypeCode: sub.trim() || null, Notes: notes.trim() || null })
+      setMsg({ text: `${takesCode && cd ? cd + ' · ' : ''}${nm} added inside ${s(node.Name)}.` })
       setType(chosen); setName(''); setCode(''); setNotes(''); refreshTree(qc)
     } catch (e) { setMsg({ text: e instanceof ApiError ? e.message : String(e), bad: true }) } finally { setBusy(false); codeRef.current?.focus() }
   }
@@ -316,9 +326,9 @@ function AddChild({ node }: { node: Row }) {
           <select className={`${inputClass} w-44`} value={chosen} disabled={busy} onChange={(e) => { setType(e.target.value); setSub('') }}>
             {options.map((o) => <option key={o.code} value={o.code}>{o.name}</option>)}
           </select></label>
-        <label className="flex flex-col gap-1 text-xs text-slate-400">code
+        {takesCode && <label className="flex flex-col gap-1 text-xs text-slate-400">code
           <input ref={codeRef} className={`${inputClass} w-24 font-mono`} value={code} disabled={busy} placeholder="Y230"
-            onChange={(e) => setCode(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void add() } }} /></label>
+            onChange={(e) => setCode(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void add() } }} /></label>}
         <label className="flex flex-col gap-1 text-xs text-slate-400">called
           <input ref={nameRef} className={`${inputClass} w-56`} value={name} disabled={busy} placeholder="e.g. 345 kV Yard"
             onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void add() } }} /></label>

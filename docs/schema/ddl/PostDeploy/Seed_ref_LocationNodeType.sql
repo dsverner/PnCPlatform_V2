@@ -19,6 +19,8 @@ USING (VALUES
     (N'Room',                  N'Room',                   N'Point',  1),
     (N'Panel',                 N'Panel',                  N'Point',  1),
     (N'DevicePosition',        N'Device position',        N'Point',  0),
+    -- #180: a protection function adds NO segment to the FLOC. A relay's tag ends at its position (21A), and the
+    -- elements inside it are recorded but never tagged — see ref.LocationNodeType.CarriesFlocSegment.
     (N'ProtectionFunction',    N'Protection function',    N'Point',  0),
     (N'TerminalBlock',         N'Terminal block',         N'Point',  0),
     (N'Stud',                  N'Stud',                   N'Point',  0),
@@ -40,4 +42,24 @@ WHEN MATCHED AND (t.[Name] <> s.[Name] OR t.[Geometry] <> s.[Geometry] OR t.[IsC
 WHEN NOT MATCHED BY TARGET
     THEN INSERT ([NodeTypeCode], [Name], [Geometry], [IsCascadeSupplied], [CreatedBy], [CreatedAt], [ModifiedBy], [ModifiedAt])
          VALUES (s.[NodeTypeCode], s.[Name], s.[Geometry], s.[IsCascadeSupplied], @actor, @now, @actor, @now);
+GO
+
+-- #180 (2026-09-17): the types whose nodes add no segment to the FLOC. Only the protection function today: the owner
+-- ruled that a relay's tag ends at the position it stands in. Set here rather than in the MERGE's VALUES so the one
+-- exception reads as an exception, and so a later ruling is one row to change.
+DECLARE @actor1 UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000001';
+DECLARE @now1 DATETIMEOFFSET(7) = SYSDATETIMEOFFSET();
+UPDATE [ref].[LocationNodeType] SET [CarriesFlocSegment] = 0, [ModifiedBy] = @actor1, [ModifiedAt] = @now1
+WHERE [NodeTypeCode] = N'ProtectionFunction' AND ISNULL([CarriesFlocSegment], 1) = 1;
+UPDATE [ref].[LocationNodeType] SET [CarriesFlocSegment] = 1, [ModifiedBy] = @actor1, [ModifiedAt] = @now1
+WHERE [NodeTypeCode] <> N'ProtectionFunction' AND [CarriesFlocSegment] IS NULL;
+GO
+
+-- and the rule made true of the data, not only of new writes: a node of such a type keeps no code and no FLOC
+DECLARE @actor2 UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000001';
+DECLARE @now2 DATETIMEOFFSET(7) = SYSDATETIMEOFFSET();
+UPDATE n SET [Code] = NULL, [FlocCode] = NULL, [ModifiedBy] = @actor2, [ModifiedAt] = @now2
+FROM [location].[Node] n
+JOIN [ref].[LocationNodeType] ty ON ty.[NodeTypeCode] = n.[NodeTypeCode] AND ISNULL(ty.[CarriesFlocSegment], 1) = 0
+WHERE n.[ValidTo] IS NULL AND n.[IsDeleted] = 0 AND (n.[Code] IS NOT NULL OR n.[FlocCode] IS NOT NULL);
 GO

@@ -5,6 +5,7 @@ CREATE PROCEDURE [ref].[LocationNodeType_Upsert]
     @Description NVARCHAR(MAX) = NULL,
     @Geometry NVARCHAR(20),
     @IsCascadeSupplied BIT = 0,
+    @CarriesFlocSegment BIT = NULL,
     @SubtypeListDefinitionRowId UNIQUEIDENTIFIER = NULL,
     @ActorId UNIQUEIDENTIFIER = NULL,
     @MigrationRunId UNIQUEIDENTIFIER = NULL
@@ -14,7 +15,7 @@ BEGIN
     DECLARE @now DATETIMEOFFSET(7) = SYSDATETIMEOFFSET();
     IF @ActorId IS NULL EXEC [personnel].[ResolveActor] @ActorId = @ActorId OUTPUT;
     IF EXISTS (SELECT 1 FROM [ref].[LocationNodeType] t WHERE t.[NodeTypeCode] = @NodeTypeCode)
-        UPDATE t SET [Name] = @Name, [Description] = @Description, [Geometry] = @Geometry, [IsCascadeSupplied] = @IsCascadeSupplied, [SubtypeListDefinitionRowId] = @SubtypeListDefinitionRowId, [IsActive] = 1, [ModifiedBy] = @ActorId, [ModifiedAt] = @now FROM [ref].[LocationNodeType] t WHERE t.[NodeTypeCode] = @NodeTypeCode;
+        UPDATE t SET [Name] = @Name, [Description] = @Description, [Geometry] = @Geometry, [IsCascadeSupplied] = @IsCascadeSupplied, [CarriesFlocSegment] = @CarriesFlocSegment, [SubtypeListDefinitionRowId] = @SubtypeListDefinitionRowId, [IsActive] = 1, [ModifiedBy] = @ActorId, [ModifiedAt] = @now FROM [ref].[LocationNodeType] t WHERE t.[NodeTypeCode] = @NodeTypeCode;
     ELSE
-        INSERT [ref].[LocationNodeType] ([NodeTypeCode], [Name], [Description], [Geometry], [IsCascadeSupplied], [SubtypeListDefinitionRowId], [CreatedBy], [CreatedAt], [ModifiedBy], [ModifiedAt], [MigrationRunId]) VALUES (@NodeTypeCode, @Name, @Description, @Geometry, @IsCascadeSupplied, @SubtypeListDefinitionRowId, @ActorId, @now, @ActorId, @now, @MigrationRunId);
+        INSERT [ref].[LocationNodeType] ([NodeTypeCode], [Name], [Description], [Geometry], [IsCascadeSupplied], [CarriesFlocSegment], [SubtypeListDefinitionRowId], [CreatedBy], [CreatedAt], [ModifiedBy], [ModifiedAt], [MigrationRunId]) VALUES (@NodeTypeCode, @Name, @Description, @Geometry, @IsCascadeSupplied, @CarriesFlocSegment, @SubtypeListDefinitionRowId, @ActorId, @now, @ActorId, @now, @MigrationRunId);
 END;

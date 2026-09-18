@@ -19,17 +19,33 @@
 -- between two sessions still lands on the index, which is the point of having it).
 -- @SelfEntityId is the node being renamed, excluded from the search so that saving a node without changing its
 -- code is not a collision with itself. AddNode passes none, because the node does not exist yet.
+-- #180 (2026-09-17): a type that adds no segment to the FLOC takes no code either. The owner: "the device FLOC should
+-- stop at TN-4134-BDG1-PNL12-21A and that FLOC position should be assigned to the device (SEL-411L etc.)" — his client
+-- shortened the tag to the position on purpose, so schematic drawings would not get busy, and everyone there knows a 21
+-- element covers more than distance. The elements are still recorded as nodes (a scheme's members ARE protection
+-- functions, which is what lets a relay be swapped without touching the scheme); they simply never appear in a tag.
+-- Refused here rather than hidden on a screen, so no path into the platform can put one there.
 CREATE PROCEDURE [location].[AssertNodeCode]
     @Caller NVARCHAR(40),
     @Code NVARCHAR(40) OUTPUT,
     @ParentEntityId UNIQUEIDENTIFIER = NULL,
-    @SelfEntityId UNIQUEIDENTIFIER = NULL
+    @SelfEntityId UNIQUEIDENTIFIER = NULL,
+    @NodeTypeCode NVARCHAR(40) = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
     IF @Code IS NULL RETURN;
     SET @Code = LTRIM(RTRIM(@Code));
     IF @Code = N'' RETURN;                      -- the clear sentinel; the caller turns it into NULL
+
+    -- #180: the FLOC stops here, so there is nothing for a code to be a segment of
+    IF @NodeTypeCode IS NOT NULL AND EXISTS (SELECT 1 FROM [ref].[LocationNodeType]
+                                             WHERE [NodeTypeCode] = @NodeTypeCode AND ISNULL([CarriesFlocSegment], 1) = 0)
+    BEGIN
+        DECLARE @t NVARCHAR(400) = CONCAT(@Caller, N': a ', @NodeTypeCode,
+            N' carries no code, because the FLOC ends at the position the device stands in. Record what it does in its name.');
+        THROW 50215, @t, 1;
+    END
     IF @Code LIKE N'%[-]%' OR @Code LIKE N'%[' + NCHAR(9) + NCHAR(10) + NCHAR(11) + NCHAR(12) + NCHAR(13) + N' ]%'
     BEGIN
         DECLARE @m NVARCHAR(400) = CONCAT(@Caller, N': ', @Code,

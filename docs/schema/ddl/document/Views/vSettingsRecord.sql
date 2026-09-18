@@ -55,6 +55,11 @@ SELECT r.[RowSeq],
        fw.[VersionString]           AS [FirmwareVersion],
        dp.[EntityId]                AS [PositionNodeEntityId],
        dp.[Name]                    AS [PositionName],
+       -- #180 (2026-09-17): the device's functional location IS its position's, and the FLOC ends there. The owner:
+       -- "the device FLOC should stop at TN-4134-BDG1-PNL12-21A and that FLOC position should be assigned to the
+       -- device (SEL-411L etc.)". The position node already carries the composed tag, so this is that column read
+       -- through the placement the view already has, not a second walk of the tree.
+       dp.[FlocCode]                AS [Floc],
        pnl.[EntityId]               AS [PanelNodeEntityId],
        pnl.[Name]                   AS [PanelName],
        bld.[BuildingEntityId]       AS [BuildingNodeEntityId],

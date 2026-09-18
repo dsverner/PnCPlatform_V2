@@ -6,6 +6,14 @@ CREATE TABLE [ref].[LocationNodeType] (
     [Description]       NVARCHAR(MAX)     NULL,
     [Geometry]          NVARCHAR(20)      NOT NULL CONSTRAINT [CK_LocationNodeType_Geometry] CHECK ([Geometry] IN (N'Point', N'Linear')),
     [IsCascadeSupplied] BIT               NOT NULL CONSTRAINT [DF_LocationNodeType_IsCascadeSupplied] DEFAULT 0,
+    -- #180 (2026-09-17): does a node of this type add a segment to the FLOC? The owner: "the device FLOC should stop
+    -- at TN-4134-BDG1-PNL12-21A and that FLOC position should be assigned to the device (SEL-411L etc.)" — a relay's
+    -- tag ends at the position it stands in. The elements inside it (21, 51N ...) are recorded as nodes, because a
+    -- scheme's members are protection functions, but they are NOT part of anyone's tag: his client shortened the tag
+    -- to 21A deliberately so schematic drawings would not get busy. NULL or 1 means the type carries a segment, which
+    -- is every type's answer but the ones named in Seed_ref_LocationNodeType. Nullable because the column is added to
+    -- a table that already has history rows.
+    [CarriesFlocSegment] BIT          NULL,
     [SubtypeListDefinitionRowId] UNIQUEIDENTIFIER NULL CONSTRAINT [FK_LocationNodeType_SubtypeList] REFERENCES [config].[DefinitionVersion] ([RowId]),
     [SysStart]          DATETIME2(7) GENERATED ALWAYS AS ROW START HIDDEN NOT NULL,
     [SysEnd]            DATETIME2(7) GENERATED ALWAYS AS ROW END   HIDDEN NOT NULL,

@@ -1046,7 +1046,7 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
                 $"#176: a scheme takes functions, assets and channels and never a device ({(int)k176_m1s}), and a member kind must name a thing of that kind ({(int)k176_m2s} {k176_m2b?["detail"]})");
 
             // a protection function under the new position, added to the scheme in a role, then withdrawn again
-            var (k176_f1s, k176_f1b) = await Post(admin, "api/v1/location/AddNode", new { NodeTypeCode = "ProtectionFunction", ParentEntityId = k176_pos, Name = "50/51 spare", Code = "5051" });
+            var (k176_f1s, k176_f1b) = await Post(admin, "api/v1/location/AddNode", new { NodeTypeCode = "ProtectionFunction", ParentEntityId = k176_pos, Name = "50/51 spare" });
             var k176_fn = Id(k176_f1b);
             var (k176_m3s, k176_m3b) = await Post(admin, "api/v1/scheme/AddSchemeMember", new { SchemeEntityId = scheme, MemberKind = "ProtectionFunction", MemberEntityId = k176_fn, MemberRoleCode = "TripCircuit" });
             var k176_member = Id(k176_m3b);
@@ -1133,6 +1133,27 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
             Must(k179_a1s == HttpStatusCode.OK && k179_a2s == HttpStatusCode.OK && k179_bld is not null
                  && k179_byBuilding.Count == k179_byStation.Count && k179_byStation.Count > 0 && k179_named,
                 $"#179: a settings record names the building it stands in, and a station with one building answers the same by either ({k179_byStation.Count} by station, {k179_byBuilding.Count} by building, named {k179_named})");
+
+            // ======== #180 (2026-09-17): the FLOC stops at the position the device stands in. The owner: "I believe that the
+            // device FLOC should stop at TN-4134-BDG1-PNL12-21A and that FLOC position should be assigned to the device
+            // (SEL-411L etc.)". His client shortened the tag on purpose so schematic drawings would not get busy, and everyone
+            // there knows a 21 element covers more than distance. The elements are still recorded — a scheme's members ARE
+            // protection functions, which is what lets a relay be swapped without touching the scheme — they simply carry no
+            // code and so appear in no tag. Refused by the platform, not merely hidden on a screen.
+            var (k180_p0s, k180_p0b) = await Post(admin, "api/v1/location/AddNode", new { NodeTypeCode = "DevicePosition", ParentEntityId = panel, Name = $"{tag} 21A", Code = "21A" });
+            var k180_pos = Id(k180_p0b);
+            var (k180_e1s, k180_e1b) = await Post(admin, "api/v1/location/AddNode", new { NodeTypeCode = "ProtectionFunction", ParentEntityId = k180_pos, Name = "21 distance", Code = "21" });
+            var (k180_o1s, k180_o1b) = await Post(admin, "api/v1/location/AddNode", new { NodeTypeCode = "ProtectionFunction", ParentEntityId = k180_pos, Name = "21 distance" });
+            var k180_fn = Id(k180_o1b);
+            var (k180_r1s, _) = await Post(admin, "api/v1/location/RenameNode", new { EntityId = k180_fn, Name = "21 distance", Code = "21" });
+            var (k180_v1s, k180_v1b) = await Get(admin, $"api/v1/location/vNode?EntityId={k180_fn}");
+            var k180_row = (k180_v1b?["rows"] as JsonArray)?.FirstOrDefault();
+            var (k180_p1s, k180_p1b) = await Get(admin, $"api/v1/location/vNode?EntityId={k180_pos}");
+            var k180_posFloc = (k180_p1b?["rows"] as JsonArray)?.FirstOrDefault()?["FlocCode"]?.ToString();
+            Must(k180_p0s == HttpStatusCode.OK && k180_e1s == HttpStatusCode.Conflict && Code(k180_e1b) == "rule" && k180_o1s == HttpStatusCode.OK
+                 && k180_r1s == HttpStatusCode.Conflict && k180_row?["FlocCode"] is null && k180_row?["Code"] is null
+                 && !string.IsNullOrWhiteSpace(k180_posFloc),
+                $"#180: a protection function takes no code, so the tag ends at the position ({k180_posFloc}) and the element beneath it has none ({(int)k180_e1s} {k180_e1b?["detail"]})");
 
 
             // the FLOC follows a code change, for the node and everything beneath it
