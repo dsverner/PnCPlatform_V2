@@ -47,7 +47,7 @@ export default function RecordScreen({ params: p, id }: { screen: Screen; params
         {/* #188: the owner, 2026-09-18: the title "should really be the name of the protection" — the scheme's name as recorded, the relay beneath */}
         <div className="flex items-center gap-2"><h1 className="text-lg font-semibold text-slate-100">{s(r.SchemeName) || legacyFree(r.DeviceName)}</h1><Pill tone={stateTone(r.GridState)}>{s(r.GridState)}</Pill></div>
         <div className="flex flex-wrap gap-2">
-          {!!r.WorkRequestEntityId && <Button onClick={() => navigate(screenPath('WORK_ITEM', s(r.WorkRequestEntityId)))}>Change request</Button>}
+          {!!r.WorkRequestEntityId && <Button onClick={() => navigate(screenPath('WORK_ITEM', s(r.WorkRequestEntityId)))}>Open its change request</Button>}
           <Button disabled={!others.length} title={others.length ? undefined : 'This device has no other revision'} onClick={() => { setSection('compare'); if (!compareWith && others[0]) setCompareWith(s(others[0].RevisionRowId)) }}>Compare</Button>
           <Button onClick={() => setSection('files')}>Documentation</Button>
           <Button onClick={back}>Close</Button>

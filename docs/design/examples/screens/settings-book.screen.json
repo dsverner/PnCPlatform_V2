@@ -252,7 +252,7 @@
         "param": "RevisionRowId"
       },
       {
-        "label": "Change request",
+        "label": "Open its change request",
         "action": "openScreen",
         "screen": "WORK_ITEM",
         "param": "WorkRequestEntityId",
@@ -275,7 +275,7 @@
         "permission": "Record.Modify"
       },
       {
-        "label": "Request change",
+        "label": "Raise a change request",
         "action": "raiseRequest",
         "workflowKey": "SETTINGS_CHANGE_REQUEST",
         "workType": "SETTINGS_CHANGE",
