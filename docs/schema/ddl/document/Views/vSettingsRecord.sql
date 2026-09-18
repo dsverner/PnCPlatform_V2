@@ -34,6 +34,14 @@ SELECT r.[RowSeq],
        it.[Sequence]                AS [PackageSequence],
        w.[EntityId]                 AS [WorkRequestEntityId],
        w.[Title]                    AS [WorkRequestTitle],
+       -- #191: the open draft this draft was copied from (RevisionLink BasedOn), its request, and whether it is still outstanding
+       bo.[BasisRevisionRowId]      AS [BasedOnRevisionRowId],
+       bow.[EntityId]               AS [BasedOnWorkRequestEntityId],
+       bow.[Title]                  AS [BasedOnWorkRequestTitle],
+       CASE WHEN bo.[BasisRevisionRowId] IS NULL THEN NULL
+            WHEN bo.[BasisStatus] IN (N'Superseded', N'Withdrawn') OR bo.[BasisInServiceTo] IS NOT NULL THEN N'Archived'
+            WHEN bo.[BasisInServiceFrom] IS NOT NULL THEN N'Active'
+            ELSE N'Outstanding' END AS [BasedOnGridState],
        wt.[DefinitionKey]           AS [WorkTypeKey],
        wt.[Name]                    AS [WorkTypeName],
        pi.[EntityId]                AS [ProcedureInstanceEntityId],
@@ -91,6 +99,22 @@ OUTER APPLY (SELECT TOP (1) x.[WorkRequestEntityId] FROM [record].[Record] x
              ORDER BY x.[OccurredAt]) prec
 OUTER APPLY (SELECT TOP (1) w.[EntityId], w.[Title], w.[WorkTypeDefinitionVersionRowId] FROM [work].[WorkRequest] w
              WHERE w.[ValidTo] IS NULL AND w.[IsDeleted] = 0 AND w.[EntityId] = COALESCE(rec.[WorkRequestEntityId], prec.[WorkRequestEntityId]) ORDER BY w.[RowSeq] DESC) w   -- #168: a copy made at the request step belongs to its request before any record points at it
+-- #191: the basis — the link, the basis revision's current row and its file, then its request the way this record's is found
+OUTER APPLY (SELECT TOP (1) br.[RowId] AS [BasisRevisionRowId], br.[Status] AS [BasisStatus], bcf.[InServiceFrom] AS [BasisInServiceFrom], bcf.[InServiceTo] AS [BasisInServiceTo]
+             FROM [document].[RevisionLink] l
+             JOIN [document].[Revision] br ON br.[RowId] = l.[SubjectEntityId] AND br.[IsDeleted] = 0   -- the subject is the basis revision's RowId
+             LEFT JOIN [document].[ConfigurationFile] bcf ON bcf.[RevisionRowId] = br.[RowId] AND bcf.[IsDeleted] = 0
+             WHERE l.[RevisionRowId] = cf.[RevisionRowId] AND l.[LinkKind] = N'BasedOn' AND l.[ValidTo] IS NULL AND l.[IsDeleted] = 0
+             ORDER BY l.[RowSeq] DESC) bo
+OUTER APPLY (SELECT TOP (1) x.[WorkRequestEntityId] FROM [record].[Record] x
+             WHERE x.[ValidTo] IS NULL AND x.[IsDeleted] = 0 AND x.[SecondSubjectKind] = N'ConfigurationFileRevision' AND x.[SecondSubjectEntityId] = bo.[BasisRevisionRowId]
+             ORDER BY x.[OccurredAt]) borec
+OUTER APPLY (SELECT TOP (1) x.[WorkRequestEntityId] FROM [document].[SettingsIssuePackageItem] bit JOIN [record].[Record] x
+               ON x.[ValidTo] IS NULL AND x.[IsDeleted] = 0 AND x.[SecondSubjectKind] = N'SettingsIssuePackage' AND x.[SecondSubjectEntityId] = bit.[PackageRevisionRowId]
+             WHERE bit.[ConfigurationFileRevisionRowId] = bo.[BasisRevisionRowId] AND bit.[IsDeleted] = 0 AND bit.[ValidTo] IS NULL
+             ORDER BY x.[OccurredAt]) boprec
+OUTER APPLY (SELECT TOP (1) bw.[EntityId], bw.[Title] FROM [work].[WorkRequest] bw
+             WHERE bw.[ValidTo] IS NULL AND bw.[IsDeleted] = 0 AND bw.[EntityId] = COALESCE(borec.[WorkRequestEntityId], boprec.[WorkRequestEntityId]) ORDER BY bw.[RowSeq] DESC) bow
 LEFT JOIN [config].[vDefinitionVersion] wtv ON wtv.[RowId] = w.[WorkTypeDefinitionVersionRowId]
 LEFT JOIN [config].[vDefinition] wt ON wt.[EntityId] = wtv.[DefinitionEntityId]
 OUTER APPLY (SELECT TOP (1) p.[EntityId], p.[State] FROM [process].[ProcedureInstance] p

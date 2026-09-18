@@ -247,9 +247,21 @@ BEGIN
             WHERE it.[PackageRevisionRowId] = @pkg AND it.[IsDeleted] = 0 AND it.[ValidTo] IS NULL AND cf.[CaptureKind] = N'Designed'
               AND NOT EXISTS (SELECT 1 FROM [process].[BlockInstance] bx WHERE bx.[ProcedureInstanceEntityId] = @instance AND bx.[MemberSubjectEntityId] = cf.[DeviceEntityId] AND bx.[Outcome] = N'Superseded' AND bx.[IsDeleted] = 0)
             ORDER BY it.[Sequence];
+        -- #191: a revision based on another request's open draft cannot go in service before that request does (the owner,
+        -- 2026-09-18: the second work request "could only be completed after the completion of the first")
+        DECLARE @basisEnt UNIQUEIDENTIFIER, @basisRow UNIQUEIDENTIFIER, @basisTitle NVARCHAR(200), @devName NVARCHAR(200), @orderMsg NVARCHAR(400);
         OPEN ic; FETCH NEXT FROM ic INTO @itRev, @itDev;
         WHILE @@FETCH_STATUS = 0
         BEGIN
+            SET @basisEnt = (SELECT TOP (1) l.[SubjectEntityId] FROM [document].[RevisionLink] l WHERE l.[RevisionRowId] = @itRev AND l.[LinkKind] = N'BasedOn' AND l.[ValidTo] IS NULL AND l.[IsDeleted] = 0 ORDER BY l.[RowSeq] DESC);
+            SET @basisRow = CASE WHEN @basisEnt IS NULL THEN NULL ELSE (SELECT TOP (1) br.[RowId] FROM [document].[Revision] br WHERE br.[RowId] = @basisEnt AND br.[IsDeleted] = 0 AND br.[Status] NOT IN (N'Superseded', N'Withdrawn')) END;   -- the subject is the basis revision's RowId
+            IF @basisRow IS NOT NULL AND EXISTS (SELECT 1 FROM [document].[ConfigurationFile] bcf WHERE bcf.[RevisionRowId] = @basisRow AND bcf.[IsDeleted] = 0 AND bcf.[InServiceFrom] IS NULL)
+            BEGIN
+                SELECT TOP (1) @basisTitle = sr.[WorkRequestTitle] FROM [document].[vSettingsRecord] sr WHERE sr.[RevisionRowId] = @basisRow;
+                SELECT @devName = [Name] FROM [asset].[vAsset] WHERE [EntityId] = @itDev;
+                SET @orderMsg = CONCAT(N'process.CommitStep: ', ISNULL(@devName, N'the device'), N' is based on the draft of "', ISNULL(@basisTitle, N'another request'), N'", which is not yet in service; that request completes first.');
+                THROW 50250, @orderMsg, 1;
+            END
             EXEC [document].[SetInService] @RevisionRowId = @itRev, @InServiceFrom = @rtsAt, @InServiceFromQuality = 1, @ActorId = @ActorId, @IsUnapproved = @unapproved OUTPUT;
             FETCH NEXT FROM ic INTO @itRev, @itDev;
         END

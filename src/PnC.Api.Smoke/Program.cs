@@ -1534,6 +1534,58 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
                         $"#168 [4]: the copy is in service (revision {aAfter?["RevisionLabel"]}), the previous revision archived (revision {pAfter?["RevisionLabel"]}), the request Closed ({(int)cl9s} {Code(cl9b)})");
                     var final9 = await Rendered(mRev);
                     Must(final9 == filedText, "#168: the in-service revision's rendered text is still its filed file, byte for byte");
+
+                    // ======== #191 (2026-09-18): a second change while one is open — based on the first's current settings, and
+                    // not in service before it. The owner: the second "took the existing work request data as the starting point
+                    // and could only be completed after the completion of the first".
+                    async Task<(Guid? wr, Guid? wf, Guid? inst)> Raise(string title)
+                    {
+                        var (ws, wb) = await Post(admin, "api/v1/work/WorkRequest_Add", new { WorkTypeDefinitionVersionRowId = simpleType, Title = title, ScopeKind = "Asset", ScopeEntityId = devBdd, OutageRequired = false });
+                        var (ss, sb) = await Post(admin, "api/v1/process/workflows/start", new { workflowKey = "SETTINGS_CHANGE_REQUEST_SIMPLE", subjectKind = "WorkRequest", subjectEntityId = Id(wb) });
+                        await Post(admin, $"api/v1/process/workflow-instances/{Id(sb, "workflowInstanceEntityId")}/transitions", new { name = "Start" });
+                        var (_, pb) = await Get(admin, $"api/v1/process/vProcedureInstance?WorkflowInstanceEntityId={Id(sb, "workflowInstanceEntityId")}");
+                        return (ws == HttpStatusCode.OK && ss == HttpStatusCode.OK ? Id(wb) : null, Id(sb, "workflowInstanceEntityId"), Id((pb?["rows"] as JsonArray)?.FirstOrDefault(r => r?["ParentInstanceEntityId"] is null)));
+                    }
+                    var (wrA, wfA, instA) = await Raise($"{tag} A: slope 35 (#191)");
+                    inst = instA;
+                    var (a1s, _) = await RunStep(admin, "REQUEST", new { outcome = "Done", capture = new { reason = "#191 A", devices = new[] { devBdd } } });
+                    var draftA = Id(await Record(devBdd, "Outstanding"), "RevisionRowId");
+                    var (ea, _) = await Post(admin, "api/v1/process/SetParsedSetting", new { ConfigurationFileRevisionRowId = draftA, DeviceEntityId = devBdd, SettingCode = "SLOPE", RawValue = "35 %" });
+                    var (wrB, wfB, instB) = await Raise($"{tag} B: based on A (#191)");
+                    inst = instB;
+                    var (b1s, _) = await RunStep(admin, "REQUEST", new { outcome = "Done", capture = new { reason = "#191 B", devices = new[] { devBdd } } });
+                    var (_, outB) = await Get(admin, $"api/v1/document/vSettingsRecord?DeviceEntityId={devBdd}&GridState=Outstanding");
+                    var outRows = (outB?["rows"] as JsonArray) ?? new JsonArray();
+                    var rowB = outRows.FirstOrDefault(r => string.Equals(r?["WorkRequestEntityId"]?.ToString(), wrB?.ToString(), StringComparison.OrdinalIgnoreCase));
+                    var draftB = Id(rowB, "RevisionRowId"); var parsedB = await Parsed(draftB);
+                    Must(a1s == HttpStatusCode.OK && ea == HttpStatusCode.OK && b1s == HttpStatusCode.OK && outRows.Count == 2 && draftB is not null && draftB != draftA
+                         && parsedB.GetValueOrDefault("SLOPE") == "35 %" && string.Equals(rowB?["BasedOnWorkRequestEntityId"]?.ToString(), wrA?.ToString(), StringComparison.OrdinalIgnoreCase) && rowB?["BasedOnGridState"]?.ToString() == "Outstanding",
+                        $"#191: B's draft starts from A's current settings (SLOPE {parsedB.GetValueOrDefault("SLOPE")}, not the in-service 30 %), two outstanding records, B based on A ({rowB?["BasedOnWorkRequestTitle"]}, {rowB?["BasedOnGridState"]})");
+                    // B runs ahead to its completion — refused while A is a draft
+                    await RunStep(admin, "WRITE_RATIONALE", new { outcome = "Done", evidence = new[] { File("rationale.txt", "text/plain", "#191 B", "Rationale") } });
+                    await RunStep(admin, "RECORD_SETTINGS", new { outcome = "Done" }, devBdd);
+                    await Post(admin, $"api/v1/process/procedure-instances/{instB}/evaluate", new { }); await Post(admin, $"api/v1/process/procedure-instances/{instB}/evaluate", new { });
+                    await RunStep(tech, "INSTALL", new { outcome = "Done", capture = new { installedAt = DateTime.UtcNow.ToString("o"), commissioningNote = "#191 B" } }, devBdd);
+                    var stepB = await ReadyStep("COMPLETE", null, 2);
+                    var (cbs, _) = await Post(admin, $"api/v1/process/step-instances/{stepB}/claim", new { });
+                    var (rbs, rbb) = await Post(admin, $"api/v1/process/step-instances/{stepB}/commit", new { outcome = "Done" });
+                    Must(cbs == HttpStatusCode.OK && rbs != HttpStatusCode.OK && (rbb?["detail"]?.ToString() ?? "").Contains("not yet in service"),
+                        $"#191: B cannot go in service before A — refused ({(int)rbs} {Code(rbb)}: {rbb?["detail"]})");
+                    // A completes; then B can
+                    inst = instA;
+                    await RunStep(admin, "WRITE_RATIONALE", new { outcome = "Done", evidence = new[] { File("rationale.txt", "text/plain", "#191 A", "Rationale") } });
+                    await RunStep(admin, "RECORD_SETTINGS", new { outcome = "Done" }, devBdd);
+                    await Post(admin, $"api/v1/process/procedure-instances/{instA}/evaluate", new { }); await Post(admin, $"api/v1/process/procedure-instances/{instA}/evaluate", new { });
+                    await RunStep(tech, "INSTALL", new { outcome = "Done", capture = new { installedAt = DateTime.UtcNow.ToString("o"), commissioningNote = "#191 A" } }, devBdd);
+                    var (kas, _) = await RunStep(admin, "COMPLETE", new { outcome = "Done" });
+                    var activeAfterA = Id(await Record(devBdd, "Active"), "RevisionRowId");
+                    var (rbs2, rbb2) = await Post(admin, $"api/v1/process/step-instances/{stepB}/commit", new { outcome = "Done" });
+                    var activeAfterB = Id(await Record(devBdd, "Active"), "RevisionRowId");
+                    var (_, archB) = await Get(admin, $"api/v1/document/vSettingsRecord?DeviceEntityId={devBdd}&GridState=Archived");
+                    var aArchived = (archB?["rows"] as JsonArray)?.Any(r => Id(r, "RevisionRowId") == draftA) == true;
+                    Must(kas == HttpStatusCode.OK && activeAfterA == draftA && rbs2 == HttpStatusCode.OK && activeAfterB == draftB && aArchived,
+                        $"#191: A in service first ({(int)kas}), then B ({(int)rbs2} {Code(rbb2)} {rbb2?["detail"]}) — B is the Active record, A archived");
+                    await Post(admin, $"api/v1/process/workflow-instances/{wfA}/transitions", new { name = "Close" }); await Post(admin, $"api/v1/process/workflow-instances/{wfB}/transitions", new { name = "Close" });
                 }
             }
         }

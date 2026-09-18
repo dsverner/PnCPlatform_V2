@@ -31,11 +31,6 @@ export function useTemplate(modelId: string | null | undefined) {
 const isRatio = (r: Row) => /current and potential inputs|transformer ratio/i.test(s(r.Category))
 const rangeText = (r: Row) => (r.MinValue == null && r.MaxValue == null ? '' : `${r.MinValue ?? '…'} – ${r.MaxValue ?? '…'}`)
 
-export function FunctionChips({ template }: { template: Template }) {
-  const codes = [...new Set(template.rows.map((r) => s(r.AnsiCode)).filter(Boolean))]
-  if (!codes.length) return null
-  return <div className="flex flex-wrap gap-1">{codes.map((c) => <Pill key={c} tone="accent" title={template.ansi.get(c)}>{c} {template.ansi.get(c) ?? ''}</Pill>)}</div>
-}
 
 /** The relay's inputs, from the template's ratio settings: what each ratio setting says the relay is fed by (the manual's words in the definition). */
 export function InputsPanel({ template, values }: { template: Template; values: Map<string, Row> }) {
@@ -128,7 +123,7 @@ export default function DeviceSettings({ r, revision, filedText, editable = fals
   if (!tq.data) return null
   return (
     <>
-      <FunctionChips template={tq.data} />
+      {/* the function chips that sat here were removed 2026-09-18 — the owner: "not sure I see the use of the tags at top of the Settings tab" */}
       <InputsPanel template={tq.data} values={values} />
       <SettingsByFunction template={tq.data} parsed={parsed} parseStatus={s(r.ParseStatus)} parseError={s(r.ParseError)} revision={revision} filedText={filedText} editable={editable} deviceId={s(r.DeviceEntityId)} />
     </>
