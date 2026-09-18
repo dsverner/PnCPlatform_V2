@@ -1309,6 +1309,51 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
                  && k173_facts.GetValueOrDefault("device.protects.terminal.voltage", "").StartsWith("230", StringComparison.Ordinal)
                  && k173_facts.ContainsKey("device.protects.rating[kind=FourHour]"),
                 $"#173: the obligation's evidence trail names the terminal's voltage, the ratings read and the criterion chosen ({k173_facts.Count} facts, criterion {k173_facts.GetValueOrDefault("asset.formula.prc023_criterion")})");
+
+            // ======== #184 (2026-09-18): the device template, and PRC-023 + NPCC A-10 / Directory 4 as its compliance. The owner:
+            // a template is one per device type, one level below a scheme, named "SEL221F_Template"; compliance in it is
+            // CALCULATED from study values recorded on the primary elements, "not something that an admin can turn on or off";
+            // and NPCC A-10 "has no impact on settings but a huge impact on the physical design of the protection (Directory 4
+            // compliance)" — a documentation-awareness case. Directory 4 and A-10 are seeded from the documents at npcc.org.
+            var (k184_d1s, k184_d1b) = await Get(admin, "api/v1/config/vDefinition?DefinitionKind=CharacteristicSchema.AssetTemplate&DefinitionKey=SEL221F_Template&take=1");
+            var k184_def = (k184_d1b?["rows"] as JsonArray)?.FirstOrDefault();
+            var (k184_v1s, k184_v1b) = await Get(admin, $"api/v1/config/vDefinitionVersion?DefinitionEntityId={k184_def?["EntityId"]}&Status=Effective&take=5");
+            var k184_ver = (k184_v1b?["rows"] as JsonArray)?.FirstOrDefault();
+            var (k184_a1s, k184_a1b) = await Get(admin, $"api/v1/config/vDefinitionAppliesTo?DefinitionVersionRowId={k184_ver?["RowId"]}&DimensionCode=Model&take=10");
+            var k184_bound = (k184_a1b?["rows"] as JsonArray)?.Count ?? -1;
+            var (k184_c1s, k184_c1b) = await Get(readOnly!, $"api/v1/config/vCharacteristicDefinition?DefinitionVersionRowId={k184_ver?["RowId"]}&take=50");
+            var k184_facts = (k184_c1b?["rows"] as JsonArray)?.Count ?? -1;
+            Must(k184_d1s == HttpStatusCode.OK && k184_def is not null && k184_ver is not null && k184_bound == 2 && k184_c1s == HttpStatusCode.OK && k184_facts == 9,
+                $"#184: SEL221F_Template is an Effective AssetTemplate bound to both SEL-221F model codes ({k184_bound}), and ReadOnly reads its {k184_facts} facts");
+
+            // Directory 4 and A-10 are seeded from the documents, page-cited, and the screen definition is Effective
+            var (k184_s1s, k184_s1b) = await Get(admin, "api/v1/compliance/vStandardVersion?StandardCode=NPCC-D4&take=5");
+            var k184_sv = (k184_s1b?["rows"] as JsonArray)?.FirstOrDefault();
+            var (k184_r1s, k184_r1b) = await Get(admin, $"api/v1/compliance/vRequirement?StandardVersionRowId={k184_sv?["RowId"]}&take=100");
+            var k184_reqs = (k184_r1b?["rows"] as JsonArray)?.Count ?? -1;
+            var (k184_s2s, k184_s2b) = await Get(admin, "api/v1/compliance/vStandardVersion?StandardCode=NPCC-A10&take=5");
+            var (k184_sc1s, k184_sc1b) = await Get(admin, "api/v1/config/vDefinition?DefinitionKind=Program.Screen&DefinitionKey=DEVICE_TEMPLATE&take=1");
+            Must(k184_s1s == HttpStatusCode.OK && k184_sv?["VersionLabel"]?.ToString() == "D4 (2025-12-18)" && k184_reqs == 23
+                 && k184_s2s == HttpStatusCode.OK && ((k184_s2b?["rows"] as JsonArray)?.Count ?? 0) == 1
+                 && k184_sc1s == HttpStatusCode.OK && ((k184_sc1b?["rows"] as JsonArray)?.Count ?? 0) == 1,
+                $"#184: NPCC Directory 4 ({k184_sv?["VersionLabel"]}) carries its {k184_reqs} criteria R5.1 — R6.3, A-10 is seeded beside it, and the DEVICE_TEMPLATE screen is defined");
+
+            // the awareness case, end to end: the A-10 outcome on the bus the relay's scheme protects from decides Directory 4.
+            // The fixture bus is tied to the line's terminal at this station (the terminal the scheme protects from), declared
+            // BPS, and the relay's next pass opens npcc_d4; declared Not BPS, the next pass closes it. Nobody switched anything on.
+            var (k184_t1s, k184_t1b) = await Post(admin, "api/v1/asset/AssetTerminal_Revise", new { EntityId = k173_term, AssetEntityId = k173_line, TerminalNo = 1, StationNodeEntityId = station, VoltageClassCode = "230kV", BusAssetEntityId = k173_bus });
+            var (k184_b1s, k184_b1b) = await Post(admin, "api/v1/asset/RecordClassification", new { SubjectKind = "Asset", SubjectEntityId = k173_bus, ClassificationKindCode = "NpccBulkPowerSystem", ClassificationValue = "BPS" });
+            var (k184_e1s, k184_e1b) = await Post(admin, "api/v1/compliance/evaluate", new { subjectEntityId = devSel, mode = "Effective" });
+            var (k184_o1s, k184_o1b) = await Get(admin, $"api/v1/compliance/vObligationSubject?SubjectEntityId={devSel}");
+            var k184_openBps = (k184_o1b?["rows"] as JsonArray)?.Where(r => r?["Status"]?.ToString() == "Open").Select(r => r?["RuleDefinitionKey"]?.ToString()).ToList() ?? new();
+            var (k184_b2s, _) = await Post(admin, "api/v1/asset/RecordClassification", new { SubjectKind = "Asset", SubjectEntityId = k173_bus, ClassificationKindCode = "NpccBulkPowerSystem", ClassificationValue = "Not BPS" });
+            var (k184_e2s, k184_e2b) = await Post(admin, "api/v1/compliance/evaluate", new { subjectEntityId = devSel, mode = "Effective" });
+            var (k184_o2s, k184_o2b) = await Get(admin, $"api/v1/compliance/vObligationSubject?SubjectEntityId={devSel}");
+            var k184_openNot = (k184_o2b?["rows"] as JsonArray)?.Where(r => r?["Status"]?.ToString() == "Open").Select(r => r?["RuleDefinitionKey"]?.ToString()).ToList() ?? new();
+            var (k184_q1s, _) = await Post(readOnly!, "api/v1/asset/RecordClassification", new { SubjectKind = "Asset", SubjectEntityId = k173_bus, ClassificationKindCode = "NpccBulkPowerSystem", ClassificationValue = "BPS" });
+            Must(k184_t1s == HttpStatusCode.OK && k184_b1s == HttpStatusCode.OK && k184_e1s == HttpStatusCode.OK && k184_openBps.Contains("npcc_d4")
+                 && k184_b2s == HttpStatusCode.OK && k184_e2s == HttpStatusCode.OK && !k184_openNot.Contains("npcc_d4") && k184_q1s == HttpStatusCode.Forbidden,
+                $"#184: the A-10 outcome on the protected bus decides Directory 4 — BPS opens npcc_d4 on the relay ({string.Join(", ", k184_openBps)}), Not BPS closes it ({string.Join(", ", k184_openNot)}), and ReadOnly records nothing ({(int)k184_q1s})");
         }
 
         // ======== #168 increment 2 (2026-09-16): the settings edited in the platform, the file written by it — the owner's four-step

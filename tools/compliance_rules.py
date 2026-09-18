@@ -23,10 +23,14 @@ VERSIONS = {   # the NB appendix labels in force on 2026-09-16 (nbeub.ca): the l
     "PRC-023": "PRC-023-6-NB-0",
     "CIP-004": "CIP-004-7-NB-0", "CIP-005": "CIP-005-7-NB-0", "CIP-006": "CIP-006-6-NB-0",
     "CIP-007": "CIP-007-6-NB-0", "CIP-010": "CIP-010-4-NB-0", "CIP-011": "CIP-011-3-NB-0",
+    "NPCC-D4": "D4 (2025-12-18)",   # #184: Seed_compliance_Standards_NPCC.sql; npcc.org lists it effective December 18, 2025
 }
 
 CIP_SCOPE = "device.classification.BesCyberAsset = 'BCA' and device.location.classification.CipImpactRating in {'High', 'Medium'}"
 CIP_ERC_SCOPE = CIP_SCOPE + " and device.classification.ExternalRoutableConnectivity = 'ERC'"
+NPCC_NOTE = ("NPCC Directory 4 is a design criterion, not a settings criterion: the evidence is the protection system design and "
+             "its TFSP submittal and acceptance (R6.1 - R6.3), kept outside the platform. Attaches when the A-10 study declares the "
+             "protected bus BPS (the owner, 2026-09-18: a documentation awareness case).")
 CIP_NOTE = ("The platform holds no record kind for this requirement in this phase; the evidence is kept outside the platform. "
             "The obligation is listed so the device's sheet shows what applies to it (owner, 2026-09-16).")
 
@@ -58,6 +62,9 @@ PRC_RULES = [
      "criterion 1, then 2, then 13, then 12 (owner, 2026-09-16); the formula prc023_criterion records which one the in-service "
      "settings satisfy. Applicability from PRC-023-6 4.2.1.1 (200 kV and above) or the Planning Authority's R6 list (recorded as "
      "the Prc023 classification of the protected asset). NB appendix PRC-023-6-NB-0: no modification."),
+    # #184: NPCC Directory 4 attaches to every relay protecting a bus the A-10 study declares BPS. One rule, pointing at the
+    # Directory's general criterion R5.1; the Compliance tab lists the whole Directory as reading material beneath it.
+    ("npcc_d4", "NPCC-D4", "R5.1", "device.protects.bus.classification.NpccBulkPowerSystem = 'BPS'", "once", NPCC_NOTE),
     ("prc023_r3", "PRC-023", "R3", "asset.formula.prc023_criterion = '13'", "once",
      "PRC-023-6 R3: a circuit set by criterion 13 (or 7, 8, 9, 12) uses the calculated circuit capability as the Facility Rating, "
      "with the Planning Authority's, Transmission Operator's and Reliability Coordinator's agreement."),
@@ -159,6 +166,11 @@ def definition_block(kind, key, name, description, payload, note="seed (#171)"):
     idempotent across deploys."""
     p = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
     return f"""
+-- #184: the name and description live on the definition, not in the payload, so the payload guard below never refreshes
+-- them; keep them current here, unconditionally (npcc_d4 read "transmission relay loadability" on DEV until this existed)
+UPDATE [config].[Definition] SET [Name] = {sql_str(name)}, [Description] = {sql_str(description)}, [ModifiedBy] = @author, [ModifiedAt] = SYSDATETIMEOFFSET()
+ WHERE [DefinitionKind] = N'{kind}' AND [DefinitionKey] = {sql_str(key)} AND [IsDeleted] = 0
+   AND ([Name] <> {sql_str(name)} OR ISNULL([Description], N'') <> {sql_str(description)});
 IF NOT EXISTS (SELECT 1 FROM [config].[Definition] d
                JOIN [config].[DefinitionVersion] dv ON dv.[DefinitionEntityId] = d.[EntityId] AND dv.[IsDeleted] = 0 AND dv.[Status] = N'Effective'
                WHERE d.[DefinitionKind] = N'{kind}' AND d.[DefinitionKey] = {sql_str(key)} AND d.[IsDeleted] = 0
@@ -220,7 +232,11 @@ def main():
                    "evidence": {"recordKinds": [], "minAcceptance": None}, "evidenceNote": note}
         if k == "prc023_r1":
             payload["record"] = PRC_RECORD
-        name = f"{ver} {num}" + (" — BES Cyber Asset at a High/Medium station" if std.startswith("CIP") else " — transmission relay loadability")
+        # #184: the name's subject is the family's, not a two-way guess (NPCC-D4 was reading "transmission relay loadability")
+        subject = {"CIP": "BES Cyber Asset at a High/Medium station", "PRC-023": "transmission relay loadability",
+                   "NPCC-D4": "bulk power system protection criteria (Directory 4)"}
+        fam = "CIP" if std.startswith("CIP") else std
+        name = f"{ver} {num} — " + subject.get(fam, std)
         sql += definition_block("Program.ObligationRule", k, name, note, payload)
     io.open(os.path.join(OUT, "Seed_config_ObligationRules.sql"), "w", encoding="utf-8", newline="\r\n").write(sql + "\n")
     print("wrote %d formulas, %d derivations, %d rules" % (len(FORMULAS), len(DERIVATIONS), len(CIP_RULES) + len(PRC_RULES)))

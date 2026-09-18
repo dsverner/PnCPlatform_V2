@@ -41,3 +41,24 @@ GO
 DECLARE @actor UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000001';
 UPDATE [ref].[ClassificationKind] SET [IsActive] = 0, [ModifiedBy] = @actor, [ModifiedAt] = SYSDATETIMEOFFSET() WHERE [ClassificationKindCode] = N'NpccA10' AND [IsActive] = 1;
 GO
+
+-- #184 (2026-09-18): the A-10 outcome has a fixed vocabulary, BPS / Not BPS (the owner: "the A10 vocabulary you note
+-- is correct"). Until now the kind was free text and the estate recorded only 'Not BPS'. The obligation rule npcc_d4
+-- tests for 'BPS', so the value a person records must be that exact word.
+IF OBJECT_ID(N'[config].[AddDefinition]') IS NULL RETURN;
+GO
+DECLARE @author UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000001', @approver UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000002';
+DECLARE @e UNIQUEIDENTIFIER, @v UNIQUEIDENTIFIER, @no INT;
+IF NOT EXISTS (SELECT 1 FROM [config].[Definition] WHERE [DefinitionKind] = N'CharacteristicSchema.Enumeration' AND [DefinitionKey] = N'NPCC_A10_OUTCOME' AND [IsDeleted] = 0)
+BEGIN
+    EXEC [config].[AddDefinition] @DefinitionKind = N'CharacteristicSchema.Enumeration', @DefinitionKey = N'NPCC_A10_OUTCOME', @Name = N'NPCC A-10 outcome — is the bus a bulk power system element?', @ActorId = @author, @EntityId = @e OUTPUT;
+    EXEC [config].[AddDefinitionVersion] @DefinitionKey = N'NPCC_A10_OUTCOME', @DefinitionKind = N'CharacteristicSchema.Enumeration', @ChangeNote = N'seed (#184)', @ActorId = @author, @VersionRowId = @v OUTPUT, @VersionNumber = @no OUTPUT;
+    EXEC [config].[EnumerationValue_Add] @DefinitionVersionRowId = @v, @ValueCode = N'BPS', @Name = N'BPS — on the NPCC Bulk Power System List', @DisplayOrder = 1, @ActorId = @author;
+    EXEC [config].[EnumerationValue_Add] @DefinitionVersionRowId = @v, @ValueCode = N'Not BPS', @Name = N'Not BPS', @DisplayOrder = 2, @ActorId = @author;
+    EXEC [config].[ApproveDefinitionVersion] @VersionRowId = @v, @ActorId = @approver;
+END
+SELECT TOP (1) @v = dv.[RowId] FROM [config].[Definition] d JOIN [config].[vDefinitionVersion] dv ON dv.[DefinitionEntityId] = d.[EntityId] AND dv.[Status] = N'Effective'
+ WHERE d.[DefinitionKind] = N'CharacteristicSchema.Enumeration' AND d.[DefinitionKey] = N'NPCC_A10_OUTCOME' AND d.[IsDeleted] = 0 ORDER BY dv.[VersionNumber] DESC;
+UPDATE [ref].[ClassificationKind] SET [AllowedValuesDefinitionRowId] = @v, [ModifiedBy] = @author, [ModifiedAt] = SYSDATETIMEOFFSET()
+ WHERE [ClassificationKindCode] = N'NpccBulkPowerSystem' AND ([AllowedValuesDefinitionRowId] IS NULL OR [AllowedValuesDefinitionRowId] <> @v);
+GO

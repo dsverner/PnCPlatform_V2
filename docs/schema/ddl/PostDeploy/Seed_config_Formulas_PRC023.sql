@@ -9,6 +9,11 @@ DECLARE @approver UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000002';
 IF NOT EXISTS (SELECT 1 FROM [personnel].[Actor] WHERE [ActorId] = @approver)
     INSERT [personnel].[Actor] ([ActorId], [ActorKind], [SystemName]) VALUES (@approver, N'System', N'Platform.SeedApprover');
 
+-- #184: the name and description live on the definition, not in the payload, so the payload guard below never refreshes
+-- them; keep them current here, unconditionally (npcc_d4 read "transmission relay loadability" on DEV until this existed)
+UPDATE [config].[Definition] SET [Name] = N'PRC-023: zone 3 set reach along the line angle', [Description] = N'Z3% of |R1 + jX1| (primary ohms) along the positive-sequence line angle — SEL-221F manual 5-14: ''The reach settings for the phase distance elements are a percentage of the positive-sequence line impedance settings along the line angle.''', [ModifiedBy] = @author, [ModifiedAt] = SYSDATETIMEOFFSET()
+ WHERE [DefinitionKind] = N'Program.Formula' AND [DefinitionKey] = N'prc023_zset' AND [IsDeleted] = 0
+   AND ([Name] <> N'PRC-023: zone 3 set reach along the line angle' OR ISNULL([Description], N'') <> N'Z3% of |R1 + jX1| (primary ohms) along the positive-sequence line angle — SEL-221F manual 5-14: ''The reach settings for the phase distance elements are a percentage of the positive-sequence line impedance settings along the line angle.''');
 IF NOT EXISTS (SELECT 1 FROM [config].[Definition] d
                JOIN [config].[DefinitionVersion] dv ON dv.[DefinitionEntityId] = d.[EntityId] AND dv.[IsDeleted] = 0 AND dv.[Status] = N'Effective'
                WHERE d.[DefinitionKind] = N'Program.Formula' AND d.[DefinitionKey] = N'prc023_zset' AND d.[IsDeleted] = 0
@@ -25,6 +30,11 @@ END
 GO
 DECLARE @author   UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000001';
 DECLARE @approver UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000002';
+-- #184: the name and description live on the definition, not in the payload, so the payload guard below never refreshes
+-- them; keep them current here, unconditionally (npcc_d4 read "transmission relay loadability" on DEV until this existed)
+UPDATE [config].[Definition] SET [Name] = N'PRC-023: positive-sequence line angle', [Description] = N'arctan(X1/R1) — the transmission line angle the manual names (2-32).', [ModifiedBy] = @author, [ModifiedAt] = SYSDATETIMEOFFSET()
+ WHERE [DefinitionKind] = N'Program.Formula' AND [DefinitionKey] = N'prc023_line_angle' AND [IsDeleted] = 0
+   AND ([Name] <> N'PRC-023: positive-sequence line angle' OR ISNULL([Description], N'') <> N'arctan(X1/R1) — the transmission line angle the manual names (2-32).');
 IF NOT EXISTS (SELECT 1 FROM [config].[Definition] d
                JOIN [config].[DefinitionVersion] dv ON dv.[DefinitionEntityId] = d.[EntityId] AND dv.[IsDeleted] = 0 AND dv.[Status] = N'Effective'
                WHERE d.[DefinitionKind] = N'Program.Formula' AND d.[DefinitionKey] = N'prc023_line_angle' AND d.[IsDeleted] = 0
@@ -41,6 +51,11 @@ END
 GO
 DECLARE @author   UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000001';
 DECLARE @approver UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000002';
+-- #184: the name and description live on the definition, not in the payload, so the payload guard below never refreshes
+-- them; keep them current here, unconditionally (npcc_d4 read "transmission relay loadability" on DEV until this existed)
+UPDATE [config].[Definition] SET [Name] = N'PRC-023: apparent impedance at 30 degrees on the zone 3 mho', [Description] = N'The mho circle passes through the origin with its diameter along the MTA: diameter = set reach / cos(line angle - MTA) (manual 2-32); the impedance the circle reaches at a 30-degree load angle is diameter x cos(MTA - 30) (SPP, Methods to Increase Line Relay Loadability, Fig. 2). Steady-state self-polarised circle; the memory-polarised expansion (2-33) is not modelled.', [ModifiedBy] = @author, [ModifiedAt] = SYSDATETIMEOFFSET()
+ WHERE [DefinitionKind] = N'Program.Formula' AND [DefinitionKey] = N'prc023_z30' AND [IsDeleted] = 0
+   AND ([Name] <> N'PRC-023: apparent impedance at 30 degrees on the zone 3 mho' OR ISNULL([Description], N'') <> N'The mho circle passes through the origin with its diameter along the MTA: diameter = set reach / cos(line angle - MTA) (manual 2-32); the impedance the circle reaches at a 30-degree load angle is diameter x cos(MTA - 30) (SPP, Methods to Increase Line Relay Loadability, Fig. 2). Steady-state self-polarised circle; the memory-polarised expansion (2-33) is not modelled.');
 IF NOT EXISTS (SELECT 1 FROM [config].[Definition] d
                JOIN [config].[DefinitionVersion] dv ON dv.[DefinitionEntityId] = d.[EntityId] AND dv.[IsDeleted] = 0 AND dv.[Status] = N'Effective'
                WHERE d.[DefinitionKind] = N'Program.Formula' AND d.[DefinitionKey] = N'prc023_z30' AND d.[IsDeleted] = 0
@@ -57,6 +72,11 @@ END
 GO
 DECLARE @author   UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000001';
 DECLARE @approver UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000002';
+-- #184: the name and description live on the definition, not in the payload, so the payload guard below never refreshes
+-- them; keep them current here, unconditionally (npcc_d4 read "transmission relay loadability" on DEV until this existed)
+UPDATE [config].[Definition] SET [Name] = N'PRC-023: zone 3 trip current at 0.85 pu and 30 degrees', [Description] = N'I = 0.85 x V(line-neutral) / Z30, the loadability current PRC-023-6 R1 asks for (0.85 per unit voltage, 30-degree power factor angle); V(line-neutral) = the terminal''s nominal kV / sqrt(3). Checks against SPP Fig. 2: 345 kV, Z30 = 88 ohm -> 1 352 MVA at nominal volts; x 0.85 / 1.5 = 766 MVA (their 8a MVA).', [ModifiedBy] = @author, [ModifiedAt] = SYSDATETIMEOFFSET()
+ WHERE [DefinitionKind] = N'Program.Formula' AND [DefinitionKey] = N'prc023_trip_current' AND [IsDeleted] = 0
+   AND ([Name] <> N'PRC-023: zone 3 trip current at 0.85 pu and 30 degrees' OR ISNULL([Description], N'') <> N'I = 0.85 x V(line-neutral) / Z30, the loadability current PRC-023-6 R1 asks for (0.85 per unit voltage, 30-degree power factor angle); V(line-neutral) = the terminal''s nominal kV / sqrt(3). Checks against SPP Fig. 2: 345 kV, Z30 = 88 ohm -> 1 352 MVA at nominal volts; x 0.85 / 1.5 = 766 MVA (their 8a MVA).');
 IF NOT EXISTS (SELECT 1 FROM [config].[Definition] d
                JOIN [config].[DefinitionVersion] dv ON dv.[DefinitionEntityId] = d.[EntityId] AND dv.[IsDeleted] = 0 AND dv.[Status] = N'Effective'
                WHERE d.[DefinitionKind] = N'Program.Formula' AND d.[DefinitionKey] = N'prc023_trip_current' AND d.[IsDeleted] = 0
@@ -73,6 +93,11 @@ END
 GO
 DECLARE @author   UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000001';
 DECLARE @approver UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000002';
+-- #184: the name and description live on the definition, not in the payload, so the payload guard below never refreshes
+-- them; keep them current here, unconditionally (npcc_d4 read "transmission relay loadability" on DEV until this existed)
+UPDATE [config].[Definition] SET [Name] = N'PRC-023: the lowest current a load-responsive element trips at', [Description] = N'The zone 3 trip current, or the 50H phase overcurrent pickup when lower (50H is the switch-onto-fault detector and may be in the unconditional trip mask, manual 5-20; the mask is not decoded here). 50P only supervises the distance elements (5-19), so it is not a limit by itself. Attachment A 2.2: ground elements are excluded.', [ModifiedBy] = @author, [ModifiedAt] = SYSDATETIMEOFFSET()
+ WHERE [DefinitionKind] = N'Program.Formula' AND [DefinitionKey] = N'prc023_load_current' AND [IsDeleted] = 0
+   AND ([Name] <> N'PRC-023: the lowest current a load-responsive element trips at' OR ISNULL([Description], N'') <> N'The zone 3 trip current, or the 50H phase overcurrent pickup when lower (50H is the switch-onto-fault detector and may be in the unconditional trip mask, manual 5-20; the mask is not decoded here). 50P only supervises the distance elements (5-19), so it is not a limit by itself. Attachment A 2.2: ground elements are excluded.');
 IF NOT EXISTS (SELECT 1 FROM [config].[Definition] d
                JOIN [config].[DefinitionVersion] dv ON dv.[DefinitionEntityId] = d.[EntityId] AND dv.[IsDeleted] = 0 AND dv.[Status] = N'Effective'
                WHERE d.[DefinitionKind] = N'Program.Formula' AND d.[DefinitionKey] = N'prc023_load_current' AND d.[IsDeleted] = 0
@@ -89,6 +114,11 @@ END
 GO
 DECLARE @author   UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000001';
 DECLARE @approver UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000002';
+-- #184: the name and description live on the definition, not in the payload, so the payload guard below never refreshes
+-- them; keep them current here, unconditionally (npcc_d4 read "transmission relay loadability" on DEV until this existed)
+UPDATE [config].[Definition] SET [Name] = N'PRC-023: the R1 criterion the in-service settings satisfy (1, 2, 13, 12 in the group''s order)', [Description] = N'Criterion 1: not at or below 150 % of the highest seasonal 4-hour Facility Rating (amperes). Criterion 2: 115 % of the 15-minute rating (when one is published). Criterion 13: 115 % of a practical limitation (then R3). Criterion 12: the distance reach at most 125 % of the line impedance with the MTA at 90 degrees (the SEL-221F''s highest, 2-8; then R5). A rating the platform does not hold skips that criterion (coalesce -> false) instead of leaving the answer unknown. ''None'' = no criterion met.', [ModifiedBy] = @author, [ModifiedAt] = SYSDATETIMEOFFSET()
+ WHERE [DefinitionKind] = N'Program.Formula' AND [DefinitionKey] = N'prc023_criterion' AND [IsDeleted] = 0
+   AND ([Name] <> N'PRC-023: the R1 criterion the in-service settings satisfy (1, 2, 13, 12 in the group''s order)' OR ISNULL([Description], N'') <> N'Criterion 1: not at or below 150 % of the highest seasonal 4-hour Facility Rating (amperes). Criterion 2: 115 % of the 15-minute rating (when one is published). Criterion 13: 115 % of a practical limitation (then R3). Criterion 12: the distance reach at most 125 % of the line impedance with the MTA at 90 degrees (the SEL-221F''s highest, 2-8; then R5). A rating the platform does not hold skips that criterion (coalesce -> false) instead of leaving the answer unknown. ''None'' = no criterion met.');
 IF NOT EXISTS (SELECT 1 FROM [config].[Definition] d
                JOIN [config].[DefinitionVersion] dv ON dv.[DefinitionEntityId] = d.[EntityId] AND dv.[IsDeleted] = 0 AND dv.[Status] = N'Effective'
                WHERE d.[DefinitionKind] = N'Program.Formula' AND d.[DefinitionKey] = N'prc023_criterion' AND d.[IsDeleted] = 0

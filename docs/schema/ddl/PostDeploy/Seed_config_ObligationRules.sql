@@ -9,6 +9,11 @@ DECLARE @approver UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000002';
 IF NOT EXISTS (SELECT 1 FROM [personnel].[Actor] WHERE [ActorId] = @approver)
     INSERT [personnel].[Actor] ([ActorId], [ActorKind], [SystemName]) VALUES (@approver, N'System', N'Platform.SeedApprover');
 
+-- #184: the name and description live on the definition, not in the payload, so the payload guard below never refreshes
+-- them; keep them current here, unconditionally (npcc_d4 read "transmission relay loadability" on DEV until this existed)
+UPDATE [config].[Definition] SET [Name] = N'CIP-004-7-NB-0 R2 — BES Cyber Asset at a High/Medium station', [Description] = N'The platform holds no record kind for this requirement in this phase; the evidence is kept outside the platform. The obligation is listed so the device''s sheet shows what applies to it (owner, 2026-09-16).', [ModifiedBy] = @author, [ModifiedAt] = SYSDATETIMEOFFSET()
+ WHERE [DefinitionKind] = N'Program.ObligationRule' AND [DefinitionKey] = N'cip004_r2' AND [IsDeleted] = 0
+   AND ([Name] <> N'CIP-004-7-NB-0 R2 — BES Cyber Asset at a High/Medium station' OR ISNULL([Description], N'') <> N'The platform holds no record kind for this requirement in this phase; the evidence is kept outside the platform. The obligation is listed so the device''s sheet shows what applies to it (owner, 2026-09-16).');
 IF NOT EXISTS (SELECT 1 FROM [config].[Definition] d
                JOIN [config].[DefinitionVersion] dv ON dv.[DefinitionEntityId] = d.[EntityId] AND dv.[IsDeleted] = 0 AND dv.[Status] = N'Effective'
                WHERE d.[DefinitionKind] = N'Program.ObligationRule' AND d.[DefinitionKey] = N'cip004_r2' AND d.[IsDeleted] = 0
@@ -25,6 +30,11 @@ END
 GO
 DECLARE @author   UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000001';
 DECLARE @approver UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000002';
+-- #184: the name and description live on the definition, not in the payload, so the payload guard below never refreshes
+-- them; keep them current here, unconditionally (npcc_d4 read "transmission relay loadability" on DEV until this existed)
+UPDATE [config].[Definition] SET [Name] = N'CIP-004-7-NB-0 R4 — BES Cyber Asset at a High/Medium station', [Description] = N'The platform holds no record kind for this requirement in this phase; the evidence is kept outside the platform. The obligation is listed so the device''s sheet shows what applies to it (owner, 2026-09-16).', [ModifiedBy] = @author, [ModifiedAt] = SYSDATETIMEOFFSET()
+ WHERE [DefinitionKind] = N'Program.ObligationRule' AND [DefinitionKey] = N'cip004_r4' AND [IsDeleted] = 0
+   AND ([Name] <> N'CIP-004-7-NB-0 R4 — BES Cyber Asset at a High/Medium station' OR ISNULL([Description], N'') <> N'The platform holds no record kind for this requirement in this phase; the evidence is kept outside the platform. The obligation is listed so the device''s sheet shows what applies to it (owner, 2026-09-16).');
 IF NOT EXISTS (SELECT 1 FROM [config].[Definition] d
                JOIN [config].[DefinitionVersion] dv ON dv.[DefinitionEntityId] = d.[EntityId] AND dv.[IsDeleted] = 0 AND dv.[Status] = N'Effective'
                WHERE d.[DefinitionKind] = N'Program.ObligationRule' AND d.[DefinitionKey] = N'cip004_r4' AND d.[IsDeleted] = 0
@@ -41,6 +51,11 @@ END
 GO
 DECLARE @author   UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000001';
 DECLARE @approver UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000002';
+-- #184: the name and description live on the definition, not in the payload, so the payload guard below never refreshes
+-- them; keep them current here, unconditionally (npcc_d4 read "transmission relay loadability" on DEV until this existed)
+UPDATE [config].[Definition] SET [Name] = N'CIP-005-7-NB-0 R1 — BES Cyber Asset at a High/Medium station', [Description] = N'The platform holds no record kind for this requirement in this phase; the evidence is kept outside the platform. The obligation is listed so the device''s sheet shows what applies to it (owner, 2026-09-16). Applies with external routable connectivity (the owner''s list).', [ModifiedBy] = @author, [ModifiedAt] = SYSDATETIMEOFFSET()
+ WHERE [DefinitionKind] = N'Program.ObligationRule' AND [DefinitionKey] = N'cip005_r1' AND [IsDeleted] = 0
+   AND ([Name] <> N'CIP-005-7-NB-0 R1 — BES Cyber Asset at a High/Medium station' OR ISNULL([Description], N'') <> N'The platform holds no record kind for this requirement in this phase; the evidence is kept outside the platform. The obligation is listed so the device''s sheet shows what applies to it (owner, 2026-09-16). Applies with external routable connectivity (the owner''s list).');
 IF NOT EXISTS (SELECT 1 FROM [config].[Definition] d
                JOIN [config].[DefinitionVersion] dv ON dv.[DefinitionEntityId] = d.[EntityId] AND dv.[IsDeleted] = 0 AND dv.[Status] = N'Effective'
                WHERE d.[DefinitionKind] = N'Program.ObligationRule' AND d.[DefinitionKey] = N'cip005_r1' AND d.[IsDeleted] = 0
@@ -57,6 +72,11 @@ END
 GO
 DECLARE @author   UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000001';
 DECLARE @approver UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000002';
+-- #184: the name and description live on the definition, not in the payload, so the payload guard below never refreshes
+-- them; keep them current here, unconditionally (npcc_d4 read "transmission relay loadability" on DEV until this existed)
+UPDATE [config].[Definition] SET [Name] = N'CIP-006-6-NB-0 R1 — BES Cyber Asset at a High/Medium station', [Description] = N'The platform holds no record kind for this requirement in this phase; the evidence is kept outside the platform. The obligation is listed so the device''s sheet shows what applies to it (owner, 2026-09-16).', [ModifiedBy] = @author, [ModifiedAt] = SYSDATETIMEOFFSET()
+ WHERE [DefinitionKind] = N'Program.ObligationRule' AND [DefinitionKey] = N'cip006_r1' AND [IsDeleted] = 0
+   AND ([Name] <> N'CIP-006-6-NB-0 R1 — BES Cyber Asset at a High/Medium station' OR ISNULL([Description], N'') <> N'The platform holds no record kind for this requirement in this phase; the evidence is kept outside the platform. The obligation is listed so the device''s sheet shows what applies to it (owner, 2026-09-16).');
 IF NOT EXISTS (SELECT 1 FROM [config].[Definition] d
                JOIN [config].[DefinitionVersion] dv ON dv.[DefinitionEntityId] = d.[EntityId] AND dv.[IsDeleted] = 0 AND dv.[Status] = N'Effective'
                WHERE d.[DefinitionKind] = N'Program.ObligationRule' AND d.[DefinitionKey] = N'cip006_r1' AND d.[IsDeleted] = 0
@@ -73,6 +93,11 @@ END
 GO
 DECLARE @author   UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000001';
 DECLARE @approver UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000002';
+-- #184: the name and description live on the definition, not in the payload, so the payload guard below never refreshes
+-- them; keep them current here, unconditionally (npcc_d4 read "transmission relay loadability" on DEV until this existed)
+UPDATE [config].[Definition] SET [Name] = N'CIP-007-6-NB-0 R1 — BES Cyber Asset at a High/Medium station', [Description] = N'The platform holds no record kind for this requirement in this phase; the evidence is kept outside the platform. The obligation is listed so the device''s sheet shows what applies to it (owner, 2026-09-16).', [ModifiedBy] = @author, [ModifiedAt] = SYSDATETIMEOFFSET()
+ WHERE [DefinitionKind] = N'Program.ObligationRule' AND [DefinitionKey] = N'cip007_r1' AND [IsDeleted] = 0
+   AND ([Name] <> N'CIP-007-6-NB-0 R1 — BES Cyber Asset at a High/Medium station' OR ISNULL([Description], N'') <> N'The platform holds no record kind for this requirement in this phase; the evidence is kept outside the platform. The obligation is listed so the device''s sheet shows what applies to it (owner, 2026-09-16).');
 IF NOT EXISTS (SELECT 1 FROM [config].[Definition] d
                JOIN [config].[DefinitionVersion] dv ON dv.[DefinitionEntityId] = d.[EntityId] AND dv.[IsDeleted] = 0 AND dv.[Status] = N'Effective'
                WHERE d.[DefinitionKind] = N'Program.ObligationRule' AND d.[DefinitionKey] = N'cip007_r1' AND d.[IsDeleted] = 0
@@ -89,6 +114,11 @@ END
 GO
 DECLARE @author   UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000001';
 DECLARE @approver UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000002';
+-- #184: the name and description live on the definition, not in the payload, so the payload guard below never refreshes
+-- them; keep them current here, unconditionally (npcc_d4 read "transmission relay loadability" on DEV until this existed)
+UPDATE [config].[Definition] SET [Name] = N'CIP-007-6-NB-0 R2 — BES Cyber Asset at a High/Medium station', [Description] = N'The platform holds no record kind for this requirement in this phase; the evidence is kept outside the platform. The obligation is listed so the device''s sheet shows what applies to it (owner, 2026-09-16).', [ModifiedBy] = @author, [ModifiedAt] = SYSDATETIMEOFFSET()
+ WHERE [DefinitionKind] = N'Program.ObligationRule' AND [DefinitionKey] = N'cip007_r2' AND [IsDeleted] = 0
+   AND ([Name] <> N'CIP-007-6-NB-0 R2 — BES Cyber Asset at a High/Medium station' OR ISNULL([Description], N'') <> N'The platform holds no record kind for this requirement in this phase; the evidence is kept outside the platform. The obligation is listed so the device''s sheet shows what applies to it (owner, 2026-09-16).');
 IF NOT EXISTS (SELECT 1 FROM [config].[Definition] d
                JOIN [config].[DefinitionVersion] dv ON dv.[DefinitionEntityId] = d.[EntityId] AND dv.[IsDeleted] = 0 AND dv.[Status] = N'Effective'
                WHERE d.[DefinitionKind] = N'Program.ObligationRule' AND d.[DefinitionKey] = N'cip007_r2' AND d.[IsDeleted] = 0
@@ -105,6 +135,11 @@ END
 GO
 DECLARE @author   UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000001';
 DECLARE @approver UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000002';
+-- #184: the name and description live on the definition, not in the payload, so the payload guard below never refreshes
+-- them; keep them current here, unconditionally (npcc_d4 read "transmission relay loadability" on DEV until this existed)
+UPDATE [config].[Definition] SET [Name] = N'CIP-007-6-NB-0 R3 — BES Cyber Asset at a High/Medium station', [Description] = N'The platform holds no record kind for this requirement in this phase; the evidence is kept outside the platform. The obligation is listed so the device''s sheet shows what applies to it (owner, 2026-09-16).', [ModifiedBy] = @author, [ModifiedAt] = SYSDATETIMEOFFSET()
+ WHERE [DefinitionKind] = N'Program.ObligationRule' AND [DefinitionKey] = N'cip007_r3' AND [IsDeleted] = 0
+   AND ([Name] <> N'CIP-007-6-NB-0 R3 — BES Cyber Asset at a High/Medium station' OR ISNULL([Description], N'') <> N'The platform holds no record kind for this requirement in this phase; the evidence is kept outside the platform. The obligation is listed so the device''s sheet shows what applies to it (owner, 2026-09-16).');
 IF NOT EXISTS (SELECT 1 FROM [config].[Definition] d
                JOIN [config].[DefinitionVersion] dv ON dv.[DefinitionEntityId] = d.[EntityId] AND dv.[IsDeleted] = 0 AND dv.[Status] = N'Effective'
                WHERE d.[DefinitionKind] = N'Program.ObligationRule' AND d.[DefinitionKey] = N'cip007_r3' AND d.[IsDeleted] = 0
@@ -121,6 +156,11 @@ END
 GO
 DECLARE @author   UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000001';
 DECLARE @approver UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000002';
+-- #184: the name and description live on the definition, not in the payload, so the payload guard below never refreshes
+-- them; keep them current here, unconditionally (npcc_d4 read "transmission relay loadability" on DEV until this existed)
+UPDATE [config].[Definition] SET [Name] = N'CIP-007-6-NB-0 R4 — BES Cyber Asset at a High/Medium station', [Description] = N'The platform holds no record kind for this requirement in this phase; the evidence is kept outside the platform. The obligation is listed so the device''s sheet shows what applies to it (owner, 2026-09-16).', [ModifiedBy] = @author, [ModifiedAt] = SYSDATETIMEOFFSET()
+ WHERE [DefinitionKind] = N'Program.ObligationRule' AND [DefinitionKey] = N'cip007_r4' AND [IsDeleted] = 0
+   AND ([Name] <> N'CIP-007-6-NB-0 R4 — BES Cyber Asset at a High/Medium station' OR ISNULL([Description], N'') <> N'The platform holds no record kind for this requirement in this phase; the evidence is kept outside the platform. The obligation is listed so the device''s sheet shows what applies to it (owner, 2026-09-16).');
 IF NOT EXISTS (SELECT 1 FROM [config].[Definition] d
                JOIN [config].[DefinitionVersion] dv ON dv.[DefinitionEntityId] = d.[EntityId] AND dv.[IsDeleted] = 0 AND dv.[Status] = N'Effective'
                WHERE d.[DefinitionKind] = N'Program.ObligationRule' AND d.[DefinitionKey] = N'cip007_r4' AND d.[IsDeleted] = 0
@@ -137,6 +177,11 @@ END
 GO
 DECLARE @author   UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000001';
 DECLARE @approver UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000002';
+-- #184: the name and description live on the definition, not in the payload, so the payload guard below never refreshes
+-- them; keep them current here, unconditionally (npcc_d4 read "transmission relay loadability" on DEV until this existed)
+UPDATE [config].[Definition] SET [Name] = N'CIP-007-6-NB-0 R5 — BES Cyber Asset at a High/Medium station', [Description] = N'The platform holds no record kind for this requirement in this phase; the evidence is kept outside the platform. The obligation is listed so the device''s sheet shows what applies to it (owner, 2026-09-16).', [ModifiedBy] = @author, [ModifiedAt] = SYSDATETIMEOFFSET()
+ WHERE [DefinitionKind] = N'Program.ObligationRule' AND [DefinitionKey] = N'cip007_r5' AND [IsDeleted] = 0
+   AND ([Name] <> N'CIP-007-6-NB-0 R5 — BES Cyber Asset at a High/Medium station' OR ISNULL([Description], N'') <> N'The platform holds no record kind for this requirement in this phase; the evidence is kept outside the platform. The obligation is listed so the device''s sheet shows what applies to it (owner, 2026-09-16).');
 IF NOT EXISTS (SELECT 1 FROM [config].[Definition] d
                JOIN [config].[DefinitionVersion] dv ON dv.[DefinitionEntityId] = d.[EntityId] AND dv.[IsDeleted] = 0 AND dv.[Status] = N'Effective'
                WHERE d.[DefinitionKind] = N'Program.ObligationRule' AND d.[DefinitionKey] = N'cip007_r5' AND d.[IsDeleted] = 0
@@ -153,6 +198,11 @@ END
 GO
 DECLARE @author   UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000001';
 DECLARE @approver UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000002';
+-- #184: the name and description live on the definition, not in the payload, so the payload guard below never refreshes
+-- them; keep them current here, unconditionally (npcc_d4 read "transmission relay loadability" on DEV until this existed)
+UPDATE [config].[Definition] SET [Name] = N'CIP-010-4-NB-0 R1 — BES Cyber Asset at a High/Medium station', [Description] = N'The platform holds no record kind for this requirement in this phase; the evidence is kept outside the platform. The obligation is listed so the device''s sheet shows what applies to it (owner, 2026-09-16).', [ModifiedBy] = @author, [ModifiedAt] = SYSDATETIMEOFFSET()
+ WHERE [DefinitionKind] = N'Program.ObligationRule' AND [DefinitionKey] = N'cip010_r1' AND [IsDeleted] = 0
+   AND ([Name] <> N'CIP-010-4-NB-0 R1 — BES Cyber Asset at a High/Medium station' OR ISNULL([Description], N'') <> N'The platform holds no record kind for this requirement in this phase; the evidence is kept outside the platform. The obligation is listed so the device''s sheet shows what applies to it (owner, 2026-09-16).');
 IF NOT EXISTS (SELECT 1 FROM [config].[Definition] d
                JOIN [config].[DefinitionVersion] dv ON dv.[DefinitionEntityId] = d.[EntityId] AND dv.[IsDeleted] = 0 AND dv.[Status] = N'Effective'
                WHERE d.[DefinitionKind] = N'Program.ObligationRule' AND d.[DefinitionKey] = N'cip010_r1' AND d.[IsDeleted] = 0
@@ -169,6 +219,11 @@ END
 GO
 DECLARE @author   UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000001';
 DECLARE @approver UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000002';
+-- #184: the name and description live on the definition, not in the payload, so the payload guard below never refreshes
+-- them; keep them current here, unconditionally (npcc_d4 read "transmission relay loadability" on DEV until this existed)
+UPDATE [config].[Definition] SET [Name] = N'CIP-010-4-NB-0 R2 — BES Cyber Asset at a High/Medium station', [Description] = N'The platform holds no record kind for this requirement in this phase; the evidence is kept outside the platform. The obligation is listed so the device''s sheet shows what applies to it (owner, 2026-09-16).', [ModifiedBy] = @author, [ModifiedAt] = SYSDATETIMEOFFSET()
+ WHERE [DefinitionKind] = N'Program.ObligationRule' AND [DefinitionKey] = N'cip010_r2' AND [IsDeleted] = 0
+   AND ([Name] <> N'CIP-010-4-NB-0 R2 — BES Cyber Asset at a High/Medium station' OR ISNULL([Description], N'') <> N'The platform holds no record kind for this requirement in this phase; the evidence is kept outside the platform. The obligation is listed so the device''s sheet shows what applies to it (owner, 2026-09-16).');
 IF NOT EXISTS (SELECT 1 FROM [config].[Definition] d
                JOIN [config].[DefinitionVersion] dv ON dv.[DefinitionEntityId] = d.[EntityId] AND dv.[IsDeleted] = 0 AND dv.[Status] = N'Effective'
                WHERE d.[DefinitionKind] = N'Program.ObligationRule' AND d.[DefinitionKey] = N'cip010_r2' AND d.[IsDeleted] = 0
@@ -185,6 +240,11 @@ END
 GO
 DECLARE @author   UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000001';
 DECLARE @approver UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000002';
+-- #184: the name and description live on the definition, not in the payload, so the payload guard below never refreshes
+-- them; keep them current here, unconditionally (npcc_d4 read "transmission relay loadability" on DEV until this existed)
+UPDATE [config].[Definition] SET [Name] = N'CIP-010-4-NB-0 R3 — BES Cyber Asset at a High/Medium station', [Description] = N'The platform holds no record kind for this requirement in this phase; the evidence is kept outside the platform. The obligation is listed so the device''s sheet shows what applies to it (owner, 2026-09-16).', [ModifiedBy] = @author, [ModifiedAt] = SYSDATETIMEOFFSET()
+ WHERE [DefinitionKind] = N'Program.ObligationRule' AND [DefinitionKey] = N'cip010_r3' AND [IsDeleted] = 0
+   AND ([Name] <> N'CIP-010-4-NB-0 R3 — BES Cyber Asset at a High/Medium station' OR ISNULL([Description], N'') <> N'The platform holds no record kind for this requirement in this phase; the evidence is kept outside the platform. The obligation is listed so the device''s sheet shows what applies to it (owner, 2026-09-16).');
 IF NOT EXISTS (SELECT 1 FROM [config].[Definition] d
                JOIN [config].[DefinitionVersion] dv ON dv.[DefinitionEntityId] = d.[EntityId] AND dv.[IsDeleted] = 0 AND dv.[Status] = N'Effective'
                WHERE d.[DefinitionKind] = N'Program.ObligationRule' AND d.[DefinitionKey] = N'cip010_r3' AND d.[IsDeleted] = 0
@@ -201,6 +261,11 @@ END
 GO
 DECLARE @author   UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000001';
 DECLARE @approver UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000002';
+-- #184: the name and description live on the definition, not in the payload, so the payload guard below never refreshes
+-- them; keep them current here, unconditionally (npcc_d4 read "transmission relay loadability" on DEV until this existed)
+UPDATE [config].[Definition] SET [Name] = N'CIP-011-3-NB-0 R1 — BES Cyber Asset at a High/Medium station', [Description] = N'The platform holds no record kind for this requirement in this phase; the evidence is kept outside the platform. The obligation is listed so the device''s sheet shows what applies to it (owner, 2026-09-16).', [ModifiedBy] = @author, [ModifiedAt] = SYSDATETIMEOFFSET()
+ WHERE [DefinitionKind] = N'Program.ObligationRule' AND [DefinitionKey] = N'cip011_r1' AND [IsDeleted] = 0
+   AND ([Name] <> N'CIP-011-3-NB-0 R1 — BES Cyber Asset at a High/Medium station' OR ISNULL([Description], N'') <> N'The platform holds no record kind for this requirement in this phase; the evidence is kept outside the platform. The obligation is listed so the device''s sheet shows what applies to it (owner, 2026-09-16).');
 IF NOT EXISTS (SELECT 1 FROM [config].[Definition] d
                JOIN [config].[DefinitionVersion] dv ON dv.[DefinitionEntityId] = d.[EntityId] AND dv.[IsDeleted] = 0 AND dv.[Status] = N'Effective'
                WHERE d.[DefinitionKind] = N'Program.ObligationRule' AND d.[DefinitionKey] = N'cip011_r1' AND d.[IsDeleted] = 0
@@ -217,6 +282,11 @@ END
 GO
 DECLARE @author   UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000001';
 DECLARE @approver UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000002';
+-- #184: the name and description live on the definition, not in the payload, so the payload guard below never refreshes
+-- them; keep them current here, unconditionally (npcc_d4 read "transmission relay loadability" on DEV until this existed)
+UPDATE [config].[Definition] SET [Name] = N'PRC-023-6-NB-0 R1 — transmission relay loadability', [Description] = N'PRC-023-6 R1: any one of criteria 1-13 for the circuit terminal; loadability at 0.85 pu and 30 degrees. The group applies criterion 1, then 2, then 13, then 12 (owner, 2026-09-16); the formula prc023_criterion records which one the in-service settings satisfy. Applicability from PRC-023-6 4.2.1.1 (200 kV and above) or the Planning Authority''s R6 list (recorded as the Prc023 classification of the protected asset). NB appendix PRC-023-6-NB-0: no modification.', [ModifiedBy] = @author, [ModifiedAt] = SYSDATETIMEOFFSET()
+ WHERE [DefinitionKind] = N'Program.ObligationRule' AND [DefinitionKey] = N'prc023_r1' AND [IsDeleted] = 0
+   AND ([Name] <> N'PRC-023-6-NB-0 R1 — transmission relay loadability' OR ISNULL([Description], N'') <> N'PRC-023-6 R1: any one of criteria 1-13 for the circuit terminal; loadability at 0.85 pu and 30 degrees. The group applies criterion 1, then 2, then 13, then 12 (owner, 2026-09-16); the formula prc023_criterion records which one the in-service settings satisfy. Applicability from PRC-023-6 4.2.1.1 (200 kV and above) or the Planning Authority''s R6 list (recorded as the Prc023 classification of the protected asset). NB appendix PRC-023-6-NB-0: no modification.');
 IF NOT EXISTS (SELECT 1 FROM [config].[Definition] d
                JOIN [config].[DefinitionVersion] dv ON dv.[DefinitionEntityId] = d.[EntityId] AND dv.[IsDeleted] = 0 AND dv.[Status] = N'Effective'
                WHERE d.[DefinitionKind] = N'Program.ObligationRule' AND d.[DefinitionKey] = N'prc023_r1' AND d.[IsDeleted] = 0
@@ -233,6 +303,32 @@ END
 GO
 DECLARE @author   UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000001';
 DECLARE @approver UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000002';
+-- #184: the name and description live on the definition, not in the payload, so the payload guard below never refreshes
+-- them; keep them current here, unconditionally (npcc_d4 read "transmission relay loadability" on DEV until this existed)
+UPDATE [config].[Definition] SET [Name] = N'D4 (2025-12-18) R5.1 — bulk power system protection criteria (Directory 4)', [Description] = N'NPCC Directory 4 is a design criterion, not a settings criterion: the evidence is the protection system design and its TFSP submittal and acceptance (R6.1 - R6.3), kept outside the platform. Attaches when the A-10 study declares the protected bus BPS (the owner, 2026-09-18: a documentation awareness case).', [ModifiedBy] = @author, [ModifiedAt] = SYSDATETIMEOFFSET()
+ WHERE [DefinitionKind] = N'Program.ObligationRule' AND [DefinitionKey] = N'npcc_d4' AND [IsDeleted] = 0
+   AND ([Name] <> N'D4 (2025-12-18) R5.1 — bulk power system protection criteria (Directory 4)' OR ISNULL([Description], N'') <> N'NPCC Directory 4 is a design criterion, not a settings criterion: the evidence is the protection system design and its TFSP submittal and acceptance (R6.1 - R6.3), kept outside the platform. Attaches when the A-10 study declares the protected bus BPS (the owner, 2026-09-18: a documentation awareness case).');
+IF NOT EXISTS (SELECT 1 FROM [config].[Definition] d
+               JOIN [config].[DefinitionVersion] dv ON dv.[DefinitionEntityId] = d.[EntityId] AND dv.[IsDeleted] = 0 AND dv.[Status] = N'Effective'
+               WHERE d.[DefinitionKind] = N'Program.ObligationRule' AND d.[DefinitionKey] = N'npcc_d4' AND d.[IsDeleted] = 0
+                 AND dv.[PayloadText] = N'{"g":1,"requirement":{"standard":"NPCC-D4","version":"D4 (2025-12-18)","number":"R5.1"},"subjectKinds":["Device"],"scopeText":"device.protects.bus.classification.NpccBulkPowerSystem = ''BPS''","scope":{"op":"=","l":{"fact":"device.protects.bus.classification.NpccBulkPowerSystem"},"r":{"lit":"BPS","t":"text"}},"cadenceText":"once","cadence":{"cadence":"once"},"evidence":{"recordKinds":[],"minAcceptance":null},"evidenceNote":"NPCC Directory 4 is a design criterion, not a settings criterion: the evidence is the protection system design and its TFSP submittal and acceptance (R6.1 - R6.3), kept outside the platform. Attaches when the A-10 study declares the protected bus BPS (the owner, 2026-09-18: a documentation awareness case)."}')
+BEGIN
+    DECLARE @e UNIQUEIDENTIFIER, @v UNIQUEIDENTIFIER, @n INT;
+    IF NOT EXISTS (SELECT 1 FROM [config].[Definition] WHERE [DefinitionKind] = N'Program.ObligationRule' AND [DefinitionKey] = N'npcc_d4' AND [IsDeleted] = 0)
+        EXEC [config].[AddDefinition] @DefinitionKind = N'Program.ObligationRule', @DefinitionKey = N'npcc_d4', @Name = N'D4 (2025-12-18) R5.1 — bulk power system protection criteria (Directory 4)',
+             @Description = N'NPCC Directory 4 is a design criterion, not a settings criterion: the evidence is the protection system design and its TFSP submittal and acceptance (R6.1 - R6.3), kept outside the platform. Attaches when the A-10 study declares the protected bus BPS (the owner, 2026-09-18: a documentation awareness case).', @ActorId = @author, @EntityId = @e OUTPUT;
+    EXEC [config].[AddDefinitionVersion] @DefinitionKey = N'npcc_d4', @DefinitionKind = N'Program.ObligationRule', @ChangeNote = N'seed (#171)',
+         @PayloadText = N'{"g":1,"requirement":{"standard":"NPCC-D4","version":"D4 (2025-12-18)","number":"R5.1"},"subjectKinds":["Device"],"scopeText":"device.protects.bus.classification.NpccBulkPowerSystem = ''BPS''","scope":{"op":"=","l":{"fact":"device.protects.bus.classification.NpccBulkPowerSystem"},"r":{"lit":"BPS","t":"text"}},"cadenceText":"once","cadence":{"cadence":"once"},"evidence":{"recordKinds":[],"minAcceptance":null},"evidenceNote":"NPCC Directory 4 is a design criterion, not a settings criterion: the evidence is the protection system design and its TFSP submittal and acceptance (R6.1 - R6.3), kept outside the platform. Attaches when the A-10 study declares the protected bus BPS (the owner, 2026-09-18: a documentation awareness case)."}', @ActorId = @author, @VersionRowId = @v OUTPUT, @VersionNumber = @n OUTPUT;
+    EXEC [config].[ApproveDefinitionVersion] @VersionRowId = @v, @ActorId = @approver;
+END
+GO
+DECLARE @author   UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000001';
+DECLARE @approver UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000002';
+-- #184: the name and description live on the definition, not in the payload, so the payload guard below never refreshes
+-- them; keep them current here, unconditionally (npcc_d4 read "transmission relay loadability" on DEV until this existed)
+UPDATE [config].[Definition] SET [Name] = N'PRC-023-6-NB-0 R3 — transmission relay loadability', [Description] = N'PRC-023-6 R3: a circuit set by criterion 13 (or 7, 8, 9, 12) uses the calculated circuit capability as the Facility Rating, with the Planning Authority''s, Transmission Operator''s and Reliability Coordinator''s agreement.', [ModifiedBy] = @author, [ModifiedAt] = SYSDATETIMEOFFSET()
+ WHERE [DefinitionKind] = N'Program.ObligationRule' AND [DefinitionKey] = N'prc023_r3' AND [IsDeleted] = 0
+   AND ([Name] <> N'PRC-023-6-NB-0 R3 — transmission relay loadability' OR ISNULL([Description], N'') <> N'PRC-023-6 R3: a circuit set by criterion 13 (or 7, 8, 9, 12) uses the calculated circuit capability as the Facility Rating, with the Planning Authority''s, Transmission Operator''s and Reliability Coordinator''s agreement.');
 IF NOT EXISTS (SELECT 1 FROM [config].[Definition] d
                JOIN [config].[DefinitionVersion] dv ON dv.[DefinitionEntityId] = d.[EntityId] AND dv.[IsDeleted] = 0 AND dv.[Status] = N'Effective'
                WHERE d.[DefinitionKind] = N'Program.ObligationRule' AND d.[DefinitionKey] = N'prc023_r3' AND d.[IsDeleted] = 0
@@ -249,6 +345,11 @@ END
 GO
 DECLARE @author   UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000001';
 DECLARE @approver UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000002';
+-- #184: the name and description live on the definition, not in the payload, so the payload guard below never refreshes
+-- them; keep them current here, unconditionally (npcc_d4 read "transmission relay loadability" on DEV until this existed)
+UPDATE [config].[Definition] SET [Name] = N'PRC-023-6-NB-0 R4 — transmission relay loadability', [Description] = N'PRC-023-6 R4: a circuit set by criterion 2 is on the list provided to the Planning Authority, Transmission Operator and Reliability Coordinator at least once each calendar year, no more than 15 months between reports.', [ModifiedBy] = @author, [ModifiedAt] = SYSDATETIMEOFFSET()
+ WHERE [DefinitionKind] = N'Program.ObligationRule' AND [DefinitionKey] = N'prc023_r4' AND [IsDeleted] = 0
+   AND ([Name] <> N'PRC-023-6-NB-0 R4 — transmission relay loadability' OR ISNULL([Description], N'') <> N'PRC-023-6 R4: a circuit set by criterion 2 is on the list provided to the Planning Authority, Transmission Operator and Reliability Coordinator at least once each calendar year, no more than 15 months between reports.');
 IF NOT EXISTS (SELECT 1 FROM [config].[Definition] d
                JOIN [config].[DefinitionVersion] dv ON dv.[DefinitionEntityId] = d.[EntityId] AND dv.[IsDeleted] = 0 AND dv.[Status] = N'Effective'
                WHERE d.[DefinitionKind] = N'Program.ObligationRule' AND d.[DefinitionKey] = N'prc023_r4' AND d.[IsDeleted] = 0
@@ -265,6 +366,11 @@ END
 GO
 DECLARE @author   UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000001';
 DECLARE @approver UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000002';
+-- #184: the name and description live on the definition, not in the payload, so the payload guard below never refreshes
+-- them; keep them current here, unconditionally (npcc_d4 read "transmission relay loadability" on DEV until this existed)
+UPDATE [config].[Definition] SET [Name] = N'PRC-023-6-NB-0 R5 — transmission relay loadability', [Description] = N'PRC-023-6 R5 (NB appendix): a circuit set by criterion 12 is on the list provided to the Northeast Power Coordinating Council at least once each calendar year, no more than 15 months between reports.', [ModifiedBy] = @author, [ModifiedAt] = SYSDATETIMEOFFSET()
+ WHERE [DefinitionKind] = N'Program.ObligationRule' AND [DefinitionKey] = N'prc023_r5' AND [IsDeleted] = 0
+   AND ([Name] <> N'PRC-023-6-NB-0 R5 — transmission relay loadability' OR ISNULL([Description], N'') <> N'PRC-023-6 R5 (NB appendix): a circuit set by criterion 12 is on the list provided to the Northeast Power Coordinating Council at least once each calendar year, no more than 15 months between reports.');
 IF NOT EXISTS (SELECT 1 FROM [config].[Definition] d
                JOIN [config].[DefinitionVersion] dv ON dv.[DefinitionEntityId] = d.[EntityId] AND dv.[IsDeleted] = 0 AND dv.[Status] = N'Effective'
                WHERE d.[DefinitionKind] = N'Program.ObligationRule' AND d.[DefinitionKey] = N'prc023_r5' AND d.[IsDeleted] = 0

@@ -3,6 +3,20 @@
 -- edited it (a version whose ChangeNote does not start with 'seed') or the same payload is already Effective.
 IF OBJECT_ID(N'[config].[AddDefinition]') IS NULL RETURN;   -- bootstrap (tables-only) publish
 GO
+-- device-template.screen.json
+DECLARE @author UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000001', @approver UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000002';
+DECLARE @e UNIQUEIDENTIFIER, @v UNIQUEIDENTIFIER, @no INT, @payload NVARCHAR(MAX) = N'{"g":1,"kind":"screen","key":"DEVICE_TEMPLATE","name":"Device template","description":"One device type''s template, named <MODEL>_Template (#184): everything true of the model itself, one level below a scheme - its settings list by the manual''s own groups with none hidden (#183), what it can do (#181, #182), the PRC-023 loadability inputs its settings feed, and the NPCC Directory 4 criteria that attach when the protected bus is declared BPS by the A-10 study. Compliance here is calculated from study values recorded on the primary elements, never switched on per device (the owner, 2026-09-18). Plain code; the definition names its data.","menu":null,"permission":"Asset.Read","screenKind":"record","params":{"view":"ref.vModel","key":"ModelId"}}';
+DECLARE @note NVARCHAR(200) = N'seed 638f9ca50c295150';
+SELECT @e = EntityId FROM [config].[Definition] WHERE [DefinitionKind] = N'Program.Screen' AND [DefinitionKey] = N'DEVICE_TEMPLATE' AND [IsDeleted] = 0;
+IF @e IS NULL
+    EXEC [config].[AddDefinition] @DefinitionKind = N'Program.Screen', @DefinitionKey = N'DEVICE_TEMPLATE', @Name = N'Device template', @Description = N'One device type''s template, named <MODEL>_Template (#184): everything true of the model itself, one level below a scheme - its settings list by the manual''s own groups with none hidden (#183), what it can do (#181, #182), the PRC-023 loadability inputs its settings feed, and the NPCC Directory 4 criteria that attach when the protected bus is declared BPS by the A-10 study. Compliance here is calculated from study values recorded on the primary elements, never switched on per device (the owner, 2026-09-18). Plain code; the definition names its data.', @ActorId = @author, @EntityId = @e OUTPUT;
+IF NOT EXISTS (SELECT 1 FROM [config].[vDefinitionVersion] WHERE [DefinitionEntityId] = @e AND [ChangeNote] NOT LIKE N'seed %')      -- untouched by an Administrator
+   AND NOT EXISTS (SELECT 1 FROM [config].[vDefinitionVersion] WHERE [DefinitionEntityId] = @e AND [Status] = N'Effective' AND [ChangeNote] = @note)
+BEGIN
+    EXEC [config].[AddDefinitionVersion] @DefinitionKey = N'DEVICE_TEMPLATE', @DefinitionKind = N'Program.Screen', @ChangeNote = @note, @PayloadText = @payload, @ActorId = @author, @VersionRowId = @v OUTPUT, @VersionNumber = @no OUTPUT;
+    EXEC [config].[ApproveDefinitionVersion] @VersionRowId = @v, @ActorId = @approver;
+END
+GO
 -- location.screen.json
 DECLARE @author UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000001', @approver UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000002';
 DECLARE @e UNIQUEIDENTIFIER, @v UNIQUEIDENTIFIER, @no INT, @payload NVARCHAR(MAX) = N'{"g":1,"kind":"screen","key":"LOCATION","name":"Location","description":"One node of the location tree — a region, a station, a building, a room, a panel or a position: where it sits, its CIP-002 impact rating (recorded here because a location carries it and every BES Cyber Asset in it inherits it — the owner, 2026-09-17), what is inside it and the devices placed there; a station also shows the primary assets with a terminal here and the schemes here (#173, the STATION screen generalised). Plain code; the definition names its data.","permission":"Asset.Read","screenKind":"record","params":{"view":"location.vNode","key":"EntityId"}}';
