@@ -36,6 +36,7 @@ import { useCan, useViewAll } from '@/lib/hooks'
 import { type RecordParams, type Screen, screenPath } from '@/lib/screens'
 import { Panel, Pill, Button, Facts, Status, inputClass } from '@/components/ui/ui'
 import { AssetPicker, modelLabel, useModels } from '@/components/pickers'
+import { workTypes, raiseAndAdvance } from '@/lib/actions'
 import { ClassificationPanel, NODE_KINDS, NodeLink, bit } from './PrimaryAssetScreen'
 
 /** The node types location.vFloc treats as a position — the places a device is installed (and the only node types
@@ -100,7 +101,7 @@ export default function LocationScreen({ params: p, id }: { screen: Screen; para
       <div className="grid gap-3 lg:grid-cols-2">
         <Inside node={r} canEdit={canEdit} canArchive={canArchive} />
         {POSITION_TYPES.includes(s(r.NodeTypeCode))
-          ? <PlacedHere node={r} canPlace={can('Asset.Modify')} canRetract={can('Asset.Archive')} />
+          ? <PlacedHere node={r} canPlace={can('Asset.Modify')} canRetract={can('Asset.Archive')} canRaise={can('WorkRequest.Modify')} />
           : <DevicesHere node={r} station={station} isStation={isStation} />}
       </div>
       {/* a terminal and a scheme are asked of a station: neither question means anything for a building, a room or a panel */}
@@ -511,7 +512,7 @@ function FunctionChecklist({ nodeId, modelId, editable }: { nodeId: string; mode
     </div>)
 }
 
-function PlacedHere({ node, canPlace, canRetract }: { node: Row; canPlace: boolean; canRetract: boolean }) {
+function PlacedHere({ node, canPlace, canRetract, canRaise }: { node: Row; canPlace: boolean; canRetract: boolean; canRaise: boolean }) {
   const qc = useQueryClient()
   const nodeId = s(node.EntityId)
   const q = useViewAll('asset', 'vPlacedAsset', { NodeEntityId: nodeId }, 'AssetName', !!nodeId)
@@ -529,8 +530,13 @@ function PlacedHere({ node, canPlace, canRetract }: { node: Row; canPlace: boole
       </ul>
       {/* #181: the elements the placed relay performs here */}
       {rows.length > 0 && <FunctionChecklist nodeId={nodeId} modelId={s(rows[0].ModelId)} editable={canPlace} />}
+      {/* #187: the first settings of a relay placed here that has none */}
+      {rows.length > 0 && <FirstSettings node={node} relay={rows[0]} canRaise={canRaise} />}
       {canPlace
-        ? <PlaceForm node={node} onDone={refresh} />
+        ? <>
+            <PlaceForm node={node} onDone={refresh} />
+            {!rows.length && <NewRelayForm node={node} onDone={refresh} />}
+          </>
         : <div className="mt-3 border-t border-slate-800 pt-2"><Status>Placing a device needs Asset.Modify.</Status></div>}
     </Panel>
   )
@@ -693,4 +699,126 @@ function PlacedNow({ assetEntityId, hereNodeEntityId }: { assetEntityId: string;
   if (s(p.NodeEntityId).toLowerCase() === hereNodeEntityId.toLowerCase())
     return <Status>It is already recorded here as {s(p.PlacementKind)}.</Status>
   return <Status>It is recorded now as {s(p.PlacementKind)} at {s(p.WhereName) || 'a place you cannot read'}{p.WhereFloc ? ` (${s(p.WhereFloc)})` : ''} — placing it here moves it, and its removal from there is written in the same transaction.</Status>
+}
+
+/** The triggers step [1] of the settings-change procedure accepts (settings-change.procedure.json, capture `trigger`). */
+const TRIGGERS = ['Project', 'Obligation', 'Finding', 'Misoperation', 'Advisory', 'Other']
+
+/**
+ * #187: the first settings request for the relay placed here. The owner, 2026-09-18, went the intuitive way — the
+ * building, the panel, the record — and could not tell whether the relay had a template or how its settings would
+ * begin; and "New setting here" was a right-click on a settings-book ROW, which a relay with no record does not have.
+ * So the button sits with the relay, at its position. It appears only while the relay has no record in the settings
+ * book (document.vSettingsRecord by DeviceEntityId — none). Raising it: a SETTINGS_ADD request scoped to this position
+ * (as the settings book's own command scopes it), step [1] committed with the trigger chosen here, step [2] claimed and
+ * its `devices` set drafted with this relay; the engineer finishes [2] (scheme, philosophy) at the work item, and its
+ * commit drafts the settings from the model's template — every setting "not set", editable in the sheet.
+ */
+function FirstSettings({ node, relay, canRaise }: { node: Row; relay: Row; canRaise: boolean }) {
+  const navigate = useNavigate()
+  const relayId = s(relay.AssetEntityId)   // asset.vPlacedAsset: EntityId is the placement, AssetEntityId the relay
+  const recQ = useViewAll('document', 'vSettingsRecord', { DeviceEntityId: relayId }, 'RevisionLabel', !!relayId)
+  const typesQ = useQuery({ queryKey: ['workTypes'], queryFn: workTypes, staleTime: 5 * 60_000 })
+  const [open, setOpen] = useState(false)
+  const [trigger, setTrigger] = useState('Project')
+  const [reference, setReference] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  if (recQ.isPending || (recQ.data ?? []).length > 0) return null
+  const wt = (typesQ.data ?? []).find((t) => t.key === 'SETTINGS_ADD')
+  const title = `New setting — ${s(relay.AssetName)} at ${s(node.Name)}`
+  const go = async () => {
+    if (!wt) return
+    setBusy(true); setErr('')
+    try {
+      const id = await raiseAndAdvance({
+        workTypeVersionRowId: wt.versionRowId, title, scopeKind: 'Node', scopeEntityId: s(node.EntityId), workflowKey: wt.workflowKey,
+        commit: [{ stepId: 'REQUEST', capture: { trigger, sourceReference: reference.trim() || `first settings for ${s(relay.AssetName)} at ${s(node.Name)}` } }],
+        draft: { stepId: 'SCOPE', values: { devices: [relayId] } },
+      })
+      navigate(screenPath('WORK_ITEM', id))
+    } catch (e) { setErr('Refused: ' + (e instanceof ApiError ? e.status + ' ' : '') + (e as Error).message); setBusy(false) }
+  }
+  return (
+    <div className="mt-3 space-y-2 border-t border-slate-800 pt-2 text-sm">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-slate-400">{s(relay.AssetName)} has no settings in the settings book yet.</span>
+        {canRaise
+          ? <Button kind="primary" disabled={!wt || busy} title={wt ? undefined : 'the SETTINGS_ADD work type is not effective'} onClick={() => setOpen(!open)}>New setting</Button>
+          : <span className="text-xs text-slate-500">(raising a request needs WorkRequest.Modify)</span>}
+      </div>
+      {open && (
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="flex flex-col gap-1 text-xs text-slate-400">Trigger
+            <select className={`${inputClass} w-40`} value={trigger} disabled={busy} onChange={(e) => setTrigger(e.target.value)}>
+              {TRIGGERS.map((x) => <option key={x} value={x}>{x}</option>)}
+            </select></label>
+          <label className="flex flex-col gap-1 text-xs text-slate-400">Reference (optional — the project, finding or advisory)
+            <input className={`${inputClass} w-72`} value={reference} disabled={busy} onChange={(e) => setReference(e.target.value)} /></label>
+          <Button kind="primary" disabled={busy || !wt} onClick={() => void go()}>Raise and start</Button>
+          <span className="text-xs text-slate-500">the request opens at step [2] with {s(relay.AssetName)} already in it; its commit drafts the settings from the model's template</span>
+        </div>)}
+      {err && <Status bad>{err}</Status>}
+    </div>
+  )
+}
+
+/**
+ * #187: a relay that is not yet in the platform, made and placed here in one go. Until now no screen created a relay
+ * (the only Asset_Add in the app makes primary assets); the proof relays went in through the API. The four writes are
+ * the database's own, in order: asset.Asset_Add (ProtectiveRelay, InService), device.Device_Add (the device row, part
+ * number = the model code), asset.AlternateKey_Add (SerialNumber, when given), asset.PlaceAsset (Installed here). A
+ * refusal part-way leaves what was written — an asset with no placement is a real thing and is named in the message so
+ * it can be placed with the picker above rather than made twice.
+ */
+function NewRelayForm({ node, onDone }: { node: Row; onDone: () => void }) {
+  const { byId, isPending } = useModels()
+  const [open, setOpen] = useState(false)
+  const [modelId, setModelId] = useState('')
+  const [name, setName] = useState('')
+  const [serial, setSerial] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null)
+  const models = [...byId.values()].filter((m) => s(m.AssetTypeCode) === 'ProtectiveRelay' || s(m.DeviceCategory) === 'ProtectiveRelay')
+    .sort((a, b) => s(a.ModelCode).localeCompare(s(b.ModelCode)))
+  const model = byId.get(modelId.toLowerCase())
+  const make = async () => {
+    if (!model || !name.trim()) return
+    setBusy(true); setMsg(null)
+    let assetId = ''
+    try {
+      const a = await proc('asset', 'Asset_Add', { AssetTypeCode: 'ProtectiveRelay', Name: name.trim(), ModelId: model.ModelId, Status: 'InService' })
+      assetId = s(a.EntityId)
+      await proc('device', 'Device_Add', { EntityId: assetId, PartNumber: s(model.ModelCode) })
+      if (serial.trim()) await proc('asset', 'AlternateKey_Add', { SubjectEntityId: assetId, KeyKindCode: 'SerialNumber', KeyValue: serial.trim(), IsPrimaryLabel: true })
+      await proc('asset', 'PlaceAsset', { AssetEntityId: assetId, NodeEntityId: node.EntityId, PlacementKind: 'Installed' })
+      setMsg({ text: `${name.trim()} (${s(model.ModelCode)}${serial.trim() ? ', serial ' + serial.trim() : ''}) is installed at ${s(node.Name)}.` })
+      setName(''); setSerial(''); setOpen(false); onDone()
+    } catch (e) {
+      const why = e instanceof ApiError ? e.message : String(e)
+      setMsg({ text: assetId ? `${name.trim()} was created but not placed: ${why} — place it with the picker above.` : why, bad: true })
+    } finally { setBusy(false) }
+  }
+  return (
+    <div className="mt-3 space-y-2 border-t border-slate-800 pt-2 text-sm">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-slate-400">Not in the platform yet?</span>
+        <Button kind="mini" disabled={busy} onClick={() => setOpen(!open)}>New relay</Button>
+      </div>
+      {open && (
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="flex flex-col gap-1 text-xs text-slate-400">Model
+            <select className={`${inputClass} w-64`} value={modelId} disabled={busy || isPending} onChange={(e) => setModelId(e.target.value)}>
+              <option value="">{isPending ? '…' : 'choose a model'}</option>
+              {models.map((m) => <option key={s(m.ModelId)} value={s(m.ModelId)}>{s(m.ModelCode)}{m.ModelName && s(m.ModelName) !== s(m.ModelCode) ? ' — ' + s(m.ModelName) : ''}</option>)}
+            </select></label>
+          <label className="flex flex-col gap-1 text-xs text-slate-400">Name (as the settings book will list it)
+            <input className={`${inputClass} w-48`} value={name} disabled={busy} placeholder="e.g. 3445" onChange={(e) => setName(e.target.value)} /></label>
+          <label className="flex flex-col gap-1 text-xs text-slate-400">Serial number (optional)
+            <input className={`${inputClass} w-40`} value={serial} disabled={busy} onChange={(e) => setSerial(e.target.value)} /></label>
+          <Button kind="primary" disabled={busy || !model || !name.trim()} onClick={() => void make()}>Create and install here</Button>
+        </div>)}
+      {msg && <Status bad={msg.bad}>{msg.text}</Status>}
+    </div>
+  )
 }

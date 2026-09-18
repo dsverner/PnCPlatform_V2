@@ -1379,6 +1379,66 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
                 $"#184: the A-10 outcome on the protected bus decides Directory 4 — BPS opens npcc_d4 on the relay ({string.Join(", ", k184_openBps)}), Not BPS closes it ({string.Join(", ", k184_openNot)}), and ReadOnly records nothing ({(int)k184_q1s})");
         }
 
+        // ======== #187 (2026-09-18): a new relay from its position, its first settings from the template, and the record that
+        // says where it is and what it wears. The owner went the intuitive way — building, panel, record — and read "no FLOC" as
+        // "not placed" and could not tell whether the relay "had a template applied". No screen created a relay; "New setting
+        // here" needed a settings-book row; CopyRevisionAsDraft made nothing for a device with no in-service revision.
+        {
+            var (k187_ps, k187_pb) = await Post(admin, "api/v1/location/AddNode", new { NodeTypeCode = "DevicePosition", ParentEntityId = panel, Name = $"{tag} 187 position", Code = "K187" });
+            var k187_pos = Id(k187_pb);
+            var (k187_ms, k187_mb) = await Get(admin, "api/v1/ref/vModel?ModelCode=SEL-221F&take=1");
+            var k187_model = Id((k187_mb?["rows"] as JsonArray)?.FirstOrDefault(), "ModelId");
+            // (1) the four writes of the New relay form, in its order; ReadOnly refused at the first
+            var (k187_r0s, _) = await Post(readOnly!, "api/v1/asset/Asset_Add", new { AssetTypeCode = "ProtectiveRelay", Name = $"{tag} 187 refused", ModelId = k187_model, Status = "InService" });
+            var (k187_a1s, k187_a1b) = await Post(admin, "api/v1/asset/Asset_Add", new { AssetTypeCode = "ProtectiveRelay", Name = $"{tag} 187 SEL-221F", ModelId = k187_model, Status = "InService" });
+            var k187_relay = Id(k187_a1b);
+            var (k187_d1s, _) = await Post(admin, "api/v1/device/Device_Add", new { EntityId = k187_relay, PartNumber = "SEL-221F" });
+            var (k187_k1s, _) = await Post(admin, "api/v1/asset/AlternateKey_Add", new { SubjectEntityId = k187_relay, KeyKindCode = "SerialNumber", KeyValue = $"SN-{tag}", IsPrimaryLabel = true });
+            var (k187_l1s, k187_l1b) = await Post(admin, "api/v1/asset/PlaceAsset", new { AssetEntityId = k187_relay, NodeEntityId = k187_pos, PlacementKind = "Installed" });
+            var (k187_g1s, k187_g1b) = await Get(admin, $"api/v1/asset/vPlacedAsset?NodeEntityId={k187_pos}&take=5");
+            var k187_placed = (k187_g1b?["rows"] as JsonArray)?.FirstOrDefault();
+            Must(k187_ps == HttpStatusCode.OK && k187_model is not null && k187_r0s == HttpStatusCode.Forbidden && k187_a1s == HttpStatusCode.OK && k187_d1s == HttpStatusCode.OK && k187_k1s == HttpStatusCode.OK
+                 && k187_l1s == HttpStatusCode.OK && k187_placed?["AssetEntityId"]?.ToString().Equals(k187_relay?.ToString(), StringComparison.OrdinalIgnoreCase) == true,
+                $"#187: a new SEL-221F is created, given its device row and serial, and installed at a fresh position in four writes ({(int)k187_a1s} {(int)k187_d1s} {(int)k187_k1s} {(int)k187_l1s} {Code(k187_l1b)}); ReadOnly is refused ({(int)k187_r0s})");
+            // (2) New setting from the position: SETTINGS_ADD raised, [1] committed with the trigger, [2] drafted with the relay,
+            //     then [2] committed the way the engineer will — the empty first draft appears Outstanding, parsed to no rows,
+            //     with the model's template behind it
+            var (k187_w0s, k187_w0b) = await Get(admin, "api/v1/config/vDefinition?DefinitionKind=Program.WorkType&DefinitionKey=SETTINGS_ADD&take=1");
+            var (k187_w1s, k187_w1b) = await Get(admin, $"api/v1/config/vDefinitionVersion?DefinitionEntityId={Id((k187_w0b?["rows"] as JsonArray)?.FirstOrDefault())}&Status=Effective&take=1");
+            var k187_wt = Id((k187_w1b?["rows"] as JsonArray)?.FirstOrDefault(), "RowId");
+            var (k187_wrs, k187_wrb) = await Post(admin, "api/v1/work/WorkRequest_Add", new { WorkTypeDefinitionVersionRowId = k187_wt, Title = $"{tag} new setting (#187)", ScopeKind = "Node", ScopeEntityId = k187_pos });
+            var k187_wr = Id(k187_wrb);
+            var (k187_sws, k187_swb) = await Post(admin, "api/v1/process/workflows/start", new { workflowKey = "SETTINGS_CHANGE_REQUEST", subjectKind = "WorkRequest", subjectEntityId = k187_wr });
+            var k187_wf = Id(k187_swb, "workflowInstanceEntityId");
+            var (k187_trs, _) = await Post(admin, $"api/v1/process/workflow-instances/{k187_wf}/transitions", new { name = "Start" });
+            var (_, k187_pib) = await Get(admin, $"api/v1/process/vProcedureInstance?WorkRequestEntityId={k187_wr}");
+            var k187_inst = Id((k187_pib?["rows"] as JsonArray)?.FirstOrDefault(r => r?["ParentInstanceEntityId"] is null));
+            var k187_saved = inst; inst = k187_inst;   // RunStep and ReadyStep read this instance now
+            var (k187_s1s, _) = await RunStep(admin, "REQUEST", new { outcome = "Done", capture = new { trigger = "Project", sourceReference = $"first settings for {tag} 187 SEL-221F" } });
+            var k187_scope = await ReadyStep("SCOPE", null, 2);
+            var (k187_cls, _) = await Post(admin, $"api/v1/process/step-instances/{k187_scope}/claim", new { });
+            var (k187_drs, _) = await Post(admin, $"api/v1/process/step-instances/{k187_scope}/draft", new { draft = new { devices = new[] { k187_relay } } });
+            var (_, k187_rdb) = await Get(admin, $"api/v1/process/step-instances/{k187_scope}");
+            var k187_drafted = (k187_rdb?["draft"]?["devices"] as JsonArray)?.FirstOrDefault()?.ToString();
+            var (k187_s2s, k187_s2b) = await Post(admin, $"api/v1/process/step-instances/{k187_scope}/commit", new { outcome = "Done", capture = new { scheme = scheme, philosophy = "first settings (#187 smoke)", devices = new[] { k187_relay } } });
+            inst = k187_saved;
+            var (_, k187_recb) = await Get(admin, $"api/v1/document/vSettingsRecord?DeviceEntityId={k187_relay}&take=5");
+            var k187_rec = (k187_recb?["rows"] as JsonArray)?.FirstOrDefault();
+            var (k187_prs, k187_prb) = await Get(admin, $"api/v1/document/vParsedSettingNamed?ConfigurationFileRevisionRowId={k187_rec?["RevisionRowId"]}&take=5");
+            var k187_parsed = (k187_prb?["rows"] as JsonArray)?.Count ?? -1;
+            Must(k187_wt is not null && k187_wrs == HttpStatusCode.OK && k187_sws == HttpStatusCode.OK && k187_trs == HttpStatusCode.OK && k187_inst is not null && k187_s1s == HttpStatusCode.OK
+                 && k187_cls == HttpStatusCode.OK && k187_drs == HttpStatusCode.OK && string.Equals(k187_drafted, k187_relay?.ToString(), StringComparison.OrdinalIgnoreCase) && k187_s2s == HttpStatusCode.OK,
+                $"#187: SETTINGS_ADD from the position — [1] committed with its trigger, [2] claimed and drafted with the relay (draft reads back {k187_drafted?[..8]}), [2] committed ({(int)k187_s2s} {Code(k187_s2b)})");
+            Must(k187_rec is not null && k187_rec["GridState"]?.ToString() == "Outstanding" && k187_rec["RevisionStatus"]?.ToString() == "Draft" && k187_rec["FileKind"]?.ToString() == "SettingsText" && k187_prs == HttpStatusCode.OK && k187_parsed == 0
+                 && k187_rec["TemplateKey"]?.ToString() == "SEL221F_Template" && k187_rec["PlacedFrom"] is not null && k187_rec["SerialNumber"]?.ToString() == $"SN-{tag}",
+                $"#187: the relay's first record is an Outstanding Draft SettingsText with no parsed rows ({k187_parsed}) — every template setting \"not set\" — and the record says PlacedFrom {k187_rec?["PlacedFrom"]?.ToString()[..10]}, serial {k187_rec?["SerialNumber"]}, template {k187_rec?["TemplateKey"]} v{k187_rec?["TemplateVersion"]}");
+            // (3) the fixture's SEL-421 has no template: TemplateKey NULL, PlacedFrom set; the two are different facts
+            var (_, k187_selb) = await Get(admin, $"api/v1/document/vSettingsRecord?DeviceEntityId={devSel}&GridState=Active&take=1");
+            var k187_sel = (k187_selb?["rows"] as JsonArray)?.FirstOrDefault();
+            Must(k187_sel is not null && k187_sel["TemplateKey"] is null && k187_sel["PlacedFrom"] is not null && k187_sel["PositionNodeEntityId"] is not null,
+                $"#187: the SEL-421 record carries its placement (since {k187_sel?["PlacedFrom"]?.ToString()[..10]}) and no template — the model has none");
+        }
+
         // ======== #168 increment 2 (2026-09-16): the settings edited in the platform, the file written by it — the owner's four-step
         // procedure on the BDD15B that the run above left in service. REQUEST copies the in-service revision as the change's outstanding
         // revision (the legacy M from the A); a value is edited through SetParsedSetting; the settings step commits with no file and

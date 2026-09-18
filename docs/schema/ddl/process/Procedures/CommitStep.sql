@@ -280,34 +280,43 @@ BEGIN
                 FETCH NEXT FROM wc INTO @wfKey;
             END
             CLOSE wc; DEALLOCATE wc;
-            -- #168 (increment 2): the legacy M from the A — every device named by a Device set captured at this step gets a draft
-            -- revision copied from its in-service revision, in the package, outstanding at once (CopyRevisionAsDraft)
-            DECLARE @devs TABLE ([DeviceEntityId] UNIQUEIDENTIFIER);
-            DECLARE @capKey NVARCHAR(100), @capPath NVARCHAR(120);
-            DECLARE ck CURSOR LOCAL FAST_FORWARD FOR SELECT c.[key] FROM OPENJSON(@node, '$.capture') c WHERE JSON_VALUE(c.[value], '$.type') = N'set' AND JSON_VALUE(c.[value], '$.refKind') = N'Device';
-            OPEN ck; FETCH NEXT FROM ck INTO @capKey;
-            WHILE @@FETCH_STATUS = 0
-            BEGIN
-                SET @capPath = N'$."' + @capKey + N'"';
-                IF ISJSON(@Capture) = 1 AND JSON_QUERY(@Capture, @capPath) IS NOT NULL
-                    INSERT @devs SELECT DISTINCT TRY_CONVERT(UNIQUEIDENTIFIER, d.[value]) FROM OPENJSON(@Capture, @capPath) d WHERE TRY_CONVERT(UNIQUEIDENTIFIER, d.[value]) IS NOT NULL;
-                FETCH NEXT FROM ck INTO @capKey;
-            END
-            CLOSE ck; DEALLOCATE ck;
-            DECLARE @dev UNIQUEIDENTIFIER, @srcRev UNIQUEIDENTIFIER, @cpyRev UNIQUEIDENTIFIER;
-            DECLARE dc CURSOR LOCAL FAST_FORWARD FOR SELECT DISTINCT [DeviceEntityId] FROM @devs;
-            OPEN dc; FETCH NEXT FROM dc INTO @dev;
-            WHILE @@FETCH_STATUS = 0
-            BEGIN
-                EXEC [process].[CopyRevisionAsDraft] @DeviceEntityId = @dev, @PackageRevisionRowId = @ProducedEntityId, @PreparedByActorId = @committer, @At = @occurred, @ActorId = @ActorId, @SourceRevisionRowId = @srcRev OUTPUT, @RevisionRowId = @cpyRev OUTPUT;
-                FETCH NEXT FROM dc INTO @dev;
-            END
-            CLOSE dc; DEALLOCATE dc;
         END
         ELSE THROW 50198, N'process.CommitStep: only a SettingsIssuePackage can be produced in this wave.', 1;
         SET @produced = JSON_MODIFY(@produced, N'$."' + @producesName + N'"', LOWER(CONVERT(NVARCHAR(36), @ProducedEntityId)));
         UPDATE [process].[ProcedureInstance] SET [Produced] = @produced, [ModifiedBy] = @ActorId, [ModifiedAt] = @now WHERE [RowId] = @iRow;
         UPDATE [record].[Record] SET [SecondSubjectKind] = N'SettingsIssuePackage', [SecondSubjectEntityId] = @ProducedEntityId WHERE [RowId] = @recRow AND [SecondSubjectEntityId] IS NULL;
+    END
+
+    -- ---- 10b the devices this step names get their draft in the package (#168 increment 2; #187: at ANY step of the run,
+    -- not only the one that produced the package). The full settings-change procedure captures its Device set at step [2],
+    -- after step [1] produced the package; until #187 the drafting ran only inside the produces block, so [2]'s devices got
+    -- nothing. The package is the one produced now, else the one this run produced earlier (procedure.package).
+    DECLARE @draftPkg UNIQUEIDENTIFIER = COALESCE(CASE WHEN @producesKind = N'SettingsIssuePackage' THEN @ProducedEntityId END, @pkg);
+    IF @draftPkg IS NOT NULL
+    BEGIN
+    -- #168 (increment 2): the legacy M from the A — every device named by a Device set captured at this step gets a draft
+    -- revision copied from its in-service revision, in the package, outstanding at once (CopyRevisionAsDraft)
+    DECLARE @devs TABLE ([DeviceEntityId] UNIQUEIDENTIFIER);
+    DECLARE @capKey NVARCHAR(100), @capPath NVARCHAR(120);
+    DECLARE ck CURSOR LOCAL FAST_FORWARD FOR SELECT c.[key] FROM OPENJSON(@node, '$.capture') c WHERE JSON_VALUE(c.[value], '$.type') = N'set' AND JSON_VALUE(c.[value], '$.refKind') = N'Device';
+    OPEN ck; FETCH NEXT FROM ck INTO @capKey;
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        SET @capPath = N'$."' + @capKey + N'"';
+        IF ISJSON(@Capture) = 1 AND JSON_QUERY(@Capture, @capPath) IS NOT NULL
+            INSERT @devs SELECT DISTINCT TRY_CONVERT(UNIQUEIDENTIFIER, d.[value]) FROM OPENJSON(@Capture, @capPath) d WHERE TRY_CONVERT(UNIQUEIDENTIFIER, d.[value]) IS NOT NULL;
+        FETCH NEXT FROM ck INTO @capKey;
+    END
+    CLOSE ck; DEALLOCATE ck;
+    DECLARE @dev UNIQUEIDENTIFIER, @srcRev UNIQUEIDENTIFIER, @cpyRev UNIQUEIDENTIFIER;
+    DECLARE dc CURSOR LOCAL FAST_FORWARD FOR SELECT DISTINCT [DeviceEntityId] FROM @devs;
+    OPEN dc; FETCH NEXT FROM dc INTO @dev;
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        EXEC [process].[CopyRevisionAsDraft] @DeviceEntityId = @dev, @PackageRevisionRowId = @draftPkg, @PreparedByActorId = @committer, @At = @occurred, @ActorId = @ActorId, @SourceRevisionRowId = @srcRev OUTPUT, @RevisionRowId = @cpyRev OUTPUT;
+        FETCH NEXT FROM dc INTO @dev;
+    END
+    CLOSE dc; DEALLOCATE dc;
     END
 
     -- ---- 7 (cont.) evidence files linked to the record

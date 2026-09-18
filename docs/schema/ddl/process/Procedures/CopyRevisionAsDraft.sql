@@ -3,8 +3,12 @@
 -- M the A and the A the P. Here: when a change's request step produces the settings-issue package, every device the step
 -- names gets a draft revision copied from its in-service revision — the same file bytes filed again under the new revision
 -- (a settings text is parsed against the template, so the copy's rows are its own to edit) and added to the package. The
--- settings book shows it Outstanding at once. A device with no in-service revision gets no copy (the settings step then
--- attaches a file, as before); a device already holding a draft in this package is not copied twice.
+-- settings book shows it Outstanding at once. A device already holding a draft in this package is not copied twice.
+-- #187 (2026-09-18): a device with NO in-service revision — a relay just placed, its first settings — gets an EMPTY draft:
+-- a SettingsText revision with no text, parsed against the model's template to zero rows, so the settings sheet opens
+-- with every setting "not set" and editable, and the file is written by the platform at issue. Until now such a device
+-- got nothing and the settings step expected a file to be attached, against the owner's ruling that settings are edited
+-- in the platform and the native file is written by it (#168, feedback-native-settings-round-trip).
 CREATE PROCEDURE [process].[CopyRevisionAsDraft]
     @DeviceEntityId UNIQUEIDENTIFIER,
     @PackageRevisionRowId UNIQUEIDENTIFIER,
@@ -31,15 +35,22 @@ BEGIN
     -- the in-service revision: the settings book's Active row
     SELECT TOP (1) @SourceRevisionRowId = sr.[RevisionRowId] FROM [document].[vSettingsRecord] sr
     WHERE sr.[DeviceEntityId] = @DeviceEntityId AND sr.[GridState] = N'Active' ORDER BY sr.[RowSeq] DESC;
-    IF @SourceRevisionRowId IS NULL RETURN;
-    DECLARE @kind NVARCHAR(20) = (SELECT [FileKind] FROM [document].[ConfigurationFile] WHERE [RevisionRowId] = @SourceRevisionRowId AND [IsDeleted] = 0);
-    DECLARE @name NVARCHAR(255), @mime NVARCHAR(100), @stream UNIQUEIDENTIFIER, @bytes VARBINARY(MAX), @text NVARCHAR(MAX);
+    DECLARE @kind NVARCHAR(20), @name NVARCHAR(255), @mime NVARCHAR(100), @stream UNIQUEIDENTIFIER, @bytes VARBINARY(MAX), @text NVARCHAR(MAX);
+    IF @SourceRevisionRowId IS NULL
+    BEGIN
+        -- #187: the first settings of a device — an empty text, the template's rows all unset
+        SET @kind = N'SettingsText'; SET @name = N'settings.txt'; SET @mime = N'text/plain'; SET @bytes = 0x; SET @text = N'';
+    END
+    ELSE
+    BEGIN
+    SET @kind = (SELECT [FileKind] FROM [document].[ConfigurationFile] WHERE [RevisionRowId] = @SourceRevisionRowId AND [IsDeleted] = 0);
     SELECT TOP (1) @name = f.[FileName], @mime = f.[MimeType], @stream = f.[FileStreamId] FROM [document].[vFile] f
     WHERE f.[RevisionRowId] = @SourceRevisionRowId AND f.[FileRole] = N'Native' ORDER BY f.[RowSeq] DESC;
     IF @stream IS NULL THROW 50186, N'process.CopyRevisionAsDraft: the in-service revision has no file to copy.', 1;
     SELECT @bytes = [file_stream] FROM [document].[FileStore] WHERE [stream_id] = @stream;
     IF @bytes IS NULL SET @bytes = 0x;
     IF @kind = N'SettingsText' SET @text = CONVERT(NVARCHAR(MAX), CONVERT(VARCHAR(MAX), @bytes));
+    END
 
     SET @mime = ISNULL(@mime, N'application/octet-stream');
     BEGIN TRANSACTION;
@@ -48,7 +59,7 @@ BEGIN
          @PreparedByActorId = @PreparedByActorId, @At = @now, @ActorId = @ActorId, @FileKindOverride = @kind, @Status = N'Draft', @RevisionRowId = @RevisionRowId OUTPUT, @FileKind = @fk OUTPUT;
     DECLARE @seq INT = 1 + (SELECT COUNT(*) FROM [document].[SettingsIssuePackageItem] WHERE [PackageRevisionRowId] = @PackageRevisionRowId AND [IsDeleted] = 0 AND [ValidTo] IS NULL), @ie UNIQUEIDENTIFIER, @ir UNIQUEIDENTIFIER;
     EXEC [document].[SettingsIssuePackageItem_Add] @PackageRevisionRowId = @PackageRevisionRowId, @ConfigurationFileRevisionRowId = @RevisionRowId, @Sequence = @seq, @ActorId = @ActorId, @EntityId = @ie OUTPUT, @RowId = @ir OUTPUT;
-    DECLARE @detail NVARCHAR(MAX) = CONCAT(N'{"action":"revision-copied-as-draft","source":"', LOWER(CONVERT(NVARCHAR(36), @SourceRevisionRowId)), N'","draft":"', LOWER(CONVERT(NVARCHAR(36), @RevisionRowId)), N'","package":"', LOWER(CONVERT(NVARCHAR(36), @PackageRevisionRowId)), N'"}');
+    DECLARE @detail NVARCHAR(MAX) = CONCAT(N'{"action":"', CASE WHEN @SourceRevisionRowId IS NULL THEN N'first-draft-from-template' ELSE N'revision-copied-as-draft' END, N'","source":"', ISNULL(LOWER(CONVERT(NVARCHAR(36), @SourceRevisionRowId)), N''), N'","draft":"', LOWER(CONVERT(NVARCHAR(36), @RevisionRowId)), N'","package":"', LOWER(CONVERT(NVARCHAR(36), @PackageRevisionRowId)), N'"}');
     EXEC [audit].[LogAction] @ActionKindCode = N'Administrative', @SubjectSchema = N'document', @SubjectTable = N'ConfigurationFile', @SubjectEntityId = @DeviceEntityId, @SubjectRowId = @RevisionRowId,
          @ActorId = @ActorId, @Detail = @detail, @OccurredAt = @now;
     COMMIT TRANSACTION;

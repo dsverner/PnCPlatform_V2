@@ -54,11 +54,17 @@ export default function RecordScreen({ params: p, id }: { screen: Screen; params
       </header>
       <Status>Revision {s(r.RevisionStatus)} · lifecycle {s(r.LifecycleState) || '—'} · {s(r.FileKind)} {s(r.ParseStatus)}</Status>
       <div className="grid gap-3 lg:grid-cols-3">
-        <Panel title="Device"><Facts cols={1} pairs={[['Device', legacyFree(r.DeviceName)], ['Model', <span><a className="text-sky-300 underline" href={screenPath('DEVICE_TEMPLATE', s(r.ModelId))} onClick={(e) => { e.preventDefault(); navigate(screenPath('DEVICE_TEMPLATE', s(r.ModelId))) }} title="the device template for this model (#184)">{s(r.ModelCode)}</a>{r.ModelName ? ' — ' + s(r.ModelName) : ''}</span>], ['Manufacturer', s(r.ManufacturerName)], ['Technology', s(r.Technology)], ['Software version', s(r.FirmwareVersion)], ['Serial number', s(r.SerialNumber)], ['Voltage', s(r.VoltageClassCode)], ['Functions', s(r.Functions || r.PositionName)]]} /></Panel>
+        <Panel title="Device"><Facts cols={1} pairs={[['Device', legacyFree(r.DeviceName)], ['Model', <span><a className="text-sky-300 underline" href={screenPath('DEVICE_TEMPLATE', s(r.ModelId))} onClick={(e) => { e.preventDefault(); navigate(screenPath('DEVICE_TEMPLATE', s(r.ModelId))) }} title="the device template for this model (#184)">{s(r.ModelCode)}</a>{r.ModelName ? ' — ' + s(r.ModelName) : ''}</span>], ['Manufacturer', s(r.ManufacturerName)], ['Technology', s(r.Technology)], ['Software version', s(r.FirmwareVersion)], ['Serial number', s(r.SerialNumber)], ['Voltage', s(r.VoltageClassCode)], ['Functions', s(r.Functions || r.PositionName)],
+          /* #187: what the sheet is drawn from — the owner could not tell whether the relay "had a template applied" */
+          ['Template', r.TemplateKey ? <span><a className="text-sky-300 underline" href={screenPath('DEVICE_TEMPLATE', s(r.ModelId))} onClick={(e) => { e.preventDefault(); navigate(screenPath('DEVICE_TEMPLATE', s(r.ModelId))) }}>{s(r.TemplateKey)} v{s(r.TemplateVersion)}</a> <span className="text-slate-500">through the model</span></span> : <span className="text-slate-500">no template for this model yet</span>]]} /></Panel>
         <Panel title="Where"><Facts cols={1} pairs={[['Location', <NodeLink id={s(r.BuildingNodeEntityId)} name={s(r.BuildingName)} />],
           ['Scheme', r.SchemeEntityId ? <a className="text-sky-300 underline" href={screenPath('SCHEME', s(r.SchemeEntityId))} onClick={(e) => { e.preventDefault(); navigate(screenPath('SCHEME', s(r.SchemeEntityId))) }}>{s(r.SchemeName)}</a> : s(r.SchemeName)],
           ['Protects', <Protects schemeEntityId={s(r.SchemeEntityId)} />], ['Equipment', s(r.PanelName)], ['Position', s(r.PositionName)],
-          ['FLOC', r.Floc ? <code className="rounded bg-slate-800 px-1 font-mono text-xs text-slate-200">{s(r.Floc)}</code> : <span className="text-slate-500">no tag yet — a code is needed on this position and on every level above it</span>]]} /></Panel>
+          /* #187: placed and FLOC are two facts — a relay can be installed at a position that has no tag yet */
+          ['Placed', r.PositionNodeEntityId
+            ? <span>Installed at <NodeLink id={s(r.PositionNodeEntityId)} name={s(r.PositionName)} />{r.PanelName ? <>, {s(r.PanelName)}</> : null}{r.PlacedFrom ? ` since ${fmtDate(r.PlacedFrom)}` : ''}</span>
+            : <span className="text-slate-500">not placed — no position holds this device</span>],
+          ['FLOC', r.Floc ? <code className="rounded bg-slate-800 px-1 font-mono text-xs text-slate-200">{s(r.Floc)}</code> : <FlocMissing r={r} />]]} /></Panel>
         <Panel title="Dates and state"><Facts cols={1} pairs={[['Calculated', fmtWhen(r.CalculatedAt) + (r.CalculatedByDisplayName ? ' by ' + r.CalculatedByDisplayName : '')], ['Verified', fmtWhen(r.VerifiedAt)], ['In service', r.InServiceFrom ? fmtWhen(r.InServiceFrom) + (r.InServiceTo ? ' – ' + fmtWhen(r.InServiceTo) : ' – now') : 'not in service'], ['Change request', legacyFree(r.WorkRequestTitle)], ['Action type', s(r.WorkTypeKey)], ['Lifecycle', s(r.LifecycleState)], ['Revision', s(r.RevisionLabel) + ' · ' + s(r.RevisionStatus)]]} /></Panel>
       </div>
       <Tabs value={section} onChange={setSection} tabs={[{ key: 'settings', label: 'Settings' }, { key: 'classification', label: 'Classification' }, { key: 'compliance', label: 'Compliance' }, { key: 'notes', label: 'Notes' }, { key: 'text', label: 'Text as filed' }, { key: 'files', label: 'Files and records' }, ...(others.length ? [{ key: 'compare', label: 'Compare' }] : [])]} />
@@ -221,5 +227,34 @@ function FilesPanel({ r, revision }: { r: Row; revision: string }) {
         { key: 'mime', label: 'Type' }, { key: 'size', label: 'Bytes' }, { key: 'sha', label: 'SHA-256', render: (x) => (x.sha ? s(x.sha).slice(0, 12) + '…' : '') }, { key: 'when', label: 'When', render: (x) => fmtWhen(x.when) }]} emptyText={q.isPending ? 'Loading…' : 'No files.'} />
       <Status>A file name opens the file (every open is a logged read, #144). The rationale document moves to the file store in a later wave (#159).</Status>
     </Panel></div>
+  )
+}
+
+/**
+ * #187: why there is no FLOC, and where to put that right. The owner, 2026-09-18: "no FLOC" read as "not placed", and the
+ * line must take the user "to the proper screen to enter this information". The tag is composed from the codes of the
+ * position and every level above it (#175); the levels without one are named here, each a link to its own location
+ * page, where the code box is. Read from location.vNode: the position, then its ancestors from Path (one read a level).
+ */
+function FlocMissing({ r }: { r: Row }) {
+  const posId = s(r.PositionNodeEntityId)
+  const q = useQuery({ queryKey: ['flocMissing', posId], enabled: !!posId, staleTime: 60_000, queryFn: async () => {
+    const pos = (await view('location', 'vNode', { EntityId: posId }, { take: 1 })).rows[0]
+    if (!pos) return [] as Row[]
+    const ids = s(pos.Path).split('/').map((x) => x.trim()).filter(Boolean)
+    const chain: Row[] = []
+    for (const id of ids) { const n = (await view('location', 'vNode', { EntityId: id }, { take: 1 })).rows[0]; if (n) chain.push(n) }
+    chain.push(pos)
+    // location.fComposeFloc: an uncoded node starts a fresh chain below it, so a level above the FIRST coded one (the
+    // Owner above "TN") is not missing anything; every uncoded level from there down breaks the tag
+    const first = chain.findIndex((n) => !!s(n.Code))
+    return chain.slice(first < 0 ? 0 : first).filter((n) => !s(n.Code))
+  } })
+  if (!posId) return <span className="text-slate-500">no tag — the device is not placed</span>
+  if (q.isPending) return <span className="text-slate-500">…</span>
+  const missing = q.data ?? []
+  if (!missing.length) return <span className="text-slate-500">no tag yet</span>
+  return (
+    <span className="text-slate-400">no tag yet — no code on {missing.map((n, i) => <span key={s(n.EntityId)}>{i > 0 ? (i === missing.length - 1 ? ' and ' : ', ') : ''}<NodeLink id={s(n.EntityId)} name={`${s(n.Name)} (${s(n.NodeTypeCode)})`} /></span>)}; open one to enter it</span>
   )
 }

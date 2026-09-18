@@ -1,7 +1,7 @@
 // The calls behind the settings book's commands, ported from pnc.js: the settings text of a revision, raising a work
 // request and starting its workflow, the return-to-service step calls behind Set Verified Date. Each is the platform's
 // own call; the API refuses in its own words and the screen shows them. Nothing here knows a rule.
-import { view, getText, postJson, proc, type Row } from './api'
+import { view, getText, getJson, postJson, proc, type Row } from './api'
 
 export interface SettingsText { name: string; mime: string; text: string }
 /** The settings file filed for a revision: the text file first, else the source, else the first. */
@@ -36,6 +36,40 @@ export async function raiseAndStart(o: { workTypeVersionRowId: string; title: st
   const wf = await postJson<{ workflowInstanceEntityId: string }>('/api/v1/process/workflows/start', { workflowKey: o.workflowKey ?? 'SETTINGS_CHANGE_REQUEST', subjectKind: 'WorkRequest', subjectEntityId: wr.EntityId })
   await postJson(`/api/v1/process/workflow-instances/${wf.workflowInstanceEntityId}/transitions`, { name: 'Start' })
   return String(wr.EntityId)
+}
+
+/**
+ * #187: raise a request and take it through the steps the button already knows the answers to. "New setting" on a
+ * position: the relay was just placed and has no settings; the person pressing the button is the engineer, and the
+ * trigger they chose commits step [1]; the relay goes into step [2]'s `devices` set as a DRAFT — step [2] stays with
+ * them (the scheme and the philosophy are theirs to say) and is committed at the work item. process.CommitStep drafts
+ * the first settings from the model's template when [2] commits (process.CopyRevisionAsDraft, the empty-draft branch).
+ * A draft is writable only on an Active step by its claimant (process.SaveDraft 50157/50164), so each step is claimed
+ * here by the same person. The root procedure instance is the one with no parent (process.vProcedureInstance).
+ */
+export async function raiseAndAdvance(o: Parameters<typeof raiseAndStart>[0] & {
+  commit: { stepId: string; capture: Record<string, unknown> }[]
+  draft?: { stepId: string; values: Record<string, unknown> }
+}): Promise<string> {
+  const requestId = await raiseAndStart(o)
+  const inst = (await view('process', 'vProcedureInstance', { WorkRequestEntityId: requestId }, { take: 20 })).rows.find((x) => !x.ParentInstanceEntityId)
+  if (!inst) return requestId
+  type Tree = { blocks?: { step?: { stepId?: string; stepInstanceEntityId?: string; state?: string } | null }[] }
+  const find = async (stepId: string) => {
+    const tree = await getJson<Tree>(`/api/v1/process/procedure-instances/${String(inst.EntityId)}`)
+    return (tree.blocks ?? []).map((b) => b.step).find((x) => x?.stepId === stepId && (x.state === 'Ready' || x.state === 'Active'))?.stepInstanceEntityId
+  }
+  for (const c of o.commit) {
+    const id = await find(c.stepId); if (!id) return requestId
+    await postJson(`/api/v1/process/step-instances/${id}/claim`, {})
+    await postJson(`/api/v1/process/step-instances/${id}/commit`, { outcome: 'Done', capture: c.capture })
+  }
+  if (o.draft) {
+    const id = await find(o.draft.stepId); if (!id) return requestId
+    await postJson(`/api/v1/process/step-instances/${id}/claim`, {})
+    await postJson(`/api/v1/process/step-instances/${id}/draft`, { draft: o.draft.values })
+  }
+  return requestId
 }
 
 /** The return-to-service step calls (#114 witnessed commit, #115 field capture check-in). */

@@ -60,6 +60,12 @@ SELECT r.[RowSeq],
        -- device (SEL-411L etc.)". The position node already carries the composed tag, so this is that column read
        -- through the placement the view already has, not a second walk of the tree.
        dp.[FlocCode]                AS [Floc],
+       -- #187: why a FLOC is missing (the levels without a code), when the relay was placed, and the model's template
+       dp.[Code]                    AS [PositionCode],
+       pnl.[Code]                   AS [PanelCode],
+       pl.[PlacedFrom],
+       at.[DefinitionKey]           AS [TemplateKey],
+       at.[VersionNumber]           AS [TemplateVersion],
        pnl.[EntityId]               AS [PanelNodeEntityId],
        pnl.[Name]                   AS [PanelName],
        bld.[BuildingEntityId]       AS [BuildingNodeEntityId],
@@ -104,7 +110,9 @@ LEFT JOIN [ref].[vManufacturer] mf ON mf.[ManufacturerId] = m.[ManufacturerId]
 LEFT JOIN [party].[vEntity] mfe ON mfe.[EntityId] = mf.[EntityEntityId]
 LEFT JOIN [ref].[vFirmwareVersion] fw ON fw.[FirmwareVersionId] = COALESCE(cf.[FirmwareVersionId], dv.[CurrentFirmwareVersionId])
 OUTER APPLY (SELECT TOP (1) k.[KeyValue] FROM [asset].[AlternateKey] k WHERE k.[ValidTo] IS NULL AND k.[IsDeleted] = 0 AND k.[SubjectEntityId] = a.[EntityId] AND k.[KeyKindCode] = N'SerialNumber' ORDER BY k.[IsPrimaryLabel] DESC, k.[RowSeq]) sn
-OUTER APPLY (SELECT TOP (1) p.[NodeEntityId] FROM [asset].[Placement] p WHERE p.[ValidTo] IS NULL AND p.[IsDeleted] = 0 AND p.[AssetEntityId] = a.[EntityId] AND p.[PlacementKind] = N'Installed' ORDER BY p.[ValidFrom] DESC) pl
+OUTER APPLY (SELECT TOP (1) p.[NodeEntityId], p.[ValidFrom] AS [PlacedFrom] FROM [asset].[Placement] p WHERE p.[ValidTo] IS NULL AND p.[IsDeleted] = 0 AND p.[AssetEntityId] = a.[EntityId] AND p.[PlacementKind] = N'Installed' ORDER BY p.[ValidFrom] DESC) pl
+-- #187: the device template bound to the model (config.vAssetTemplate is Effective-only; NULL when the model has none)
+OUTER APPLY (SELECT TOP (1) t.[DefinitionKey], t.[VersionNumber] FROM [config].[vAssetTemplate] t WHERE t.[ModelId] = a.[ModelId] ORDER BY t.[VersionNumber] DESC) at
 LEFT JOIN [location].[vNode] dp  ON dp.[EntityId]  = pl.[NodeEntityId]
 LEFT JOIN [location].[vNode] pnl ON pnl.[EntityId] = dp.[ParentEntityId]
 LEFT JOIN [location].[vNode] h2  ON h2.[EntityId]  = pnl.[ParentEntityId]
