@@ -49,7 +49,14 @@ export default function SettingsBookScreen({ screen, params: p }: { screen: Scre
   const choose = (id: string) => {
     setStation(id); setOpen(new Set()); setExpanded(null); store(store_('station'), id)
     // #188: the list is shown while the book is scoped to one device or one request; choosing a location leaves that scope
-    if (scopeDevice || scopeRequest) navigate(screenPath(screen.key, null, { [p.stationColumn]: id, [p.stateColumn]: gridState }))
+    // (a new place in the history). Otherwise the choice REWRITES the current address in place: the address wins over the
+    // stored choice on entry (line 30), so the entry Back returns to must carry what was chosen — the owner, 2026-09-18:
+    // "the back button is always taking me back to EEL RIVER 230 BDG no matter what I have selected".
+    navigate(screenPath(screen.key, null, { [p.stationColumn]: id, [p.stateColumn]: gridState }), { replace: !(scopeDevice || scopeRequest) })
+  }
+  const chooseState = (k: string) => {
+    setGridState(k); setExpanded(null)
+    if (!scopeDevice && !scopeRequest && station) navigate(screenPath(screen.key, null, { [p.stationColumn]: station, [p.stateColumn]: k }), { replace: true })
   }
   // #188: the owner, 2026-09-18: the Locations list "should typically always be displayed and have a collapse button"
   const [locationsHidden, setLocationsHidden] = useState(() => stored(store_('locations.hidden'), 'false') === 'true')
@@ -130,7 +137,7 @@ export default function SettingsBookScreen({ screen, params: p }: { screen: Scre
       )}
       <div className="min-w-0 flex-1 space-y-3">
         <div className="no-print flex flex-wrap items-center gap-2">
-          <Tabs tabs={p.states.map((x) => ({ key: x.value, label: x.label }))} value={gridState} onChange={(k) => { setGridState(k); setExpanded(null) }} />
+          <Tabs tabs={p.states.map((x) => ({ key: x.value, label: x.label }))} value={gridState} onChange={chooseState} />
           {groupings.length > 1 && <Field label="Group by" className="ml-2"><select className={inputClass} value={grouping} onChange={(e) => { setGrouping(e.target.value); setOpen(new Set()); store(store_('grouping'), e.target.value) }}>
             {groupings.map((x) => <option key={x.key} value={x.key}>{x.label}</option>)}</select></Field>}
           <input className={`${inputClass} w-56`} placeholder="filter the rows…" value={filter} onChange={(e) => setFilter(e.target.value)} />
