@@ -2,10 +2,11 @@
 // level below a scheme, and it bundles everything true of the model itself. Nothing here is per model in code: every
 // panel draws from what is bound to the model in the database, so a template for another relay draws the same way.
 //
-//   Template facts  the CharacteristicSchema.AssetTemplate definition bound to this model (config.vDefinitionAppliesTo,
-//                   dimension Model), its rows the model-level facts nothing else holds
+//   Settings        FIRST — the model's settings template by the manual's own groups, none hidden (#183) — DeviceSettings.tsx
+//   then, collapsed until wanted (#186, the owner: "the important, user facing stuff, at the top of the page and only show
+//   the documentation when the user needs them"):
+//   Template facts  the CharacteristicSchema.AssetTemplate definition bound to this model, its rows the model-level facts
 //   What it can do  scheme.vFunctionCapability, numbers as numbers and the rest as words (#181, #182)
-//   Settings        the model's settings template by the manual's own groups, none hidden (#183) — DeviceSettings.tsx
 //
 // #185: no compliance here. The owner: "compliance is really a function of it's own, outside of the template. That is
 // PRC-023 will be compulsory, no matter what physical device we are implementing". The standards and the rules live
@@ -53,28 +54,37 @@ export default function DeviceTemplateScreen({ params: p, id }: { screen: Screen
       </header>
       <Status>One template per device type, one level below a scheme. What is shown here is true of every {code}. Which standards apply and why is under Compliance; which obligations bind a particular relay is on that relay's own record.</Status>
 
-      <div className="grid gap-3 lg:grid-cols-2">
-        <Panel title="Template facts">
-          {factsQ.isPending && <Status>…</Status>}
-          {!factsQ.isPending && !factsQ.data && <Status>No template definition is bound to this model yet. An administrator seeds one ({templateKey}) from the manufacturer's manual.</Status>}
-          {factsQ.data && <Facts cols={1} pairs={factsQ.data.rows.map((r) => [s(r.Name), <span className="text-slate-300">{s(r.Description)}</span>] as [string, React.ReactNode])} />}
-        </Panel>
-        <Panel title={`What it can do · ${caps.isPending ? '…' : (caps.data ?? []).length}`}>
-          {!caps.isPending && !(caps.data ?? []).length && <Status>No element list has been recorded for this model. An administrator builds it from the manufacturer's manual.</Status>}
-          <ul className="grid grid-cols-1 gap-x-4 gap-y-1 text-sm md:grid-cols-2">
-            {(caps.data ?? []).map((c) => { const k = s(c.AnsiCode); return (
-              <li key={k} className="text-slate-200">{isNum.get(k) ? <><span className="font-mono">{k}</span> {nameOf.get(k) ?? ''}</> : (nameOf.get(k) || k)}
-                <span className="ml-2 text-xs text-slate-500">{s(c.Source).toLowerCase()}</span></li>) })}
-          </ul>
-          <div className="mt-2"><Status>Ten carry a C37.2 device number; the rest are named in the manual's own words (#182). Ticked per position when a relay is placed.</Status></div>
-        </Panel>
-      </div>
 
+      {/* #186: the settings first — the owner: "the important, user facing stuff, at the top of the page and only show the
+          documentation when the user needs them" */}
       <Panel title="Settings — by the manual's own groups, none hidden">
         {tmpl.isPending && <Status>…</Status>}
         {!tmpl.isPending && !tmpl.data && <Status>No settings template is bound to this model.</Status>}
         {tmpl.data && <SettingsByFunction template={tmpl.data} parsed={[]} parseStatus="template" parseError="" revision="" filedText={null} />}
       </Panel>
+
+      {/* #186: the documentation, closed until wanted */}
+      <details className="rounded border border-slate-800">
+        <summary className="cursor-pointer select-none px-3 py-2 text-xs font-semibold uppercase tracking-wider text-slate-400 hover:text-slate-200">Template facts and what it can do — the documentation</summary>
+        <div className="p-3">
+        <div className="grid gap-3 lg:grid-cols-2">
+          <Panel title="Template facts">
+            {factsQ.isPending && <Status>…</Status>}
+            {!factsQ.isPending && !factsQ.data && <Status>No template definition is bound to this model yet. An administrator seeds one ({templateKey}) from the manufacturer's manual.</Status>}
+            {factsQ.data && <Facts cols={1} pairs={factsQ.data.rows.map((r) => [s(r.Name), <span className="text-slate-300">{s(r.Description)}</span>] as [string, React.ReactNode])} />}
+          </Panel>
+          <Panel title={`What it can do · ${caps.isPending ? '…' : (caps.data ?? []).length}`}>
+            {!caps.isPending && !(caps.data ?? []).length && <Status>No element list has been recorded for this model. An administrator builds it from the manufacturer's manual.</Status>}
+            <ul className="grid grid-cols-1 gap-x-4 gap-y-1 text-sm md:grid-cols-2">
+              {(caps.data ?? []).map((c) => { const k = s(c.AnsiCode); return (
+                <li key={k} className="text-slate-200">{isNum.get(k) ? <><span className="font-mono">{k}</span> {nameOf.get(k) ?? ''}</> : (nameOf.get(k) || k)}
+                  <span className="ml-2 text-xs text-slate-500">{s(c.Source).toLowerCase()}</span></li>) })}
+            </ul>
+            <div className="mt-2"><Status>Ten carry a C37.2 device number; the rest are named in the manual's own words (#182). Ticked per position when a relay is placed.</Status></div>
+          </Panel>
+        </div>
+        </div>
+      </details>
     </div>
   )
 }
