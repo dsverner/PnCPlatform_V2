@@ -8,7 +8,7 @@ import { useNavigate, useSearchParams } from 'react-router'
 import { getJson, s, type Row } from '@/lib/api'
 import { useCan, useViewAll } from '@/lib/hooks'
 import { settingsText } from '@/lib/actions'
-import { type SettingsBookParams, type Screen, type Command, type ColumnDef, splitView, cellText, labelOf, fill, runCommand, commandEnabled } from '@/lib/screens'
+import { type SettingsBookParams, type Screen, type Command, type ColumnDef, splitView, cellText, labelOf, fill, runCommand, commandEnabled, screenPath } from '@/lib/screens'
 import { Panel, Pill, Button, Facts, Tabs, Field, inputClass, Status } from '@/components/ui/ui'
 import { DataGrid, ColumnChooser, downloadCsv, useChosenColumns, type Column } from '@/components/ui/data-grid'
 import type { MenuItem } from '@/components/ui/context-menu'
@@ -46,7 +46,14 @@ export default function SettingsBookScreen({ screen, params: p }: { screen: Scre
   const stations = stationsQ.data ?? []
   const stationRows = stations.filter((x) => !stationFilter || String(x.Name).toLowerCase().includes(stationFilter.toLowerCase()))
   const stationName = stations.find((x) => String(x.EntityId).toLowerCase() === station.toLowerCase())?.Name
-  const choose = (id: string) => { setStation(id); setOpen(new Set()); setExpanded(null); store(store_('station'), id) }
+  const choose = (id: string) => {
+    setStation(id); setOpen(new Set()); setExpanded(null); store(store_('station'), id)
+    // #188: the list is shown while the book is scoped to one device or one request; choosing a location leaves that scope
+    if (scopeDevice || scopeRequest) navigate(screenPath(screen.key, null, { [p.stationColumn]: id, [p.stateColumn]: gridState }))
+  }
+  // #188: the owner, 2026-09-18: the Locations list "should typically always be displayed and have a collapse button"
+  const [locationsHidden, setLocationsHidden] = useState(() => stored(store_('locations.hidden'), 'false') === 'true')
+  const toggleLocations = () => { setLocationsHidden(!locationsHidden); store(store_('locations.hidden'), String(!locationsHidden)) }
 
   // ---- the read: one state, one location; a state with badgeFrom also reads that state for the badges (round 5 B5)
   const scoped = !!(scopeDevice || scopeRequest)
@@ -106,9 +113,11 @@ export default function SettingsBookScreen({ screen, params: p }: { screen: Scre
 
   return (
     <div className="flex gap-4">
-      {!scoped && (
+      {locationsHidden
+        ? <aside className="no-print shrink-0"><Button kind="mini" onClick={toggleLocations} title="show the locations">›</Button></aside>
+        : (
         <aside className="no-print w-60 shrink-0">
-          <Panel title="Locations">
+          <Panel title="Locations" actions={<Button kind="mini" onClick={toggleLocations} title="hide the locations">‹</Button>}>
             <input className={`${inputClass} mb-2 w-full`} placeholder="filter locations…" value={stationFilter} onChange={(e) => setStationFilter(e.target.value)} />
             <ul className="max-h-[70vh] overflow-y-auto text-sm">
               {stationRows.map((x) => { const id = String(x.EntityId); const sel = id.toLowerCase() === station.toLowerCase()

@@ -1,7 +1,7 @@
 // The frame every screen sits in: a collapsible sidebar with grouped navigation (Dev_Final's layout), the signed-in
 // person top right, the health line in the footer. The navigation is built from the screen definitions the person may
 // open (#165: GET /api/v1/screens, grouped by each screen's menu.group); the plain pages not yet ported stay as links.
-import { NavLink, Outlet, useLocation } from 'react-router'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useHealth, useMe } from '@/lib/hooks'
 import { devUser } from '@/lib/api'
@@ -26,6 +26,22 @@ const PAGES: Group[] = [
   { key: 'Compliance', label: 'Compliance', match: [], items: [] },
   { key: 'Administration', label: 'Administration', match: [], items: [{ to: '/grants.html', label: 'Grants', external: true }, { to: '/definitions.html', label: 'Definitions', external: true }] },
 ]
+
+/**
+ * #188: Back on every screen. The owner, 2026-09-18: "a Back button on every screen that takes the user back to a previous
+ * screen. This occurs a lot in actual usage." One button in the bar every screen shares, the router's own history
+ * (react-router keeps its index in history.state.idx), disabled at the first screen of the session. The screens' own
+ * Close buttons stay: Close means "done with this", Back means "the screen before".
+ */
+function BackButton() {
+  const navigate = useNavigate(); useLocation()   // re-render on every navigation so the index is re-read
+  const idx = (window.history.state as { idx?: number } | null)?.idx
+  const canBack = idx == null ? window.history.length > 1 : idx > 0
+  return (
+    <button type="button" disabled={!canBack} onClick={() => navigate(-1)} title={canBack ? 'the previous screen' : 'nothing to go back to'}
+      className="rounded border border-slate-700 px-2 py-0.5 text-xs text-slate-300 hover:border-slate-500 hover:text-slate-100 disabled:cursor-default disabled:opacity-40">‹ Back</button>
+  )
+}
 
 function GroupHeader({ label, open, onToggle }: { label: string; open: boolean; onToggle: () => void }) {
   return (
@@ -71,7 +87,7 @@ export default function AppLayout({ children }: { children?: ReactNode }) {
         </footer>
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center justify-end border-b border-slate-800 bg-slate-900/60 px-4 py-2 text-xs text-slate-400">{who}</header>
+        <header className="flex items-center justify-between border-b border-slate-800 bg-slate-900/60 px-4 py-2 text-xs text-slate-400"><BackButton />{who}</header>
         <main className="min-w-0 flex-1 p-4">{children ?? <Outlet />}</main>
       </div>
     </div>

@@ -44,7 +44,8 @@ export default function RecordScreen({ params: p, id }: { screen: Screen; params
   return (
     <div className="space-y-3">
       <header className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2"><h1 className="text-lg font-semibold text-slate-100">{legacyFree(r.DeviceName)} — rev {s(r.RevisionLabel) || '?'}</h1><Pill tone={stateTone(r.GridState)}>{s(r.GridState)}</Pill></div>
+        {/* #188: the owner, 2026-09-18: the title "should really be the name of the protection" — the scheme's name as recorded, the relay beneath */}
+        <div className="flex items-center gap-2"><h1 className="text-lg font-semibold text-slate-100">{s(r.SchemeName) || legacyFree(r.DeviceName)}</h1><Pill tone={stateTone(r.GridState)}>{s(r.GridState)}</Pill></div>
         <div className="flex flex-wrap gap-2">
           {!!r.WorkRequestEntityId && <Button onClick={() => navigate(screenPath('WORK_ITEM', s(r.WorkRequestEntityId)))}>Change request</Button>}
           <Button disabled={!others.length} title={others.length ? undefined : 'This device has no other revision'} onClick={() => { setSection('compare'); if (!compareWith && others[0]) setCompareWith(s(others[0].RevisionRowId)) }}>Compare</Button>
@@ -52,12 +53,22 @@ export default function RecordScreen({ params: p, id }: { screen: Screen; params
           <Button onClick={back}>Close</Button>
         </div>
       </header>
-      <Status>Revision {s(r.RevisionStatus)} · lifecycle {s(r.LifecycleState) || '—'} · {s(r.FileKind)} {s(r.ParseStatus)}</Status>
+      <Status>{legacyFree(r.DeviceName)} · rev {s(r.RevisionLabel) || '?'} · Revision {s(r.RevisionStatus)} · lifecycle {s(r.LifecycleState) || '—'} · {s(r.FileKind)} {s(r.ParseStatus)}</Status>
+      <Tabs value={section} onChange={setSection} tabs={[{ key: 'settings', label: 'Settings' }, { key: 'record', label: 'Record' }, { key: 'classification', label: 'Classification' }, { key: 'compliance', label: 'Compliance' }, { key: 'notes', label: 'Notes' }, { key: 'text', label: 'Text as filed' }, { key: 'files', label: 'Files and records' }, ...(others.length ? [{ key: 'compare', label: 'Compare' }] : [])]} />
+      {section === 'settings' && (template
+        /* #168: the template's view of the device — functions, inputs, settings by function — when the model has one */
+        ? <DeviceSettings r={r} revision={revision} filedText={textQ.data?.text ?? null} editable={r.GridState === 'Outstanding' && can('ConfigurationFile.Modify')} />
+        : <Panel title={parsed.length ? `Settings · ${parsed.length} parsed from the ${s(r.FileKind)} file` : r.FileKind === 'NativeSettings' ? 'Settings · the native (vendor) file is stored as is; no reader exists for it yet (#113)' : 'Settings · no parsed settings; the text as filed is the record'}>
+            {parsed.length > 0 ? <DataGrid rows={parsed} columns={PARSED_COLS} rowKey={(x) => s(x.SettingCode) + '|' + s(x.GroupNumber)} /> : <Status>No settings template for this model yet; the text as filed is the record.</Status>}
+          </Panel>)}
+      {/* #188: the relay, its placement and scheme, and the dates and state — a tab, not the top of every view. The owner,
+          2026-09-18: the three panels "take up too much room and should really just be another tab"; "Where" renamed */}
+      {section === 'record' && (
       <div className="grid gap-3 lg:grid-cols-3">
-        <Panel title="Device"><Facts cols={1} pairs={[['Device', legacyFree(r.DeviceName)], ['Model', <span><a className="text-sky-300 underline" href={screenPath('DEVICE_TEMPLATE', s(r.ModelId))} onClick={(e) => { e.preventDefault(); navigate(screenPath('DEVICE_TEMPLATE', s(r.ModelId))) }} title="the device template for this model (#184)">{s(r.ModelCode)}</a>{r.ModelName ? ' — ' + s(r.ModelName) : ''}</span>], ['Manufacturer', s(r.ManufacturerName)], ['Technology', s(r.Technology)], ['Software version', s(r.FirmwareVersion)], ['Serial number', s(r.SerialNumber)], ['Voltage', s(r.VoltageClassCode)], ['Functions', s(r.Functions || r.PositionName)],
+        <Panel title="Relay"><Facts cols={1} pairs={[['Device', legacyFree(r.DeviceName)], ['Model', <span><a className="text-sky-300 underline" href={screenPath('DEVICE_TEMPLATE', s(r.ModelId))} onClick={(e) => { e.preventDefault(); navigate(screenPath('DEVICE_TEMPLATE', s(r.ModelId))) }} title="the device template for this model (#184)">{s(r.ModelCode)}</a>{r.ModelName ? ' — ' + s(r.ModelName) : ''}</span>], ['Manufacturer', s(r.ManufacturerName)], ['Technology', s(r.Technology)], ['Software version', s(r.FirmwareVersion)], ['Serial number', s(r.SerialNumber)], ['Voltage', s(r.VoltageClassCode)], ['Functions', s(r.Functions || r.PositionName)],
           /* #187: what the sheet is drawn from — the owner could not tell whether the relay "had a template applied" */
           ['Template', r.TemplateKey ? <span><a className="text-sky-300 underline" href={screenPath('DEVICE_TEMPLATE', s(r.ModelId))} onClick={(e) => { e.preventDefault(); navigate(screenPath('DEVICE_TEMPLATE', s(r.ModelId))) }}>{s(r.TemplateKey)} v{s(r.TemplateVersion)}</a> <span className="text-slate-500">through the model</span></span> : <span className="text-slate-500">no template for this model yet</span>]]} /></Panel>
-        <Panel title="Where"><Facts cols={1} pairs={[['Location', <NodeLink id={s(r.BuildingNodeEntityId)} name={s(r.BuildingName)} />],
+        <Panel title="Placement and scheme"><Facts cols={1} pairs={[['Location', <NodeLink id={s(r.BuildingNodeEntityId)} name={s(r.BuildingName)} />],
           ['Scheme', r.SchemeEntityId ? <a className="text-sky-300 underline" href={screenPath('SCHEME', s(r.SchemeEntityId))} onClick={(e) => { e.preventDefault(); navigate(screenPath('SCHEME', s(r.SchemeEntityId))) }}>{s(r.SchemeName)}</a> : s(r.SchemeName)],
           ['Protects', <Protects schemeEntityId={s(r.SchemeEntityId)} />], ['Equipment', s(r.PanelName)], ['Position', s(r.PositionName)],
           /* #187: placed and FLOC are two facts — a relay can be installed at a position that has no tag yet */
@@ -67,13 +78,7 @@ export default function RecordScreen({ params: p, id }: { screen: Screen; params
           ['FLOC', r.Floc ? <code className="rounded bg-slate-800 px-1 font-mono text-xs text-slate-200">{s(r.Floc)}</code> : <FlocMissing r={r} />]]} /></Panel>
         <Panel title="Dates and state"><Facts cols={1} pairs={[['Calculated', fmtWhen(r.CalculatedAt) + (r.CalculatedByDisplayName ? ' by ' + r.CalculatedByDisplayName : '')], ['Verified', fmtWhen(r.VerifiedAt)], ['In service', r.InServiceFrom ? fmtWhen(r.InServiceFrom) + (r.InServiceTo ? ' – ' + fmtWhen(r.InServiceTo) : ' – now') : 'not in service'], ['Change request', legacyFree(r.WorkRequestTitle)], ['Action type', s(r.WorkTypeKey)], ['Lifecycle', s(r.LifecycleState)], ['Revision', s(r.RevisionLabel) + ' · ' + s(r.RevisionStatus)]]} /></Panel>
       </div>
-      <Tabs value={section} onChange={setSection} tabs={[{ key: 'settings', label: 'Settings' }, { key: 'classification', label: 'Classification' }, { key: 'compliance', label: 'Compliance' }, { key: 'notes', label: 'Notes' }, { key: 'text', label: 'Text as filed' }, { key: 'files', label: 'Files and records' }, ...(others.length ? [{ key: 'compare', label: 'Compare' }] : [])]} />
-      {section === 'settings' && (template
-        /* #168: the template's view of the device — functions, inputs, settings by function — when the model has one */
-        ? <DeviceSettings r={r} revision={revision} filedText={textQ.data?.text ?? null} editable={r.GridState === 'Outstanding' && can('ConfigurationFile.Modify')} />
-        : <Panel title={parsed.length ? `Settings · ${parsed.length} parsed from the ${s(r.FileKind)} file` : r.FileKind === 'NativeSettings' ? 'Settings · the native (vendor) file is stored as is; no reader exists for it yet (#113)' : 'Settings · no parsed settings; the text as filed is the record'}>
-            {parsed.length > 0 ? <DataGrid rows={parsed} columns={PARSED_COLS} rowKey={(x) => s(x.SettingCode) + '|' + s(x.GroupNumber)} /> : <Status>No settings template for this model yet; the text as filed is the record.</Status>}
-          </Panel>)}
+      )}
       {/* an outstanding record is editable (owner, 2026-09-15); in service or archived is the record */}
       {section === 'classification' && <Characteristics r={r} revision={revision} editable={r.GridState === 'Outstanding' && can('Record.Modify')} hideGroups={template?.rows.some(isRatio) ? ['Instrument transformers'] : []} />}
       {/* #171: what the device is, what it inherits from the station and the protected asset, its obligations and the evaluator's working */}
