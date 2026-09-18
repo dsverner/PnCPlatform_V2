@@ -19,7 +19,7 @@ NL = chr(13) + chr(10)
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 KEY = "SEL221F_Template"
 MODEL_CODES = ["SEL-221F Z1-3=.125-64 OHMS", "SEL-221F"]   # the same two codes the settings template and the capabilities bind to
-NOTE = "seed (#184): the SEL-221F device template, from IM 981207"
+NOTE = "seed (#185): the SEL-221F device template, from IM 981207 — compliance moved out to the Compliance menu"
 
 # (key, name, datatype, unit, group, order, description-with-cite)
 ROWS = [
@@ -46,14 +46,6 @@ ROWS = [
     ("Capabilities", "What it can do", "Text", None, "Bundle", 7,
      "The fifteen elements of scheme.FunctionCapability for this model (#181, #182): ten with a C37.2 device number and "
      "five named in the manual's own words."),
-    ("Prc023Inputs", "PRC-023 loadability inputs", "Text", None, "Compliance", 8,
-     "The loadability calculation (#171) reads Z3%, R1, X1, MTA and 50H from this relay's settings, the terminal voltage "
-     "of the protected line, and its four-hour, fifteen-minute and practical-limitation ratings. Manual 2-32 / 5-14: "
-     "reach along the line angle; mho diameter = reach / cos(line angle - MTA)."),
-    ("NpccDirectory4", "NPCC Directory 4 awareness", "Text", None, "Compliance", 9,
-     "When the bus this relay protects is declared BPS by the NPCC A-10 study, Directory 4's protection criteria "
-     "(R5.1 - R5.20, R6.1 - R6.3) attach as reading material; they govern the physical design of the protection, not "
-     "its settings (the owner, 2026-09-18)."),
 ]
 
 

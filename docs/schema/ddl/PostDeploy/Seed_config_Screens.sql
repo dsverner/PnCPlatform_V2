@@ -17,6 +17,20 @@ BEGIN
     EXEC [config].[ApproveDefinitionVersion] @VersionRowId = @v, @ActorId = @approver;
 END
 GO
+-- device-templates.screen.json
+DECLARE @author UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000001', @approver UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000002';
+DECLARE @e UNIQUEIDENTIFIER, @v UNIQUEIDENTIFIER, @no INT, @payload NVARCHAR(MAX) = N'{"g":1,"kind":"screen","key":"DEVICE_TEMPLATES","name":"Device templates","description":"The device templates, one row per template and the model it is bound to (#185). The owner, 2026-09-18, unable to reach SEL221F_Template from the main screen: functionality must always be reachable from the left navigation, and templates belong under a Templates entry. A row opens the model''s template. Reads config.vAssetTemplate.","menu":{"group":"Templates","label":"Device templates","order":30},"permission":"Asset.Read","screenKind":"list","params":{"view":"config.vAssetTemplate","orderBy":"DefinitionKey","rowKey":"ModelId","columns":[{"key":"DefinitionKey","label":"Template"},{"key":"ModelCode","label":"Model"},{"key":"Manufacturer","label":"Manufacturer"},{"key":"Technology","label":"Technology"},{"key":"VersionNumber","label":"Version"}],"textFilterColumns":["DefinitionKey","ModelCode","ModelName","Manufacturer"],"rowOpen":{"label":"Open the template","action":"openScreen","screen":"DEVICE_TEMPLATE","param":"ModelId"}}}';
+DECLARE @note NVARCHAR(200) = N'seed c432eef19413dace';
+SELECT @e = EntityId FROM [config].[Definition] WHERE [DefinitionKind] = N'Program.Screen' AND [DefinitionKey] = N'DEVICE_TEMPLATES' AND [IsDeleted] = 0;
+IF @e IS NULL
+    EXEC [config].[AddDefinition] @DefinitionKind = N'Program.Screen', @DefinitionKey = N'DEVICE_TEMPLATES', @Name = N'Device templates', @Description = N'The device templates, one row per template and the model it is bound to (#185). The owner, 2026-09-18, unable to reach SEL221F_Template from the main screen: functionality must always be reachable from the left navigation, and templates belong under a Templates entry. A row opens the model''s template. Reads config.vAssetTemplate.', @ActorId = @author, @EntityId = @e OUTPUT;
+IF NOT EXISTS (SELECT 1 FROM [config].[vDefinitionVersion] WHERE [DefinitionEntityId] = @e AND [ChangeNote] NOT LIKE N'seed %')      -- untouched by an Administrator
+   AND NOT EXISTS (SELECT 1 FROM [config].[vDefinitionVersion] WHERE [DefinitionEntityId] = @e AND [Status] = N'Effective' AND [ChangeNote] = @note)
+BEGIN
+    EXEC [config].[AddDefinitionVersion] @DefinitionKey = N'DEVICE_TEMPLATES', @DefinitionKind = N'Program.Screen', @ChangeNote = @note, @PayloadText = @payload, @ActorId = @author, @VersionRowId = @v OUTPUT, @VersionNumber = @no OUTPUT;
+    EXEC [config].[ApproveDefinitionVersion] @VersionRowId = @v, @ActorId = @approver;
+END
+GO
 -- location.screen.json
 DECLARE @author UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000001', @approver UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000002';
 DECLARE @e UNIQUEIDENTIFIER, @v UNIQUEIDENTIFIER, @no INT, @payload NVARCHAR(MAX) = N'{"g":1,"kind":"screen","key":"LOCATION","name":"Location","description":"One node of the location tree — a region, a station, a building, a room, a panel or a position: where it sits, its CIP-002 impact rating (recorded here because a location carries it and every BES Cyber Asset in it inherits it — the owner, 2026-09-17), what is inside it and the devices placed there; a station also shows the primary assets with a terminal here and the schemes here (#173, the STATION screen generalised). Plain code; the definition names its data.","permission":"Asset.Read","screenKind":"record","params":{"view":"location.vNode","key":"EntityId"}}';
@@ -42,6 +56,20 @@ IF NOT EXISTS (SELECT 1 FROM [config].[vDefinitionVersion] WHERE [DefinitionEnti
    AND NOT EXISTS (SELECT 1 FROM [config].[vDefinitionVersion] WHERE [DefinitionEntityId] = @e AND [Status] = N'Effective' AND [ChangeNote] = @note)
 BEGIN
     EXEC [config].[AddDefinitionVersion] @DefinitionKey = N'LOCATIONS', @DefinitionKind = N'Program.Screen', @ChangeNote = @note, @PayloadText = @payload, @ActorId = @author, @VersionRowId = @v OUTPUT, @VersionNumber = @no OUTPUT;
+    EXEC [config].[ApproveDefinitionVersion] @VersionRowId = @v, @ActorId = @approver;
+END
+GO
+-- obligation-rules.screen.json
+DECLARE @author UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000001', @approver UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000002';
+DECLARE @e UNIQUEIDENTIFIER, @v UNIQUEIDENTIFIER, @no INT, @payload NVARCHAR(MAX) = N'{"g":1,"kind":"screen","key":"OBLIGATION_RULES","name":"Obligation rules","description":"What applies and why, for every device type (#185): each obligation rule, the requirement it binds, its scope - the trigger, in the platform''s own fact language - and its cadence. The owner, 2026-09-18: compliance is a function of its own, outside the device template. Compliance is calculated from these rules against the study values recorded on the primary elements; nothing here is switched on per device. Reads compliance.vObligationRule.","menu":{"group":"Compliance","label":"Obligation rules","order":41},"permission":"Obligation.Read","screenKind":"list","params":{"view":"compliance.vObligationRule","orderBy":"DefinitionKey","rowKey":"DefinitionEntityId","columns":[{"key":"DefinitionKey","label":"Rule"},{"key":"Name","label":"Requirement"},{"key":"ScopeText","label":"Applies when"},{"key":"CadenceText","label":"Cadence"},{"key":"EffectiveVersionNumber","label":"Version"}],"textFilterColumns":["DefinitionKey","Name","ScopeText"]}}';
+DECLARE @note NVARCHAR(200) = N'seed 038c5966ed7865d8';
+SELECT @e = EntityId FROM [config].[Definition] WHERE [DefinitionKind] = N'Program.Screen' AND [DefinitionKey] = N'OBLIGATION_RULES' AND [IsDeleted] = 0;
+IF @e IS NULL
+    EXEC [config].[AddDefinition] @DefinitionKind = N'Program.Screen', @DefinitionKey = N'OBLIGATION_RULES', @Name = N'Obligation rules', @Description = N'What applies and why, for every device type (#185): each obligation rule, the requirement it binds, its scope - the trigger, in the platform''s own fact language - and its cadence. The owner, 2026-09-18: compliance is a function of its own, outside the device template. Compliance is calculated from these rules against the study values recorded on the primary elements; nothing here is switched on per device. Reads compliance.vObligationRule.', @ActorId = @author, @EntityId = @e OUTPUT;
+IF NOT EXISTS (SELECT 1 FROM [config].[vDefinitionVersion] WHERE [DefinitionEntityId] = @e AND [ChangeNote] NOT LIKE N'seed %')      -- untouched by an Administrator
+   AND NOT EXISTS (SELECT 1 FROM [config].[vDefinitionVersion] WHERE [DefinitionEntityId] = @e AND [Status] = N'Effective' AND [ChangeNote] = @note)
+BEGIN
+    EXEC [config].[AddDefinitionVersion] @DefinitionKey = N'OBLIGATION_RULES', @DefinitionKind = N'Program.Screen', @ChangeNote = @note, @PayloadText = @payload, @ActorId = @author, @VersionRowId = @v OUTPUT, @VersionNumber = @no OUTPUT;
     EXEC [config].[ApproveDefinitionVersion] @VersionRowId = @v, @ActorId = @approver;
 END
 GO
@@ -140,6 +168,20 @@ IF NOT EXISTS (SELECT 1 FROM [config].[vDefinitionVersion] WHERE [DefinitionEnti
    AND NOT EXISTS (SELECT 1 FROM [config].[vDefinitionVersion] WHERE [DefinitionEntityId] = @e AND [Status] = N'Effective' AND [ChangeNote] = @note)
 BEGIN
     EXEC [config].[AddDefinitionVersion] @DefinitionKey = N'SETTINGS_RECORD', @DefinitionKind = N'Program.Screen', @ChangeNote = @note, @PayloadText = @payload, @ActorId = @author, @VersionRowId = @v OUTPUT, @VersionNumber = @no OUTPUT;
+    EXEC [config].[ApproveDefinitionVersion] @VersionRowId = @v, @ActorId = @approver;
+END
+GO
+-- standards.screen.json
+DECLARE @author UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000001', @approver UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000002';
+DECLARE @e UNIQUEIDENTIFIER, @v UNIQUEIDENTIFIER, @no INT, @payload NVARCHAR(MAX) = N'{"g":1,"kind":"screen","key":"STANDARDS","name":"Standards and requirements","description":"Every requirement of every standard the platform holds, with its standard and version in force (#185). The owner, 2026-09-18: compliance is a function of its own, outside the device template - PRC-023 is compulsory whatever the relay - so the standards live here under Compliance, for every device type. NPCC Directory 4''s 23 criteria and A-10 sit here. Reads compliance.vRequirementDetail.","menu":{"group":"Compliance","label":"Standards","order":40},"permission":"Obligation.Read","screenKind":"list","params":{"view":"compliance.vRequirementDetail","orderBy":"StandardCode","rowKey":"RequirementEntityId","columns":[{"key":"StandardCode","label":"Standard"},{"key":"VersionLabel","label":"Version"},{"key":"RequirementNumber","label":"Requirement"},{"key":"Title","label":"Title"},{"key":"Summary","label":"Summary"}],"textFilterColumns":["StandardCode","RequirementNumber","Title","Summary"],"filters":[{"column":"StandardCode","label":"Standard"},{"column":"Family","label":"Family"}]}}';
+DECLARE @note NVARCHAR(200) = N'seed 0c309c7a880663fd';
+SELECT @e = EntityId FROM [config].[Definition] WHERE [DefinitionKind] = N'Program.Screen' AND [DefinitionKey] = N'STANDARDS' AND [IsDeleted] = 0;
+IF @e IS NULL
+    EXEC [config].[AddDefinition] @DefinitionKind = N'Program.Screen', @DefinitionKey = N'STANDARDS', @Name = N'Standards and requirements', @Description = N'Every requirement of every standard the platform holds, with its standard and version in force (#185). The owner, 2026-09-18: compliance is a function of its own, outside the device template - PRC-023 is compulsory whatever the relay - so the standards live here under Compliance, for every device type. NPCC Directory 4''s 23 criteria and A-10 sit here. Reads compliance.vRequirementDetail.', @ActorId = @author, @EntityId = @e OUTPUT;
+IF NOT EXISTS (SELECT 1 FROM [config].[vDefinitionVersion] WHERE [DefinitionEntityId] = @e AND [ChangeNote] NOT LIKE N'seed %')      -- untouched by an Administrator
+   AND NOT EXISTS (SELECT 1 FROM [config].[vDefinitionVersion] WHERE [DefinitionEntityId] = @e AND [Status] = N'Effective' AND [ChangeNote] = @note)
+BEGIN
+    EXEC [config].[AddDefinitionVersion] @DefinitionKey = N'STANDARDS', @DefinitionKind = N'Program.Screen', @ChangeNote = @note, @PayloadText = @payload, @ActorId = @author, @VersionRowId = @v OUTPUT, @VersionNumber = @no OUTPUT;
     EXEC [config].[ApproveDefinitionVersion] @VersionRowId = @v, @ActorId = @approver;
 END
 GO

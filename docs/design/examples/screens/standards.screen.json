@@ -1,0 +1,27 @@
+{
+  "g": 1,
+  "kind": "screen",
+  "key": "STANDARDS",
+  "name": "Standards and requirements",
+  "description": "Every requirement of every standard the platform holds, with its standard and version in force (#185). The owner, 2026-09-18: compliance is a function of its own, outside the device template - PRC-023 is compulsory whatever the relay - so the standards live here under Compliance, for every device type. NPCC Directory 4's 23 criteria and A-10 sit here. Reads compliance.vRequirementDetail.",
+  "menu": { "group": "Compliance", "label": "Standards", "order": 40 },
+  "permission": "Obligation.Read",
+  "screenKind": "list",
+  "params": {
+    "view": "compliance.vRequirementDetail",
+    "orderBy": "StandardCode",
+    "rowKey": "RequirementEntityId",
+    "columns": [
+      { "key": "StandardCode", "label": "Standard" },
+      { "key": "VersionLabel", "label": "Version" },
+      { "key": "RequirementNumber", "label": "Requirement" },
+      { "key": "Title", "label": "Title" },
+      { "key": "Summary", "label": "Summary" }
+    ],
+    "textFilterColumns": ["StandardCode", "RequirementNumber", "Title", "Summary"],
+    "filters": [
+      { "column": "StandardCode", "label": "Standard" },
+      { "column": "Family", "label": "Family" }
+    ]
+  }
+}

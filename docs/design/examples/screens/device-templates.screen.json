@@ -1,0 +1,24 @@
+{
+  "g": 1,
+  "kind": "screen",
+  "key": "DEVICE_TEMPLATES",
+  "name": "Device templates",
+  "description": "The device templates, one row per template and the model it is bound to (#185). The owner, 2026-09-18, unable to reach SEL221F_Template from the main screen: functionality must always be reachable from the left navigation, and templates belong under a Templates entry. A row opens the model's template. Reads config.vAssetTemplate.",
+  "menu": { "group": "Templates", "label": "Device templates", "order": 30 },
+  "permission": "Asset.Read",
+  "screenKind": "list",
+  "params": {
+    "view": "config.vAssetTemplate",
+    "orderBy": "DefinitionKey",
+    "rowKey": "ModelId",
+    "columns": [
+      { "key": "DefinitionKey", "label": "Template" },
+      { "key": "ModelCode", "label": "Model" },
+      { "key": "Manufacturer", "label": "Manufacturer" },
+      { "key": "Technology", "label": "Technology" },
+      { "key": "VersionNumber", "label": "Version" }
+    ],
+    "textFilterColumns": ["DefinitionKey", "ModelCode", "ModelName", "Manufacturer"],
+    "rowOpen": { "label": "Open the template", "action": "openScreen", "screen": "DEVICE_TEMPLATE", "param": "ModelId" }
+  }
+}

@@ -1201,6 +1201,29 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
             Must(k181_m1s == HttpStatusCode.OK && k181_m2s == HttpStatusCode.OK && k181_onNode == 0,
                 $"#181: every commissioned element in the estate names a position, none a node of its own ({k181_onNode} on a node)");
 
+            // ======== #185 (2026-09-18): reachable from the nav, and compliance out of the template. The owner: "we must always
+            // build in an intuitive way for the users to find this functionality... I was expecting to see a Templates tab on
+            // the left hand side"; and "compliance is really a function of it's own, outside of the template". So a Templates
+            // menu lists the templates and a Compliance menu lists the standards and the rules, and the template carries neither.
+            var (k185_t1s, k185_t1b) = await Get(readOnly!, "api/v1/config/vAssetTemplate?DefinitionKey=SEL221F_Template&take=10");
+            var k185_tmpl = (k185_t1b?["rows"] as JsonArray) ?? [];
+            var (k185_r1s, k185_r1b) = await Get(readOnly!, "api/v1/compliance/vRequirementDetail?StandardCode=NPCC-D4&take=100");
+            var k185_d4 = (k185_r1b?["rows"] as JsonArray)?.Count ?? -1;
+            var k185_menus = new Dictionary<string, string>();
+            foreach (var key in new[] { "DEVICE_TEMPLATES", "STANDARDS", "OBLIGATION_RULES" })
+            {
+                var (ds, db) = await Get(admin, $"api/v1/config/vDefinition?DefinitionKind=Program.Screen&DefinitionKey={key}&take=1");
+                var d = (db?["rows"] as JsonArray)?.FirstOrDefault();
+                var (vs, vb) = await Get(admin, $"api/v1/config/vDefinitionVersion?DefinitionEntityId={d?["EntityId"]}&Status=Effective&take=1");
+                var payload = (vb?["rows"] as JsonArray)?.FirstOrDefault()?["PayloadText"]?.ToString() ?? "";
+                var m = System.Text.RegularExpressions.Regex.Match(payload, "\"group\":\"([^\"]+)\"");
+                k185_menus[key] = ds == HttpStatusCode.OK && d is not null && vs == HttpStatusCode.OK && m.Success ? m.Groups[1].Value : "(no menu)";
+            }
+            Must(k185_t1s == HttpStatusCode.OK && k185_tmpl.Count == 2 && k185_tmpl.All(r => r?["ModelCode"]?.ToString()?.Contains("221F") == true)
+                 && k185_r1s == HttpStatusCode.OK && k185_d4 == 23
+                 && k185_menus["DEVICE_TEMPLATES"] == "Templates" && k185_menus["STANDARDS"] == "Compliance" && k185_menus["OBLIGATION_RULES"] == "Compliance",
+                $"#185: the Templates menu lists SEL221F_Template for both its models ({k185_tmpl.Count}), the Compliance menu lists Directory 4's {k185_d4} criteria, and the three screens carry their menus ({string.Join(", ", k185_menus.Select(x => x.Key + "=" + x.Value))})");
+
 
             // the FLOC follows a code change, for the node and everything beneath it
             var (k175_r1s, k175_r1b) = await Post(admin, "api/v1/location/RenameNode", new { EntityId = k175_yard, Name = "230 kV yard (HQ side)", Code = "Y230HQ" });
@@ -1323,7 +1346,7 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
             var k184_bound = (k184_a1b?["rows"] as JsonArray)?.Count ?? -1;
             var (k184_c1s, k184_c1b) = await Get(readOnly!, $"api/v1/config/vCharacteristicDefinition?DefinitionVersionRowId={k184_ver?["RowId"]}&take=50");
             var k184_facts = (k184_c1b?["rows"] as JsonArray)?.Count ?? -1;
-            Must(k184_d1s == HttpStatusCode.OK && k184_def is not null && k184_ver is not null && k184_bound == 2 && k184_c1s == HttpStatusCode.OK && k184_facts == 9,
+            Must(k184_d1s == HttpStatusCode.OK && k184_def is not null && k184_ver is not null && k184_bound == 2 && k184_c1s == HttpStatusCode.OK && k184_facts == 7,   // #185: the two compliance facts left the template
                 $"#184: SEL221F_Template is an Effective AssetTemplate bound to both SEL-221F model codes ({k184_bound}), and ReadOnly reads its {k184_facts} facts");
 
             // Directory 4 and A-10 are seeded from the documents, page-cited, and the screen definition is Effective

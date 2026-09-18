@@ -1,0 +1,23 @@
+{
+  "g": 1,
+  "kind": "screen",
+  "key": "OBLIGATION_RULES",
+  "name": "Obligation rules",
+  "description": "What applies and why, for every device type (#185): each obligation rule, the requirement it binds, its scope - the trigger, in the platform's own fact language - and its cadence. The owner, 2026-09-18: compliance is a function of its own, outside the device template. Compliance is calculated from these rules against the study values recorded on the primary elements; nothing here is switched on per device. Reads compliance.vObligationRule.",
+  "menu": { "group": "Compliance", "label": "Obligation rules", "order": 41 },
+  "permission": "Obligation.Read",
+  "screenKind": "list",
+  "params": {
+    "view": "compliance.vObligationRule",
+    "orderBy": "DefinitionKey",
+    "rowKey": "DefinitionEntityId",
+    "columns": [
+      { "key": "DefinitionKey", "label": "Rule" },
+      { "key": "Name", "label": "Requirement" },
+      { "key": "ScopeText", "label": "Applies when" },
+      { "key": "CadenceText", "label": "Cadence" },
+      { "key": "EffectiveVersionNumber", "label": "Version" }
+    ],
+    "textFilterColumns": ["DefinitionKey", "Name", "ScopeText"]
+  }
+}

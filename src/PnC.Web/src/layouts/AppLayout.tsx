@@ -20,6 +20,10 @@ const PAGES: Group[] = [
   { key: 'Settings book', label: 'Settings book', match: [], items: [{ to: '/report.html', label: 'Location report', external: true }] },
   // #170: Schemes and Primary assets are defined screens now; #173: Locations is one too — the legacy tree stays beside it until the page covers it
   { key: 'Assets and schemes', label: 'Assets and schemes', match: [], items: [{ to: '/floc.html', label: 'Locations (legacy tree)', external: true }] },
+  // #185: the definition-driven groups an owner expects to find on the left ("I was expecting to see a Templates tab") sit
+  // before Administration; a group is placed by its position in this list, and one not listed here is appended last
+  { key: 'Templates', label: 'Templates', match: [], items: [] },
+  { key: 'Compliance', label: 'Compliance', match: [], items: [] },
   { key: 'Administration', label: 'Administration', match: [], items: [{ to: '/grants.html', label: 'Grants', external: true }, { to: '/definitions.html', label: 'Definitions', external: true }] },
 ]
 
