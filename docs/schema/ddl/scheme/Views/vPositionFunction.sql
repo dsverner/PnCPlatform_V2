@@ -20,6 +20,7 @@ SELECT cf.[EntityId],
        cf.[AnsiCode],
        a.[Name]                            AS [AnsiName],
        a.[Category]                        AS [AnsiCategory],
+       a.[IsDeviceNumber],   -- #182: 1 = a C37.2 device number; 0 = the manufacturer's own abbreviation, read the name
        cf.[IsPrincipal],
        cf.[LogicalNodeEntityId],
        cf.[EnabledFromConfigurationFileRevisionRowId],

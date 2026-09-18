@@ -5,6 +5,7 @@ CREATE PROCEDURE [ref].[AnsiFunction_Upsert]
     @Description NVARCHAR(MAX) = NULL,
     @Category NVARCHAR(40) = NULL,
     @DefaultLnClass NVARCHAR(10) = NULL,
+    @IsDeviceNumber BIT = NULL,
     @ActorId UNIQUEIDENTIFIER = NULL,
     @MigrationRunId UNIQUEIDENTIFIER = NULL
 AS
@@ -13,7 +14,7 @@ BEGIN
     DECLARE @now DATETIMEOFFSET(7) = SYSDATETIMEOFFSET();
     IF @ActorId IS NULL EXEC [personnel].[ResolveActor] @ActorId = @ActorId OUTPUT;
     IF EXISTS (SELECT 1 FROM [ref].[AnsiFunction] t WHERE t.[AnsiCode] = @AnsiCode)
-        UPDATE t SET [Name] = @Name, [Description] = @Description, [Category] = @Category, [DefaultLnClass] = @DefaultLnClass, [IsActive] = 1, [ModifiedBy] = @ActorId, [ModifiedAt] = @now FROM [ref].[AnsiFunction] t WHERE t.[AnsiCode] = @AnsiCode;
+        UPDATE t SET [Name] = @Name, [Description] = @Description, [Category] = @Category, [DefaultLnClass] = @DefaultLnClass, [IsDeviceNumber] = @IsDeviceNumber, [IsActive] = 1, [ModifiedBy] = @ActorId, [ModifiedAt] = @now FROM [ref].[AnsiFunction] t WHERE t.[AnsiCode] = @AnsiCode;
     ELSE
-        INSERT [ref].[AnsiFunction] ([AnsiCode], [Name], [Description], [Category], [DefaultLnClass], [CreatedBy], [CreatedAt], [ModifiedBy], [ModifiedAt], [MigrationRunId]) VALUES (@AnsiCode, @Name, @Description, @Category, @DefaultLnClass, @ActorId, @now, @ActorId, @now, @MigrationRunId);
+        INSERT [ref].[AnsiFunction] ([AnsiCode], [Name], [Description], [Category], [DefaultLnClass], [IsDeviceNumber], [CreatedBy], [CreatedAt], [ModifiedBy], [ModifiedAt], [MigrationRunId]) VALUES (@AnsiCode, @Name, @Description, @Category, @DefaultLnClass, @IsDeviceNumber, @ActorId, @now, @ActorId, @now, @MigrationRunId);
 END;

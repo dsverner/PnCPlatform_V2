@@ -28,3 +28,16 @@ BEGIN
 END
 CLOSE c; DEALLOCATE c;
 GO
+
+-- #182 (2026-09-17): the codes above ARE C37.2 device numbers, and are marked so. The flag is set by a plain UPDATE
+-- rather than through the upsert: that procedure is GENERATED from the deployed catalogue, so on the publish that adds
+-- the column it does not yet take the parameter. A column and the procedure that writes it arrive one publish apart.
+UPDATE [ref].[AnsiFunction] SET [IsDeviceNumber] = 1
+ WHERE [IsDeviceNumber] IS NULL
+   AND [AnsiCode] IN (N'21', N'25', N'27', N'50', N'50N', N'50BF', N'51', N'51N', N'59', N'67', N'67N', N'79', N'87');
+GO
+
+-- The rest of the catalogue. Everything else in this catalogue is
+-- either a manufacturer's abbreviation added deliberately with a manual behind it (marked 0 by the seed that adds it) or
+-- a string the legacy importer invented from a position's free text (left NULL — nobody has said what it is).
+GO

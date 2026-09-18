@@ -471,6 +471,10 @@ function FunctionChecklist({ nodeId, modelId, editable }: { nodeId: string; mode
   const [busy, setBusy] = useState('')
   const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null)
   const nameOf = new Map((names.data ?? []).map((a) => [s(a.AnsiCode), s(a.Name)]))
+  // #182, the owner: elements with no device number "are part of the device and must be included. When no numbers can be
+  // found for the functionality, wording will have to suffice." So a C37.2 number is shown as a number and everything
+  // else is shown as its words alone — never as a code pretending to be one.
+  const isNum = new Map((names.data ?? []).map((a) => [s(a.AnsiCode), bit(a.IsDeviceNumber)]))
   const ticked = new Map((on.data ?? []).map((r) => [s(r.AnsiCode), r]))
   const list = caps.data ?? []
   const refresh = () => qc.invalidateQueries({ queryKey: ['view', 'scheme'] })
@@ -497,7 +501,9 @@ function FunctionChecklist({ nodeId, modelId, editable }: { nodeId: string; mode
             <label key={code} className="flex items-center gap-1.5 text-sm">
               <input type="checkbox" id={`fn-${nodeId}-${code}`} checked={isOn} disabled={!editable || busy === code}
                 onChange={() => void toggle(code)} />
-              <span className={isOn ? 'text-slate-200' : 'text-slate-500'}><span className="font-mono">{code}</span> {nameOf.get(code) ?? ''}</span>
+              <span className={isOn ? 'text-slate-200' : 'text-slate-500'}>
+                {isNum.get(code) ? <><span className="font-mono">{code}</span> {nameOf.get(code) ?? ''}</> : (nameOf.get(code) || code)}
+              </span>
             </label>) })}
       </div>
       {msg && <Status bad={msg.bad}>{msg.text}</Status>}

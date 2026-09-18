@@ -1165,9 +1165,9 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
             var k181_model = (k181_m0b?["rows"] as JsonArray)?.FirstOrDefault()?["ModelId"]?.ToString();
             var (k181_c1s, k181_c1b) = await Get(admin, $"api/v1/scheme/vFunctionCapability?ModelId={k181_model}&take=50");
             var k181_caps = ((k181_c1b?["rows"] as JsonArray) ?? []).Select(r => r?["AnsiCode"]?.ToString()).OrderBy(x => x).ToList();
-            var k181_want = new[] { "21", "25", "27", "50", "50BF", "50N", "51N", "59", "67N", "79" }.OrderBy(x => x).ToList();
+            var k181_want = new[] { "21", "25", "27", "32Q", "50", "50BF", "50N", "51N", "59", "67N", "79", "FAULTLOC", "LOP", "REJO", "SOTF" }.OrderBy(x => x).ToList();
             Must(k181_m0s == HttpStatusCode.OK && k181_model is not null && k181_c1s == HttpStatusCode.OK && k181_caps.SequenceEqual(k181_want),
-                $"#181: the SEL-221F's capability list is the manual's ten elements ({string.Join(", ", k181_caps)})");
+                $"#181/#182: the SEL-221F's capability list is the manual's fifteen elements, five of them named in words because the manual prints no device number ({string.Join(", ", k181_caps)})");
 
             // none ticked at a position until someone ticks one, then it reads back with the element's name
             var (k181_n0s, k181_n0b) = await Get(admin, $"api/v1/scheme/vPositionFunction?PositionNodeEntityId={k180_pos}&take=20");

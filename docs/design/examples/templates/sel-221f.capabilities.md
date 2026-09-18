@@ -7,42 +7,41 @@ The list is the manual's own Functional Specifications headings (2-2 to 2-4) plu
 title page and in the Relay Overview (1-1). The ANSI code on each row is the one the settings template already
 assigns to that function's settings (#168), so the capability list and the settings agree.
 
-| ANSI | The manual's name | Variants | Where the manual says so |
-|---|---|---|---|
-| `21` | Phase and ground distance | all | Functional Specifications > Expanded Mho Characteristics for Phase-Ground, Phase-Phase, and Three-Phase Faults (2-2); Relay Overview (1-1) |
-| `51N` | Residual time-overcurrent | all | Functional Specifications > Residual Overcurrent Backup Protection for Ground Faults (2-3) |
-| `50N` | Instantaneous residual overcurrent | all | Functional Specifications > Residual Overcurrent Backup Protection for Ground Faults (2-3) |
-| `67N` | Ground directional overcurrent | all | Title page; Functional Specifications > Residual Overcurrent Backup Protection for Ground Faults (2-3) |
-| `50` | Phase overcurrent (nondirectional) | all | Functional Specifications > Nondirectional Phase Overcurrent Elements (2-3, 2-4) |
-| `79` | Reclosing | all | Title page; Functional Specifications > Reclosing (2-4) |
-| `25` | Synchronism check | all | Title page; Functional Specifications > Synchronism Checking (2-4) |
-| `27` | Undervoltage (dead-line / dead-bus check) | all | Functional Specifications > Voltage Checking (2-4) |
-| `59` | Overvoltage (live-line / live-bus check) | all | Functional Specifications > Voltage Checking (2-4) |
-| `50BF` | Breaker failure | SEL-221F-3, -4 only | Introduction > Model Variations (1-2); Specifications > Breaker Failure Features of the SEL-221F-3/121F-3 and SEL-221F-4 Relays (2-50) |
+| Code | The manual's name | Device number? | Variants | Where the manual says so |
+|---|---|---|---|---|
+| `21` | Phase and ground distance | C37.2 | all | Functional Specifications > Expanded Mho Characteristics for Phase-Ground, Phase-Phase, and Three-Phase Faults (2-2); Relay Overview (1-1) |
+| `51N` | Residual time-overcurrent | C37.2 | all | Functional Specifications > Residual Overcurrent Backup Protection for Ground Faults (2-3) |
+| `50N` | Instantaneous residual overcurrent | C37.2 | all | Functional Specifications > Residual Overcurrent Backup Protection for Ground Faults (2-3) |
+| `67N` | Ground directional overcurrent | C37.2 | all | Title page; Functional Specifications > Residual Overcurrent Backup Protection for Ground Faults (2-3) |
+| `50` | Phase overcurrent (nondirectional) | C37.2 | all | Functional Specifications > Nondirectional Phase Overcurrent Elements (2-3, 2-4) |
+| `79` | Reclosing | C37.2 | all | Title page; Functional Specifications > Reclosing (2-4) |
+| `25` | Synchronism check | C37.2 | all | Title page; Functional Specifications > Synchronism Checking (2-4) |
+| `27` | Undervoltage (dead-line / dead-bus check) | C37.2 | all | Functional Specifications > Voltage Checking (2-4) |
+| `59` | Overvoltage (live-line / live-bus check) | C37.2 | all | Functional Specifications > Voltage Checking (2-4) |
+| `50BF` | Breaker failure | C37.2 | SEL-221F-3, -4 only | Introduction > Model Variations (1-2); Specifications > Breaker Failure Features of the SEL-221F-3/121F-3 and SEL-221F-4 Relays (2-50) |
+| `32Q` | Negative-sequence directional element | no - words | all | Functional Specifications > Negative-Sequence Directional Element (2-3); Figure 2.2 32Q Polarization Criteria (2-10) |
+| `LOP` | Loss-of-potential detection | no - words | all | Functional Specifications > Loss-of-Potential (LOP) Detection (2-3); Table 2.3 LOPE Settings (2-17) |
+| `SOTF` | Switch-onto-fault protection | no - words | all | Relay Overview (1-1); Functional Specifications > Switch-Onto-Fault Protection (2-4) |
+| `REJO` | Remote-end-just-opened protection | no - words | all | Functional Specifications > Remote-End-Just-Opened (REJO) Protection (2-4) |
+| `FAULTLOC` | Fault locating | no - words | all | Title page; Relay Overview (1-1); General Description (1-4, 1-5) |
 
 ## Why each row is here (the manual's words)
 
-- **21 Phase and ground distance** - 'Three zones of phase and ground distance protection'; 'Independent timers for Zone 2 phase, Zone 2 ground, and Zone 3 distance elements (time-step backup protection)' (2-2). Figure 2.1 'Three Zones of Phase and Ground Mho Distance Protection' (2-3).
-- **51N Residual time-overcurrent** - 'Time-overcurrent element detects highly resistive ground faults - Four curve families (moderate, inverse, very inverse, and extremely inverse) - Nondirectional or forward-reaching, as enabled in relay settings' (2-3). Curve equations 2-41.
-- **50N Instantaneous residual overcurrent** - 'Instantaneous residual overcurrent element - Nondirectional or forward-reaching, as enabled' (2-3).
-- **67N Ground directional overcurrent** - The title page names the relay a 'GROUND DIRECTIONAL OVERCURRENT RELAY'. 'Negative-sequence directional polarization' (2-3); the negative-sequence directional element 'May polarize ground directional overcurrent protection, if enabled' (2-3).
-- **50 Phase overcurrent (nondirectional)** - 'Low-set phase overcurrent elements supervise phase distance elements and release the TRIP output contacts...' (2-3); 'High-set phase overcurrent element provides switch-onto-fault protection for close-in three-phase faults' (2-4).
-- **79 Reclosing** - The title page names the relay a 'RECLOSING RELAY'. 'Single reclosing shot with settable open interval timer; Selectable reclose initiate and cancel conditions; Settable reclose reset timer' (2-4).
-- **25 Synchronism check** - The title page names the relay a 'SYNCHRONISM CHECKING RELAY'. 'Closing may be supervised by a synchronism checking function... Relay setting allows synch-check potential to be taken from any phase' (2-4).
-- **27 Undervoltage (dead-line / dead-bus check)** - 'Closing may be supervised by Live-line/Dead-Bus conditions, Live-bus/Dead-line conditions, or either condition' (2-4) - the dead half of that check. Its setting is 27VLO in the settings template (#168).
-- **59 Overvoltage (live-line / live-bus check)** - 'Closing may be supervised by Live-line/Dead-Bus conditions, Live-bus/Dead-line conditions, or either condition' (2-4) - the live half of that check. Its setting is 59VHI in the settings template (#168).
-- **50BF Breaker failure** - 'The SEL-221F-3/121F-3 Relay includes a breaker failure function... the A1TP setting is replaced with BFIN1 and the A1TD setting is replaced with BFTD' (1-2); 'The SEL-221F-4 Relay includes the same breaker failure functionality as the SEL-221F-3' (1-2). NOT present on the SEL-221F-2.
-
-## Described by the manual, not seeded - no established ANSI code in this platform
-
-These are real functions of the relay. They are **not** in the capability list because `ref.AnsiFunction` has no
-code for them and this platform never invents one. Each needs a ruling before it can be offered.
-
-- **Negative-sequence directional element** (Functional Specifications > Negative-Sequence Directional Element (2-3); Figure 2.2 '32Q Polarization Criteria' (2-10)) - 'Directional polarization is based upon negative-sequence voltage and current; Adds security to phase and ground distance elements' (2-3). The manual calls it 32Q; no 32 or 32Q row exists in ref.AnsiFunction.
-- **Loss-of-potential (LOP) detection** (Functional Specifications > Loss-of-Potential (LOP) Detection (2-3); Table 2.3 'LOPE Settings' (2-17)) - 'Detects blown secondary potential fuse(s) condition... When enabled, an LOP condition blocks all mho distance elements' (2-3). Commonly device 60; the manual prints no number.
-- **Switch-onto-fault (SOTF) protection** (Functional Specifications > Switch-Onto-Fault Protection (2-4)) - 'User selected elements enabled to trip for 52BT time after the line breaker closes' (2-4). No C37.2 device number.
-- **Remote-end-just-opened (REJO) protection** (Functional Specifications > Remote-End-Just-Opened (REJO) Protection (2-4)) - 'User selected elements enabled to trip if remote breaker clears fault contribution; Provides pilotless accelerated tripping' (2-4). No C37.2 device number.
-- **Fault locating** (Title page; Relay Overview (1-1); General Description (1-4)) - The title page names the relay a 'FAULT LOCATOR'; 'Fault locating' (1-1). A measurement, not a protective element; sometimes written 21FL.
+- **21 Phase and ground distance** - Three zones of phase and ground distance protection; independent timers for Zone 2 phase, Zone 2 ground and Zone 3 (time-step backup protection) (2-2). Figure 2.1 Three Zones of Phase and Ground Mho Distance Protection (2-3).
+- **51N Residual time-overcurrent** - Time-overcurrent element detects highly resistive ground faults; four curve families (moderate, inverse, very inverse, extremely inverse); nondirectional or forward-reaching as enabled (2-3). Curve equations 2-41.
+- **50N Instantaneous residual overcurrent** - Instantaneous residual overcurrent element; nondirectional or forward-reaching, as enabled (2-3).
+- **67N Ground directional overcurrent** - The title page names the relay a GROUND DIRECTIONAL OVERCURRENT RELAY. Negative-sequence directional polarization (2-3); the negative-sequence element may polarize ground directional overcurrent protection, if enabled (2-3).
+- **50 Phase overcurrent (nondirectional)** - Low-set phase overcurrent elements supervise phase distance elements and release the TRIP output contacts (2-3); the high-set phase overcurrent element provides switch-onto-fault protection for close-in three-phase faults (2-4).
+- **79 Reclosing** - The title page names the relay a RECLOSING RELAY. Single reclosing shot with settable open interval timer; selectable reclose initiate and cancel conditions; settable reclose reset timer (2-4).
+- **25 Synchronism check** - The title page names the relay a SYNCHRONISM CHECKING RELAY. Closing may be supervised by a synchronism checking function; the relay setting allows synch-check potential to be taken from any phase (2-4).
+- **27 Undervoltage (dead-line / dead-bus check)** - Closing may be supervised by Live-line/Dead-Bus conditions, Live-bus/Dead-line conditions, or either (2-4) - the dead half of that check. Its setting is 27VLO in the settings template (#168).
+- **59 Overvoltage (live-line / live-bus check)** - Closing may be supervised by Live-line/Dead-Bus conditions, Live-bus/Dead-line conditions, or either (2-4) - the live half of that check. Its setting is 59VHI in the settings template (#168).
+- **50BF Breaker failure** - The SEL-221F-3/121F-3 includes a breaker failure function; the A1TP setting is replaced with BFIN1 and A1TD with BFTD (1-2); the SEL-221F-4 has the same breaker failure functionality (1-2). NOT present on the SEL-221F-2.
+- **32Q Negative-sequence directional element** - Directional polarization is based upon negative-sequence voltage and current; adds security to phase and ground distance elements; may polarize ground directional overcurrent protection, if enabled (2-3). The abbreviation 32Q is the manual's own, printed as the title of Figure 2.2. It is NOT a C37.2 device number.
+- **LOP Loss-of-potential detection** - Detects blown secondary potential fuse(s); enabled or disabled with a simple setting; when enabled an LOP condition blocks all mho distance elements (2-3). LOP is the manual's own abbreviation, in its heading. The manual prints no device number.
+- **SOTF Switch-onto-fault protection** - Programmable switch-onto-fault logic (1-1); user selected elements enabled to trip for 52BT time after the line breaker closes, functioning independently from communications channel equipment (2-4). The manual prints no device number.
+- **REJO Remote-end-just-opened protection** - User selected elements enabled to trip if the remote breaker clears the fault contribution; provides pilotless accelerated tripping in many applications (2-4). REJO is the manual's own abbreviation, in its heading. The manual prints no device number.
+- **FAULTLOC Fault locating** - The title page names the relay a FAULT LOCATOR; Fault locating (1-1); an event report carries Fault location and Secondary ohms to the fault location (1-5). The manual names this in words throughout and never abbreviates it, so the code FAULTLOC IS OURS, chosen to be obviously not a device number.
 
 ## One thing the platform cannot yet tell apart
 

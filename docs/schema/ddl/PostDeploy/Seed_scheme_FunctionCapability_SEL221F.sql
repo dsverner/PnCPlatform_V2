@@ -20,35 +20,95 @@ BEGIN
     IF @model IS NOT NULL
     BEGIN
         -- 21 Phase and ground distance (all) - Functional Specifications > Expanded Mho Characteristics for Phase-Ground, Phase-Phase, and Three-Phase Faults (2-2); Relay Overview (1-1)
+        IF NOT EXISTS (SELECT 1 FROM [ref].[AnsiFunction] WHERE [AnsiCode] = N'21')
+            EXEC [ref].[AnsiFunction_Upsert] @AnsiCode = N'21', @Name = N'Phase and ground distance', @Category = N'Protection', @ActorId = @author;
+        UPDATE [ref].[AnsiFunction] SET [IsDeviceNumber] = 1 WHERE [AnsiCode] = N'21';
         IF NOT EXISTS (SELECT 1 FROM [scheme].[vFunctionCapability] WHERE [ModelId] = @model AND [AnsiCode] = N'21')
             EXEC [scheme].[FunctionCapability_Add] @ModelId = @model, @AnsiCode = N'21', @Source = N'Manual', @ActorId = @author;
         -- 51N Residual time-overcurrent (all) - Functional Specifications > Residual Overcurrent Backup Protection for Ground Faults (2-3)
+        IF NOT EXISTS (SELECT 1 FROM [ref].[AnsiFunction] WHERE [AnsiCode] = N'51N')
+            EXEC [ref].[AnsiFunction_Upsert] @AnsiCode = N'51N', @Name = N'Residual time-overcurrent', @Category = N'Protection', @ActorId = @author;
+        UPDATE [ref].[AnsiFunction] SET [IsDeviceNumber] = 1 WHERE [AnsiCode] = N'51N';
         IF NOT EXISTS (SELECT 1 FROM [scheme].[vFunctionCapability] WHERE [ModelId] = @model AND [AnsiCode] = N'51N')
             EXEC [scheme].[FunctionCapability_Add] @ModelId = @model, @AnsiCode = N'51N', @Source = N'Manual', @ActorId = @author;
         -- 50N Instantaneous residual overcurrent (all) - Functional Specifications > Residual Overcurrent Backup Protection for Ground Faults (2-3)
+        IF NOT EXISTS (SELECT 1 FROM [ref].[AnsiFunction] WHERE [AnsiCode] = N'50N')
+            EXEC [ref].[AnsiFunction_Upsert] @AnsiCode = N'50N', @Name = N'Instantaneous residual overcurrent', @Category = N'Protection', @ActorId = @author;
+        UPDATE [ref].[AnsiFunction] SET [IsDeviceNumber] = 1 WHERE [AnsiCode] = N'50N';
         IF NOT EXISTS (SELECT 1 FROM [scheme].[vFunctionCapability] WHERE [ModelId] = @model AND [AnsiCode] = N'50N')
             EXEC [scheme].[FunctionCapability_Add] @ModelId = @model, @AnsiCode = N'50N', @Source = N'Manual', @ActorId = @author;
         -- 67N Ground directional overcurrent (all) - Title page; Functional Specifications > Residual Overcurrent Backup Protection for Ground Faults (2-3)
+        IF NOT EXISTS (SELECT 1 FROM [ref].[AnsiFunction] WHERE [AnsiCode] = N'67N')
+            EXEC [ref].[AnsiFunction_Upsert] @AnsiCode = N'67N', @Name = N'Ground directional overcurrent', @Category = N'Protection', @ActorId = @author;
+        UPDATE [ref].[AnsiFunction] SET [IsDeviceNumber] = 1 WHERE [AnsiCode] = N'67N';
         IF NOT EXISTS (SELECT 1 FROM [scheme].[vFunctionCapability] WHERE [ModelId] = @model AND [AnsiCode] = N'67N')
             EXEC [scheme].[FunctionCapability_Add] @ModelId = @model, @AnsiCode = N'67N', @Source = N'Manual', @ActorId = @author;
         -- 50 Phase overcurrent (nondirectional) (all) - Functional Specifications > Nondirectional Phase Overcurrent Elements (2-3, 2-4)
+        IF NOT EXISTS (SELECT 1 FROM [ref].[AnsiFunction] WHERE [AnsiCode] = N'50')
+            EXEC [ref].[AnsiFunction_Upsert] @AnsiCode = N'50', @Name = N'Phase overcurrent (nondirectional)', @Category = N'Protection', @ActorId = @author;
+        UPDATE [ref].[AnsiFunction] SET [IsDeviceNumber] = 1 WHERE [AnsiCode] = N'50';
         IF NOT EXISTS (SELECT 1 FROM [scheme].[vFunctionCapability] WHERE [ModelId] = @model AND [AnsiCode] = N'50')
             EXEC [scheme].[FunctionCapability_Add] @ModelId = @model, @AnsiCode = N'50', @Source = N'Manual', @ActorId = @author;
         -- 79 Reclosing (all) - Title page; Functional Specifications > Reclosing (2-4)
+        IF NOT EXISTS (SELECT 1 FROM [ref].[AnsiFunction] WHERE [AnsiCode] = N'79')
+            EXEC [ref].[AnsiFunction_Upsert] @AnsiCode = N'79', @Name = N'Reclosing', @Category = N'Control', @ActorId = @author;
+        UPDATE [ref].[AnsiFunction] SET [IsDeviceNumber] = 1 WHERE [AnsiCode] = N'79';
         IF NOT EXISTS (SELECT 1 FROM [scheme].[vFunctionCapability] WHERE [ModelId] = @model AND [AnsiCode] = N'79')
             EXEC [scheme].[FunctionCapability_Add] @ModelId = @model, @AnsiCode = N'79', @Source = N'Manual', @ActorId = @author;
         -- 25 Synchronism check (all) - Title page; Functional Specifications > Synchronism Checking (2-4)
+        IF NOT EXISTS (SELECT 1 FROM [ref].[AnsiFunction] WHERE [AnsiCode] = N'25')
+            EXEC [ref].[AnsiFunction_Upsert] @AnsiCode = N'25', @Name = N'Synchronism check', @Category = N'Control', @ActorId = @author;
+        UPDATE [ref].[AnsiFunction] SET [IsDeviceNumber] = 1 WHERE [AnsiCode] = N'25';
         IF NOT EXISTS (SELECT 1 FROM [scheme].[vFunctionCapability] WHERE [ModelId] = @model AND [AnsiCode] = N'25')
             EXEC [scheme].[FunctionCapability_Add] @ModelId = @model, @AnsiCode = N'25', @Source = N'Manual', @ActorId = @author;
         -- 27 Undervoltage (dead-line / dead-bus check) (all) - Functional Specifications > Voltage Checking (2-4)
+        IF NOT EXISTS (SELECT 1 FROM [ref].[AnsiFunction] WHERE [AnsiCode] = N'27')
+            EXEC [ref].[AnsiFunction_Upsert] @AnsiCode = N'27', @Name = N'Undervoltage (dead-line / dead-bus check)', @Category = N'Protection', @ActorId = @author;
+        UPDATE [ref].[AnsiFunction] SET [IsDeviceNumber] = 1 WHERE [AnsiCode] = N'27';
         IF NOT EXISTS (SELECT 1 FROM [scheme].[vFunctionCapability] WHERE [ModelId] = @model AND [AnsiCode] = N'27')
             EXEC [scheme].[FunctionCapability_Add] @ModelId = @model, @AnsiCode = N'27', @Source = N'Manual', @ActorId = @author;
         -- 59 Overvoltage (live-line / live-bus check) (all) - Functional Specifications > Voltage Checking (2-4)
+        IF NOT EXISTS (SELECT 1 FROM [ref].[AnsiFunction] WHERE [AnsiCode] = N'59')
+            EXEC [ref].[AnsiFunction_Upsert] @AnsiCode = N'59', @Name = N'Overvoltage (live-line / live-bus check)', @Category = N'Protection', @ActorId = @author;
+        UPDATE [ref].[AnsiFunction] SET [IsDeviceNumber] = 1 WHERE [AnsiCode] = N'59';
         IF NOT EXISTS (SELECT 1 FROM [scheme].[vFunctionCapability] WHERE [ModelId] = @model AND [AnsiCode] = N'59')
             EXEC [scheme].[FunctionCapability_Add] @ModelId = @model, @AnsiCode = N'59', @Source = N'Manual', @ActorId = @author;
         -- 50BF Breaker failure (SEL-221F-3, -4 only) - Introduction > Model Variations (1-2); Specifications > Breaker Failure Features of the SEL-221F-3/121F-3 and SEL-221F-4 Relays (2-50)
+        IF NOT EXISTS (SELECT 1 FROM [ref].[AnsiFunction] WHERE [AnsiCode] = N'50BF')
+            EXEC [ref].[AnsiFunction_Upsert] @AnsiCode = N'50BF', @Name = N'Breaker failure', @Category = N'Protection', @ActorId = @author;
+        UPDATE [ref].[AnsiFunction] SET [IsDeviceNumber] = 1 WHERE [AnsiCode] = N'50BF';
         IF NOT EXISTS (SELECT 1 FROM [scheme].[vFunctionCapability] WHERE [ModelId] = @model AND [AnsiCode] = N'50BF')
             EXEC [scheme].[FunctionCapability_Add] @ModelId = @model, @AnsiCode = N'50BF', @Source = N'Manual', @ActorId = @author;
+        -- 32Q Negative-sequence directional element (all) - Functional Specifications > Negative-Sequence Directional Element (2-3); Figure 2.2 32Q Polarization Criteria (2-10)
+        IF NOT EXISTS (SELECT 1 FROM [ref].[AnsiFunction] WHERE [AnsiCode] = N'32Q')
+            EXEC [ref].[AnsiFunction_Upsert] @AnsiCode = N'32Q', @Name = N'Negative-sequence directional element', @Category = N'Protection', @ActorId = @author;
+        UPDATE [ref].[AnsiFunction] SET [IsDeviceNumber] = 0 WHERE [AnsiCode] = N'32Q';
+        IF NOT EXISTS (SELECT 1 FROM [scheme].[vFunctionCapability] WHERE [ModelId] = @model AND [AnsiCode] = N'32Q')
+            EXEC [scheme].[FunctionCapability_Add] @ModelId = @model, @AnsiCode = N'32Q', @Source = N'Manual', @ActorId = @author;
+        -- LOP Loss-of-potential detection (all) - Functional Specifications > Loss-of-Potential (LOP) Detection (2-3); Table 2.3 LOPE Settings (2-17)
+        IF NOT EXISTS (SELECT 1 FROM [ref].[AnsiFunction] WHERE [AnsiCode] = N'LOP')
+            EXEC [ref].[AnsiFunction_Upsert] @AnsiCode = N'LOP', @Name = N'Loss-of-potential detection', @Category = N'Protection', @ActorId = @author;
+        UPDATE [ref].[AnsiFunction] SET [IsDeviceNumber] = 0 WHERE [AnsiCode] = N'LOP';
+        IF NOT EXISTS (SELECT 1 FROM [scheme].[vFunctionCapability] WHERE [ModelId] = @model AND [AnsiCode] = N'LOP')
+            EXEC [scheme].[FunctionCapability_Add] @ModelId = @model, @AnsiCode = N'LOP', @Source = N'Manual', @ActorId = @author;
+        -- SOTF Switch-onto-fault protection (all) - Relay Overview (1-1); Functional Specifications > Switch-Onto-Fault Protection (2-4)
+        IF NOT EXISTS (SELECT 1 FROM [ref].[AnsiFunction] WHERE [AnsiCode] = N'SOTF')
+            EXEC [ref].[AnsiFunction_Upsert] @AnsiCode = N'SOTF', @Name = N'Switch-onto-fault protection', @Category = N'Protection', @ActorId = @author;
+        UPDATE [ref].[AnsiFunction] SET [IsDeviceNumber] = 0 WHERE [AnsiCode] = N'SOTF';
+        IF NOT EXISTS (SELECT 1 FROM [scheme].[vFunctionCapability] WHERE [ModelId] = @model AND [AnsiCode] = N'SOTF')
+            EXEC [scheme].[FunctionCapability_Add] @ModelId = @model, @AnsiCode = N'SOTF', @Source = N'Manual', @ActorId = @author;
+        -- REJO Remote-end-just-opened protection (all) - Functional Specifications > Remote-End-Just-Opened (REJO) Protection (2-4)
+        IF NOT EXISTS (SELECT 1 FROM [ref].[AnsiFunction] WHERE [AnsiCode] = N'REJO')
+            EXEC [ref].[AnsiFunction_Upsert] @AnsiCode = N'REJO', @Name = N'Remote-end-just-opened protection', @Category = N'Protection', @ActorId = @author;
+        UPDATE [ref].[AnsiFunction] SET [IsDeviceNumber] = 0 WHERE [AnsiCode] = N'REJO';
+        IF NOT EXISTS (SELECT 1 FROM [scheme].[vFunctionCapability] WHERE [ModelId] = @model AND [AnsiCode] = N'REJO')
+            EXEC [scheme].[FunctionCapability_Add] @ModelId = @model, @AnsiCode = N'REJO', @Source = N'Manual', @ActorId = @author;
+        -- FAULTLOC Fault locating (all) - Title page; Relay Overview (1-1); General Description (1-4, 1-5)
+        IF NOT EXISTS (SELECT 1 FROM [ref].[AnsiFunction] WHERE [AnsiCode] = N'FAULTLOC')
+            EXEC [ref].[AnsiFunction_Upsert] @AnsiCode = N'FAULTLOC', @Name = N'Fault locating', @Category = N'Measurement', @ActorId = @author;
+        UPDATE [ref].[AnsiFunction] SET [IsDeviceNumber] = 0 WHERE [AnsiCode] = N'FAULTLOC';
+        IF NOT EXISTS (SELECT 1 FROM [scheme].[vFunctionCapability] WHERE [ModelId] = @model AND [AnsiCode] = N'FAULTLOC')
+            EXEC [scheme].[FunctionCapability_Add] @ModelId = @model, @AnsiCode = N'FAULTLOC', @Source = N'Manual', @ActorId = @author;
     END
     FETCH NEXT FROM mc INTO @code;
 END
