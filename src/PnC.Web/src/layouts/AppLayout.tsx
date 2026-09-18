@@ -3,7 +3,7 @@
 // open (#165: GET /api/v1/screens, grouped by each screen's menu.group); the plain pages not yet ported stay as links.
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { useHealth, useMe } from '@/lib/hooks'
+import { useHealth, useMe, useScrollMemory } from '@/lib/hooks'
 import { devUser } from '@/lib/api'
 import { useScreens, screenPath } from '@/lib/screens'
 
@@ -59,6 +59,7 @@ function NavItem({ it, collapsed }: { it: Item; collapsed: boolean }) {
 export default function AppLayout({ children }: { children?: ReactNode }) {
   const meQ = useMe(); const healthQ = useHealth(); const loc = useLocation(); const screensQ = useScreens()
   const [collapsed, toggleCollapsed] = useStored('pnc.sidebar.collapsed', false)
+  useScrollMemory()   // #189: each history entry keeps its scroll position
   const groups = useMemo<Group[]>(() => {
     const byGroup = new Map<string, Group>()
     for (const g of PAGES) byGroup.set(g.key, { ...g, items: [] })

@@ -8,7 +8,7 @@ import { useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useLocation } from 'react-router'
 import { ApiError, fmtDate, fmtWhen, s, view, viewAll, proc, type Row } from '@/lib/api'
-import { useCan, useViewAll } from '@/lib/hooks'
+import { useCan, useEntryState, useViewAll } from '@/lib/hooks'
 import { legacyFree, legacyDetail } from '@/lib/legacy'
 import { settingsText } from '@/lib/actions'
 import { type RecordParams, type Screen, splitView, screenPath } from '@/lib/screens'
@@ -30,11 +30,11 @@ export default function RecordScreen({ params: p, id }: { screen: Screen; params
   const revisionsQ = useViewAll(schema, vw, { DeviceEntityId: s(r?.DeviceEntityId) }, '-CalculatedAt', !!r?.DeviceEntityId)
   const others = useMemo(() => (revisionsQ.data ?? []).filter((x) => x.RevisionRowId !== revision), [revisionsQ.data, revision])
   const templateQ = useTemplate(s(r?.ModelId) || null); const template = templateQ.data ?? null
-  const [compareWith, setCompareWith] = useState('')
+  const [compareWith, setCompareWith] = useEntryState('compareWith', '')   // #189: kept per history entry
   const compareId = compareWith || s(others[0]?.RevisionRowId)   // #compare in the address: the newest other revision until one is chosen
   // owner, 2026-09-16: the settings, the classification, the notes, the text as filed, the files and Compare are each a tab of their
   // own — nothing sits under the settings tabs whatever tab is chosen (it read as part of the settings and confused)
-  const [section, setSection] = useState(loc.hash === '#compare' ? 'compare' : loc.hash === '#files' ? 'files' : 'settings')
+  const [section, setSection] = useEntryState('section', () => loc.hash === '#compare' ? 'compare' : loc.hash === '#files' ? 'files' : 'settings')   // #189
   if (!id) return <Status bad>No revision in the address.</Status>
   if (rowQ.isPending) return <Status>Loading the record…</Status>
   if (rowQ.isError) return <Status bad>Could not load: {(rowQ.error as Error).message}</Status>

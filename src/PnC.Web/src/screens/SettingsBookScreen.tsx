@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useSearchParams } from 'react-router'
 import { getJson, s, type Row } from '@/lib/api'
-import { useCan, useViewAll } from '@/lib/hooks'
+import { useCan, useEntryState, useViewAll } from '@/lib/hooks'
 import { settingsText } from '@/lib/actions'
 import { type SettingsBookParams, type Screen, type Command, type ColumnDef, splitView, cellText, labelOf, fill, runCommand, commandEnabled, screenPath } from '@/lib/screens'
 import { Panel, Pill, Button, Facts, Tabs, Field, inputClass, Status } from '@/components/ui/ui'
@@ -26,15 +26,18 @@ export default function SettingsBookScreen({ screen, params: p }: { screen: Scre
   const rowKey = p.rowKey ?? 'RevisionRowId'; const deviceCol = p.deviceColumn ?? 'DeviceEntityId'
   const col = (k: string): ColumnDef => p.leadColumns.find((c) => c.key === k) ?? { key: k, label: p.labels?.[k] ?? k, format: p.formats?.[k] }
   const scopeDevice = sp.get(deviceCol); const scopeRequest = sp.get('WorkRequestEntityId')
-  const [gridState, setGridState] = useState(sp.get(p.stateColumn) || p.states[0].value)
+  // #189: the working state — the state tab, the open groups, the unfolded record, the filters — belongs to the history
+  // entry, so Back (and a reload) brings the book up as it was left, not pristine
+  const [gridState, setGridState] = useEntryState('gridState', () => sp.get(p.stateColumn) || p.states[0].value)
   const [station, setStation] = useState(() => sp.get(p.stationColumn) || (scopeDevice || scopeRequest ? '' : stored(store_('station'), '')))
-  const [stationFilter, setStationFilter] = useState('')
+  const [stationFilter, setStationFilter] = useEntryState('stationFilter', '')
   const groupings = p.groupings ?? [{ key: 'none', label: 'No grouping' }]
   const [grouping, setGrouping] = useState(() => stored(store_('grouping'), groupings[0].key))
-  const [open, setOpen] = useState<Set<string>>(new Set()); const [expanded, setExpanded] = useState<string | null>(null)
-  const [filter, setFilter] = useState(''); const [filters, setFilters] = useState<FieldFilter[]>([])
+  const [open, setOpen] = useEntryState<Set<string>>('open', () => new Set(), { to: (v) => [...v], from: (raw) => new Set(Array.isArray(raw) ? raw as string[] : []) })
+  const [expanded, setExpanded] = useEntryState<string | null>('expanded', null)
+  const [filter, setFilter] = useEntryState('filter', ''); const [filters, setFilters] = useEntryState<FieldFilter[]>('filters', [])
   const [chosen, setChosen] = useChosenColumns(store_('columns'), p.defaultColumns)
-  const [showColumns, setShowColumns] = useState(false); const [showFilter, setShowFilter] = useState(false)
+  const [showColumns, setShowColumns] = useState(false); const [showFilter, setShowFilter] = useEntryState('showFilter', false)
   const [raise, setRaise] = useState<RaiseOpts | null>(null)
 
   // ---- the location list (legacy: the active location; round 4: a list first, the estate only by an explicit choice)
@@ -48,16 +51,12 @@ export default function SettingsBookScreen({ screen, params: p }: { screen: Scre
   const stationName = stations.find((x) => String(x.EntityId).toLowerCase() === station.toLowerCase())?.Name
   const choose = (id: string) => {
     setStation(id); setOpen(new Set()); setExpanded(null); store(store_('station'), id)
-    // #188: the list is shown while the book is scoped to one device or one request; choosing a location leaves that scope
-    // (a new place in the history). Otherwise the choice REWRITES the current address in place: the address wins over the
-    // stored choice on entry (line 30), so the entry Back returns to must carry what was chosen — the owner, 2026-09-18:
-    // "the back button is always taking me back to EEL RIVER 230 BDG no matter what I have selected".
-    navigate(screenPath(screen.key, null, { [p.stationColumn]: id, [p.stateColumn]: gridState }), { replace: !(scopeDevice || scopeRequest) })
+    // #188/#189: a location is a new place in the history — pushed with the location and state in the address, so Back
+    // returns to the entry it came from (the owner: "always taking me back to EEL RIVER 230 BDG no matter what I had
+    // selected"); a replace would make a new entry key and lose the entry's working state (#189)
+    navigate(screenPath(screen.key, null, { [p.stationColumn]: id, [p.stateColumn]: gridState }))
   }
-  const chooseState = (k: string) => {
-    setGridState(k); setExpanded(null)
-    if (!scopeDevice && !scopeRequest && station) navigate(screenPath(screen.key, null, { [p.stationColumn]: station, [p.stateColumn]: k }), { replace: true })
-  }
+  const chooseState = (k: string) => { setGridState(k); setExpanded(null) }
   // #188: the owner, 2026-09-18: the Locations list "should typically always be displayed and have a collapse button"
   const [locationsHidden, setLocationsHidden] = useState(() => stored(store_('locations.hidden'), 'false') === 'true')
   const toggleLocations = () => { setLocationsHidden(!locationsHidden); store(store_('locations.hidden'), String(!locationsHidden)) }
