@@ -154,9 +154,11 @@ export default function SettingsBookScreen({ screen, params: p }: { screen: Scre
         {raise && <RaiseRequest o={raise} onClose={() => setRaise(null)} />}
         {status}
         <DataGrid rows={visible} columns={columns} rowKey={(r) => s(r[rowKey])} groupBy={groupBy} openGroups={open} onToggleGroup={toggleGroup}
-          expandedKey={expanded} onRowClick={(r) => setExpanded(expanded === s(r[rowKey]) ? null : s(r[rowKey]))} detail={p.card ? (r) => <Card r={r} card={p.card!} can={can} ctx={ctx} rowKey={rowKey} /> : undefined} menu={commands}
+          expandedKey={expanded} onRowClick={(r) => setExpanded(expanded === s(r[rowKey]) ? null : s(r[rowKey]))}
+          /* #190: double-click opens the record (the row stays unfolded, so Back returns to it open — #189) */
+          onRowDoubleClick={(r) => { if (p.rowOpen) { setExpanded(s(r[rowKey])); runCommand(p.rowOpen, r, ctx) } }} detail={p.card ? (r) => <Card r={r} card={p.card!} can={can} ctx={ctx} rowKey={rowKey} /> : undefined} menu={commands}
           emptyText={ready ? 'No records for this choice.' : 'Choose a location.'} />
-        {ready && rowsQ.isSuccess && <Status>{visible.length} row(s) in {groupCount} group(s) of {rows.length} · open a group to see its records; click a record to unfold it</Status>}
+        {ready && rowsQ.isSuccess && <Status>{visible.length} row(s) in {groupCount} group(s) of {rows.length} · open a group to see its records; click a record to unfold it, double-click to open it, right-click for its commands</Status>}
       </div>
     </div>
   )

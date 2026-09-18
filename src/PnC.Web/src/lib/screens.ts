@@ -23,6 +23,7 @@ export interface SettingsBookParams {
   leadColumns: ColumnDef[]; defaultColumns: string[]; labels?: Record<string, string>; formats?: Record<string, Format>
   hiddenColumns?: string[]; textFilterColumns?: string[]
   card?: { facts?: ColumnDef[]; textFrom?: 'revisionFile'; links?: Command[] }
+  rowOpen?: Command   // #190: what a double-click on a record row does (the list screens' convention)
   commands?: Command[]; report?: string
 }
 export interface ListParams {

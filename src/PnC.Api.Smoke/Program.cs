@@ -1554,9 +1554,15 @@ else Skip("W4 run (needs the Administrator, Approver, Hydro and Technician ident
             var csp = r.Headers.TryGetValues("Content-Security-Policy", out var v) ? string.Join("", v) : "";
             var bodyText = await r.Content.ReadAsStringAsync();
             var ok = r.StatusCode == HttpStatusCode.OK && csp.Contains("script-src 'self'") && !bodyText.Contains("<script>") && !bodyText.Contains("style=\"");
-            if (path == "sw.js") ok = ok && bodyText.Contains("\"/definitions.js\"") && bodyText.Contains("\"/pnc.js\"") && bodyText.Contains("\"/floc.js\"") && !bodyText.Contains("\"/settings.js\"") && bodyText.Contains("shell-10");
+            if (path == "sw.js") ok = ok && bodyText.Contains("\"/definitions.js\"") && bodyText.Contains("\"/pnc.js\"") && bodyText.Contains("\"/floc.js\"") && !bodyText.Contains("\"/settings.js\"") && bodyText.Contains("shell-11");
             Check(ok, $"GET /{path} → {(int)r.StatusCode}, CSP script-src 'self', no inline script or style{(path == "sw.js" ? ", the editor files in the shell list" : "")}");
         }
+        // #190: the React app is the PWA - the manifest starts it at /app/ and carries PNG icons (Chrome install criteria)
+        var mf = await who.GetAsync("manifest.webmanifest"); var mfText = await mf.Content.ReadAsStringAsync();
+        var ic = await who.GetAsync("icon-192.png"); var ic2 = await who.GetAsync("icon-512.png");
+        Check(mf.StatusCode == HttpStatusCode.OK && (mf.Content.Headers.ContentType?.MediaType ?? "").Contains("manifest") && mfText.Contains("\"start_url\": \"/app/\"") && mfText.Contains("\"display\": \"standalone\"")
+              && ic.StatusCode == HttpStatusCode.OK && ic.Content.Headers.ContentType?.MediaType == "image/png" && ic2.StatusCode == HttpStatusCode.OK,
+            $"#190: the manifest ({mf.Content.Headers.ContentType?.MediaType}) starts the PWA at /app/ standalone, with PNG icons 192 ({(int)ic.StatusCode}) and 512 ({(int)ic2.StatusCode})");
         var (ms, mb) = await Get(who, "api/v1/me");
         Check(ms == HttpStatusCode.OK && mb?["permissions"] is JsonArray, "/me carries the permission codes of the roles in force");
         // W6: the parity read models are catalogued with the subject column that scopes them (decision #127)
