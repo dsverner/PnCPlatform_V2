@@ -49,6 +49,8 @@
 :r .\Seed_location_Divisions.sql
 :r .\Seed_location_StationCodes.sql
 :r .\Seed_location_BuildingCodes.sql
+:r .\Seed_scheme_FunctionCapability_SEL221F.sql
+:r .\Seed_scheme_RepointCommissionedFunctions.sql
 :r .\Seed_compliance_Standards_NB.sql
 :r .\Seed_config_Formulas_PRC023.sql
 :r .\Seed_config_ClassificationDerivations.sql

@@ -59,12 +59,15 @@ LEFT JOIN [ref].[vManufacturer] mf ON mf.[ManufacturerId] = m.[ManufacturerId]
 LEFT JOIN [party].[vEntity] mfe ON mfe.[EntityId] = mf.[EntityEntityId]
 LEFT JOIN [ref].[vFirmwareVersion] fw ON fw.[FirmwareVersionId] = dv.[CurrentFirmwareVersionId]
 OUTER APPLY (SELECT STRING_AGG(f.[AnsiCode], N', ') WITHIN GROUP (ORDER BY f.[IsPrincipal] DESC, f.[AnsiCode]) AS [Functions], COUNT(*) AS [FunctionCount]
-             FROM [location].[Node] pf JOIN [scheme].[CommissionedFunction] f ON f.[ProtectionFunctionNodeEntityId] = pf.[EntityId]
-             WHERE pf.[ValidTo] IS NULL AND pf.[IsDeleted] = 0 AND f.[ValidTo] IS NULL AND f.[IsDeleted] = 0 AND pf.[ParentEntityId] = dp.[EntityId] AND pf.[NodeTypeCode] = N'ProtectionFunction') fn
+             -- #181 (2026-09-17): the elements are commissioned AT the position now, not under a node of their own.
+             -- The owner ruled the FLOC ends at the position, so a relay's elements are ticked against it; this is one
+             -- seek of UX_CommissionedFunction per position, where it used to be a node join first.
+             FROM [scheme].[CommissionedFunction] f
+             WHERE f.[ValidTo] IS NULL AND f.[IsDeleted] = 0 AND f.[ProtectionFunctionNodeEntityId] = dp.[EntityId]) fn
 OUTER APPLY (SELECT STRING_AGG(s.[Name], N'; ') WITHIN GROUP (ORDER BY s.[Name]) AS [SchemeNames]
              FROM (SELECT DISTINCT sm.[SchemeEntityId]
-                   FROM [location].[Node] pf JOIN [scheme].[SchemeMember] sm ON sm.[MemberKind] = N'ProtectionFunction' AND sm.[MemberEntityId] = pf.[EntityId]
-                   WHERE pf.[ValidTo] IS NULL AND pf.[IsDeleted] = 0 AND sm.[ValidTo] IS NULL AND sm.[IsDeleted] = 0 AND pf.[ParentEntityId] = dp.[EntityId] AND pf.[NodeTypeCode] = N'ProtectionFunction') x
+                   FROM [asset].[Placement] pf JOIN [scheme].[SchemeMember] sm ON sm.[MemberKind] = N'Asset' AND sm.[MemberEntityId] = pf.[AssetEntityId]   -- #181: through the relay placed there
+                   WHERE pf.[ValidTo] IS NULL AND pf.[IsDeleted] = 0 AND sm.[ValidTo] IS NULL AND sm.[IsDeleted] = 0 AND pf.[NodeEntityId] = dp.[EntityId]) x
              -- W8 (#158): the base table with the current-row predicate, not the windowed vScheme — evaluated per position, the
              -- windowed view took the whole read from ~1 s to 11 s once the migration raised 1 769 schemes (2026-09-14)
              JOIN [scheme].[Scheme] s ON s.[EntityId] = x.[SchemeEntityId] AND s.[ValidTo] IS NULL AND s.[IsDeleted] = 0) sch

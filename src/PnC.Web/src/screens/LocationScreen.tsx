@@ -451,6 +451,60 @@ function SchemesHere({ stationId }: { stationId: string }) {
  * Add, or as a Revise that closes the asset's prior fact, and for a device it writes the Installed / Removed lifecycle
  * events in the same transaction, so the two never disagree (§5.4).
  */
+/**
+ * #181: the elements in service at this position. What the relay CAN do is its model's scheme.vFunctionCapability list,
+ * authored by an admin from the manufacturer's manual; what it DOES here is a tick against the position, one
+ * scheme.CommissionedFunction row each, read back through scheme.vPositionFunction with the element's name.
+ *
+ * The owner, 2026-09-17: "the devices really do have all those different elements and they are used", and, on what a
+ * newly placed relay starts with, "If a new device is added, none ticked but when a standard template is used then it
+ * should follow the template." So nothing is ticked by itself; the standard-template preselect is its own increment.
+ *
+ * A model nobody has written a capability list for says so, rather than showing an empty box a person cannot fill: the
+ * list is the admin's to author, not the technician's to invent.
+ */
+function FunctionChecklist({ nodeId, modelId, editable }: { nodeId: string; modelId: string; editable: boolean }) {
+  const qc = useQueryClient()
+  const caps = useViewAll('scheme', 'vFunctionCapability', { ModelId: modelId }, 'AnsiCode', !!modelId)
+  const on = useViewAll('scheme', 'vPositionFunction', { PositionNodeEntityId: nodeId }, 'AnsiCode', !!nodeId)
+  const names = useViewAll('ref', 'vAnsiFunction', {}, 'AnsiCode')
+  const [busy, setBusy] = useState('')
+  const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null)
+  const nameOf = new Map((names.data ?? []).map((a) => [s(a.AnsiCode), s(a.Name)]))
+  const ticked = new Map((on.data ?? []).map((r) => [s(r.AnsiCode), r]))
+  const list = caps.data ?? []
+  const refresh = () => qc.invalidateQueries({ queryKey: ['view', 'scheme'] })
+  const toggle = async (code: string) => {
+    setBusy(code); setMsg(null)
+    try {
+      const row = ticked.get(code)
+      if (row) { await proc('scheme', 'CommissionedFunction_SoftDelete', { EntityId: row.EntityId }); setMsg({ text: `${code} is no longer in service here.` }) }
+      else { await proc('scheme', 'CommissionedFunction_Add', { ProtectionFunctionNodeEntityId: nodeId, AnsiCode: code }); setMsg({ text: `${code} ${nameOf.get(code) ?? ''} is in service here.` }) }
+      refresh()
+    } catch (e) { setMsg({ text: e instanceof ApiError ? e.message : String(e), bad: true }) } finally { setBusy('') }
+  }
+  if (caps.isPending) return null
+  if (!list.length) return (
+    <div className="mt-2 border-t border-slate-800 pt-2">
+      <Status>No element list has been recorded for this model yet. An administrator builds it from the manufacturer's manual, and it then appears here for every relay of this model.</Status>
+    </div>)
+  return (
+    <div className="mt-2 space-y-1 border-t border-slate-800 pt-2">
+      <div className="text-xs text-slate-400">Elements in service here — what this model can do, from its manual</div>
+      <div className="flex flex-wrap gap-x-4 gap-y-1">
+        {list.map((c) => { const code = s(c.AnsiCode); const isOn = ticked.has(code)
+          return (
+            <label key={code} className="flex items-center gap-1.5 text-sm">
+              <input type="checkbox" id={`fn-${nodeId}-${code}`} checked={isOn} disabled={!editable || busy === code}
+                onChange={() => void toggle(code)} />
+              <span className={isOn ? 'text-slate-200' : 'text-slate-500'}><span className="font-mono">{code}</span> {nameOf.get(code) ?? ''}</span>
+            </label>) })}
+      </div>
+      {msg && <Status bad={msg.bad}>{msg.text}</Status>}
+      {!editable && <Status>You may not change what is in service here.</Status>}
+    </div>)
+}
+
 function PlacedHere({ node, canPlace, canRetract }: { node: Row; canPlace: boolean; canRetract: boolean }) {
   const qc = useQueryClient()
   const nodeId = s(node.EntityId)
@@ -467,6 +521,8 @@ function PlacedHere({ node, canPlace, canRetract }: { node: Row; canPlace: boole
           <PlacedRow key={s(x.EntityId)} x={x} model={byId.get(s(x.ModelId).toLowerCase())} nodeName={s(node.Name)}
             canPlace={canPlace} canRetract={canRetract} onDone={refresh} />))}
       </ul>
+      {/* #181: the elements the placed relay performs here */}
+      {rows.length > 0 && <FunctionChecklist nodeId={nodeId} modelId={s(rows[0].ModelId)} editable={canPlace} />}
       {canPlace
         ? <PlaceForm node={node} onDone={refresh} />
         : <div className="mt-3 border-t border-slate-800 pt-2"><Status>Placing a device needs Asset.Modify.</Status></div>}

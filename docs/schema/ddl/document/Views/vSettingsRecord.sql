@@ -125,8 +125,8 @@ OUTER APPLY (SELECT TOP (1) x.[BuildingEntityId], x.[BuildingName]
              WHERE x.[T] = N'Building' ORDER BY x.[o]) bld
 OUTER APPLY (SELECT TOP (1) k.[KeyValue] FROM [location].[AlternateKey] k WHERE k.[ValidTo] IS NULL AND k.[IsDeleted] = 0 AND k.[SubjectEntityId] = st.[StationEntityId] AND k.[KeyKindCode] = N'StationNumber' ORDER BY k.[IsPrimaryLabel] DESC, k.[RowSeq]) stno
 OUTER APPLY (SELECT STRING_AGG(f.[AnsiCode], N', ') WITHIN GROUP (ORDER BY f.[IsPrincipal] DESC, f.[AnsiCode]) AS [Functions]
-             FROM [location].[Node] pf JOIN [scheme].[CommissionedFunction] f ON f.[ProtectionFunctionNodeEntityId] = pf.[EntityId]
-             WHERE pf.[ValidTo] IS NULL AND pf.[IsDeleted] = 0 AND f.[ValidTo] IS NULL AND f.[IsDeleted] = 0 AND pf.[ParentEntityId] = dp.[EntityId] AND pf.[NodeTypeCode] = N'ProtectionFunction') fn
+             FROM [scheme].[CommissionedFunction] f   -- #181: commissioned AT the position, not under a node of its own
+             WHERE f.[ValidTo] IS NULL AND f.[IsDeleted] = 0 AND f.[ProtectionFunctionNodeEntityId] = dp.[EntityId]) fn
 -- W8 (#158): the scheme through the asset's own membership first (the migration's equipment group), else through a
 -- protection function under the position. Three seeks on the base tables in the filtered indexes' own form
 -- (IX_SchemeMember_Member on (MemberKind, MemberEntityId)); one combined OR/EXISTS apply measured 28 s for the whole

@@ -49,3 +49,14 @@ UPDATE [ref].[LocationNodeTypeParent]
  WHERE [IsActive] = 1
    AND ([ChildNodeTypeCode] = N'Bay' OR [ParentNodeTypeCode] = N'Bay');
 GO
+
+-- #181 (2026-09-17): a protection function is no longer a NODE. The owner, on the elements inside a microprocessor
+-- relay: "I am not sure that it is valuable to have all of them listed, the device should really end with the device
+-- id... I believe that the device FLOC should stop at TN-4134-BDG1-PNL12-21A". The elements are still recorded — as
+-- scheme.CommissionedFunction rows against the POSITION, offered from the model's scheme.FunctionCapability list — so
+-- nothing is lost and nothing is tagged. Deactivated rather than deleted, the way Bay was: location.AddNode honours
+-- IsActive, so the database itself now refuses one, and a ruling that brings it back is one row.
+UPDATE [ref].[LocationNodeTypeParent]
+   SET [IsActive] = 0, [ModifiedBy] = '00000000-0000-0000-0000-000000000001', [ModifiedAt] = SYSDATETIMEOFFSET()
+ WHERE [IsActive] = 1 AND [ChildNodeTypeCode] = N'ProtectionFunction';
+GO

@@ -626,20 +626,21 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
     var scheme = Id(scb);
     Must(scs == HttpStatusCode.OK && scheme is not null, $"fixture: a scheme ({Code(scb)} {scb?["detail"]})");
     var workType = await Definition("Program.WorkType", $"{tag}_SETTINGS_CHANGE", "Settings change (W4 fixture)", new { g = 1, workflow = "SETTINGS_CHANGE_REQUEST", requiredRecordKinds = Array.Empty<string>() });
-    // W6 fixture: one commissioned protection function (87T) under each position, all members of the scheme; a station number
+    // W6 fixture: 87T commissioned AT each position, and the relay standing there is the scheme's member.
+    // #181: the element is no longer a node of its own — the owner ruled the FLOC ends at the position, so a
+    // commissioned function names the position and a scheme names the relay.
     var (afs, afb) = await Post(admin, "api/v1/ref/AnsiFunction_Upsert", new { AnsiCode = "87T", Name = "Transformer differential" });
     Must(afs == HttpStatusCode.OK, $"fixture: ANSI function 87T ({(int)afs} {Code(afb)} {afb?["detail"]})");
-    var functionNodes = new List<Guid?>();
+    var commissioned = new List<Guid?>();
     for (var i = 0; i < 3; i++)
     {
-        var fnNode = await Node("ProtectionFunction", positions[i], $"{tag} 87T at position {i + 1}");
-        functionNodes.Add(fnNode);
-        var (cfs0, cfb0) = await Post(admin, "api/v1/scheme/CommissionedFunction_Add", new { ProtectionFunctionNodeEntityId = fnNode, AnsiCode = "87T", IsPrincipal = true });
+        var (cfs0, cfb0) = await Post(admin, "api/v1/scheme/CommissionedFunction_Add", new { ProtectionFunctionNodeEntityId = positions[i], AnsiCode = "87T", IsPrincipal = true });
         if (cfs0 != HttpStatusCode.OK) Must(false, $"fixture: CommissionedFunction_Add position {i + 1} → {(int)cfs0} {Code(cfb0)} {cfb0?["detail"]}");
-        var (sms, smb) = await Post(admin, "api/v1/scheme/AddSchemeMember", new { SchemeEntityId = scheme, MemberKind = "ProtectionFunction", MemberEntityId = fnNode, MemberRoleCode = "InitiatingDevice" });
+        commissioned.Add(Id(cfb0));
+        var (sms, smb) = await Post(admin, "api/v1/scheme/AddSchemeMember", new { SchemeEntityId = scheme, MemberKind = "Asset", MemberEntityId = new[] { devSel, devBdd, devCyl }[i], MemberRoleCode = "InitiatingDevice" });
         if (sms != HttpStatusCode.OK) Must(false, $"fixture: AddSchemeMember position {i + 1} → {(int)sms} {Code(smb)} {smb?["detail"]}");
     }
-    Must(functionNodes.All(f => f is not null), "fixture: three 87T protection functions commissioned under the positions and in the scheme");
+    Must(commissioned.All(f => f is not null), "fixture: 87T commissioned at the three positions, with their relays in the scheme");
     var stationNumber = "9" + tag[^6..];
     var (aks, akb) = await Post(admin, "api/v1/location/AlternateKey_Add", new { SubjectEntityId = station, KeyKindCode = "StationNumber", KeyValue = stationNumber, IsPrimaryLabel = true });
     Must(aks == HttpStatusCode.OK, $"fixture: station number {stationNumber} ({(int)aks} {Code(akb)} {akb?["detail"]})");
@@ -949,7 +950,7 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
         var (f4s, f4b) = await Get(admin, $"api/v1/location/vFloc?ModelCode=SEL-421&take=500");
         Must(f4s == HttpStatusCode.OK && (f4b?["rows"] as JsonArray)?.Any(r => string.Equals(r?["NodeEntityId"]?.ToString(), positions[0]?.ToString(), StringComparison.OrdinalIgnoreCase)) == true, "vFloc by model: position 1 is among the SEL-421 positions");
         var (t1s, t1rows, t1ms) = await Timed(admin, $"api/v1/location/vNodeTree?ParentEntityId={panel}");
-        Must(t1s == HttpStatusCode.OK && t1rows.Count == 3 && t1rows.All(r => r?["HasChildren"]?.GetValue<bool>() == true), $"vNodeTree under the panel: three positions, each with children (the function nodes) ({t1ms} ms)");
+        Must(t1s == HttpStatusCode.OK && t1rows.Count == 3 && t1rows.All(r => r?["HasChildren"]?.GetValue<bool>() == false), $"vNodeTree under the panel: three positions, and the tree stops there — an element is no longer a node of its own (#181) ({t1ms} ms)");
         var (fh1s, fh1b) = await Get(hydro, $"api/v1/location/vFloc?StationNodeEntityId={station}");
         Must(fh1s == HttpStatusCode.OK && (fh1b?["rows"] as JsonArray)?.Count == 3, "the Hydro engineer reads the station's positions (Node family scope)");
         // W7 (#144): the file download — the STUDY step's evidence file comes back byte for byte, its SHA-256 as stored
@@ -1045,22 +1046,21 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
             Must(k176_m1s != HttpStatusCode.OK && k176_m2s == HttpStatusCode.Conflict,
                 $"#176: a scheme takes functions, assets and channels and never a device ({(int)k176_m1s}), and a member kind must name a thing of that kind ({(int)k176_m2s} {k176_m2b?["detail"]})");
 
-            // a protection function under the new position, added to the scheme in a role, then withdrawn again
-            var (k176_f1s, k176_f1b) = await Post(admin, "api/v1/location/AddNode", new { NodeTypeCode = "ProtectionFunction", ParentEntityId = k176_pos, Name = "50/51 spare" });
-            var k176_fn = Id(k176_f1b);
-            var (k176_m3s, k176_m3b) = await Post(admin, "api/v1/scheme/AddSchemeMember", new { SchemeEntityId = scheme, MemberKind = "ProtectionFunction", MemberEntityId = k176_fn, MemberRoleCode = "TripCircuit" });
+            // the relay at the new position joins the scheme in a role, then is withdrawn again (#181: a scheme names the
+            // relay, because the element is no longer a node of its own)
+            var (k176_m3s, k176_m3b) = await Post(admin, "api/v1/scheme/AddSchemeMember", new { SchemeEntityId = scheme, MemberKind = "Asset", MemberEntityId = k176_relay, MemberRoleCode = "TripCircuit" });
             var k176_member = Id(k176_m3b);
             var (k176_v1s, k176_v1b) = await Get(admin, $"api/v1/scheme/vSchemeMember?SchemeEntityId={scheme}");
             var k176_before = (k176_v1b?["rows"] as JsonArray)?.Count ?? 0;
             var (k176_r1s, k176_r1b) = await Post(admin, "api/v1/scheme/SchemeMember_SoftDelete", new { EntityId = k176_member });
             var (k176_v2s, k176_v2b) = await Get(admin, $"api/v1/scheme/vSchemeMember?SchemeEntityId={scheme}");
             var k176_after = (k176_v2b?["rows"] as JsonArray)?.Count ?? 0;
-            Must(k176_f1s == HttpStatusCode.OK && k176_m3s == HttpStatusCode.OK && k176_r1s == HttpStatusCode.OK && k176_after == k176_before - 1,
-                $"#176: a protection function built under the position joins the scheme in a role and can be withdrawn again ({(int)k176_m3s} {Code(k176_m3b)} · {k176_before} → {k176_after} members)");
+            Must(k176_m3s == HttpStatusCode.OK && k176_r1s == HttpStatusCode.OK && k176_after == k176_before - 1,
+                $"#176: the relay at the position joins the scheme in a role and can be withdrawn again ({(int)k176_m3s} {Code(k176_m3b)} · {k176_before} → {k176_after} members)");
 
             // ReadOnly may do neither
             var (k176_q1s, _) = await Post(readOnly!, "api/v1/asset/PlaceAsset", new { AssetEntityId = k176_relay, NodeEntityId = k176_pos, PlacementKind = "Installed" });
-            var (k176_q2s, _) = await Post(readOnly!, "api/v1/scheme/AddSchemeMember", new { SchemeEntityId = scheme, MemberKind = "ProtectionFunction", MemberEntityId = k176_fn, MemberRoleCode = "Member" });
+            var (k176_q2s, _) = await Post(readOnly!, "api/v1/scheme/AddSchemeMember", new { SchemeEntityId = scheme, MemberKind = "Asset", MemberEntityId = k176_relay, MemberRoleCode = "Member" });
             Must(k176_q1s == HttpStatusCode.Forbidden && k176_q2s == HttpStatusCode.Forbidden,
                 $"#176: ReadOnly places nothing ({(int)k176_q1s}) and joins nothing to a scheme ({(int)k176_q2s})");
 
@@ -1142,18 +1142,64 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
             // code and so appear in no tag. Refused by the platform, not merely hidden on a screen.
             var (k180_p0s, k180_p0b) = await Post(admin, "api/v1/location/AddNode", new { NodeTypeCode = "DevicePosition", ParentEntityId = panel, Name = $"{tag} 21A", Code = "21A" });
             var k180_pos = Id(k180_p0b);
-            var (k180_e1s, k180_e1b) = await Post(admin, "api/v1/location/AddNode", new { NodeTypeCode = "ProtectionFunction", ParentEntityId = k180_pos, Name = "21 distance", Code = "21" });
-            var (k180_o1s, k180_o1b) = await Post(admin, "api/v1/location/AddNode", new { NodeTypeCode = "ProtectionFunction", ParentEntityId = k180_pos, Name = "21 distance" });
-            var k180_fn = Id(k180_o1b);
-            var (k180_r1s, _) = await Post(admin, "api/v1/location/RenameNode", new { EntityId = k180_fn, Name = "21 distance", Code = "21" });
-            var (k180_v1s, k180_v1b) = await Get(admin, $"api/v1/location/vNode?EntityId={k180_fn}");
-            var k180_row = (k180_v1b?["rows"] as JsonArray)?.FirstOrDefault();
+            // #181: a protection function is no longer a node at all, so nothing below the position can be built to carry
+            // a tag. The element is recorded AT the position instead, by the checklist below.
+            var (k180_e1s, k180_e1b) = await Post(admin, "api/v1/location/AddNode", new { NodeTypeCode = "ProtectionFunction", ParentEntityId = k180_pos, Name = "21 distance" });
             var (k180_p1s, k180_p1b) = await Get(admin, $"api/v1/location/vNode?EntityId={k180_pos}");
             var k180_posFloc = (k180_p1b?["rows"] as JsonArray)?.FirstOrDefault()?["FlocCode"]?.ToString();
-            Must(k180_p0s == HttpStatusCode.OK && k180_e1s == HttpStatusCode.Conflict && Code(k180_e1b) == "rule" && k180_o1s == HttpStatusCode.OK
-                 && k180_r1s == HttpStatusCode.Conflict && k180_row?["FlocCode"] is null && k180_row?["Code"] is null
+            var (k180_t1s, k180_t1b) = await Get(admin, "api/v1/ref/vLocationNodeTypeParent?ParentNodeTypeCode=DevicePosition&take=20");
+            var k180_offered = ((k180_t1b?["rows"] as JsonArray) ?? []).Where(r => r?["IsActive"]?.ToString() is "true" or "True" or "1").Select(r => r?["ChildNodeTypeCode"]?.ToString()).ToList();
+            Must(k180_p0s == HttpStatusCode.OK && k180_e1s != HttpStatusCode.OK && !k180_offered.Contains("ProtectionFunction")
                  && !string.IsNullOrWhiteSpace(k180_posFloc),
-                $"#180: a protection function takes no code, so the tag ends at the position ({k180_posFloc}) and the element beneath it has none ({(int)k180_e1s} {k180_e1b?["detail"]})");
+                $"#180/#181: the tag ends at the position ({k180_posFloc}) and nothing may be built below it to extend one — a protection function is refused ({(int)k180_e1s}) and is not offered ({string.Join(", ", k180_offered)})");
+
+            // ======== #181 (2026-09-17): what a relay CAN do comes from its model, from the manual; what it DOES here is
+            // ticked at the position. The owner: "lets build the checklist on the device instead, you can build the list
+            // from the devices manual... an admin would create an SEL-221F device template with all the possible
+            // capabilities so that when the user selects the device to add to a panel it will populate". Nothing had ever
+            // written a scheme.FunctionCapability row; the table was designed for exactly this (SCHEMA-DESIGN 7.3).
+            // The owner also ruled what a newly placed relay starts with: "If a new device is added, none ticked".
+            // the model is looked up by code, not by a fixed id: the migration may already have created the row, in which
+            // case the template seed binds to that one rather than to the id it would otherwise use
+            var (k181_m0s, k181_m0b) = await Get(admin, "api/v1/ref/vModel?ModelCode=SEL-221F&take=5");
+            var k181_model = (k181_m0b?["rows"] as JsonArray)?.FirstOrDefault()?["ModelId"]?.ToString();
+            var (k181_c1s, k181_c1b) = await Get(admin, $"api/v1/scheme/vFunctionCapability?ModelId={k181_model}&take=50");
+            var k181_caps = ((k181_c1b?["rows"] as JsonArray) ?? []).Select(r => r?["AnsiCode"]?.ToString()).OrderBy(x => x).ToList();
+            var k181_want = new[] { "21", "25", "27", "50", "50BF", "50N", "51N", "59", "67N", "79" }.OrderBy(x => x).ToList();
+            Must(k181_m0s == HttpStatusCode.OK && k181_model is not null && k181_c1s == HttpStatusCode.OK && k181_caps.SequenceEqual(k181_want),
+                $"#181: the SEL-221F's capability list is the manual's ten elements ({string.Join(", ", k181_caps)})");
+
+            // none ticked at a position until someone ticks one, then it reads back with the element's name
+            var (k181_n0s, k181_n0b) = await Get(admin, $"api/v1/scheme/vPositionFunction?PositionNodeEntityId={k180_pos}&take=20");
+            var k181_before = (k181_n0b?["rows"] as JsonArray)?.Count ?? -1;
+            var (k181_t1s, k181_t1b) = await Post(admin, "api/v1/scheme/CommissionedFunction_Add", new { ProtectionFunctionNodeEntityId = k180_pos, AnsiCode = "21", IsPrincipal = true });
+            var k181_row1 = Id(k181_t1b);
+            var (k181_t2s, _) = await Post(admin, "api/v1/scheme/CommissionedFunction_Add", new { ProtectionFunctionNodeEntityId = k180_pos, AnsiCode = "51N" });
+            var (k181_d1s, k181_d1b) = await Post(admin, "api/v1/scheme/CommissionedFunction_Add", new { ProtectionFunctionNodeEntityId = k180_pos, AnsiCode = "21" });
+            var (k181_n1s, k181_n1b) = await Get(admin, $"api/v1/scheme/vPositionFunction?PositionNodeEntityId={k180_pos}&take=20");
+            var k181_now = (k181_n1b?["rows"] as JsonArray) ?? [];
+            var k181_named = k181_now.FirstOrDefault(r => r?["AnsiCode"]?.ToString() == "21")?["AnsiName"]?.ToString();
+            Must(k181_before == 0 && k181_t1s == HttpStatusCode.OK && k181_t2s == HttpStatusCode.OK
+                 && k181_d1s != HttpStatusCode.OK && k181_now.Count == 2 && k181_named == "Distance relay",
+                $"#181: a new position starts with nothing ticked ({k181_before}), ticking records the element by name ({k181_named}), and one element is ticked once ({(int)k181_d1s})");
+
+            // untick, and ReadOnly may tick nothing
+            var (k181_u1s, _) = await Post(admin, "api/v1/scheme/CommissionedFunction_SoftDelete", new { EntityId = k181_row1 });
+            var (k181_n2s, k181_n2b) = await Get(admin, $"api/v1/scheme/vPositionFunction?PositionNodeEntityId={k180_pos}&take=20");
+            var k181_after = (k181_n2b?["rows"] as JsonArray)?.Count ?? -1;
+            var (k181_q1s, _) = await Post(readOnly!, "api/v1/scheme/CommissionedFunction_Add", new { ProtectionFunctionNodeEntityId = k180_pos, AnsiCode = "79" });
+            Must(k181_u1s == HttpStatusCode.OK && k181_after == 1 && k181_q1s == HttpStatusCode.Forbidden,
+                $"#181: unticking withdraws the element (2 — 1 = {k181_after}) and ReadOnly ticks nothing ({(int)k181_q1s})");
+
+            // the migrated estate moved with it: every commissioned element names a position, not a node of its own.
+            // (A protection-function node an earlier smoke run left inside a fixture scheme is left standing on purpose:
+            // the repoint never retires a node a scheme member still names.)
+            var (k181_m1s, k181_m1b) = await Get(admin, "api/v1/location/vNode?NodeTypeCode=ProtectionFunction&take=5000");
+            var k181_nodes = ((k181_m1b?["rows"] as JsonArray) ?? []).Select(r => r?["EntityId"]?.ToString()?.ToLowerInvariant()).ToHashSet();
+            var (k181_m2s, k181_m2b) = await Get(admin, "api/v1/scheme/vPositionFunction?take=5000");
+            var k181_onNode = ((k181_m2b?["rows"] as JsonArray) ?? []).Count(r => k181_nodes.Contains(r?["PositionNodeEntityId"]?.ToString()?.ToLowerInvariant()));
+            Must(k181_m1s == HttpStatusCode.OK && k181_m2s == HttpStatusCode.OK && k181_onNode == 0,
+                $"#181: every commissioned element in the estate names a position, none a node of its own ({k181_onNode} on a node)");
 
 
             // the FLOC follows a code change, for the node and everything beneath it
