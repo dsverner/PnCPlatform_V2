@@ -1,119 +1,118 @@
-# Applicability — the layers that decide which standards bind a device
+# Applicability — one flowchart, every standard attached where it binds
 
-Started 2026-09-19 (#197) at the owner's request: *"These 'layers' of applicability for the various standards are incredibly
-important as they are the kick off point for the various requirements … it would be valuable to start some form of
-applicability flowchart for each of the standards so that we can build off of them … These are the things that we need to
-ensure we get correct, so that devices don't fall through the cracks."*
+Started 2026-09-19 (#197) at the owner's request; rebuilt the same day (#199) after his corrections and a reading of the
+texts: *"These 'layers' of applicability for the various standards are incredibly important as they are the kick off point
+for the various requirements … the next logical step in these flowcharts is to incorporate all of them into a single
+flowchart with the various standards attached to them at the appropriate locations."*
 
-One chart per standard. Every box names the fact the rule reads (`tools/compliance_rules.py` is the source of the rules;
-`compliance.vFactCatalogue` of the facts). A box marked **open** is a layer the standard has and the platform does not
-model yet; it is listed so it is not forgotten, not because a rule reads it. Nothing in a chart is a rule: the rules are
-`Program.ObligationRule` definitions and the derivations `Program.ClassificationDerivation` definitions; the charts describe
-them.
+**Nothing here is from memory** (the owner, 2026-09-19, #198). Every box that states what a standard says was read from
+the text named in *Sources* at the end, in the version in force in New Brunswick on 2026-09-19 (nbeub.ca), and names the
+clause. A box marked **to read** names a document not yet read and asserts nothing of its content. A box marked **rule
+differs** is where the platform's rule today (`tools/compliance_rules.py`) reads the standard wrongly; those are the next
+increment, listed at the end.
 
-Conventions the charts share (rulings on record in `docs/decisions/DECISION-LOG.md`):
+Colour key of the drawn page (the same words are in the boxes here): *fact* — a fact a rule reads or a test the standard
+sets; *binds* — requirements attach here; *does not apply* — with the reason kept; *undetermined* — a fact nobody has
+recorded; *open / to read* — a layer not modelled or a text not read.
 
-- **Nothing here is from memory** (the owner, 2026-09-19: *"when dealing with compliance, never go by memory, all must be
-  verified against the particular standard in question"*). A box states what a standard says only when that standard's
-  text, in the version in force in New Brunswick, was read and the clause is named. A layer the standard is believed to
-  have but whose text has not been read is a **to read** box: it names the document to open, not what it says.
-- **Applicability comes from the primary asset and the device's own nature** (#171, memory
-  `feedback-applicability-from-primary-assets`): the element the scheme protects carries the BES status, the PRC-023 listing
-  and the A-10 declaration; the building carries the CIP impact rating (#195); the device carries what only it can — its
-  technology, its routable connectivity, its elements in service.
-- **Unknown is not false** (#171, #197): a fact nobody has recorded leaves the standard *undetermined* and the device on the
-  undetermined list; the platform never declares a standard inapplicable on a fact it cannot read.
-- **A standard that does not bind must not appear against the device** (#173) — but **the reason must** (#197): the
-  Compliance tab lists each standard that does not apply with what the rule read.
-
-## CIP-002 → CIP-004/005/006/007/010/011 (cyber security)
+## The chart
 
 ```mermaid
 flowchart TD
-    T[device.technology<br/>ref.Model.Technology] -->|Microprocessor or IEC61850| CA[Cyber Asset]
-    T -->|Electromechanical or Static| NCA[not a cyber asset<br/>no CIP requirement]
-    CA --> E{device.protects.classification.BesStatus<br/>the protected element}
-    E -->|BES| BCA[BesCyberAsset = BCA<br/>derived, never typed]
-    E -->|Not BES| NB[BesCyberAsset = Not BCA]
-    E -->|unrecorded| U1[undetermined]
-    BCA --> R{device.location.classification.CipImpactRating<br/>the BUILDING the device is in, #195}
-    R -->|High or Medium| CIP[CIP-004 R2 R4 · CIP-006 R1 · CIP-007 R1-R5 · CIP-010 R1-R3 · CIP-011 R1]
-    R -->|Low| LOW[to read: whether a Low rating carries requirements of its own — CIP-003, not in the seed; its NB version not yet recorded]
-    R -->|no building rated| U2[undetermined]
-    CIP --> PARTS[to read: whether ERC selects requirement parts within CIP-005 / 007 / 010 — from those standards' texts]
-    CIP --> ERC{device.classification.ExternalRoutableConnectivity<br/>recorded by hand}
-    ERC -->|ERC| C5[CIP-005 R1]
-    ERC -->|No ERC| C5N[CIP-005 R1 does not apply]
-    CA --> PCA[open: Protected Cyber Asset —<br/>a Cyber Asset on the same network as a BCA<br/>takes the BCA's requirements though it is not 15-minute impactful]
-    BCA --> FIFTEEN[open: the 15-minute test of the BES Cyber Asset definition —<br/>today every microprocessor relay protecting a BES element is taken as one]
+    DEV["A protection device at its position<br/>asset.vPlacedAsset · the scheme it belongs to · the element the scheme protects"]
+
+    %% ───────────────── cyber security: CIP ─────────────────
+    DEV --> EX{"CIP-002 / 005 / 006 … 4.2.3 exemptions<br/>Cyber Assets at a Facility regulated by the Canadian Nuclear Safety Commission (4.2.3.1);<br/>Cyber Assets of communication networks and data links between discrete ESPs (4.2.3.2)"}
+    EX -->|exempt| EXO["exempt from the CIP standards — open: nothing marks a CNSC-regulated Facility or an inter-ESP link"]
+    EX -->|not exempt| T{"device.technology (ref.Model.Technology)<br/>Glossary: a Cyber Asset is a programmable electronic device"}
+    T -->|Electromechanical or Static| NCA["not a Cyber Asset — no CIP requirement attaches to the device"]
+    T -->|Microprocessor or IEC61850| CA["Cyber Asset"]
+    CA --> BCAQ{"BES (BPS) Cyber Asset test — NB appendix CIP-002-5.1a-NB-0 §G:<br/>if unavailable, degraded or misused, would it within 15 minutes adversely impact a Facility<br/>whose loss affects the reliable operation of the bulk power system? Redundancy not considered.<br/>Platform proxy today: protects an element classified BES (BesStatus) — the 15-minute judgement itself is not modelled"}
+    BCAQ -->|yes| BCA["BES Cyber Asset (BesCyberAsset = BCA, derived) — grouped into a BES Cyber System, CIP-002 R1"]
+    BCAQ -->|no| PCAQ{"connected using a routable protocol within or on the ESP of a BES Cyber System?<br/>Glossary PCA, in force to 2028-06-30 — open: no ESP is modelled; network.port / network.vlan exist"}
+    BCAQ -->|element's BES status unrecorded| U1["undetermined"]
+    PCAQ -->|yes| PCA["Protected Cyber Asset — takes the impact rating of the highest BES Cyber System in the same ESP<br/>(from 2028-07-01: protected by an ESP, or sharing CPU or memory with the BCS; TCAs excluded)"]
+    PCAQ -->|no| NOC["no CIP requirement (a device connected 30 days or less for maintenance is a Transient Cyber Asset — CIP-010 R4 plans, not these rules)"]
+    BCA --> RATE{"impact rating — CIP-002 Attachment 1, evaluated per station or substation (the platform holds it on the building, #195)<br/>High 1.1–1.4: Control Centers only · Medium 2.4: Facilities at 500 kV and above · 2.5: 200–499 kV at a station connected at 200 kV+ to 3 or more other stations, weighted value over 3000 (700 per 200–299 kV line, 1300 per 300–499 kV line) · 2.6 IROL-critical · 2.7 NPIR · 2.8 generation interconnection · 2.9 SPS/RAS · 2.10 UFLS/UVLS 300 MW+<br/>Low 3.2: every other BES Cyber System at a transmission station (R1.3: no discrete list required)"}
+    PCA --> RATE
+    RATE -->|no station criterion met, no rating recorded| U2["undetermined"]
+    RATE -->|Low| LOW["Low impact — CIP-003-8-NB-0 in force, CIP-003-9-NB-0 effective 2026-10-01 — to read"]
+    RATE -->|High| HIGH["High impact — a Control Center's systems; not a substation relay"]
+    RATE -->|Medium| MED["Medium impact BES Cyber System (and its PCA)"]
+    MED --> MALL["binds, ERC or not — BCS + EACMS + PACS + PCA unless noted:<br/>CIP-004 R1.1 (BCS only) · CIP-005 R1.1 (BCS + PCA) · CIP-006 R1.1 (BCS without ERC: procedural physical controls)<br/>CIP-007 R2.1–2.4, R3.1–3.3, R4.1, R5.2, R5.4, R5.5 · CIP-010 R1.1–1.4, R1.6, R3.1, R3.4, R4 (BCS + PCA)<br/>CIP-011 R1.1–1.2 (BCS + EACMS + PACS — not PCA), R2.1–2.2"]
+    MED --> ERC{"External Routable Connectivity — of the BCS through its ESP, not of the relay<br/>Glossary: access to a BCS from a Cyber Asset outside its ESP via a bi-directional routable protocol connection<br/>platform: device.classification.ExternalRoutableConnectivity, by hand"}
+    ERC -->|ERC| MERC["binds with ERC — adds:<br/>CIP-004 R2.1–2.3, R3.1–3.5, R4.1–4.3, R5.1–5.2, R6.1–6.3 (BCS + EACMS + PACS — not PCA)<br/>CIP-005 R1.2 (BCS + PCA), R2.1–2.5 (BCS + PCA), R3.1–3.2 (EACMS + PACS)<br/>CIP-006 R1.2, R1.4, R1.5, R1.8, R1.9, R2.1–2.3, R3.1 (BCS + EACMS + PCA; PACS for 1.6, 1.7, 3.1)<br/>CIP-007 R1.1, R4.2, R5.1, R5.3, R5.6"]
+    ERC -->|No ERC| MNOE["with No ERC these do not apply: the CIP-004 R2–R6 parts, CIP-005 R1.2 and R2, CIP-006 R1.2–1.9 and R2, CIP-007 R1.1, R4.2, R5.3, R5.6"]
+    ERC -->|unrecorded| U3["undetermined"]
+    MED --> MCC["Medium at Control Centers only — not a substation relay:<br/>CIP-005 R1.5 · CIP-006 R1.10 · CIP-007 R1.2, R4.3, R5.1, R5.7"]
+    HIGH --> HONLY["High only: CIP-004 R5.3–5.4 · CIP-006 R1.3 · CIP-007 R4.4 · CIP-010 R1.5, R2.1, R3.2, R3.3"]
+    MED --> DIAL["Dial-up Connectivity: CIP-005 R1.4 (BCS + PCA) — open: not modelled"]
+
+    %% ───────────────── protection settings: PRC-023-6 ─────────────────
+    DEV --> P["device.protects — the element the scheme protects (compliance.fDeviceProtects)"]
+    P --> V{"PRC-023-6 4.2 circuits"}
+    V -->|"line operated at 200 kV and above (4.2.1.1) — except an element connecting a GSU used only to export a BES generator"| C1["circuit in scope"]
+    V -->|"transformer whose LOW-voltage terminal connects at 200 kV and above (4.2.1.4) — rule differs: the rule reads one terminal's voltage"| C1
+    V -->|"100–200 kV, or below 100 kV and BES, on the Planning Coordinator's R6 list (4.2.1.2/3/5/6) — device.protects.classification.Prc023 = Listed"| C1
+    V -->|neither| NO1["PRC-023 does not apply — the circuit"]
+    C1 --> F{"4.1 / Attachment A — the elements in service at the position (device.functions)<br/>included A.1: phase distance 1.1 · out-of-step 1.2 · switch-on-to-fault 1.3 · overcurrent 1.4 · comms-aided POTT/PUTT/DCB/DCUB 1.5 · phase OC supervision of current-based pilot schemes that trip on loss of comms 1.6<br/>excluded A.2: enabled only when other relays fail, e.g. on loss of potential 2.1 · ground fault detection 2.2 · RAS-only 2.5 · 15-minute-or-slower 2.6 · thermal emulation 2.7 · dc lines 2.8 · dc converter transformers 2.9"}
+    F -->|"an element ruled load-responsive (21 · 78 · SOTF · 50 · 51 · 67, not ground)"| R1["PRC-023 R1 binds — any one of criteria 1–13 at 0.85 pu and 30°"]
+    F -->|"every element ruled not (ground A 2.2; 87T, 25, 27, 59, 79, 50BF not listed) — rule differs: 87 is blanket-ruled; A 1.6 brings a line differential scheme's phase OC supervision in"| NO2["does not apply — no in-service load-responsive element; device.functions.note says which and why"]
+    F -->|an element nobody has ruled| U4["undetermined — 1 437 of 3 203 commissioned rows on DEV"]
+    F --> X3["open: A 2.8 / 2.9 — Eel River HVDC's dc-side and converter-transformer relays are excluded; nothing marks them"]
+    F --> X4["open: A 2.1 — an element enabled only on loss of potential or loss of communications; open: enablement from the settings masks (SEL-221F MTU/MPT/MTO)"]
+    R1 --> CRIT["asset.formula.prc023_criterion — the group applies 1, then 2, then 13, then 12 (owner, 2026-09-16)"]
+    CRIT -->|"7, 8, 9, 12 or 13 — rule differs: the rule reads 13 only"| R3["PRC-023 R3 — the calculated capability becomes the Facility Rating, agreed with PC, TOP, RC"]
+    CRIT -->|2| R4["PRC-023 R4 — yearly circuit list to PC, TOP, RC (15 months at most)"]
+    CRIT -->|12| R5["PRC-023 R5 — yearly circuit list to the Regional Entity (NB appendix: NPCC)"]
+
+    %% ───────────────── design: NPCC Directory 4 ─────────────────
+    P --> D{"NPCC A-10: device.protects.classification.NpccBulkPowerSystem — the element's declaration, else the bus's at the protected terminal (#196)"}
+    D -->|BPS| D4["NPCC Directory 4 R5.1 binds — a design criterion; TFSP evidence kept outside the platform (text read at #184, not re-read)"]
+    D -->|Not BPS| NO3["does not apply"]
+    D -->|nothing declared| U5["undetermined — open: the studies group's bus database and a connectivity model"]
 ```
 
-What the rules read today (`CIP_SCOPE`): `device.classification.BesCyberAsset = 'BCA' and
-device.location.classification.CipImpactRating in {'High', 'Medium'}`; CIP-005 R1 adds
-`and device.classification.ExternalRoutableConnectivity = 'ERC'` (`CIP_ERC_SCOPE`). The BCA flag is the derivation
-`bes_cyber_asset`: BCA when `device.technology in {'Microprocessor', 'IEC61850'} and
-device.protects.classification.BesStatus = 'BES'`, else Not BCA; undetermined while the element's BES status is unrecorded.
+## Where each requirement sits — read from the Applicable Systems columns
 
-Open layers, in the owner's words (2026-09-19): *"Once a building has been deemed to be a particular level … then all devices
-in that building will need to be categorized, no matter whether or not they are '15-minute impactful' or not to the BES …
-any device which is located on the same network, whether or not it is impactful, has much the same requirements … these
-devices would be categorized as PCA (protected cyber asset) since … if they were compromised, that would be a door into the
-BCAs which are on the same network."* The platform has the facts a PCA layer needs in outline — `network.port`,
-`network.vlan`, `network.services` on a device, and `device.connections` — but no rule reads them for this yet and no
-classification kind `ProtectedCyberAsset` exists. To read before anything is built on them: whether external routable
-connectivity selects requirement *parts* within CIP-005/007/010 (the note of 2026-09-19 that said so was from memory and
-does not count), and what a Low impact rating carries (CIP-003). The PCA definition itself is to be read from the NERC
-Glossary and CIP-002 before a rule is written; the owner's description above is the requirement, not the text.
+| Standard (NB version in force) | Applies to Medium **without** ERC | Applies to Medium **with** ERC only | Medium at Control Centers only | High only | Reaches PCA? |
+|---|---|---|---|---|---|
+| CIP-004-7 | R1.1 | R2.1–2.3, R3.1–3.5, R4.1–4.3, R5.1–5.2, R6.1–6.3 | — | R5.3, R5.4 | No (EACMS, PACS only) |
+| CIP-005-7 | R1.1 | R1.2, R2.1–2.5, R3.1–3.2 (EACMS, PACS) | R1.5 (EAPs) | — | Yes (R1, R2) |
+| CIP-006-6 | R1.1 | R1.2, R1.4, R1.5, R1.6–1.7 (PACS), R1.8, R1.9, R2.1–2.3, R3.1 | R1.10 | R1.3 | Yes (R1, R2) |
+| CIP-007-6 | R2.1–2.4, R3.1–3.3, R4.1, R5.2, R5.4, R5.5 | R1.1, R4.2, R5.1, R5.3, R5.6 | R1.2, R4.3, R5.1, R5.7 | R4.4 | Yes (all) |
+| CIP-010-4 | R1.1–1.4, R1.6, R3.1, R3.4, R4 | — | — | R1.5, R2.1, R3.2, R3.3 | Yes (R1, R3, R4) |
+| CIP-011-3 | R1.1–1.2, R2.1–2.2 | — | — | — | R2 yes; R1 no |
+| PRC-023-6 | R1 where 4.2 and Attachment A both hold; R3 for criteria 7, 8, 9, 12, 13; R4 for criterion 2; R5 for criterion 12 | | | | |
+| CIP-003-8 (Low) | to read | | | | |
 
-## PRC-023-6 (transmission relay loadability)
+"Medium" here means a Medium impact BES Cyber System and, where the column says so, its associated EACMS, PACS and PCA.
+A relay that is a PCA in a Medium ESP takes the PCA-reaching parts and none of CIP-004 or CIP-011 R1.
 
-```mermaid
-flowchart TD
-    P[device.protects — the element the scheme protects<br/>compliance.fDeviceProtects] --> V{4.2 Circuits}
-    V -->|device.protects.terminal.voltage >= 200 kV| C1[4.2.1.1 / 4.2.1.4 in scope]
-    V -->|device.protects.classification.Prc023 = Listed<br/>the Planning Coordinator's R6 list| C1
-    V -->|neither| NO1[R1 does not apply — the circuit]
-    C1 --> F{4.1 / Attachment A — the elements in service<br/>device.functions = scheme.CommissionedFunction at the position}
-    F -->|any element ruled load-responsive<br/>21 · 78 · SOTF · 50 · 51 · 67, not ground| R1[PRC-023 R1 binds]
-    F -->|every element ruled not — 50N 51N 67N ground A 2.2,<br/>87 · 25 · 27 · 59 · 79 · 50BF not listed| NO2[R1 does not apply — no in-service load-responsive element<br/>device.functions.note says which and why]
-    F -->|an element nobody has ruled| U[undetermined — 1 437 of 3 203 commissioned rows on DEV]
-    R1 --> CRIT[asset.formula.prc023_criterion<br/>criterion 1, then 2, then 13, then 12]
-    CRIT -->|13| R3[PRC-023 R3]
-    CRIT -->|2| R4[PRC-023 R4 yearly list]
-    CRIT -->|12| R5[PRC-023 R5 yearly list to NPCC]
-    V --> X1[open: 4.2.1.4 transformers — the LOW-voltage terminal's connection at 200 kV, not the element's voltage]
-    V --> X2[open: 4.2.1.1 GSU-to-transmission elements used only to export a BES generator are excluded]
-    F --> X3[open: Attachment A 2.8 / 2.9 — relay elements of dc lines and dc converter transformers are excluded<br/>Eel River HVDC: nothing marks a dc line or a converter transformer yet]
-    F --> X4[open: Attachment A 2.1 — elements enabled only on loss of potential or loss of communications]
-    F --> X5[open: enablement from the settings themselves — the SEL-221F's MTU/MPT/MTO masks decide which elements trip;<br/>decoded from the manual's 3-20 table, they fill CommissionedFunction.EnabledFromConfigurationFileRevisionRowId]
-```
+## What the platform's rules must change (the next increment)
 
-What the rule reads today (`PRC_R1_SCOPE`, #197): `(device.protects.terminal.voltage >= 200kV or
-device.protects.classification.Prc023 = 'Listed') and device.functions[load_responsive='true'] is not empty`. The function
-ruling lives on `ref.AnsiFunction.LoadResponsive` / `LoadResponsiveBasis` (the core seed, each with its Attachment A
-clause); a legacy code such as `50/51N` or `21-B` is judged by `ref.fAnsiLoadResponsive` (its numbers, ground when N or G
-follows the digits). Read from PRC-023-6 itself (FERC letter order 2024-01-24), the copy `Seed_compliance_Standards_NB.sql`
-cites.
+Read against the texts above, five of the thirteen CIP rules and two PRC-023 pieces are wrong today:
 
-## NPCC Directory 4 (bulk power system protection design)
+1. `cip004_r2`, `cip004_r4` — bind only with ERC at Medium (they bind every Medium BCA today).
+2. `cip005_r1` — part 1.1 binds every Medium BCS and its PCA, ERC or not; only 1.2 carries ERC (the rule carries ERC for all of R1).
+3. `cip007_r1` — part 1.1 binds Medium only with ERC (the rule binds without).
+4. `cip010_r2` — High only; never at a Medium substation (the rule opens it there).
+5. `prc023_r3` — criteria 7, 8, 9, 12 or 13 (the rule reads 13 only).
+6. `ref.AnsiFunction` ruling for 87 — right for 87T; A 1.6 brings the phase overcurrent supervision of a current-based pilot
+   scheme (line differential included) in when the scheme trips on loss of communications: rule 87L's supervising elements
+   per scheme, not by the number.
+7. The rules are written per requirement; the standards bind per **part**. The honest shape is one rule per part-group
+   (the rows of the table above), so an obligation names the parts it stands for.
 
-```mermaid
-flowchart TD
-    P[device.protects — the element the scheme protects] --> D{device.protects.classification.NpccBulkPowerSystem<br/>the element's own A-10 declaration, #196}
-    D -->|declared on the element| DV{value}
-    D -->|no declaration| B{the bus at the terminal the scheme protects from<br/>fDeviceProtects.BusAssetEntityId}
-    B -->|bus declared| DV
-    B -->|nothing declared| U[undetermined]
-    DV -->|BPS| D4[NPCC D4 R5.1 binds — a design criterion; the TFSP evidence is kept outside the platform]
-    DV -->|Not BPS| NO[does not apply]
-    D --> X1[open: the studies group's bus database and a connectivity model replace the hand entry; a hand-entered element that disagrees is flagged, not overwritten]
-```
+Also open, with no rule yet: the PCA layer (needs an ESP model); the exemptions (CNSC facility; inter-ESP links); Low
+impact (CIP-003, to read); Dial-up; the NB Regulation's definition of the bulk power system, which is what "BES" means in
+every NB appendix (to read); the NB appendices of CIP-004 to CIP-011 (their §G definitions not read this session).
 
-## How a layer gets added
+## Sources read (2026-09-19)
 
-1. The fact first: a column, a classification kind, or a derivation — and its row in `compliance.vFactCatalogue` with the
-   branch in `fFactRead` / `fFixedFactValue` that reads it.
-2. Then the rule term, in `tools/compliance_rules.py`, regenerated into `Seed_config_ObligationRules.sql` (a new rule version
-   by payload; the old obligations close on the next Effective run, with the reads that closed them).
-3. Then the screen shows the fact where the rating is shown, and the reason line names it when the rule reads false.
-4. Then this file: the box moves from **open** to a fact.
+- PRC-023-6 — https://www.nerc.com/pa/Stand/Reliability%20Standards/PRC-023-6.pdf (4.1, 4.2, R1–R6, Attachment A, B).
+- CIP-002-5.1a — https://www.nerc.com/pa/Stand/Reliability%20Standards/CIP-002-5.1a.pdf (4.2, 4.2.3, R1, Attachment 1, Background p. 5–6) and NB Appendix CIP-002-5.1a-NB-0 (§G BPS Cyber Asset / BPS Cyber System; "BES" means the NB Regulation's bulk power system; in force 2017-06-07).
+- CIP-004-7, CIP-005-7, CIP-006-6, CIP-007-6, CIP-010-4, CIP-011-3 — the NERC texts at the same host, Requirements and Measures tables (every part's Applicable Systems); 4.2.3 exemptions of CIP-005-7 and CIP-006-6.
+- NERC Glossary of Terms (https://www.nerc.com/glossary-of-terms, read 2026-09-19): Cyber Assets, BES Cyber Asset, BES Cyber System, Protected Cyber Assets, External Routable Connectivity, Electronic Security Perimeter, EACMS, PACS, Transient Cyber Asset — the definitions in force (inactive 2028-06-30) and their 2028-07-01 successors.
+- nbeub.ca/reliability-standards — versions and effective dates (CIP-002-5.1a-NB-0, CIP-003-8-NB-0, CIP-004-7-NB-0, CIP-005-7-NB-0 in force; CIP-003-9-NB-0 effective 2026-10-01; the -8/-9/-10/-11 CIP versions effective 2028-10-01).
+- NPCC Directory 4 — read at #184 from npcc.org; not re-read this session.
