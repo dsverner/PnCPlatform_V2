@@ -14,7 +14,7 @@ import { settingsText } from '@/lib/actions'
 import { type RecordParams, type Screen, splitView, screenPath } from '@/lib/screens'
 import { Panel, Pill, stateTone, Button, Facts, Status, Field, Tabs, inputClass } from '@/components/ui/ui'
 import { DataGrid, type Column } from '@/components/ui/data-grid'
-import DeviceSettings, { useTemplate, isRatio, BasisPanel } from './DeviceSettings'
+import DeviceSettings, { useTemplate, AnalogInputs, BasisPanel } from './DeviceSettings'
 import ComplianceTab, { useProtectedAssets } from './ComplianceTab'
 import { NodeLink } from './PrimaryAssetScreen'
 
@@ -54,7 +54,7 @@ export default function RecordScreen({ params: p, id }: { screen: Screen; params
         </div>
       </header>
       <Status>{legacyFree(r.DeviceName)} · rev {s(r.RevisionLabel) || '?'} · Revision {s(r.RevisionStatus)} · lifecycle {s(r.LifecycleState) || '—'} · {s(r.FileKind)} {s(r.ParseStatus)}</Status>
-      <Tabs value={section} onChange={setSection} tabs={[{ key: 'settings', label: 'Settings' }, { key: 'record', label: 'Record' }, { key: 'compliance', label: 'Compliance' }, { key: 'notes', label: 'Notes' }, { key: 'text', label: 'Text as filed' }, { key: 'files', label: 'Files and records' }, ...(others.length ? [{ key: 'compare', label: 'Compare' }] : [])]} />
+      <Tabs value={section} onChange={setSection} tabs={[{ key: 'settings', label: 'Settings' }, { key: 'analog', label: 'Analog inputs' }, { key: 'record', label: 'Record' }, { key: 'compliance', label: 'Compliance' }, { key: 'notes', label: 'Notes' }, { key: 'text', label: 'Text as filed' }, { key: 'files', label: 'Files and records' }, ...(others.length ? [{ key: 'compare', label: 'Compare' }] : [])]} />
       {section === 'settings' && (template
         /* #168: the template's view of the device — functions, inputs, settings by function — when the model has one */
         ? <>
@@ -65,6 +65,15 @@ export default function RecordScreen({ params: p, id }: { screen: Screen; params
         : <Panel title={parsed.length ? `Settings · ${parsed.length} parsed from the ${s(r.FileKind)} file` : r.FileKind === 'NativeSettings' ? 'Settings · the native (vendor) file is stored as is; no reader exists for it yet (#113)' : 'Settings · no parsed settings; the text as filed is the record'}>
             {parsed.length > 0 ? <DataGrid rows={parsed} columns={PARSED_COLS} rowKey={(x) => s(x.SettingCode) + '|' + s(x.GroupNumber)} /> : <Status>No settings template for this model yet; the text as filed is the record.</Status>}
           </Panel>)}
+      {/* #200 (owner, 2026-09-19): the CTs and PTs on a tab of their own — the template's ratio settings (CTR, PTR, SPTR on an
+          SEL-221F) with their edit, then the instrument-transformer characteristics, which were the Record tab's and only
+          shown when the model had no template; now every record's, template or not */}
+      {section === 'analog' && (
+        <>
+          <AnalogInputs r={r} revision={revision} editable={r.GridState === 'Outstanding' && can('ConfigurationFile.Modify')} />
+          <Characteristics r={r} revision={revision} editable={r.GridState === 'Outstanding' && can('Record.Modify')} />
+        </>
+      )}
       {/* #188: the relay, its placement and scheme, and the dates and state — a tab, not the top of every view. The owner,
           2026-09-18: the three panels "take up too much room and should really just be another tab"; "Where" renamed */}
       {section === 'record' && (
@@ -88,11 +97,10 @@ export default function RecordScreen({ params: p, id }: { screen: Screen; params
                 <span className="text-slate-500">{r.BasedOnGridState === 'Outstanding' ? ' — still outstanding; this revision cannot go in service before it' : ` — ${s(r.BasedOnGridState).toLowerCase()}`}</span></span>
             : '—']]} /></Panel>
       </div>
-        {!template?.rows.some(isRatio) && <Characteristics r={r} revision={revision} editable={r.GridState === 'Outstanding' && can('Record.Modify')} />}
         </>
       )}
       {/* #194: the Classification tab is gone (its eight legacy fields dropped as untrusted); the instrument-transformer
-          characteristics keep a home on the Record tab when the model has no template (a template's Inputs panel shows CTR/PTR) */}
+          characteristics kept a home on the Record tab until #200 moved them to the Analog inputs tab */}
       {/* #171: what the device is, what it inherits from the station and the protected asset, its obligations and the evaluator's working */}
       {section === 'compliance' && <ComplianceTab r={r} />}
       {section === 'notes' && <Notes r={r} revision={revision} />}

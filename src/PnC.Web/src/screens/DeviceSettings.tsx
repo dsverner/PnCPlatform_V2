@@ -32,31 +32,32 @@ const isRatio = (r: Row) => /current and potential inputs|transformer ratio/i.te
 const rangeText = (r: Row) => (r.MinValue == null && r.MaxValue == null ? '' : `${r.MinValue ?? '…'} – ${r.MaxValue ?? '…'}`)
 
 
-/** The relay's inputs, from the template's ratio settings: what each ratio setting says the relay is fed by (the manual's words in the definition). */
-export function InputsPanel({ template, values }: { template: Template; values: Map<string, Row> }) {
-  const ratios = template.rows.filter(isRatio)
-  if (!ratios.length) return null
+/** #200 (owner, 2026-09-19: "I would prefer to have the CTs and PTs located on a separate tab called something like 'Analog
+ * Inputs'"): the template's ratio settings — what the relay is fed by — on the record's Analog inputs tab, as the same grid
+ * with the same per-field edit the settings book uses; they no longer appear in the book. The Inputs panel that sat above
+ * the book is gone with them. */
+export function AnalogInputs({ r, revision, editable = false }: { r: Row; revision: string; editable?: boolean }) {
+  const tq = useTemplate(s(r.ModelId) || null)
+  const parsedQ = useViewAll('document', 'vParsedSettingNamed', { ConfigurationFileRevisionRowId: revision }, 'DisplayOrder')
+  const parsed = parsedQ.data ?? []
+  const values = useMemo(() => new Map(parsed.map((p) => [s(p.SettingCode), p])), [parsed])
+  if (tq.isPending) return <Status>Loading the template…</Status>
+  if (!tq.data) return <Status>No settings template for this model; the instrument transformers below are the record of its analog inputs.</Status>
+  const ratios = tq.data.rows.filter(isRatio)
   return (
-    <Panel title="Inputs">
-      <dl className="grid grid-cols-1 gap-x-6 gap-y-1 text-sm md:grid-cols-2">
-        {ratios.map((r) => { const v = values.get(s(r.SettingCode)); const inputs = s(r.Description).split('. ').find((x) => /input/i.test(x) && !x.startsWith('§'))
-          return <div key={s(r.SettingCode)} className="grid grid-cols-[11rem_1fr] gap-2"><dt className="text-slate-400">{s(r.Name)} <span className="text-slate-600">{s(r.SettingCode)}</span></dt>
-            <dd className="text-slate-200">{v ? s(v.RawValue ?? v.DisplayValue) : <span className="text-slate-500">not set</span>}{inputs && <span className="ml-2 text-xs text-slate-500">{inputs}</span>}</dd></div> })}
-      </dl>
+    <Panel title={`Analog inputs · ${tq.data.name}`}>
+      {!ratios.length && <Status>The template carries no ratio settings.</Status>}
+      {ratios.length > 0 && <SettingsGrid rows={ratios} values={values} revision={revision} editable={editable} deviceId={s(r.DeviceEntityId)} />}
     </Panel>
   )
 }
 
-/** The settings by function: a tab per category in the template's order; every template row, with the revision's value or "not set". */
-export function SettingsByFunction({ template, parsed, parseStatus, parseError, revision, filedText, editable = false, deviceId = '' }: { template: Template; parsed: Row[]; parseStatus: string; parseError: string; revision: string; filedText: string | null; editable?: boolean; deviceId?: string }) {
-  const values = useMemo(() => new Map(parsed.map((p) => [s(p.SettingCode), p])), [parsed])
-  const categories = useMemo(() => { const seen: string[] = []; for (const r of template.rows) { const c = s(r.Category) || 'Settings'; if (!seen.includes(c)) seen.push(c) } return seen }, [template.rows])
-  const [tab, setTab] = useState(categories[0] ?? '')
-  const current = tab || categories[0] || ''
-  const rows: (Row & { _v?: Row })[] = template.rows.filter((r) => (s(r.Category) || 'Settings') === current).map((r) => ({ ...r, _v: values.get(s(r.SettingCode)) }))
-  const renderedQ = useQuery({ queryKey: ['rendered', revision], queryFn: () => getText(`/api/v1/settings/${revision}/rendered`), staleTime: 60_000, enabled: parsed.length > 0 })
-  // #168 increment 2: a value edited in the platform — process.SetParsedSetting reads it as the parser would (type, range, closed list),
-  // closes the prior row in valid time and audits the change; the platform writes the settings file from these rows at the settings step
+/** The settings grid: the template rows given, each with the revision's value or "not set"; a value edits in place when the
+ * revision is outstanding (#168 increment 2: process.SetParsedSetting reads it as the parser would — type, range, closed
+ * list — closes the prior row in valid time and audits the change; the platform writes the settings file from these rows
+ * at the settings step). One grid for the book and for the Analog inputs tab (#200). */
+function SettingsGrid({ rows: given, values, revision, editable = false, deviceId = '' }: { rows: Row[]; values: Map<string, Row>; revision: string; editable?: boolean; deviceId?: string }) {
+  const rows: (Row & { _v?: Row })[] = given.map((r) => ({ ...r, _v: values.get(s(r.SettingCode)) }))
   const qc = useQueryClient()
   const [edits, setEdits] = useState<Record<string, string>>({})
   const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null)
@@ -82,15 +83,32 @@ export function SettingsByFunction({ template, parsed, parseStatus, parseError, 
     { key: '_flag', label: '', render: (r) => (r._v?.RangeCheck === 'OutOfRange' ? <Pill tone="bad" title={s(r._v.RangeCheckNote)}>out of range</Pill> : null), csv: (r) => s(r._v?.RangeCheck) },
     { key: 'Description', label: 'The manual says', render: (r) => <span className="text-xs text-slate-400">{s(r.Description).replace(/^§ /, '')}</span> },
   ]
+  return (
+    <>
+      {msg && <Status bad={msg.bad}>{msg.text}</Status>}
+      {editable && <Status>Outstanding revision: a value saves when you leave the field (audited as your change). The platform writes the settings file from these values when the settings step of the change commits.</Status>}
+      <div className="mt-2"><DataGrid rows={rows} columns={cols} rowKey={(r) => s(r.SettingCode)} emptyText="No settings in this group." /></div>
+    </>
+  )
+}
+
+/** The settings by function: a tab per category in the template's order (the ratio settings excepted — they are the Analog
+ * inputs tab's, #200); every template row of the category, with the revision's value or "not set". */
+export function SettingsByFunction({ template, parsed, parseStatus, parseError, revision, filedText, editable = false, deviceId = '' }: { template: Template; parsed: Row[]; parseStatus: string; parseError: string; revision: string; filedText: string | null; editable?: boolean; deviceId?: string }) {
+  const values = useMemo(() => new Map(parsed.map((p) => [s(p.SettingCode), p])), [parsed])
+  const bookRows = useMemo(() => template.rows.filter((r) => !isRatio(r)), [template.rows])
+  const categories = useMemo(() => { const seen: string[] = []; for (const r of bookRows) { const c = s(r.Category) || 'Settings'; if (!seen.includes(c)) seen.push(c) } return seen }, [bookRows])
+  const [tab, setTab] = useState(categories[0] ?? '')
+  const current = tab || categories[0] || ''
+  const rows = bookRows.filter((r) => (s(r.Category) || 'Settings') === current)
+  const renderedQ = useQuery({ queryKey: ['rendered', revision], queryFn: () => getText(`/api/v1/settings/${revision}/rendered`), staleTime: 60_000, enabled: parsed.length > 0 })
   const unmatched = parseError && /not in the template: ([^;]+)/.exec(parseError)?.[1]
   return (
     <Panel title={`Settings · ${template.name}`} actions={<>{parseStatus && <Pill tone={parseStatus === 'Parsed' ? 'good' : parseStatus === 'Partial' ? 'warn' : 'neutral'}>{parseStatus}</Pill>}
       {parsed.length > 0 && <a className="text-xs text-sky-300 underline" href={`/api/v1/settings/${revision}/rendered`} target="_blank" rel="noopener">the settings file as the platform writes it</a>}</>}>
       {unmatched && <Status bad>Names in the filed text that the template does not know: {unmatched}</Status>}
-      {msg && <Status bad={msg.bad}>{msg.text}</Status>}
-      {editable && <Status>Outstanding revision: a value saves when you leave the field (audited as your change). The platform writes the settings file from these values when the settings step of the change commits.</Status>}
       <Tabs tabs={categories.map((c) => ({ key: c, label: c.length > 42 ? c.slice(0, 40) + '…' : c }))} value={current} onChange={setTab} />
-      <div className="mt-2"><DataGrid rows={rows} columns={cols} rowKey={(r) => s(r.SettingCode)} emptyText="No settings in this group." /></div>
+      <SettingsGrid rows={rows} values={values} revision={revision} editable={editable} deviceId={deviceId} />
       <details className="mt-3">
         <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wide text-slate-400">Relay listing and the file</summary>
         <div className="mt-2 grid gap-3 lg:grid-cols-2">
@@ -113,18 +131,16 @@ function listing(rows: Row[], values: Map<string, Row>): string {
   return lines.join('\n')
 }
 
-/** Everything the template gives a record: functions, inputs, settings by function. Falls back to the plain parsed grid when the model has no template. */
+/** Everything the template gives a record's Settings tab: the settings by function. Falls back to the plain parsed grid when the model has no template.
+ * The function chips (2026-09-18) and the Inputs panel (#200) that sat above the book are gone: the owner wanted neither there. */
 export default function DeviceSettings({ r, revision, filedText, editable = false }: { r: Row; revision: string; filedText: string | null; editable?: boolean }) {
   const tq = useTemplate(s(r.ModelId) || null)
   const parsedQ = useViewAll('document', 'vParsedSettingNamed', { ConfigurationFileRevisionRowId: revision }, 'DisplayOrder')
   const parsed = parsedQ.data ?? []
-  const values = useMemo(() => new Map(parsed.map((p) => [s(p.SettingCode), p])), [parsed])
   if (tq.isPending) return <Status>Loading the template…</Status>
   if (!tq.data) return null
   return (
     <>
-      {/* the function chips that sat here were removed 2026-09-18 — the owner: "not sure I see the use of the tags at top of the Settings tab" */}
-      <InputsPanel template={tq.data} values={values} />
       <SettingsByFunction template={tq.data} parsed={parsed} parseStatus={s(r.ParseStatus)} parseError={s(r.ParseError)} revision={revision} filedText={filedText} editable={editable} deviceId={s(r.DeviceEntityId)} />
     </>
   )
