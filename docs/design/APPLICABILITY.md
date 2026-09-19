@@ -13,6 +13,10 @@ them.
 
 Conventions the charts share (rulings on record in `docs/decisions/DECISION-LOG.md`):
 
+- **Nothing here is from memory** (the owner, 2026-09-19: *"when dealing with compliance, never go by memory, all must be
+  verified against the particular standard in question"*). A box states what a standard says only when that standard's
+  text, in the version in force in New Brunswick, was read and the clause is named. A layer the standard is believed to
+  have but whose text has not been read is a **to read** box: it names the document to open, not what it says.
 - **Applicability comes from the primary asset and the device's own nature** (#171, memory
   `feedback-applicability-from-primary-assets`): the element the scheme protects carries the BES status, the PRC-023 listing
   and the A-10 declaration; the building carries the CIP impact rating (#195); the device carries what only it can — its
@@ -34,8 +38,9 @@ flowchart TD
     E -->|unrecorded| U1[undetermined]
     BCA --> R{device.location.classification.CipImpactRating<br/>the BUILDING the device is in, #195}
     R -->|High or Medium| CIP[CIP-004 R2 R4 · CIP-006 R1 · CIP-007 R1-R5 · CIP-010 R1-R3 · CIP-011 R1]
-    R -->|Low| LOW[open: the low-impact requirements CIP-003 R2]
+    R -->|Low| LOW[to read: whether a Low rating carries requirements of its own — CIP-003, not in the seed; its NB version not yet recorded]
     R -->|no building rated| U2[undetermined]
+    CIP --> PARTS[to read: whether ERC selects requirement parts within CIP-005 / 007 / 010 — from those standards' texts]
     CIP --> ERC{device.classification.ExternalRoutableConnectivity<br/>recorded by hand}
     ERC -->|ERC| C5[CIP-005 R1]
     ERC -->|No ERC| C5N[CIP-005 R1 does not apply]
@@ -55,8 +60,10 @@ any device which is located on the same network, whether or not it is impactful,
 devices would be categorized as PCA (protected cyber asset) since … if they were compromised, that would be a door into the
 BCAs which are on the same network."* The platform has the facts a PCA layer needs in outline — `network.port`,
 `network.vlan`, `network.services` on a device, and `device.connections` — but no rule reads them for this yet and no
-classification kind `ProtectedCyberAsset` exists. Also open: the ERC qualifiers that select requirement *parts* within
-CIP-005/007/010 (the research of 2026-09-19: ERC narrows parts, not whole requirements), and the low-impact family.
+classification kind `ProtectedCyberAsset` exists. To read before anything is built on them: whether external routable
+connectivity selects requirement *parts* within CIP-005/007/010 (the note of 2026-09-19 that said so was from memory and
+does not count), and what a Low impact rating carries (CIP-003). The PCA definition itself is to be read from the NERC
+Glossary and CIP-002 before a rule is written; the owner's description above is the requirement, not the text.
 
 ## PRC-023-6 (transmission relay loadability)
 

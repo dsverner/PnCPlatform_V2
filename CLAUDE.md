@@ -26,6 +26,11 @@ These held across every predecessor and hold here.
   so contractors and departed staff stay attributable.
 - **Granular access control.** Role and permission based, fine-grained. Read scope is as strict as
   write scope — the breadth of information held makes visibility itself a security concern.
+- **Compliance is never from memory.** Owner, 2026-09-19: *"when dealing with compliance, never go by memory, all must be
+  verified against the particular standard in question."* Any statement about what a standard requires, includes, excludes
+  or applies to — a rule's scope, a seeded requirement text, a flowchart box, a sentence in a reply — is read from the text
+  of that standard in the version in force here, and the source is named (the document, the clause). What has not been read
+  this way is not written down as the standard's; if it must be mentioned, it is marked as unread and is not built on.
 - **Credentials never in source.** Externalise to ignored config. `.gitignore` already covers
   `connection.ini`, `server.ini`, `dev.local`, `.env`.
 
