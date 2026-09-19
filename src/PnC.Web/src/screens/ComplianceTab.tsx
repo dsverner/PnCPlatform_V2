@@ -132,7 +132,7 @@ export default function ComplianceTab({ r }: { r: Row }) {
         <ClassificationPanel title="This device" subjectKind="Asset" subjectEntityId={device} editable={can('Asset.Modify')} kinds={DEVICE_KINDS}
           reasons={{ BesCyberAsset: besCyberAssetNote(r, protectsQ.data, bca, report) }}
           note="Whether the device is a BES Cyber Asset is derived, not judged (the owner, 2026-09-17): a microprocessor-based device protecting a BES element is one, so it is stated here with its basis and no control. External routable connectivity is recorded by hand until a network-analysis module can determine it. The impact rating is the location's, beside it." />
-        <Inherited r={r} />
+        <Inherited r={r} bca={s(bca?.ClassificationValue)} />
       </div>
       <Obligations r={r} report={report} />
       <Evaluate device={device} report={report} setReport={setReport} />
@@ -142,7 +142,7 @@ export default function ComplianceTab({ r }: { r: Row }) {
 
 /** What the device inherits: the location's CIP impact rating, and the protected primary asset's BES / PRC-023 and the bus's NPCC.
  * #173: a classification that does not apply to the protected asset's type is not shown at all — a bus has no PRC-023 line. */
-function Inherited({ r }: { r: Row }) {
+function Inherited({ r, bca }: { r: Row; bca: string }) {
   const navigate = useNavigate()
   const cipQ = useLocationCip(s(r.PositionNodeEntityId), s(r.DeviceEntityId))
   const protectsQ = useProtectedAssets(s(r.SchemeEntityId))
@@ -158,14 +158,17 @@ function Inherited({ r }: { r: Row }) {
     <Panel title="Inherited">
       <dl className="space-y-2 text-sm">
         <div className="grid grid-cols-[13rem_1fr] items-start gap-2">
-          <dt className="text-slate-400">CIP impact rating (location)</dt>
+          <dt className="text-slate-400">CIP impact rating</dt>
           <dd className="min-w-0">
+            {/* #196 follow-up (owner, 2026-09-19): the rating is the device's only when the device is a BES Cyber Asset; the
+                MCGG22's page read "Medium" though it is electromechanical — the building's rating shown as if it were the relay's */}
             {cipQ.isPending ? <span className="text-slate-500">…</span>
               : !cip ? <span className="text-slate-500">the device is not placed anywhere, so it inherits no rating</span>
-              : cip.value ? <><Pill tone={cip.value === 'High' ? 'bad' : cip.value === 'Medium' ? 'warn' : 'neutral'}>{cip.value}</Pill>
-                  <span className="ml-2">— recorded on <NodeLink id={cip.nodeId} name={cip.nodeName} /> <span className="text-xs text-slate-500">{cip.nodeType}{cip.at ? ' · ' + fmtWhen(cip.at) : ''}</span></span></>
-              : <span className="text-slate-500">not recorded on this device's position or on anything above it</span>}
-            <div className="text-xs text-slate-600">CIP-002: the nearest classified location of the device's placement, the position itself included — a rating on the building beats the station's, which is what the rules read (#173).</div>
+              : !cip.value ? <span className="text-slate-500">no building above this device's position carries a rating</span>
+              : bca === 'Not BCA' ? <span className="text-slate-300">Not applicable — not a BES Cyber Asset. <span className="text-slate-500">The building <NodeLink id={cip.nodeId} name={cip.nodeName} /> is rated {cip.value}; that applies to the cyber assets it houses, not to this relay.</span></span>
+              : <><Pill tone={cip.value === 'High' ? 'bad' : cip.value === 'Medium' ? 'warn' : 'neutral'}>{cip.value}</Pill>
+                  <span className="ml-2">— {bca === 'BCA' ? 'a BES Cyber Asset in' : 'the rating of'} <NodeLink id={cip.nodeId} name={cip.nodeName} /> <span className="text-xs text-slate-500">{cip.nodeType}{cip.at ? ' · ' + fmtWhen(cip.at) : ''}{bca === 'BCA' ? '' : ' · cyber status not derived yet — evaluate below'}</span></span></>}
+            <div className="text-xs text-slate-600">CIP-002: the building's rating, taken by the BES Cyber Assets it houses (#173, #195); whether this device is one is derived above.</div>
           </dd>
         </div>
         <div className="grid grid-cols-[13rem_1fr] items-start gap-2">
