@@ -548,7 +548,7 @@ def main():
     prim = q("DECLARE @e UNIQUEIDENTIFIER; EXEC asset.Asset_Add @AssetTypeCode=?, @Name=?, @Status=N'InService', @ManufacturerEntityId=?, @ActorId=?, @EntityId=@e OUTPUT; SELECT @e", W3r + "_p", W3r + " line", org3r, SYSTEM_ACTOR)[0][0]
     wire = q("DECLARE @e UNIQUEIDENTIFIER; EXEC asset.Asset_Add @AssetTypeCode=?, @Name=?, @Status=N'InService', @ManufacturerEntityId=?, @ActorId=?, @EntityId=@e OUTPUT; SELECT @e", W3r + "_p", W3r + " wire", org3r, SYSTEM_ACTOR)[0][0]
     regr = add_node("Region", None, W3r + " region"); str_ = add_node("Station", regr, W3r + " station"); bldr = add_node("Building", str_, W3r + " b")
-    panr = add_node("Panel", bldr, W3r + " panel"); dpr = add_node("DevicePosition", panr, W3r + " dp", "Relay"); pfr = add_node("ProtectionFunction", dpr, W3r + " 21")
+    panr = add_node("Panel", bldr, W3r + " panel"); dpr = add_node("DevicePosition", panr, W3r + " dp", "Relay")   # #181: no ProtectionFunction node under a position any more — the function is the relay's, at the position
     tbr = add_node("TerminalBlock", panr, W3r + " tb"); st1 = add_node("Stud", tbr, W3r + " s1"); st2_ = add_node("Stud", tbr, W3r + " s2")
     cur.execute("EXEC asset.PlaceAsset @AssetEntityId=?, @NodeEntityId=?, @PlacementKind=N'Installed', @ActorId=?", devr, dpr, SYSTEM_ACTOR)
     # #9 connection rules per realisation
@@ -573,7 +573,7 @@ def main():
     schr = q("DECLARE @e UNIQUEIDENTIFIER; EXEC scheme.Scheme_Add @SchemeTypeDefinitionVersionRowId=?, @Name=?, @Status=N'InService', @ActorId=?, @EntityId=@e OUTPUT; SELECT @e", stype3[0][0], W3r + " scheme", SYSTEM_ACTOR)[0][0]
     check(expect_error(cur, "EXEC scheme.AddSchemeMember @SchemeEntityId=?, @MemberKind=N'ProtectionFunction', @MemberEntityId=?, @MemberRoleCode=N'EndA', @ActorId=?", schr, panr, SYSTEM_ACTOR, contains="ProtectionFunction node"), "AddSchemeMember: a ProtectionFunction member must be a node of that type (§7.2)")
     check(expect_error(cur, "EXEC scheme.AddSchemeMember @SchemeEntityId=?, @MemberKind=N'Channel', @MemberEntityId=?, @MemberRoleCode=N'Channel', @ActorId=?", schr, str(uuid.uuid4()), SYSTEM_ACTOR, contains="channel asset"), "AddSchemeMember: a Channel member must be a current asset")
-    sm1 = q("DECLARE @e UNIQUEIDENTIFIER; EXEC scheme.AddSchemeMember @SchemeEntityId=?, @MemberKind=N'ProtectionFunction', @MemberEntityId=?, @MemberRoleCode=N'EndA', @ActorId=?, @EntityId=@e OUTPUT; SELECT @e", schr, pfr, SYSTEM_ACTOR)[0][0]
+    sm1 = q("DECLARE @e UNIQUEIDENTIFIER; EXEC scheme.AddSchemeMember @SchemeEntityId=?, @MemberKind=N'Asset', @MemberEntityId=?, @MemberRoleCode=N'EndA', @ActorId=?, @EntityId=@e OUTPUT; SELECT @e", schr, devr, SYSTEM_ACTOR)[0][0]   # #176/#181: the relay itself is the member
     sm2 = q("DECLARE @e UNIQUEIDENTIFIER; EXEC scheme.AddSchemeMember @SchemeEntityId=?, @MemberKind=N'Connection', @MemberEntityId=?, @MemberRoleCode=N'TripCircuit', @ActorId=?, @EntityId=@e OUTPUT; SELECT @e", schr, wcx, SYSTEM_ACTOR)[0][0]
     # FORMULA-GRAMMAR.md §4.2 / PROCEDURES.md #35: a parameterised fact read through the interpreter on real rows
     import formula as FG
@@ -583,8 +583,8 @@ def main():
     check(r == {"k": "bool", "v": True}, f"the engine: a lambda over scheme.members binds its variable ({r})")
     r = ev("count(scheme.members[role='Nope'])", schr)
     check(r == {"k": "num", "v": "0"}, f"the engine: no member in that role is an empty set, not Unknown ({r})")
-    exp = {r[0]: (lo(r[1]) if r[1] else None, lo(r[2]) if r[2] else None) for r in q("SELECT MemberKind, ResolvedDeviceEntityId, ConnectionEntityId FROM scheme.vSchemeExpanded WHERE SchemeEntityId = ?", schr)}
-    check(exp.get("ProtectionFunction") == (lo(devr), None) and exp.get("Connection") == (None, lo(wcx)), f"vSchemeExpanded resolves the function to the device installed at its position and the connection to itself ({exp})")
+    exp = {r[0]: (lo(r[1]) if r[1] else None, lo(r[2]) if r[2] else None) for r in q("SELECT MemberKind, ResolvedAssetEntityId, ConnectionEntityId FROM scheme.vSchemeExpanded WHERE SchemeEntityId = ?", schr)}
+    check(exp.get("Asset") == (lo(devr), None) and exp.get("Connection") == (None, lo(wcx)), f"vSchemeExpanded resolves the relay member to itself and the connection to itself ({exp})")
     cur.execute("EXEC scheme.SchemeProtects_Add @SchemeEntityId=?, @PrimaryAssetEntityId=?, @ZoneRole=N'Primary', @ActorId=?", schr, prim, SYSTEM_ACTOR)
     # #14 in-service opener; #16 approval segregation; #1 warn-and-log
     dcls3 = q("SELECT TOP (1) EntityId FROM config.vDefinition WHERE DefinitionKind = N'CharacteristicSchema.DocumentClass'")
@@ -690,7 +690,7 @@ def main():
     cur.execute("EXEC device.Device_SoftDelete @EntityId=?, @ActorId=?", devr, SYSTEM_ACTOR)
     for a_ in (devr, prim, wire):
         cur.execute("EXEC asset.Asset_SoftDelete @EntityId=?, @ActorId=?", a_, SYSTEM_ACTOR)
-    for n_ in (st1, st2_, tbr, pfr, dpr, panr, bldr, str_, regr):
+    for n_ in (st1, st2_, tbr, dpr, panr, bldr, str_, regr):   # #181: no function node to retract
         cur.execute("EXEC location.Node_SoftDelete @EntityId=?, @ActorId=?", n_, SYSTEM_ACTOR)
     cur.execute("EXEC party.Entity_SoftDelete @EntityId=?, @ActorId=?", org3r, SYSTEM_ACTOR)
     for t_ in (W3r, W3r + "_p"):
@@ -961,7 +961,7 @@ def main():
     check(ev("count(device.advisories[open=true])", dev4) == {"k": "num", "v": "1"} and ev("count(device.advisories[open=true])", dev4b) == {"k": "num", "v": "1"}, "fact device.advisories[open=true] lists an advisory scoped to the device's model, for every device of that model (#35)")
     cur.execute("DECLARE @t DATETIMEOFFSET(7) = SYSDATETIMEOFFSET(); EXEC device.AdvisoryDisposition_Add @AdvisoryEntityId=?, @DeviceEntityId=?, @Applicability=N'Applicable', @AssessedByActorId=?, @AssessedAt=@t, @Action=N'Patch', @CompletedAt=@t, @ActorId=?", adv, dev4, SYSTEM_ACTOR, SYSTEM_ACTOR)
     check(ev("count(device.advisories[open=true])", dev4) == {"k": "num", "v": "0"} and ev("count(device.advisories[open=false])", dev4) == {"k": "num", "v": "1"} and ev("count(device.advisories[open=true])", dev4b) == {"k": "num", "v": "1"}, "a completed disposition closes the advisory for that device only (#35)")
-    check(ev("function.logical_node", pfr).get("k") == "unk", "fact function.logical_node is Unknown when the function cites no logical node")
+    check(ev("function.logical_node", dpr).get("k") == "unk", "fact function.logical_node is Unknown when the function cites no logical node")   # #181: the function's node is the device position
     # a Person-scoped obligation rule end to end (decision 56)
     cur.execute("EXEC compliance.Standard_Upsert @StandardCode=?, @IssuingEntityEntityId=?, @Subject=N'smoke', @ActorId=?", W4r[-8:], org4r, SYSTEM_ACTOR)
     sv4r = q("DECLARE @e UNIQUEIDENTIFIER, @r UNIQUEIDENTIFIER; EXEC compliance.StandardVersion_Add @StandardCode=?, @VersionLabel=N'1', @ActorId=?, @EntityId=@e OUTPUT, @RowId=@r OUTPUT; SELECT @r", W4r[-8:], SYSTEM_ACTOR)[0][0]
@@ -1463,6 +1463,16 @@ def main():
         de = q("SELECT EntityId FROM config.vDefinition WHERE DefinitionKey=?", kk)[0][0]
         cur.execute("EXEC config.Definition_SoftDelete @EntityId=?, @ActorId=?", de, SYSTEM_ACTOR)
         cur.execute("UPDATE config.DefinitionVersion SET IsDeleted=1, DeletedBy=?, DeletedAt=SYSDATETIMEOFFSET() WHERE DefinitionEntityId=(SELECT EntityId FROM config.Definition WHERE DefinitionKey=? AND IsDeleted=1)", SYSTEM_ACTOR, kk)
+    # ---- cleanup (2026-09-19): the smoke's own standards leave the Standards screen — the owner found 30 throwaway
+    # standards (4_xxxxxx, r_xxxxxx, one requirement each) on Compliance > Standards after fifteen deploys. Soft deletes and
+    # a deactivation, attributed; the audit rows stay.
+    for (req, sv, code) in ((req3, sv3, W3r[-8:]), (req4, sv4, W4[-8:]), (req4r, sv4r, W4r[-8:])):   # W4r: the person-scoped rule's standard
+        cur.execute("EXEC compliance.Requirement_SoftDelete @EntityId=?, @ActorId=?", req, SYSTEM_ACTOR)
+        sve = q("SELECT EntityId FROM compliance.StandardVersion WHERE RowId=?", sv)[0][0]
+        cur.execute("EXEC compliance.StandardVersion_SoftDelete @EntityId=?, @ActorId=?", sve, SYSTEM_ACTOR)
+        cur.execute("EXEC compliance.Standard_Deactivate @StandardCode=?, @ActorId=?", code, SYSTEM_ACTOR)
+    left = q("SELECT COUNT(*) FROM compliance.vRequirementDetail WHERE StandardCode IN (?, ?, ?) OR Subject = N'smoke'", W3r[-8:], W4[-8:], W4r[-8:])[0][0]
+    check(left == 0, "the smoke's own standards are withdrawn from the Standards list (soft delete; audit kept)")
     print("SMOKE " + ("PASS" if not fails else f"FAIL ({len(fails)})"))
     sys.exit(0 if not fails else 1)
 

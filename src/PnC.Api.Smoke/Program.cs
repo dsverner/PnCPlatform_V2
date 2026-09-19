@@ -1208,6 +1208,20 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
             var (k185_t1s, k185_t1b) = await Get(readOnly!, "api/v1/config/vAssetTemplate?DefinitionKey=SEL221F_Template&take=10");
             var k185_tmpl = (k185_t1b?["rows"] as JsonArray) ?? [];
             var (k185_r1s, k185_r1b) = await Get(readOnly!, "api/v1/compliance/vRequirementDetail?StandardCode=NPCC-D4&take=100");
+            // #194 (2026-09-19): the eight legacy classification fields are gone — the template's Effective version has no Classification
+            // group and a migrated record's summary no longer carries CLASS=
+            var (k194_ds, k194_db) = await Get(readOnly!, "api/v1/config/vDefinition?DefinitionKind=CharacteristicSchema.RecordTemplate&DefinitionKey=SETTINGS_RECORD&take=1");
+            var (k194_vs, k194_vb) = await Get(readOnly!, $"api/v1/config/vDefinitionVersion?DefinitionEntityId={Id((k194_db?["rows"] as JsonArray)?.FirstOrDefault())}&Status=Effective&take=5");
+            var k194_ver = (k194_vb?["rows"] as JsonArray)?.OrderByDescending(r => (int?)r?["VersionNumber"] ?? 0).FirstOrDefault();
+            var (k194_cs, k194_cb) = await Get(readOnly!, $"api/v1/config/vCharacteristicDefinition?DefinitionVersionRowId={k194_ver?["RowId"]}&take=50");
+            var k194_groups = (k194_cb?["rows"] as JsonArray)?.Select(r => r?["DisplayGroup"]?.ToString()).Distinct().ToList() ?? new();
+            var (k194_rs, k194_rb) = await Get(admin, "api/v1/record/vRecord?RecordKindCode=ConfigurationFileRevision&take=200");
+            var k194_class = (k194_rb?["rows"] as JsonArray)?.Count(r => (r?["Summary"]?.ToString() ?? "").Contains("CLASS=")) ?? -1;
+            Must(k194_ds == HttpStatusCode.OK && k194_cs == HttpStatusCode.OK && k194_groups.Count == 1 && k194_groups[0] == "Instrument transformers" && k194_rs == HttpStatusCode.OK && k194_class == 0,
+                $"#194: SETTINGS_RECORD v{k194_ver?["VersionNumber"]} carries only the instrument-transformer group ({string.Join(", ", k194_groups)}); no migrated summary carries CLASS= ({k194_class} of {(k194_rb?["rows"] as JsonArray)?.Count})");
+            // 2026-09-19: the schema smoke withdraws its own standards; none of its "smoke" subjects is on the Standards list
+            var (k193_ss, k193_sb) = await Get(readOnly!, "api/v1/compliance/vRequirementDetail?Subject=smoke&take=10");
+            Must(k193_ss == HttpStatusCode.OK && ((k193_sb?["rows"] as JsonArray)?.Count ?? -1) == 0, $"the Standards list carries no smoke-fixture standard ({(k193_sb?["rows"] as JsonArray)?.Count})");
             var k185_d4 = (k185_r1b?["rows"] as JsonArray)?.Count ?? -1;
             var k185_menus = new Dictionary<string, string>();
             foreach (var key in new[] { "DEVICE_TEMPLATES", "STANDARDS", "OBLIGATION_RULES" })

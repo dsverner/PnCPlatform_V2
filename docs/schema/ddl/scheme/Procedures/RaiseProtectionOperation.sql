@@ -90,6 +90,10 @@ BEGIN
     FROM @members m
     JOIN [location].[vNode] fn ON m.[MemberKind] = N'ProtectionFunction' AND fn.[EntityId] = m.[MemberEntityId]
     JOIN [asset].[fPlacementAsOf](@OccurredAt, @believed) pl ON pl.[NodeEntityId] = fn.[ParentEntityId] AND pl.[PlacementKind] = N'Installed' AND pl.[IsDeleted] = 0;
+    -- #193 (2026-09-19): since #176/#181 a scheme's relay is an Asset member (the function is the relay's, at its position, no node);
+    -- the in-service settings of those relays are snapshotted too. Found by the schema smoke once it ran again (dead since #181).
+    INSERT @devices SELECT DISTINCT m.[MemberEntityId] FROM @members m
+    WHERE m.[MemberKind] = N'Asset' AND NOT EXISTS (SELECT 1 FROM @devices d WHERE d.[DeviceEntityId] = m.[MemberEntityId]);
 
     DECLARE @snap TABLE ([SubjectKind] NVARCHAR(40), [SubjectRowId] UNIQUEIDENTIFIER);
     INSERT @snap SELECT N'SchemeMember', [RowId] FROM @members;
