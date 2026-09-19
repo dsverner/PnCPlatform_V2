@@ -6,6 +6,15 @@
 html { font-size: 15px; }
 body { @apply bg-slate-950 text-slate-200 antialiased; }
 
+/* Owner, 2026-09-19: the explaining text was too dim — "the two types of grey text". The dark theme's secondary greys
+   (slate-400 for labels and notes, slate-500 for asides, slate-600 for the faintest hints) are lifted three steps of
+   lightness each; the white text and the layout are untouched. Tailwind's defaults were 0.704 / 0.554 / 0.446. */
+@theme {
+  --color-slate-400: oklch(0.82 0.03 256.8);
+  --color-slate-500: oklch(0.72 0.036 257.4);
+  --color-slate-600: oklch(0.60 0.04 257.3);
+}
+
 @media (prefers-color-scheme: light) {
   :root {
     --color-slate-950: oklch(0.984 0.003 247.858);
