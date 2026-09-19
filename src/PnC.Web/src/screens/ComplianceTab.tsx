@@ -63,7 +63,8 @@ export function useProtectedAssets(schemeEntityId: string) {
       const cls = (await view('asset', 'vClassification', { SubjectKind: 'Asset', SubjectEntityId: s(a.EntityId) }, { take: 50 })).rows
       const valueOf = (code: string) => cls.find((c) => s(c.ClassificationKindCode) === code)?.ClassificationValue ?? null
       out.push({ ...a, ZoneRole: l.ZoneRole, TerminalNo: term?.TerminalNo, TerminalStation: term?.StationName, TerminalStationId: term?.StationNodeEntityId,
-        BusName: term?.BusName, BusNpcc: term?.BusNpcc, HasTerminal: !!term, BesStatus: valueOf('BesStatus'), Prc023: valueOf('Prc023') })
+        BusName: term?.BusName, BusNpcc: term?.BusNpcc, HasTerminal: !!term, BesStatus: valueOf('BesStatus'), Prc023: valueOf('Prc023'),
+        Npcc: valueOf('NpccBulkPowerSystem') })   // #196: the element's own A-10 declaration, entered by hand for now; the bus's stands in when it has none
     }
     return out
   } })
@@ -181,7 +182,8 @@ function Inherited({ r }: { r: Row }) {
                       {!inherited(a).length && <span className="text-slate-500">no applicability classification applies to a {s(a.AssetTypeName).toLowerCase()}</span>}
                     </div>
                     <div className="ml-3 text-xs text-slate-400">
-                      {a.HasTerminal ? <>from terminal {s(a.TerminalNo)} · {a.TerminalStationId ? link('LOCATION', s(a.TerminalStationId), s(a.TerminalStation)) : s(a.TerminalStation)} · {a.BusName ? <>bus {s(a.BusName)} — NPCC {s(a.BusNpcc) || 'not recorded'}</> : 'no bus linked at that end'}</>
+                      {a.Npcc ? <span className="text-sky-300">NPCC {s(a.Npcc)} — declared on the {s(a.AssetTypeName).toLowerCase() || 'element'} (#196) · </span> : null}
+                      {a.HasTerminal ? <>from terminal {s(a.TerminalNo)} · {a.TerminalStationId ? link('LOCATION', s(a.TerminalStationId), s(a.TerminalStation)) : s(a.TerminalStation)} · {a.BusName ? <>bus {s(a.BusName)} — NPCC {s(a.BusNpcc) || 'not recorded'}{a.Npcc ? ' (the element\'s declaration rules)' : ''}</> : 'no bus linked at that end'}</>
                         : <span className="text-slate-500">the protects link names no terminal end, so no bus NPCC is inherited</span>}
                     </div>
                   </li>))}</ul>}

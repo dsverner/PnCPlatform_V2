@@ -78,14 +78,26 @@ BEGIN
           AND c.[ClassificationKindCode] = SUBSTRING(@factName, CHARINDEX(N'.classification.', @factName) + 16, 40)
           AND c.[IsDeleted] = 0 AND c.[ValidFrom] <= @at AND (c.[ValidTo] IS NULL OR c.[ValidTo] > @at)
         ORDER BY c.[ValidFrom] DESC, c.[RowSeq] DESC;
-    -- inherited from the primary asset the device's scheme protects (BES status, the PRC-023 list)
+    -- inherited from the primary asset the device's scheme protects (BES status, the PRC-023 list, the A-10 declaration)
     ELSE IF @factName LIKE N'device.protects.classification.%'
+    BEGIN
         SELECT TOP (1) @v = c.[ClassificationValue] FROM [asset].[Classification] c
         WHERE c.[SubjectKind] = N'Asset'
           AND c.[SubjectEntityId] = (SELECT TOP (1) dp.[PrimaryAssetEntityId] FROM [compliance].[fDeviceProtects](@subjectEntityId, @at) dp)
           AND c.[ClassificationKindCode] = SUBSTRING(@factName, CHARINDEX(N'.classification.', @factName) + 16, 40)
           AND c.[IsDeleted] = 0 AND c.[ValidFrom] <= @at AND (c.[ValidTo] IS NULL OR c.[ValidTo] > @at)
         ORDER BY c.[ValidFrom] DESC, c.[RowSeq] DESC;
+        -- #196 (owner, 2026-09-19): the A-10 classification is entered by hand on the protected ELEMENT until the studies group's
+        -- bus database and a connectivity model exist. An element with no declaration of its own takes its bus's (the bus at the
+        -- terminal the scheme protects from) — what A-10 connectivity means; a declaration on the element wins.
+        IF @v IS NULL AND @factName = N'device.protects.classification.NpccBulkPowerSystem'
+            SELECT TOP (1) @v = c.[ClassificationValue] FROM [asset].[Classification] c
+            WHERE c.[SubjectKind] = N'Asset'
+              AND c.[SubjectEntityId] = (SELECT TOP (1) dp.[BusAssetEntityId] FROM [compliance].[fDeviceProtects](@subjectEntityId, @at) dp)
+              AND c.[ClassificationKindCode] = N'NpccBulkPowerSystem'
+              AND c.[IsDeleted] = 0 AND c.[ValidFrom] <= @at AND (c.[ValidTo] IS NULL OR c.[ValidTo] > @at)
+            ORDER BY c.[ValidFrom] DESC, c.[RowSeq] DESC;
+    END
     -- the voltage at that terminal end, in kV (the catalogue row carries the unit); the terminal's voltage class, not the asset's
     ELSE IF @factName = N'device.protects.terminal.voltage'
         SELECT TOP (1) @v = CONVERT(NVARCHAR(400), dp.[NominalKv]) FROM [compliance].[fDeviceProtects](@subjectEntityId, @at) dp;

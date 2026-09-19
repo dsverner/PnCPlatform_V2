@@ -64,7 +64,7 @@ PRC_RULES = [
      "the Prc023 classification of the protected asset). NB appendix PRC-023-6-NB-0: no modification."),
     # #184: NPCC Directory 4 attaches to every relay protecting a bus the A-10 study declares BPS. One rule, pointing at the
     # Directory's general criterion R5.1; the Compliance tab lists the whole Directory as reading material beneath it.
-    ("npcc_d4", "NPCC-D4", "R5.1", "device.protects.bus.classification.NpccBulkPowerSystem = 'BPS'", "once", NPCC_NOTE),
+    ("npcc_d4", "NPCC-D4", "R5.1", "device.protects.classification.NpccBulkPowerSystem = 'BPS'", "once", NPCC_NOTE),   # #196: the element's declaration, else its bus's
     ("prc023_r3", "PRC-023", "R3", "asset.formula.prc023_criterion = '13'", "once",
      "PRC-023-6 R3: a circuit set by criterion 13 (or 7, 8, 9, 12) uses the calculated circuit capability as the Facility Rating, "
      "with the Planning Authority's, Transmission Operator's and Reliability Coordinator's agreement."),

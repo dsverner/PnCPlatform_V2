@@ -1393,6 +1393,17 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
             var (k184_o2s, k184_o2b) = await Get(admin, $"api/v1/compliance/vObligationSubject?SubjectEntityId={devSel}");
             var k184_openNot = (k184_o2b?["rows"] as JsonArray)?.Where(r => r?["Status"]?.ToString() == "Open").Select(r => r?["RuleDefinitionKey"]?.ToString()).ToList() ?? new();
             var (k184_q1s, _) = await Post(readOnly!, "api/v1/asset/RecordClassification", new { SubjectKind = "Asset", SubjectEntityId = k173_bus, ClassificationKindCode = "NpccBulkPowerSystem", ClassificationValue = "BPS" });
+            // #196 (owner, 2026-09-19): the A-10 declaration is entered on the protected ELEMENT; the bus's stands in when the element has none
+            var (k196_l1s, k196_l1b) = await Post(admin, "api/v1/asset/RecordClassification", new { SubjectKind = "Asset", SubjectEntityId = k173_line, ClassificationKindCode = "NpccBulkPowerSystem", ClassificationValue = "BPS" });
+            var (k196_e1s, _) = await Post(admin, "api/v1/compliance/evaluate", new { subjectEntityId = devSel, mode = "Effective" });
+            var (_, k196_o1b) = await Get(admin, $"api/v1/compliance/vObligationSubject?SubjectEntityId={devSel}");
+            var k196_openLine = (k196_o1b?["rows"] as JsonArray)?.Where(r => r?["Status"]?.ToString() == "Open").Select(r => r?["RuleDefinitionKey"]?.ToString()).ToList() ?? new();
+            var (k196_l2s, _) = await Post(admin, "api/v1/asset/RecordClassification", new { SubjectKind = "Asset", SubjectEntityId = k173_line, ClassificationKindCode = "NpccBulkPowerSystem", ClassificationValue = "" });
+            var (k196_e2s, _) = await Post(admin, "api/v1/compliance/evaluate", new { subjectEntityId = devSel, mode = "Effective" });
+            var (_, k196_o2b) = await Get(admin, $"api/v1/compliance/vObligationSubject?SubjectEntityId={devSel}");
+            var k196_openBack = (k196_o2b?["rows"] as JsonArray)?.Where(r => r?["Status"]?.ToString() == "Open").Select(r => r?["RuleDefinitionKey"]?.ToString()).ToList() ?? new();
+            Must(k196_l1s == HttpStatusCode.OK && k196_e1s == HttpStatusCode.OK && k196_openLine.Contains("npcc_d4") && k196_l2s == HttpStatusCode.OK && k196_e2s == HttpStatusCode.OK && !k196_openBack.Contains("npcc_d4"),
+                $"#196: the line declared BPS (the bus Not BPS) opens npcc_d4 on its relay ({(int)k196_l1s} {Code(k196_l1b)}; open: {string.Join(", ", k196_openLine)}); the declaration withdrawn, the bus's Not BPS stands in and it closes ({string.Join(", ", k196_openBack)})");
             Must(k184_t1s == HttpStatusCode.OK && k184_b1s == HttpStatusCode.OK && k184_e1s == HttpStatusCode.OK && k184_openBps.Contains("npcc_d4")
                  && k184_b2s == HttpStatusCode.OK && k184_e2s == HttpStatusCode.OK && !k184_openNot.Contains("npcc_d4") && k184_q1s == HttpStatusCode.Forbidden,
                 $"#184: the A-10 outcome on the protected bus decides Directory 4 — BPS opens npcc_d4 on the relay ({string.Join(", ", k184_openBps)}), Not BPS closes it ({string.Join(", ", k184_openNot)}), and ReadOnly records nothing ({(int)k184_q1s})");

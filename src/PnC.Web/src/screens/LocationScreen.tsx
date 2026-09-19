@@ -28,7 +28,7 @@
 // where an asset is (§4.4). So a position node shows what is placed at it and offers to place a device there; every
 // other node keeps the read-only list of what is placed beneath it, because asset.PlaceAsset refuses a device anywhere
 // but a DevicePosition or a custody location (50215) and the screen should not offer what the database forbids.
-import { useRef, useState } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router'
 import { ApiError, fmtDate, proc, s, sqlNumber, view, type Row } from '@/lib/api'
@@ -69,6 +69,12 @@ export default function LocationScreen({ params: p, id }: { screen: Screen; para
   const ancestorsQ = useAncestors(r?.Path)
   // #195 follow-up (owner, 2026-09-19): a panel, a position, any node inside a building shows the rating it inherits, read-only, with its source
   const cipAllQ = useViewAll('asset', 'vClassification', { SubjectKind: 'Node', ClassificationKindCode: 'CipImpactRating' }, undefined, !!r && s(r.NodeTypeCode) !== 'Building')
+  // #196 (owner, 2026-09-19): "the final CIP rating will depend on whether the device is a cyber asset or not" — on a position
+  // the placed device's derived BES Cyber Asset status is shown beside the building's rating; the rating applies only to a BCA
+  const placedQ = useViewAll('asset', 'vPlacedAsset', { NodeEntityId: s(r?.EntityId) }, undefined, !!r && POSITION_TYPES.includes(s(r.NodeTypeCode)))
+  const placedId = s(placedQ.data?.[0]?.AssetEntityId)
+  const bcaQ = useViewAll('asset', 'vClassification', { SubjectKind: 'Asset', SubjectEntityId: placedId, ClassificationKindCode: 'BesCyberAsset' }, undefined, !!placedId)
+  const { byId: modelsById } = useModels()
   if (!id) return <Status bad>No location in the address.</Status>
   if (rowQ.isPending) return <Status>Loading the location…</Status>
   if (!r) return <Status bad>No node with that id is readable by you.</Status>
@@ -107,7 +113,16 @@ export default function LocationScreen({ params: p, id }: { screen: Screen; para
                 <Panel title="Applicability classifications">
                   {s(r.NodeTypeCode) !== 'Station' && <Facts cols={1} pairs={[['CIP impact rating', rated
                     ? <span>{s(rated.c!.ClassificationValue)} <span className="text-slate-500">— inherited from <NodeLink id={s(rated.a.EntityId)} name={s(rated.a.Name)} /> ({s(rated.a.NodeTypeCode)})</span></span>
-                    : <span className="text-slate-500">none — no building above this carries a rating yet</span>]]} />}
+                    : <span className="text-slate-500">none — no building above this carries a rating yet</span>],
+                    ...(POSITION_TYPES.includes(s(r.NodeTypeCode)) ? [['Device here', (() => {
+                      const x = placedQ.data?.[0]; if (!x) return <span className="text-slate-500">nothing placed</span>
+                      const tech = s(modelsById.get(s(x.ModelId).toLowerCase())?.Technology)
+                      const bca = bcaQ.data?.[0]?.ClassificationValue
+                      return <span>{s(x.AssetName)} <span className="text-slate-500">({tech || 'technology unknown'})</span> — {bca === 'BCA'
+                        ? <span className="text-amber-200">BES Cyber Asset{rated ? `: ${s(rated.c!.ClassificationValue)} impact, from the building` : ''}</span>
+                        : bca === 'Not BCA' ? <span className="text-slate-300">not a BES Cyber Asset; the building's rating does not apply to it</span>
+                        : <span className="text-slate-500">cyber status not derived yet — evaluate compliance on its settings record</span>}</span>
+                    })()] as [string, ReactNode]] : [])]} />}
                   <Status>The CIP-002 impact rating is recorded on a building — the BES Cyber Systems it houses take it. {s(r.NodeTypeCode) === 'Station' ? 'This station\'s buildings and their ratings are in the list below.' : 'Open the building to change it.'}</Status>
                 </Panel>)
             })()}

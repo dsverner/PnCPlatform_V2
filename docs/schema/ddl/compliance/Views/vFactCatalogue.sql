@@ -112,6 +112,7 @@ FROM [ref].[ClassificationKind] k WHERE k.[IsActive] = 1
   AND EXISTS (SELECT 1 FROM OPENJSON(ISNULL(k.[SubjectKinds], N'[]')) j JOIN [ref].[LocationNodeType] nt ON nt.[NodeTypeCode] = j.[value])   -- #195: any location level a kind is recorded on (a building's CIP rating), not stations only
 UNION ALL
 -- inherited from the primary asset the device's scheme protects, and from the bus at that terminal end
+-- (#196: device.protects.classification.NpccBulkPowerSystem reads the element's own declaration, else its bus's)
 SELECT N'device.protects.classification.' + k.[ClassificationKindCode], N'Fixed', N'device.protects.classification.' + k.[ClassificationKindCode], NULL,
        N'asset', N'vClassification', N'ClassificationValue', N'Text', NULL, N'Device', N'BiTemporal', NULL, NULL, NULL, NULL
 FROM [ref].[ClassificationKind] k WHERE k.[IsActive] = 1
