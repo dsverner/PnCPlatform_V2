@@ -92,6 +92,10 @@ Carried forward from the predecessor, after a run of avoidable mistakes there.
 - **Work in small increments.** Build one thing, show the end state, then continue.
 - **Re-check every figure against its source before writing it down.** One row count was wrong
   once in this project's history and was caught only by re-querying.
+- **A migration decision is a rule, never a hand edit.** Owner, 2026-09-19: the real cutover replays every decision on
+  the client's verified copy of the legacy database. A decision about migrated data goes into `legacy_import.py` (a
+  counted `self.rule`) or a PostDeploy seed carrying a `-- migration-rule:` line; a hand edit on DEV or QA is recorded in
+  `docs/schema/migration/DEV-ONLY-MUTATIONS.json` as not-a-rule; `migration_rules.py` regenerates the register.
 
 ## How to ask the owner anything
 

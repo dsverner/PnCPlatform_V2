@@ -89,7 +89,10 @@ its size. That is the main reason to prefer it over any method that does.
 
 ## 5. The migration mapping
 
-How legacy rows become platform facts. The rules, not the code.
+How legacy rows become platform facts. The rules, not the code. **The current, complete register is generated:
+`docs/schema/migration/MIGRATION-RULES.md` (from the importer's own rule calls, the seeds that act on migrated data, and the
+list of hand edits that are not rules) — #194, owner 2026-09-19: every migration decision is remembered and replayed at the
+real cutover on the client's verified copy.**
 
 | Legacy | Becomes | Rule |
 |---|---|---|
@@ -112,6 +115,7 @@ How legacy rows become platform facts. The rules, not the code.
 | `Type` | Work type | Change · Delete · Add · Verify |
 | `Users` | Persons, not accounts | Stored passwords are **not** migrated. Identity comes from Active Directory |
 | `DESC1-4`, `REMARKS1-5`, `CT_*`, `PT_*` | Characteristics on the revision | Overflow columns become typed characteristic values where a definition exists, free-text notes where not |
+| `CLASS`, `USE`, `RESPONSIBILITY`, `Bulk_Power_Element`, `Protection_Group`, `ELEMENT`, `LINE_TYPE`, `NUMBER OF RELAYS` | **Dropped, counted** | Owner's ruling #194 (2026-09-19): "I do not trust any of the data in those fields". The platform's own facts stand in: model technology, the relay's capabilities, the scheme and what it protects, the A-10 bus classification |
 
 ---
 

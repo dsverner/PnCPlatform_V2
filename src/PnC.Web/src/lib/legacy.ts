@@ -11,8 +11,8 @@ const DETAIL: Record<string, ['notes' | 'mp' | 'it', string]> = {
   REMARKS1: ['notes', 'Remarks 1'], REMARKS2: ['notes', 'Remarks 2'], REMARKS3: ['notes', 'Remarks 3'], REMARKS4: ['notes', 'Remarks 4'], REMARKS5: ['notes', 'Remarks 5'],
   CT_MAIN1: ['it', 'CT main 1'], CT_MAIN2: ['it', 'CT main 2'], CT_MAIN3: ['it', 'CT main 3'], CT_MAIN4: ['it', 'CT main 4'], PT_MAIN: ['it', 'PT main'],
   CT_AUX1: ['it', 'CT aux 1'], CT_AUX2: ['it', 'CT aux 2'], CT_AUX3: ['it', 'CT aux 3'], CT_AUX4: ['it', 'CT aux 4'], PT_AUX: ['it', 'PT aux'],
-  CLASS: ['mp', 'Class'], USE: ['mp', 'Use'], RESPONSIBILITY: ['mp', 'Responsibility'], Bulk_Power_Element: ['mp', 'Bulk power element'], Protection_Group: ['mp', 'Protection group'],
-  ELEMENT: ['mp', 'Element'], LINE_TYPE: ['mp', 'Line type'], 'NUMBER OF RELAYS': ['mp', 'Number of relays'],
+  // #194 (2026-09-19): CLASS, USE, RESPONSIBILITY, Bulk_Power_Element, Protection_Group, ELEMENT, LINE_TYPE and NUMBER OF RELAYS
+  // are no longer read — the owner: "I do not trust any of the data in those fields"; the importer no longer carries them.
 }
 export interface LegacyDetail { notes: [string, string][]; mp: [string, string][]; it: [string, string][] }
 export function legacyDetail(summary: unknown): LegacyDetail {

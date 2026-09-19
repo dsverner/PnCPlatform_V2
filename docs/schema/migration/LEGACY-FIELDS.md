@@ -599,7 +599,7 @@ must skip the dropped `D` records too.
 | `` | 4 |
 | `M` | 3 |
 
-**Meaning:** TODO
+**Meaning:** **Dropped at cutover — untrusted (#194, owner 2026-09-19: "all can go … I do not trust any of the data in those fields").** Not the relay technology: on DEV, MP sits on 286 electromechanical models and EM on 917 microprocessor ones; SS splits 1,638 / 1,529. Meaning never established.
 
 **Notes:**
 
@@ -616,7 +616,7 @@ must skip the dropped `D` records too.
 | `A` | 212 |
 | `R` | 139 |
 
-**Meaning:** TODO
+**Meaning:** **Dropped at cutover — untrusted (#194, owner 2026-09-19: "all can go … I do not trust any of the data in those fields").** By the models it sits on it reads as a device function class (M protection relays, T timers, D differentials, B breaker failure, A auxiliaries, R reclosers) — the platform's per-relay capability checklist (#181) is finer and true per device.
 
 **Notes:**
 
@@ -633,7 +633,7 @@ must skip the dropped `D` records too.
 | `Grand Falls` | 1,509 |
 | `All` | 25 |
 
-**Meaning:** TODO
+**Meaning:** **Dropped at cutover — untrusted (#194, owner 2026-09-19: "all can go … I do not trust any of the data in those fields").** The five regional offices (plus "All" and typos); 142 of 223 stations carry more than one across their records, so it was per record, not per station.
 
 **Notes:**
 
@@ -646,7 +646,7 @@ must skip the dropped `D` records too.
 | `False` | 11,185 |
 | `True` | 3,025 |
 
-**Meaning:** TODO
+**Meaning:** **Dropped at cutover — untrusted (#194, owner 2026-09-19: "all can go … I do not trust any of the data in those fields").** The platform's fact is the NPCC A-10 classification on the protected bus (#170, #184); this flag is not used to seed it.
 
 **Notes:**
 
@@ -660,7 +660,7 @@ must skip the dropped `D` records too.
 | `A` | 2,889 |
 | `B` | 2,108 |
 
-**Meaning:** TODO
+**Meaning:** **Dropped at cutover — untrusted (#194, owner 2026-09-19: "all can go … I do not trust any of the data in those fields").** A/B agree with the scheme name (…A-PROT / …B-PROT) about 85 % of the time and disagree otherwise; the scheme is the home of a group, when one is recorded.
 
 **Notes:**
 
@@ -677,7 +677,7 @@ must skip the dropped `D` records too.
 | `` | 5 |
 | `T` | 3 |
 
-**Meaning:** TODO
+**Meaning:** **Dropped at cutover — untrusted (#194, owner 2026-09-19: "all can go … I do not trust any of the data in those fields").** L sits on line schemes, Y on transformer (T1/T2) schemes and differential relays, U on underfrequency schemes; the platform's fact is what the scheme protects (SchemeProtects).
 
 **Notes:**
 
@@ -711,7 +711,7 @@ must skip the dropped `D` records too.
 | `0` | 12 |
 | `na` | 4 |
 
-**Meaning:** TODO
+**Meaning:** **Dropped at cutover — untrusted (#194, owner 2026-09-19: "all can go … I do not trust any of the data in those fields").** G/R, only on lines, meaning never established; a line property would belong on the line asset.
 
 **Notes:**
 
@@ -727,7 +727,7 @@ must skip the dropped `D` records too.
 | `0` | 5 |
 | `11` | 1 |
 
-**Meaning:** TODO
+**Meaning:** **Dropped at cutover — untrusted (#194, owner 2026-09-19: "all can go … I do not trust any of the data in those fields").** One settings file for three single-phase relays (the owner, 2026-09-19). In the platform that is one settings-bearing asset with three components (asset.AssetComponent) — a derived count, not a typed one; the legacy count is not migrated.
 
 **Notes:**
 

@@ -1,4 +1,5 @@
 -- #181 (2026-09-17): the commissioned functions move from the protection-function NODE to the device POSITION, and the
+-- migration-rule: #181 a migrated ProtectionFunction node is retired; its commissioned functions point at the device position and the relay itself is the scheme member
 -- nodes are retired. The owner, asked whether to leave them or repoint them: "repoint them".
 --
 -- Why. The importer made one ProtectionFunction node per parenthesised fragment of the legacy FUNCTIONS text, so the

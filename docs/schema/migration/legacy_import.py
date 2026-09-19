@@ -666,8 +666,12 @@ class Importer:
                     except pyodbc.Error as e:
                         flags.append(self.run.flag("InServiceOrder", f"{oldno}/{cr}: SetInService refused ({str(e)[:120]}); left with no in-service period", oldno))
                 # the overflow columns as the record's summary (#140: notes, not characteristics — W7 default)
-                labels = ["SETTINGS2", "DESC1", "DESC2", "DESC3", "DESC4", "REMARKS1", "REMARKS2", "REMARKS3", "REMARKS4", "REMARKS5", "CT_MAIN1", "CT_MAIN2", "CT_MAIN3", "CT_MAIN4", "PT_MAIN", "CT_AUX1", "CT_AUX2", "CT_AUX3", "CT_AUX4", "PT_AUX", "CLASS", "USE", "RESPONSIBILITY", "Bulk_Power_Element", "Protection_Group", "ELEMENT", "LINE_TYPE", "NUMBER OF RELAYS"]
-                extra = "; ".join(f"{l}={strip(v)}" for l, v in zip(labels, d[1:29]) if strip(v) not in (None, "", "0", "False"))
+                # #194 (2026-09-19): CLASS, USE, RESPONSIBILITY, Bulk_Power_Element, Protection_Group, ELEMENT, LINE_TYPE and
+                # NUMBER OF RELAYS (d[21:29]) are not carried — the owner: "I do not trust any of the data in those fields"
+                labels = ["SETTINGS2", "DESC1", "DESC2", "DESC3", "DESC4", "REMARKS1", "REMARKS2", "REMARKS3", "REMARKS4", "REMARKS5", "CT_MAIN1", "CT_MAIN2", "CT_MAIN3", "CT_MAIN4", "PT_MAIN", "CT_AUX1", "CT_AUX2", "CT_AUX3", "CT_AUX4", "PT_AUX"]
+                extra = "; ".join(f"{l}={strip(v)}" for l, v in zip(labels, d[1:21]) if strip(v) not in (None, "", "0", "False"))
+                if any(strip(v) not in (None, "", "0", "False") for v in d[21:29]):
+                    self.rule("legacy classification columns (CLASS, USE, RESPONSIBILITY, Bulk_Power_Element, Protection_Group, ELEMENT, LINE_TYPE, NUMBER OF RELAYS): dropped — untrusted (#194)", oldno)
                 summary = f"Legacy {oldno}, CR {cr}" + (f"; {extra}" if extra else "")
                 (rec, rrow) = self.run.exec("record.Record_Add", outputs=[("EntityId", "UNIQUEIDENTIFIER"), ("RowId", "UNIQUEIDENTIFIER")],
                                             RecordKindCode="ConfigurationFileRevision", SubjectKind="Device", SubjectEntityId=b["asset"], SecondSubjectKind="ConfigurationFileRevision", SecondSubjectEntityId=rev,
@@ -677,7 +681,7 @@ class Importer:
                 self.run.provenance("record", "Record", key, h, entity_id=rec, row_id=rrow)
                 self.rule({"A": "A row → the current revision, in service now", "P": "P row → a superseded revision with its in-service period", "M": "M row → a Draft revision (the open change)"}[prefix], oldno)
                 if extra:
-                    self.rule("overflow columns (SETTINGS2, DESC, REMARKS, CT/PT, CLASS…) → the record's summary text", oldno)
+                    self.rule("overflow columns (SETTINGS2, DESC, REMARKS, CT/PT) → the record's summary text", oldno)
                 n += 1
                 if n % 500 == 0:
                     self.log(f"revisions: {n}")

@@ -1,0 +1,23 @@
+{
+  "_": "Hand edits made on a DEV/QA copy that are NOT migration rules and must not be repeated at cutover (#194). The register tool lists them so nobody mistakes them for rules.",
+  "mutations": [
+    {
+      "date": "2026-09-18",
+      "what": "#187/#191/#192 proof rows on relay [3445] and a proof relay at TN-4416-BDG2-PNL23-21B: requests raised, drafts made, then cancelled and soft-deleted",
+      "why": "browser proofs of the increments",
+      "rule": false
+    },
+    {
+      "date": "2026-09-19",
+      "what": "#193: 30 throwaway standards (4_xxxxxx, r_xxxxxx) left by the schema smoke deactivated, their versions and requirements soft-deleted",
+      "why": "fixture cleanup; the schema smoke now withdraws its own",
+      "rule": false
+    },
+    {
+      "date": "2026-09-19",
+      "what": "#194: the eight legacy classification segments stripped from the 11,549 migrated record summaries on DEV",
+      "why": "the copy made to look as the importer now makes it \u2014 an application of rule #194, recorded in RECONCILIATION-2026-09-19-DEV-194.md",
+      "rule": true
+    }
+  ]
+}

@@ -54,7 +54,7 @@ export default function RecordScreen({ params: p, id }: { screen: Screen; params
         </div>
       </header>
       <Status>{legacyFree(r.DeviceName)} · rev {s(r.RevisionLabel) || '?'} · Revision {s(r.RevisionStatus)} · lifecycle {s(r.LifecycleState) || '—'} · {s(r.FileKind)} {s(r.ParseStatus)}</Status>
-      <Tabs value={section} onChange={setSection} tabs={[{ key: 'settings', label: 'Settings' }, { key: 'record', label: 'Record' }, { key: 'classification', label: 'Classification' }, { key: 'compliance', label: 'Compliance' }, { key: 'notes', label: 'Notes' }, { key: 'text', label: 'Text as filed' }, { key: 'files', label: 'Files and records' }, ...(others.length ? [{ key: 'compare', label: 'Compare' }] : [])]} />
+      <Tabs value={section} onChange={setSection} tabs={[{ key: 'settings', label: 'Settings' }, { key: 'record', label: 'Record' }, { key: 'compliance', label: 'Compliance' }, { key: 'notes', label: 'Notes' }, { key: 'text', label: 'Text as filed' }, { key: 'files', label: 'Files and records' }, ...(others.length ? [{ key: 'compare', label: 'Compare' }] : [])]} />
       {section === 'settings' && (template
         /* #168: the template's view of the device — functions, inputs, settings by function — when the model has one */
         ? <>
@@ -68,6 +68,7 @@ export default function RecordScreen({ params: p, id }: { screen: Screen; params
       {/* #188: the relay, its placement and scheme, and the dates and state — a tab, not the top of every view. The owner,
           2026-09-18: the three panels "take up too much room and should really just be another tab"; "Where" renamed */}
       {section === 'record' && (
+        <>
       <div className="grid gap-3 lg:grid-cols-3">
         <Panel title="Relay"><Facts cols={1} pairs={[['Device', legacyFree(r.DeviceName)], ['Model', <span><a className="text-sky-300 underline" href={screenPath('DEVICE_TEMPLATE', s(r.ModelId))} onClick={(e) => { e.preventDefault(); navigate(screenPath('DEVICE_TEMPLATE', s(r.ModelId))) }} title="the device template for this model (#184)">{s(r.ModelCode)}</a>{r.ModelName ? ' — ' + s(r.ModelName) : ''}</span>], ['Manufacturer', s(r.ManufacturerName)], ['Technology', s(r.Technology)], ['Software version', s(r.FirmwareVersion)], ['Serial number', s(r.SerialNumber)], ['Voltage', s(r.VoltageClassCode)], ['Functions', s(r.Functions || r.PositionName)],
           /* #187: what the sheet is drawn from — the owner could not tell whether the relay "had a template applied" */
@@ -87,9 +88,11 @@ export default function RecordScreen({ params: p, id }: { screen: Screen; params
                 <span className="text-slate-500">{r.BasedOnGridState === 'Outstanding' ? ' — still outstanding; this revision cannot go in service before it' : ` — ${s(r.BasedOnGridState).toLowerCase()}`}</span></span>
             : '—']]} /></Panel>
       </div>
+        {!template?.rows.some(isRatio) && <Characteristics r={r} revision={revision} editable={r.GridState === 'Outstanding' && can('Record.Modify')} />}
+        </>
       )}
-      {/* an outstanding record is editable (owner, 2026-09-15); in service or archived is the record */}
-      {section === 'classification' && <Characteristics r={r} revision={revision} editable={r.GridState === 'Outstanding' && can('Record.Modify')} hideGroups={template?.rows.some(isRatio) ? ['Instrument transformers'] : []} />}
+      {/* #194: the Classification tab is gone (its eight legacy fields dropped as untrusted); the instrument-transformer
+          characteristics keep a home on the Record tab when the model has no template (a template's Inputs panel shows CTR/PTR) */}
       {/* #171: what the device is, what it inherits from the station and the protected asset, its obligations and the evaluator's working */}
       {section === 'compliance' && <ComplianceTab r={r} />}
       {section === 'notes' && <Notes r={r} revision={revision} />}
@@ -125,9 +128,10 @@ const PARSED_COLS: Column<Row>[] = [
   { key: 'MinValue', label: 'Min' }, { key: 'MaxValue', label: 'Max' }, { key: 'RangeCheck', label: 'Range' }, { key: 'RangeCheckNote', label: 'Note' },
 ]
 
-/** The classification and instrument-transformer fields (the columnless legacy fields, characteristics by the owner's ruling of
- * 2026-09-15): the schema's definitions by display group; a migrated record's values read from its summary until the values are
- * migrated; a draft revision's values saved directly (document.CharacteristicValue_Add/_Revise, audited). */
+/** The instrument-transformer fields (the columnless legacy CT/PT fields, characteristics by the owner's ruling of 2026-09-15;
+ * the eight classification fields left in #194 — untrusted): the schema's definitions by display group; a migrated record's
+ * values read from its summary until the values are migrated; a draft revision's values saved directly
+ * (document.CharacteristicValue_Add/_Revise, audited). */
 function Characteristics({ r, revision, editable, hideGroups = [] }: { r: Row; revision: string; editable: boolean; hideGroups?: string[] }) {
   const qc = useQueryClient()
   const defsQ = useQuery({ queryKey: ['characteristicSchema', CHARACTERISTIC_SCHEMA], staleTime: 10 * 60_000, queryFn: async () => {
@@ -156,7 +160,7 @@ function Characteristics({ r, revision, editable, hideGroups = [] }: { r: Row; r
   if (defsQ.isPending) return <Status>Loading the characteristics…</Status>
   if (!defs.length) {
     const mp = migrated.mp.concat(migrated.it)
-    return <Panel title="Classification and instrument transformers"><Facts pairs={mp.length ? mp : [['Class · use · responsibility', 'not recorded'], ['CT / PT ratios', 'not recorded']]} /><Status>No characteristic schema {CHARACTERISTIC_SCHEMA} is Effective; the migrated values are shown from the record.</Status></Panel>
+    return <Panel title="Instrument transformers"><Facts pairs={mp.length ? mp : [['CT / PT ratios', 'not recorded']]} /><Status>No characteristic schema {CHARACTERISTIC_SCHEMA} is Effective; the migrated values are shown from the record.</Status></Panel>
   }
   return (
     <div className="grid gap-3 lg:grid-cols-2">

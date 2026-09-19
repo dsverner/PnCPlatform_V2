@@ -1,4 +1,5 @@
 -- #179 (2026-09-17). Every building gets a code and a name it can be recognised by.
+-- migration-rule: #178/#179 a migrated LOCATION is a building under its station (a placeholder building coded BDG1, named as the station); station and building names in capitals
 --
 -- The owner, 2026-09-17, on the settings book: "It would be helpful for the engineers and techs if the 'Locations'
 -- list box at the left, actually displayed the BDGx Names and filtered the data on those. That way there would be
