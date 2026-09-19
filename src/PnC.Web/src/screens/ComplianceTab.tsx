@@ -2,7 +2,7 @@
 // from the primary asset its scheme protects, the obligations standing against it, and the evaluator's own working.
 // Plain React (the #167 rule). Nothing here decides an obligation: the rules and the formulas are definitions and the
 // evaluator (POST /api/v1/compliance/evaluate) is the only thing that reads them — this screen shows what it read.
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router'
 import { ApiError, fmtDate, fmtWhen, postJson, s, view, viewAll, type Row } from '@/lib/api'
@@ -17,7 +17,7 @@ export interface Verdict {
   ruleKey: string; ruleName: string; ruleVersionRowId: string; requirementEntityId: string | null
   subjectKind: string; subjectEntityId: string; subjectName: string
   result: 'true' | 'false' | 'unknown' | 'error'; error: string | null; unknowns: string[]; reads: FactRead[]
-  instanceRowId: string | null; action: 'open' | 'close' | 'unchanged' | 'none'; evidenceNote: string | null
+  instanceRowId: string | null; action: 'open' | 'supersede' | 'close' | 'unchanged' | 'none'; evidenceNote: string | null   // #197: supersede = the obligation stood under an earlier rule version
   requirementNumber: string | null; standardCode: string | null; standardVersion: string | null
 }
 /** What a Program.ClassificationDerivation decided for one subject in this pass (#173): the value, why, and — in an
@@ -33,6 +33,8 @@ export interface EvaluationReport {
 
 /** The PRC-023 loadability working, in the order the calculation goes (the Program.Formula seeds of #171). */
 const PRC023_READS: [string, string][] = [
+  ['device.functions', 'elements in service at the position'],                    // #197
+  ['device.functions.note', 'load-responsive under PRC-023-6 Attachment A'],      // #197
   ['asset.formula.prc023_zset', 'zone 3 reach along the line angle'],
   ['asset.formula.prc023_line_angle', 'line angle'],
   ['asset.formula.prc023_z30', 'impedance at 30°'],
@@ -134,6 +136,7 @@ export default function ComplianceTab({ r }: { r: Row }) {
           note="Whether the device is a BES Cyber Asset is derived, not judged (the owner, 2026-09-17): a microprocessor-based device protecting a BES element is one, so it is stated here with its basis and no control. External routable connectivity is recorded by hand until a network-analysis module can determine it. The impact rating is the location's, beside it." />
         <Inherited r={r} bca={s(bca?.ClassificationValue)} />
       </div>
+      <ElementsInService r={r} />
       <Obligations r={r} report={report} />
       <Evaluate device={device} report={report} setReport={setReport} />
     </div>
@@ -194,6 +197,38 @@ function Inherited({ r, bca }: { r: Row; bca: string }) {
           </dd>
         </div>
       </dl>
+    </Panel>
+  )
+}
+
+/** #197 (owner, 2026-09-19): the elements in service at the device's position (scheme.CommissionedFunction, one row per
+ * enabled element, #181), each with its PRC-023-6 Attachment A ruling — read from scheme.vPositionFunction, which judges a
+ * legacy string such as 50/51N by its numbers (ref.fAnsiLoadResponsive). PRC-023 R1's applicability turns on this list: the
+ * rule reads these same rows as device.functions[load_responsive='true']. */
+function ElementsInService({ r }: { r: Row }) {
+  const pos = s(r.PositionNodeEntityId)
+  const q = useViewAll('scheme', 'vPositionFunction', { PositionNodeEntityId: pos }, 'AnsiCode', !!pos)
+  const rows = q.data ?? []
+  return (
+    <Panel title={`Elements in service · ${pos && q.isPending ? '…' : rows.length}`}>
+      {!pos && <Status>The record names no position, so its elements in service are not known.</Status>}
+      {pos && !q.isPending && !rows.length && <Status>No element is recorded in service at this position; PRC-023 cannot bind until one is.</Status>}
+      {rows.length > 0 && (
+        <table className="w-full text-sm">
+          <thead><tr className="border-b border-slate-700 text-left text-xs uppercase tracking-wide text-slate-400">
+            <th className="py-1 pr-2">Element</th><th className="py-1 pr-2">Load-responsive</th><th className="py-1">Basis (PRC-023-6 Attachment A)</th></tr></thead>
+          <tbody>
+            {rows.map((f) => { const lr = f.LoadResponsive
+              return (
+                <tr key={s(f.RowId)} className="border-b border-slate-800 align-top">
+                  <td className="py-1 pr-2 text-slate-200">{s(f.AnsiCode)}{f.IsPrincipal ? <span className="ml-1 text-xs text-slate-500">principal</span> : null}
+                    <div className="text-xs text-slate-500">{s(f.AnsiName) !== s(f.AnsiCode) ? s(f.AnsiName) : ''}{f.BaseCodes && s(f.BaseCodes) !== s(f.AnsiCode) ? ` · read as ${s(f.BaseCodes)}` : ''}</div></td>
+                  <td className="py-1 pr-2"><Pill tone={lr === true ? 'good' : lr === false ? 'neutral' : 'warn'}>{lr === true ? 'yes' : lr === false ? 'no' : 'not ruled'}</Pill></td>
+                  <td className="py-1 text-xs text-slate-400">{s(f.LoadResponsiveBasis)}</td>
+                </tr>) })}
+          </tbody>
+        </table>)}
+      <Status>PRC-023-6 binds “load-responsive phase protection systems as described in Attachment A” at the terminals of its circuits (4.1). The rule reads this list; an element nobody has ruled leaves the standard undetermined, never inapplicable.</Status>
     </Panel>
   )
 }
@@ -261,6 +296,9 @@ function Evaluate({ device, report, setReport }: { device: string; report: Evalu
       if (mode === 'Effective') { qc.invalidateQueries({ queryKey: ['view', 'compliance', 'vObligationSubject'] }); qc.invalidateQueries({ queryKey: ['view', 'compliance', 'vObligationInstanceFact'] }) }
     } catch (e) { setErr(e instanceof ApiError ? `${e.status} ${e.message}` : String(e)) } finally { setBusy('') }
   }
+  // #197 (owner, 2026-09-19: "there must be automatic recognition of why ... a standard does not apply"): the preview runs when
+  // the tab opens — it writes nothing — so the verdicts and their reasons are on the screen without a click.
+  useEffect(() => { if (device && !report) void run('Preview') }, [device])   // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <Panel title="Evaluate now" actions={
       <div className="flex gap-2">
@@ -280,9 +318,22 @@ function Evaluate({ device, report, setReport }: { device: string; report: Evalu
   )
 }
 
+/** #197: why a rule does not bind, in words from what it read. The function term is the case the owner raised (a neutral
+ * overcurrent relay shown a PRC-023 obligation): an empty device.functions[load_responsive='true'] with the note that says
+ * which element is what. Any other false scope shows the reads that decided it. */
+function whyNot(v: Verdict): string {
+  const reads = v.reads ?? []
+  const lr = reads.find((x) => x.name === 'device.functions' && (x.params ?? '').includes('load_responsive'))
+  const note = reads.find((x) => x.name === 'device.functions.note')?.value
+  if (lr && (lr.value === '{}' || lr.value === '')) return `no in-service load-responsive element${note ? ` — ${note}` : ''}`
+  const others = reads.filter((x) => x.name !== 'device.functions.note').slice(0, 3).map((x) => `${x.name}${x.params ? ` [${x.params}]` : ''} = ${x.value}`)
+  return others.length ? `it read ${others.join('; ')}` : 'its scope evaluated false'
+}
+
 /** #173 (the owner, 2026-09-17: "a standard a device is not bound by must not appear"): the rules that bind — the ones that
- * evaluated true — and the ones still undetermined, with what is missing; the rules that evaluated false collapse to one
- * line, opened by the engineer who wants to see why. An error is shown: it is not a decision that the rule does not bind. */
+ * evaluated true — and the ones still undetermined, with what is missing; the rules that evaluated false are listed in one
+ * line each with the reason (#197), their reads opened by the engineer who wants them. An error is shown: it is not a
+ * decision that the rule does not bind. */
 function Verdicts({ verdicts }: { verdicts: Verdict[] }) {
   const [showFalse, setShowFalse] = useState(false)
   const binding = verdicts.filter((v) => v.result !== 'false')
@@ -295,8 +346,11 @@ function Verdicts({ verdicts }: { verdicts: Verdict[] }) {
         <div className="rounded border border-slate-800 bg-slate-950 p-2 text-sm">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-slate-400">{notBinding.length} standard{notBinding.length === 1 ? '' : 's'} do{notBinding.length === 1 ? 'es' : ''} not apply to this device</span>
-            <Button kind="mini" onClick={() => setShowFalse(!showFalse)}>{showFalse ? 'hide them' : 'show them'}</Button>
+            <Button kind="mini" onClick={() => setShowFalse(!showFalse)}>{showFalse ? 'hide the reads' : 'show the reads'}</Button>
           </div>
+          <ul className="mt-1 space-y-0.5 text-xs">
+            {notBinding.map((v, i) => <li key={'why' + v.ruleKey + i}><span className="text-slate-200">{v.standardCode ? `${v.standardCode} ${v.standardVersion ?? ''} ${v.requirementNumber ?? ''}`.replace(/\s+/g, ' ').trim() : v.ruleName}</span> <span className="text-slate-400">— does not apply: {whyNot(v)}</span></li>)}
+          </ul>
           {showFalse && <ul className="mt-2 space-y-2">{notBinding.map((v, i) => <li key={v.ruleKey + i}><VerdictCard v={v} /></li>)}</ul>}
         </div>)}
     </div>

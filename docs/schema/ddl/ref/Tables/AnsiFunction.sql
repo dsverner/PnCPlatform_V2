@@ -13,6 +13,14 @@ CREATE TABLE [ref].[AnsiFunction] (
     -- flag says which kind of key the code is, so a screen can show a number as a number and everything else as words.
     -- NULL means nobody has said — the migrated codes, which the importer invented from free text, are all NULL.
     [IsDeviceNumber]    BIT               NULL,
+    -- #197 (2026-09-19): is this function one PRC-023-6 applies to? The standard binds "load-responsive phase protection
+    -- systems as described in Attachment A" (4.1): Attachment A 1 lists the functions included (phase distance, out-of-step,
+    -- switch-on-to-fault, overcurrent, communications-aided schemes), Attachment A 2 the exclusions (ground fault detection,
+    -- elements enabled only on failure of others, RAS-only, 15-minute-or-slower, thermal emulation, dc lines and converter
+    -- transformers). 1 = included, 0 = excluded or not listed, NULL = nobody has ruled (the migrated strings). [LoadResponsiveBasis]
+    -- names the clause. Set by the core seed for the C37.2 numbers; a legacy string is read through ref.fAnsiLoadResponsive.
+    [LoadResponsive]    BIT               NULL,
+    [LoadResponsiveBasis] NVARCHAR(200)   NULL,
     [SysStart]          DATETIME2(7) GENERATED ALWAYS AS ROW START HIDDEN NOT NULL,
     [SysEnd]            DATETIME2(7) GENERATED ALWAYS AS ROW END   HIDDEN NOT NULL,
     PERIOD FOR SYSTEM_TIME ([SysStart], [SysEnd]),

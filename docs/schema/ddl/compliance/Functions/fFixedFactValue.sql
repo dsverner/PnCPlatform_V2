@@ -101,6 +101,17 @@ BEGIN
     -- the voltage at that terminal end, in kV (the catalogue row carries the unit); the terminal's voltage class, not the asset's
     ELSE IF @factName = N'device.protects.terminal.voltage'
         SELECT TOP (1) @v = CONVERT(NVARCHAR(400), dp.[NominalKv]) FROM [compliance].[fDeviceProtects](@subjectEntityId, @at) dp;
+    -- #197: each element in service at the device's position with its PRC-023-6 Attachment A ruling and the clause: the
+    -- reason a person reads when the standard does not apply ("50/51N: not load-responsive - ground fault detection (...)")
+    ELSE IF @factName = N'device.functions.note'
+        SELECT @v = LEFT(STRING_AGG(CONCAT(cf.[AnsiCode], N': ',
+                                           CASE lr.[LoadResponsive] WHEN 1 THEN N'load-responsive - ' WHEN 0 THEN N'not load-responsive - ' ELSE N'' END,
+                                           ISNULL(lr.[LoadResponsiveBasis], N'not yet ruled')), N'; ') WITHIN GROUP (ORDER BY cf.[AnsiCode]), 400)
+        FROM [scheme].[CommissionedFunction] cf CROSS APPLY [ref].[fAnsiLoadResponsive](cf.[AnsiCode]) lr
+        WHERE cf.[IsDeleted] = 0 AND cf.[ValidFrom] <= @at AND (cf.[ValidTo] IS NULL OR cf.[ValidTo] > @at)
+          AND cf.[ProtectionFunctionNodeEntityId] IN (SELECT pl.[NodeEntityId] FROM [asset].[Placement] pl
+                                                       WHERE pl.[AssetEntityId] = @subjectEntityId AND pl.[PlacementKind] = N'Installed' AND pl.[IsDeleted] = 0
+                                                         AND pl.[ValidFrom] <= @at AND (pl.[ValidTo] IS NULL OR pl.[ValidTo] > @at));
     ELSE IF @factName = N'device.protects.name'
         SELECT TOP (1) @v = dp.[PrimaryAssetName] FROM [compliance].[fDeviceProtects](@subjectEntityId, @at) dp;
     ELSE IF @factName LIKE N'platform.backup.last.%'

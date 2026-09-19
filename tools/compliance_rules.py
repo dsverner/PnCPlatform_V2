@@ -51,17 +51,29 @@ CIP_RULES = [
     ("cip011_r1", "CIP-011", "R1", CIP_SCOPE, "once", CIP_NOTE),
 ]
 
-PRC_R1_SCOPE = "device.protects.terminal.voltage >= 200kV or device.protects.classification.Prc023 = 'Listed'"
+# #197 (2026-09-19): PRC-023-6 binds "load-responsive phase protection systems as described in Attachment A, applied at the
+# terminals of the circuits defined in 4.2.1" - two lists, both required. The element term is 4.2.1 (200 kV and above, or the
+# Planning Coordinator's R6 list); the function term is Attachment A, read per element in service at the device's position
+# (device.functions[load_responsive='true']: ground fault detection is excluded by A 2.2, differential is not listed). The
+# owner: "a device is only applicable if it has a load responsive element... in service". A device whose elements nobody has
+# ruled reads Unknown, not false - the platform does not declare a standard inapplicable on an element it cannot classify.
+PRC_R1_SCOPE = ("(device.protects.terminal.voltage >= 200kV or device.protects.classification.Prc023 = 'Listed') "
+                "and device.functions[load_responsive='true'] is not empty")
 PRC_RECORD = ["asset.formula.prc023_zset", "asset.formula.prc023_line_angle", "asset.formula.prc023_z30",
               "asset.formula.prc023_trip_current", "asset.formula.prc023_load_current", "asset.formula.prc023_criterion",
               "device.settings.Z3%", "device.settings.R1", "device.settings.X1", "device.settings.MTA", "device.settings.50H",
-              "device.protects.name", "device.protects.terminal.voltage"]
+              "device.protects.name", "device.protects.terminal.voltage",
+              "device.functions", "device.functions.note"]   # #197: the elements in service and why each is or is not load-responsive
+# #197: what to read when the scope is FALSE, so the verdict says why the standard does not apply (the owner: "there must be a
+# reason"). The record list is read only for a device the rule binds; these are read for one it does not.
+PRC_EXPLAIN = ["device.functions", "device.functions.note"]
 PRC_RULES = [
     ("prc023_r1", "PRC-023", "R1", PRC_R1_SCOPE, "once",
      "PRC-023-6 R1: any one of criteria 1-13 for the circuit terminal; loadability at 0.85 pu and 30 degrees. The group applies "
      "criterion 1, then 2, then 13, then 12 (owner, 2026-09-16); the formula prc023_criterion records which one the in-service "
      "settings satisfy. Applicability from PRC-023-6 4.2.1.1 (200 kV and above) or the Planning Authority's R6 list (recorded as "
-     "the Prc023 classification of the protected asset). NB appendix PRC-023-6-NB-0: no modification."),
+     "the Prc023 classification of the protected asset), and only where an element in service at the device's position is one "
+     "Attachment A includes (4.1; ground fault detection excluded by A 2.2). NB appendix PRC-023-6-NB-0: no modification."),
     # #184: NPCC Directory 4 attaches to every relay protecting a bus the A-10 study declares BPS. One rule, pointing at the
     # Directory's general criterion R5.1; the Compliance tab lists the whole Directory as reading material beneath it.
     ("npcc_d4", "NPCC-D4", "R5.1", "device.protects.classification.NpccBulkPowerSystem = 'BPS'", "once", NPCC_NOTE),   # #196: the element's declaration, else its bus's
@@ -232,6 +244,7 @@ def main():
                    "evidence": {"recordKinds": [], "minAcceptance": None}, "evidenceNote": note}
         if k == "prc023_r1":
             payload["record"] = PRC_RECORD
+            payload["explain"] = PRC_EXPLAIN
         # #184: the name's subject is the family's, not a two-way guess (NPCC-D4 was reading "transmission relay loadability")
         subject = {"CIP": "BES Cyber Asset at a High/Medium station", "PRC-023": "transmission relay loadability",
                    "NPCC-D4": "bulk power system protection criteria (Directory 4)"}

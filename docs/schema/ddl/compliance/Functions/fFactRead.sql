@@ -77,6 +77,29 @@ BEGIN
                                                           AND (d.[Applicability] = N'NotApplicable' OR (d.[CompletedAt] IS NOT NULL AND d.[CompletedAt] <= @at))));
         RETURN @out;
     END
+    IF @factName = N'device.functions'
+    BEGIN
+        -- #197 (2026-09-19): the elements in service at the device's position (scheme.CommissionedFunction, one row per enabled
+        -- element, #181), as their ANSI codes; [load_responsive='true'|'false'] keeps the ones ruled so under PRC-023-6
+        -- Attachment A (ref.fAnsiLoadResponsive). Unknown when the filter would leave nothing but an element nobody has ruled:
+        -- the platform cannot say a device has no load-responsive element while one of its elements is unclassified.
+        SET @p = JSON_VALUE(@params, '$.load_responsive');
+        DECLARE @lr BIT = CASE @p WHEN N'true' THEN 1 WHEN N'false' THEN 0 END;
+        DECLARE @fns TABLE ([AnsiCode] NVARCHAR(10), [LoadResponsive] BIT);
+        INSERT @fns
+        SELECT cf.[AnsiCode], lr.[LoadResponsive]
+        FROM [scheme].[CommissionedFunction] cf CROSS APPLY [ref].[fAnsiLoadResponsive](cf.[AnsiCode]) lr
+        WHERE cf.[IsDeleted] = 0 AND cf.[ValidFrom] <= @at AND (cf.[ValidTo] IS NULL OR cf.[ValidTo] > @at)
+          AND cf.[ProtectionFunctionNodeEntityId] IN (SELECT pl.[NodeEntityId] FROM [asset].[Placement] pl
+                                                       WHERE pl.[AssetEntityId] = @subjectEntityId AND pl.[PlacementKind] = N'Installed' AND pl.[IsDeleted] = 0
+                                                         AND pl.[ValidFrom] <= @at AND (pl.[ValidTo] IS NULL OR pl.[ValidTo] > @at));
+        IF @lr = 1 AND NOT EXISTS (SELECT 1 FROM @fns WHERE [LoadResponsive] = 1) AND EXISTS (SELECT 1 FROM @fns WHERE [LoadResponsive] IS NULL)
+            RETURN CONCAT(N'{"k":"unk","why":["device.functions: not yet ruled load-responsive or not: ',
+                          STRING_ESCAPE((SELECT STRING_AGG(f.[AnsiCode], N', ') WITHIN GROUP (ORDER BY f.[AnsiCode]) FROM @fns f WHERE f.[LoadResponsive] IS NULL), 'json'), N'"]}');
+        SELECT @out = N'{"k":"set","v":[' + ISNULL(STRING_AGG(CONCAT(N'{"k":"text","v":"', STRING_ESCAPE(f.[AnsiCode], 'json'), N'"}'), N',') WITHIN GROUP (ORDER BY f.[AnsiCode]), N'') + N']}'
+        FROM @fns f WHERE @lr IS NULL OR f.[LoadResponsive] = @lr;
+        RETURN @out;
+    END
     IF @factName = N'device.connections'
     BEGIN
         SET @p = JSON_VALUE(@params, '$.realisation');

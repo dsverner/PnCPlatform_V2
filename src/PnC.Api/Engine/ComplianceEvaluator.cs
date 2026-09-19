@@ -36,7 +36,7 @@ public sealed record Derived(string Key, string Kind, string SubjectKind, Guid S
 public sealed class ComplianceEvaluator(SqlSession s, Catalog catalog, ILogger log)
 {
     sealed record Rule(Guid DefinitionEntityId, string Key, string Name, Guid VersionRowId, Guid? RequirementEntityId, string[] SubjectKinds,
-        JsonObject Scope, string ScopeKey, string Cadence, string? EvidenceNote, string[] Record, string? RequirementNumber, string? StandardCode, string? StandardVersion);
+        JsonObject Scope, string ScopeKey, string Cadence, string? EvidenceNote, string[] Record, string[] Explain, string? RequirementNumber, string? StandardCode, string? StandardVersion);
 
     sealed record Formula(string Key, JsonObject Expression, string? Type, string? Unit, int? Precision);
 
@@ -119,6 +119,14 @@ public sealed class ComplianceEvaluator(SqlSession s, Catalog catalog, ILogger l
                             foreach (var f in rule.Record) reader.ReadNamed(subject, f, now);
                             reads.AddRange(reader.Reads);
                         }
+                        else if (result == "false" && rule.Explain.Length > 0)
+                        {
+                            // #197: a rule may name the facts that say why it does NOT bind (the owner: "there must be a reason");
+                            // they ride in the same trail, so a preview shows them and a close keeps them
+                            reader.Reads.Clear();
+                            foreach (var f in rule.Explain) reader.ReadNamed(subject, f, now);
+                            reads.AddRange(reader.Reads);
+                        }
                         // one line per fact: a formula read inside another formula is replayed wherever it was used, and the
                         // trail is a list of what was read, not of how many times (the last value read is the one recorded)
                         reads = reads.GroupBy(x => (x.Name, x.Params)).Select(g => g.Last()).ToList();
@@ -136,6 +144,14 @@ public sealed class ComplianceEvaluator(SqlSession s, Catalog catalog, ILogger l
                                     if (mode == "Effective") { instanceRowId = await OpenAsync(rule, kind, id, now, runId, reads, ct); }
                                     c.opened++; opened++;
                                 }
+                                else if (open.VersionRowId != rule.VersionRowId)
+                                {
+                                    // #197: the obligation stands, but under an earlier version of the rule — that row is Superseded and
+                                    // one opens under the version in force, with the reads this version made
+                                    action = "supersede";
+                                    if (mode == "Effective") { await SupersedeAsync(rule, open, kind, id, runId, ct); instanceRowId = await OpenAsync(rule, kind, id, now, runId, reads, ct); }
+                                    c.opened++; opened++;
+                                }
                                 else { action = "unchanged"; c.unchanged++; unchanged++; }
                             }
                             else if (result == "false")
@@ -143,7 +159,7 @@ public sealed class ComplianceEvaluator(SqlSession s, Catalog catalog, ILogger l
                                 if (open is not null)
                                 {
                                     action = "close";
-                                    if (mode == "Effective") await CloseAsync(rule, open, kind, id, runId, ct);
+                                    if (mode == "Effective") await CloseAsync(rule, open, kind, id, runId, reads, ct);
                                     c.closed++; closed++;
                                 }
                                 else { action = "none"; c.unchanged++; unchanged++; }
@@ -175,22 +191,28 @@ public sealed class ComplianceEvaluator(SqlSession s, Catalog catalog, ILogger l
     ProcInfo Proc(string name) => catalog.Procedure("compliance", name) ?? throw new ApiException(500, "internal", $"compliance.{name} is not in the catalogue.");
     ProcInfo Proc2(string schema, string name) => catalog.Procedure(schema, name) ?? throw new ApiException(500, "internal", $"{schema}.{name} is not in the catalogue.");
 
-    sealed record OpenRow(Guid RowId, Guid EntityId, DateTimeOffset PeriodStartAt, DateTimeOffset? PeriodEndAt);
+    sealed record OpenRow(Guid RowId, Guid EntityId, DateTimeOffset PeriodStartAt, DateTimeOffset? PeriodEndAt, Guid VersionRowId);
 
     async Task<OpenRow?> OpenInstanceAsync(Rule rule, Guid subject, DateTimeOffset now, CancellationToken ct)
     {
         var (start, _) = Period(rule.Cadence, now);
         var rows = await s.RowsAsync("""
-            SELECT TOP (1) RowId, EntityId, PeriodStartAt, PeriodEndAt FROM compliance.vObligationInstance
-            WHERE SubjectEntityId = @s AND RuleDefinitionVersionRowId = @v AND Status = N'Open'
-              AND (@req IS NULL OR RequirementEntityId = @req) AND (PeriodEndAt IS NULL OR PeriodEndAt >= @start)
-            ORDER BY PeriodStartAt DESC
-            """, new Dictionary<string, object?> { ["@s"] = subject, ["@v"] = rule.VersionRowId, ["@req"] = rule.RequirementEntityId, ["@start"] = start }, ct);
+            SELECT TOP (1) i.RowId, i.EntityId, i.PeriodStartAt, i.PeriodEndAt, i.RuleDefinitionVersionRowId
+            FROM compliance.vObligationInstance i
+            JOIN config.vDefinitionVersion dv ON dv.RowId = i.RuleDefinitionVersionRowId
+            WHERE i.SubjectEntityId = @s AND dv.DefinitionEntityId = @d AND i.Status = N'Open'
+              AND (@req IS NULL OR i.RequirementEntityId = @req) AND (i.PeriodEndAt IS NULL OR i.PeriodEndAt >= @start)
+            ORDER BY CASE WHEN i.RuleDefinitionVersionRowId = @v THEN 0 ELSE 1 END, i.PeriodStartAt DESC
+            """, new Dictionary<string, object?> { ["@s"] = subject, ["@d"] = rule.DefinitionEntityId, ["@v"] = rule.VersionRowId, ["@req"] = rule.RequirementEntityId, ["@start"] = start }, ct);
+        // #197: found by the rule's DEFINITION, any version — an obligation opened under an earlier version of the rule is the
+        // same obligation. Before this a re-versioned rule (a scope edit, #196, #197) never saw its old instances again and left
+        // them Open for good; 157 PRC-023 R1 obligations stood on DEV that way. The current version's row is preferred.
         var r = rows.FirstOrDefault() as JsonObject;
         if (r is null) return null;
         return new OpenRow(Guid.Parse(r["RowId"]!.GetValue<string>()), Guid.Parse(r["EntityId"]!.GetValue<string>()),
             DateTimeOffset.Parse(r["PeriodStartAt"]!.GetValue<string>(), CultureInfo.InvariantCulture),
-            r["PeriodEndAt"] is null ? null : DateTimeOffset.Parse(r["PeriodEndAt"]!.GetValue<string>(), CultureInfo.InvariantCulture));
+            r["PeriodEndAt"] is null ? null : DateTimeOffset.Parse(r["PeriodEndAt"]!.GetValue<string>(), CultureInfo.InvariantCulture),
+            Guid.Parse(r["RuleDefinitionVersionRowId"]!.GetValue<string>()));
     }
 
     /// <summary>The obligation period the cadence text names: "once" → from the run instant, open-ended; "every calendar_year" → the run's calendar year.</summary>
@@ -235,15 +257,36 @@ public sealed class ComplianceEvaluator(SqlSession s, Catalog catalog, ILogger l
         return rowId;
     }
 
-    async Task CloseAsync(Rule rule, OpenRow open, string kind, Guid subject, Guid runId, CancellationToken ct)
+    async Task SupersedeAsync(Rule rule, OpenRow open, string kind, Guid subject, Guid runId, CancellationToken ct)
     {
         await s.ExecuteProcedureAsync(Proc("ObligationInstance_Revise"), new JsonObject
         {
             ["EntityId"] = open.EntityId.ToString(), ["SubjectKind"] = kind, ["SubjectEntityId"] = subject.ToString(),
-            ["RuleDefinitionVersionRowId"] = rule.VersionRowId.ToString(), ["RequirementEntityId"] = rule.RequirementEntityId?.ToString(),
+            ["RuleDefinitionVersionRowId"] = open.VersionRowId.ToString(), ["RequirementEntityId"] = rule.RequirementEntityId?.ToString(),
+            ["PeriodStartAt"] = open.PeriodStartAt.ToString("o"), ["PeriodEndAt"] = open.PeriodEndAt?.ToString("o"),
+            ["Status"] = "Superseded", ["EvaluationRunId"] = runId.ToString(),
+        }, ct);
+    }
+
+    // #197 (owner, 2026-09-19: "there must be a reason" a standard does not apply): the reads that made the scope false are
+    // appended to the closed row, so the NotApplicable obligation carries why it stopped applying, the way an opened one
+    // carries why it opened. The revise returns the new row; the facts hang off that RowId (the one a screen reads).
+    async Task CloseAsync(Rule rule, OpenRow open, string kind, Guid subject, Guid runId, IReadOnlyList<FactRead> reads, CancellationToken ct)
+    {
+        var res = await s.ExecuteProcedureAsync(Proc("ObligationInstance_Revise"), new JsonObject
+        {
+            ["EntityId"] = open.EntityId.ToString(), ["SubjectKind"] = kind, ["SubjectEntityId"] = subject.ToString(),
+            ["RuleDefinitionVersionRowId"] = open.VersionRowId.ToString(), ["RequirementEntityId"] = rule.RequirementEntityId?.ToString(),
             ["PeriodStartAt"] = open.PeriodStartAt.ToString("o"), ["PeriodEndAt"] = open.PeriodEndAt?.ToString("o"),
             ["Status"] = "NotApplicable", ["EvaluationRunId"] = runId.ToString(),
         }, ct);
+        var rowId = res["RowId"]?.GetValue<string>() is { } id && Guid.TryParse(id, out var g) ? g : open.RowId;
+        foreach (var f in reads)
+            await s.ExecuteProcedureAsync(Proc("ObligationInstanceFact_Append"), new JsonObject
+            {
+                ["ObligationInstanceRowId"] = rowId.ToString(), ["FactName"] = f.Params is null ? f.Name : f.Name + f.Params,
+                ["ValueAsRead"] = f.Value.Length > 400 ? f.Value[..400] : f.Value,
+            }, ct);
     }
 
     async Task<List<Rule>> LoadRulesAsync(Catalogue cat, List<string> errors, CancellationToken ct)
@@ -271,10 +314,11 @@ public sealed class ComplianceEvaluator(SqlSession s, Catalog catalog, ILogger l
                 new Checker(cat).Check(scope, new Dictionary<string, FormulaType>(), kinds.FirstOrDefault());
                 var cadence = payload["cadenceText"]?.GetValue<string>() ?? "once";
                 var record = (payload["record"] as JsonArray)?.Select(k => k!.GetValue<string>()).ToArray() ?? [];
+                var explain = (payload["explain"] as JsonArray)?.Select(k => k!.GetValue<string>()).ToArray() ?? [];
                 list.Add(new Rule(Guid.Parse(r["DefinitionEntityId"]!.GetValue<string>()), key, r["Name"]!.GetValue<string>(),
                     Guid.Parse(r["EffectiveVersionRowId"]!.GetValue<string>()),
                     r["RequirementEntityId"] is null ? (Guid?)null : Guid.Parse(r["RequirementEntityId"]!.GetValue<string>()), kinds, scope,
-                    Canonical.ToCanonical(scope), cadence, payload["evidenceNote"]?.GetValue<string>(), record,
+                    Canonical.ToCanonical(scope), cadence, payload["evidenceNote"]?.GetValue<string>(), record, explain,
                     r["RequirementNumber"]?.GetValue<string>(), r["StandardCode"]?.GetValue<string>(), r["VersionLabel"]?.GetValue<string>()));
             }
             catch (Exception e) when (e is not OperationCanceledException) { errors.Add($"{key}: {e.Message}"); }

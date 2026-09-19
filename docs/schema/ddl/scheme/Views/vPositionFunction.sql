@@ -24,6 +24,9 @@ SELECT cf.[EntityId],
        cf.[IsPrincipal],
        cf.[LogicalNodeEntityId],
        cf.[EnabledFromConfigurationFileRevisionRowId],
+       lr.[LoadResponsive],        -- #197: PRC-023-6 Attachment A, read through ref.fAnsiLoadResponsive (a legacy string such as 50/51N is judged by its numbers)
+       lr.[LoadResponsiveBasis],
+       lr.[BaseCodes],
        cf.[ValidFrom],
        cf.[ValidFromQuality],
        cf.[CreatedBy],
@@ -32,6 +35,7 @@ SELECT cf.[EntityId],
        cf.[ModifiedAt]
 FROM [scheme].[CommissionedFunction] cf
 LEFT JOIN [ref].[AnsiFunction] a ON a.[AnsiCode] = cf.[AnsiCode]
+CROSS APPLY [ref].[fAnsiLoadResponsive](cf.[AnsiCode]) lr
 WHERE cf.[ValidTo] IS NULL AND cf.[IsDeleted] = 0;
 GO
 GRANT SELECT ON [scheme].[vPositionFunction] TO [app_execute];

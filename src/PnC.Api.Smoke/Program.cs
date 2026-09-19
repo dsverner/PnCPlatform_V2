@@ -1300,6 +1300,10 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
                  && k173_d1?["value"]?.ToString() == "BCA" && ((k173_cl0b?["rows"] as JsonArray)?.Count ?? -1) == 0,
                 $"#173: a person may not record the BES Cyber Asset flag ({(int)k173_h1s} {k173_h1b?["detail"]}); the preview derives it BCA for the microprocessor relay and writes nothing ({k173_d1?["value"]} · {k173_d1?["reason"]} · {(k173_cl0b?["rows"] as JsonArray)?.Count} rows)");
 
+            // #197: from here the SEL-421 also carries a phase-distance element in service (21) beside its 87T — PRC-023 binds a relay
+            // only through a load-responsive element (Attachment A); the grid and FLOC checks above saw the position as the fixture placed it
+            var (k197_cfs, k197_cfb) = await Post(admin, "api/v1/scheme/CommissionedFunction_Add", new { ProtectionFunctionNodeEntityId = positions[0], AnsiCode = "21" });
+            Must(k197_cfs == HttpStatusCode.OK, $"#197: 21 commissioned beside 87T at position 1 ({(int)k197_cfs} {Code(k197_cfb)} {k197_cfb?["detail"]})");
             // (d) committed: the derived flag is written with Basis Derived, and the standards that bind open
             var k173_term = Id((await Get(admin, $"api/v1/asset/vAssetTerminalDetail?AssetEntityId={k173_line}")).body?["rows"]?[0], "TerminalEntityId");
             var (k173_t1s, _) = await Post(admin, "api/v1/asset/AssetTerminal_Revise", new { EntityId = k173_term, AssetEntityId = k173_line, TerminalNo = 1, StationNodeEntityId = station, VoltageClassCode = "230kV" });
@@ -1407,6 +1411,32 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
             Must(k184_t1s == HttpStatusCode.OK && k184_b1s == HttpStatusCode.OK && k184_e1s == HttpStatusCode.OK && k184_openBps.Contains("npcc_d4")
                  && k184_b2s == HttpStatusCode.OK && k184_e2s == HttpStatusCode.OK && !k184_openNot.Contains("npcc_d4") && k184_q1s == HttpStatusCode.Forbidden,
                 $"#184: the A-10 outcome on the protected bus decides Directory 4 — BPS opens npcc_d4 on the relay ({string.Join(", ", k184_openBps)}), Not BPS closes it ({string.Join(", ", k184_openNot)}), and ReadOnly records nothing ({(int)k184_q1s})");
+        }
+
+        // ======== #197 (2026-09-19): PRC-023 applies only where an element in service is load-responsive (Attachment A), and the
+        // reason it does not apply is read from the facts. The owner: "a device is only applicable if it has a load responsive
+        // element... in service"; "there must be a reason". The fixture's SEL-421 carries 87T and 21 at its position; the BDD15B
+        // carries 87T alone — differential is not listed in Attachment A 1, so R1 does not bind it, and the note says why.
+        {
+            var (k197_a1s, k197_a1b) = await Get(admin, "api/v1/ref/vAnsiFunction?AnsiCode=51N&take=1");
+            var k197_51n = (k197_a1b?["rows"] as JsonArray)?.FirstOrDefault();
+            var (k197_pfs, k197_pfb) = await Get(admin, $"api/v1/scheme/vPositionFunction?PositionNodeEntityId={positions[1]}&take=10");
+            var k197_pf = (k197_pfb?["rows"] as JsonArray)?.FirstOrDefault(r => r?["AnsiCode"]?.ToString() == "87T");
+            Must(k197_a1s == HttpStatusCode.OK && k197_51n?["LoadResponsive"]?.GetValue<bool>() == false && (k197_51n?["LoadResponsiveBasis"]?.ToString() ?? "").Contains("2.2")
+                 && k197_pfs == HttpStatusCode.OK && k197_pf?["LoadResponsive"]?.GetValue<bool>() == false,
+                $"#197: 51N is ruled not load-responsive ({k197_51n?["LoadResponsiveBasis"]}); the position's 87T reads the ruling ({k197_pf?["LoadResponsive"]} — {k197_pf?["LoadResponsiveBasis"]})");
+            var (k197_v1s, k197_v1b) = await Post(admin, "api/v1/compliance/evaluate", new { subjectEntityId = devBdd, mode = "Preview" });
+            var k197_prc = (k197_v1b?["verdicts"] as JsonArray)?.FirstOrDefault(v => v?["ruleKey"]?.ToString() == "prc023_r1");
+            var k197_reads = (k197_prc?["reads"] as JsonArray) ?? new JsonArray();
+            var k197_fn = k197_reads.FirstOrDefault(r => r?["name"]?.ToString() == "device.functions" && r?["params"] is null)?["value"]?.ToString();
+            var k197_note = k197_reads.FirstOrDefault(r => r?["name"]?.ToString() == "device.functions.note")?["value"]?.ToString() ?? "";
+            Must(k197_v1s == HttpStatusCode.OK && k197_prc?["result"]?.ToString() == "false" && k197_fn == "{87T}" && k197_note.Contains("not load-responsive") && k197_note.Contains("Attachment A"),
+                $"#197: PRC-023 R1 does not bind the 87T-only relay ({k197_prc?["result"]}); the reason is in the reads — device.functions {k197_fn}; {k197_note}");
+            var (k197_v2s, k197_v2b) = await Post(admin, "api/v1/compliance/evaluate", new { subjectEntityId = devSel, mode = "Preview" });
+            var k197_prc2 = (k197_v2b?["verdicts"] as JsonArray)?.FirstOrDefault(v => v?["ruleKey"]?.ToString() == "prc023_r1");
+            var k197_lr = (k197_prc2?["reads"] as JsonArray)?.FirstOrDefault(r => r?["name"]?.ToString() == "device.functions" && (r?["params"]?.ToString() ?? "").Contains("load_responsive"))?["value"]?.ToString();
+            Must(k197_v2s == HttpStatusCode.OK && k197_prc2?["result"]?.ToString() == "true" && k197_lr == "{21}",
+                $"#197: the relay with 21 in service is bound ({k197_prc2?["result"]}; load-responsive elements {k197_lr})");
         }
 
         // ======== #187 (2026-09-18): a new relay from its position, its first settings from the template, and the record that
