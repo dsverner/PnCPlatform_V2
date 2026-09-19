@@ -95,8 +95,11 @@ export default function LocationScreen({ params: p, id }: { screen: Screen; para
               : <Facts cols={1} pairs={[['Code', s(r.Code) || '—'], ['Name', s(r.Name)], ['Subtype', s(r.SubtypeCode) || '—'], ['Notes', s(r.Notes) || '—']]} />}
           </div>
         </Panel>
-        <ClassificationPanel title="Applicability classifications" subjectKind="Node" subjectEntityId={s(r.EntityId)} editable={can('Asset.Modify')} kinds={NODE_KINDS}
-          note="The CIP-002 impact rating of this location — every BES Cyber Asset in it inherits it, and a rating on a building beats the station's for the devices in that building (#173). Recorded by you from the entity's own CIP-002 evaluation in this phase; a value saves at once, audited." />
+        {/* #195 (owner, 2026-09-19): the CIP impact rating is the building's — offered on a Building page only; a station shows its buildings' ratings in the list below */}
+        {s(r.NodeTypeCode) === 'Building'
+          ? <ClassificationPanel title="Applicability classifications" subjectKind="Node" subjectEntityId={s(r.EntityId)} editable={can('Asset.Modify')} kinds={NODE_KINDS}
+              note="The CIP-002 impact rating of this building — every BES Cyber Asset housed in it inherits it (#173, #177, #195). Recorded by you from the entity's own CIP-002 evaluation in this phase; a value saves at once, audited." />
+          : <Panel title="Applicability classifications"><Status>The CIP-002 impact rating is recorded on a building — the BES Cyber Systems it houses take it. {s(r.NodeTypeCode) === 'Station' ? 'This station\'s buildings and their ratings are in the list below.' : 'Open the building this sits in.'}</Status></Panel>}
       </div>
       <div className="grid gap-3 lg:grid-cols-2">
         <Inside node={r} canEdit={canEdit} canArchive={canArchive} />
@@ -252,6 +255,9 @@ function Inside({ node, canEdit, canArchive }: { node: Row; canEdit: boolean; ca
   const qc = useQueryClient()
   const q = useViewAll('location', 'vNode', { ParentEntityId: s(node.EntityId) }, 'Name', !!node.EntityId)
   const rows = [...(q.data ?? [])].sort(byCodeThenName)
+  // #195: a station's buildings carry the CIP impact rating; shown here, read-only, so the station still tells you
+  const cipQ = useViewAll('asset', 'vClassification', { SubjectKind: 'Node', ClassificationKindCode: 'CipImpactRating' }, undefined, s(node.NodeTypeCode) === 'Station')
+  const cipOf = (id: string) => (cipQ.data ?? []).find((c) => s(c.SubjectEntityId).toLowerCase() === id.toLowerCase())?.ClassificationValue
   const [confirmId, setConfirmId] = useState(''); const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null)
   const remove = async (n: Row) => {
@@ -270,6 +276,9 @@ function Inside({ node, canEdit, canArchive }: { node: Row; canEdit: boolean; ca
           <li key={s(n.EntityId)} className="flex flex-wrap items-center gap-2">
             <CodeName id={s(n.EntityId)} code={s(n.Code)} name={s(n.Name)} />
             <span className="text-xs text-slate-500">{s(n.NodeTypeCode)}{n.SubtypeCode ? ' · ' + s(n.SubtypeCode) : ''}</span>
+            {s(node.NodeTypeCode) === 'Station' && s(n.NodeTypeCode) === 'Building' && (cipOf(s(n.EntityId))
+              ? <span className="text-xs text-sky-300">CIP {s(cipOf(s(n.EntityId)))}</span>
+              : <span className="text-xs text-slate-500">— no CIP rating yet; open the building to enter it</span>)}
             {canArchive && (confirmId === s(n.EntityId)
               ? <span className="flex items-center gap-1 text-xs text-amber-300">withdraw {s(n.Name)}?
                   <Button kind="mini" disabled={busy} onClick={() => void remove(n)}>yes, withdraw</Button>

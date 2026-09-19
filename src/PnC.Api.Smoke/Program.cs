@@ -1322,13 +1322,18 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
             Must(k173_e2s == HttpStatusCode.OK && k173_d2?["value"]?.ToString() == "Not BCA" && k173_cipRows == 0,
                 $"#173: the electromechanical relay is derived Not BCA ({k173_d2?["reason"]}) and no CIP standard appears against it ({k173_cipRows} CIP rows)");
 
-            // (f) the nearest classified location rules: the station says Low, the building the device is in says Medium
-            var (k173_c2s, _) = await Post(admin, "api/v1/asset/RecordClassification", new { SubjectKind = "Node", SubjectEntityId = station, ClassificationKindCode = "CipImpactRating", ClassificationValue = "Low" });
+            // (f) #195: the rating is the building's — a station is refused (50235); the building's Medium is what the device reads
+            var (k173_c2s, k173_c2b) = await Post(admin, "api/v1/asset/RecordClassification", new { SubjectKind = "Node", SubjectEntityId = station, ClassificationKindCode = "CipImpactRating", ClassificationValue = "Low" });
             var (k173_v2s, k173_v2b) = await Post(admin, "api/v1/compliance/evaluate", new { subjectEntityId = devSel, mode = "Preview" });
             var k173_cipV = (k173_v2b?["verdicts"] as JsonArray)?.FirstOrDefault(v => v?["ruleKey"]?.ToString() == "cip007_r1");
             var k173_read = (k173_cipV?["reads"] as JsonArray)?.FirstOrDefault(r => r?["name"]?.ToString() == "device.location.classification.CipImpactRating");
-            Must(k173_c2s == HttpStatusCode.OK && k173_v2s == HttpStatusCode.OK && k173_read?["value"]?.ToString() == "Medium" && k173_cipV?["result"]?.ToString() == "true",
-                $"#173: the building's Medium rules over the station's Low — the device reads {k173_read?["value"]} and CIP-007 R1 still binds ({k173_cipV?["result"]})");
+            Must(k173_c2s == HttpStatusCode.Conflict && (k173_c2b?["detail"]?.ToString() ?? "").Contains("not on a Station") && k173_v2s == HttpStatusCode.OK && k173_read?["value"]?.ToString() == "Medium" && k173_cipV?["result"]?.ToString() == "true",
+                $"#173/#195: a station is not rated ({(int)k173_c2s} {k173_c2b?["detail"]}); the building's Medium is what the device reads ({k173_read?["value"]}) and CIP-007 R1 still binds ({k173_cipV?["result"]})");
+            // #195: the fixture building's rating is withdrawn at the end — no smoke run leaves a rating behind
+            var (k195_ws, _) = await Post(admin, "api/v1/asset/RecordClassification", new { SubjectKind = "Node", SubjectEntityId = building, ClassificationKindCode = "CipImpactRating", ClassificationValue = "" });
+            var (k195_ls, k195_lb) = await Get(admin, "api/v1/asset/vClassification?SubjectKind=Node&ClassificationKindCode=CipImpactRating&take=500");
+            var k195_left = 0; foreach (var c in (k195_lb?["rows"] as JsonArray) ?? new JsonArray()) { var (_, nb) = await Get(admin, $"api/v1/location/vNode?EntityId={c?["SubjectEntityId"]}&take=1"); if ((((nb?["rows"] as JsonArray)?.FirstOrDefault())?["Name"]?.ToString() ?? "").StartsWith("W4_")) k195_left++; }
+            Must(k195_ws == HttpStatusCode.OK && k195_ls == HttpStatusCode.OK && k195_left == 0, $"#195: the fixture building's rating withdrawn ({(int)k195_ws}); no smoke-fixture node carries a CIP rating ({k195_left} of {(k195_lb?["rows"] as JsonArray)?.Count})");
 
             // (g) a second pass changes nothing; ReadOnly may preview but not commit; the runs are on record
             var (k173_e3s, k173_e3b) = await Post(admin, "api/v1/compliance/evaluate", new { subjectEntityId = devSel, mode = "Effective" });

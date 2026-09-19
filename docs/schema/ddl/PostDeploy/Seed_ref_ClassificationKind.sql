@@ -17,7 +17,7 @@ DECLARE @now DATETIMEOFFSET(7) = SYSDATETIMEOFFSET();
 MERGE [ref].[ClassificationKind] AS t
 USING (VALUES
     (N'BesStatus',            N'BES status',            NULL, N'["Asset","Station"]', NULL, NULL),
-    (N'CipImpactRating',      N'CIP impact rating',     NULL, N'["Station"]', NULL, NULL),
+    (N'CipImpactRating',      N'CIP impact rating',     NULL, N'["Building"]', NULL, NULL),   -- #195 (owner 2026-09-19): the rating is the building's — the BES Cyber Systems it houses take it; a station is not rated
     (N'NpccBulkPowerSystem',  N'NPCC bulk power system (declared by the A-10 study)', NULL, N'["Asset"]', N'["Bus"]', NULL),
     (N'NpccA10',              N'NPCC A-10 list (retired 2026-09-16: the A-10 study declares the BPS bus — NpccBulkPowerSystem)', NULL, NULL, NULL, NULL),
     (N'Prc023',               N'PRC-023 list (impactful lines)', NULL, N'["Asset"]', N'["Line","Transformer"]', NULL),

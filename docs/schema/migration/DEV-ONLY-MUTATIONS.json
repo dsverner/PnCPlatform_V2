@@ -18,6 +18,12 @@
       "what": "#194: the eight legacy classification segments stripped from the 11,549 migrated record summaries on DEV",
       "why": "the copy made to look as the importer now makes it \u2014 an application of rule #194, recorded in RECONCILIATION-2026-09-19-DEV-194.md",
       "rule": true
+    },
+    {
+      "date": "2026-09-19",
+      "what": "#195: 75 CIP impact ratings on API-smoke fixture stations and buildings (W4_...) withdrawn (empty value through asset.RecordClassification, audited)",
+      "why": "fixture cleanup; the smoke now withdraws its own and a station is refused",
+      "rule": false
     }
   ]
 }

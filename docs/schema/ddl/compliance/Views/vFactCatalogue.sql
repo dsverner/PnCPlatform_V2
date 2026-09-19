@@ -105,11 +105,11 @@ UNION ALL
 -- it that carries the classification (location.fNearestClassified). This replaces device.station.classification.<Kind>:
 -- the owner, 2026-09-17, on the CIP requirements following from the impact rating "of building that the device is in" —
 -- a rating on the building beats one on the station, and a group that models rooms or panels can classify there instead.
--- The generator condition is unchanged: a kind that is recorded against a Station is what a location inherits.
+-- #195 (2026-09-19): a kind recorded on ANY location level (ref.LocationNodeType) is what a device inherits — the CIP impact rating is the building's (#177/#195).
 SELECT N'device.location.classification.' + k.[ClassificationKindCode], N'Fixed', N'device.location.classification.' + k.[ClassificationKindCode], NULL,
        N'asset', N'vClassification', N'ClassificationValue', N'Text', NULL, N'Device', N'BiTemporal', NULL, NULL, NULL, NULL
 FROM [ref].[ClassificationKind] k WHERE k.[IsActive] = 1
-  AND EXISTS (SELECT 1 FROM OPENJSON(ISNULL(k.[SubjectKinds], N'[]')) WHERE [value] = N'Station')
+  AND EXISTS (SELECT 1 FROM OPENJSON(ISNULL(k.[SubjectKinds], N'[]')) j JOIN [ref].[LocationNodeType] nt ON nt.[NodeTypeCode] = j.[value])   -- #195: any location level a kind is recorded on (a building's CIP rating), not stations only
 UNION ALL
 -- inherited from the primary asset the device's scheme protects, and from the bus at that terminal end
 SELECT N'device.protects.classification.' + k.[ClassificationKindCode], N'Fixed', N'device.protects.classification.' + k.[ClassificationKindCode], NULL,

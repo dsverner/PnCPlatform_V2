@@ -44,6 +44,22 @@ BEGIN
             + N'; record the inputs it reads instead.';
         THROW 50234, @m2, 1;
     END
+    -- #195 (owner, 2026-09-19): "Stations should not have a CIP impact rating ... the impact rating will be based on the
+    -- building level". A kind whose SubjectKinds names location node types is recorded on those types only: the check is
+    -- here, not on the screen. A withdrawal (empty value) is always possible.
+    DECLARE @subjectKinds NVARCHAR(400) = (SELECT k.[SubjectKinds] FROM [ref].[ClassificationKind] k WHERE k.[ClassificationKindCode] = @ClassificationKindCode);
+    IF @value IS NOT NULL AND @SubjectKind = N'Node' AND @subjectKinds IS NOT NULL
+       AND EXISTS (SELECT 1 FROM OPENJSON(@subjectKinds) j JOIN [ref].[LocationNodeType] nt ON nt.[NodeTypeCode] = j.[value])
+    BEGIN
+        DECLARE @nodeType NVARCHAR(40) = (SELECT [NodeTypeCode] FROM [location].[vNode] WHERE [EntityId] = @SubjectEntityId);
+        IF @nodeType IS NOT NULL AND NOT EXISTS (SELECT 1 FROM OPENJSON(@subjectKinds) WHERE [value] = @nodeType)
+        BEGIN
+            DECLARE @m4 NVARCHAR(400) = N'asset.RecordClassification: ' + @ClassificationKindCode + N' is recorded on a '
+                + ISNULL((SELECT STRING_AGG(j.[value], N' or ') FROM OPENJSON(@subjectKinds) j JOIN [ref].[LocationNodeType] nt ON nt.[NodeTypeCode] = j.[value]), N'location')
+                + N', not on a ' + @nodeType + N' (the rating is the building''s, #177/#195).';
+            THROW 50235, @m4, 1;
+        END
+    END
     IF @value IS NOT NULL AND @appliesTo IS NOT NULL AND @SubjectKind = N'Asset'
     BEGIN
         SELECT @assetType = a.[AssetTypeCode] FROM [asset].[vAsset] a WHERE a.[EntityId] = @SubjectEntityId;
