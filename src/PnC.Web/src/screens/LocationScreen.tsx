@@ -67,6 +67,8 @@ export default function LocationScreen({ params: p, id }: { screen: Screen; para
   const rowQ = useViewAll('location', 'vNode', { [p.key]: id ?? '' }, undefined, !!id)
   const r = rowQ.data?.[0]
   const ancestorsQ = useAncestors(r?.Path)
+  // #195 follow-up (owner, 2026-09-19): a panel, a position, any node inside a building shows the rating it inherits, read-only, with its source
+  const cipAllQ = useViewAll('asset', 'vClassification', { SubjectKind: 'Node', ClassificationKindCode: 'CipImpactRating' }, undefined, !!r && s(r.NodeTypeCode) !== 'Building')
   if (!id) return <Status bad>No location in the address.</Status>
   if (rowQ.isPending) return <Status>Loading the location…</Status>
   if (!r) return <Status bad>No node with that id is readable by you.</Status>
@@ -99,7 +101,16 @@ export default function LocationScreen({ params: p, id }: { screen: Screen; para
         {s(r.NodeTypeCode) === 'Building'
           ? <ClassificationPanel title="Applicability classifications" subjectKind="Node" subjectEntityId={s(r.EntityId)} editable={can('Asset.Modify')} kinds={NODE_KINDS}
               note="The CIP-002 impact rating of this building — every BES Cyber Asset housed in it inherits it (#173, #177, #195). Recorded by you from the entity's own CIP-002 evaluation in this phase; a value saves at once, audited." />
-          : <Panel title="Applicability classifications"><Status>The CIP-002 impact rating is recorded on a building — the BES Cyber Systems it houses take it. {s(r.NodeTypeCode) === 'Station' ? 'This station\'s buildings and their ratings are in the list below.' : 'Open the building this sits in.'}</Status></Panel>}
+          : (() => {
+              const rated = [...ancestors].reverse().map((a) => ({ a, c: (cipAllQ.data ?? []).find((c) => s(c.SubjectEntityId).toLowerCase() === s(a.EntityId).toLowerCase()) })).find((x) => x.c)
+              return (
+                <Panel title="Applicability classifications">
+                  {s(r.NodeTypeCode) !== 'Station' && <Facts cols={1} pairs={[['CIP impact rating', rated
+                    ? <span>{s(rated.c!.ClassificationValue)} <span className="text-slate-500">— inherited from <NodeLink id={s(rated.a.EntityId)} name={s(rated.a.Name)} /> ({s(rated.a.NodeTypeCode)})</span></span>
+                    : <span className="text-slate-500">none — no building above this carries a rating yet</span>]]} />}
+                  <Status>The CIP-002 impact rating is recorded on a building — the BES Cyber Systems it houses take it. {s(r.NodeTypeCode) === 'Station' ? 'This station\'s buildings and their ratings are in the list below.' : 'Open the building to change it.'}</Status>
+                </Panel>)
+            })()}
       </div>
       <div className="grid gap-3 lg:grid-cols-2">
         <Inside node={r} canEdit={canEdit} canArchive={canArchive} />
