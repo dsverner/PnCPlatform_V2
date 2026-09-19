@@ -165,7 +165,7 @@ function Inherited({ r, bca }: { r: Row; bca: string }) {
             {cipQ.isPending ? <span className="text-slate-500">…</span>
               : !cip ? <span className="text-slate-500">the device is not placed anywhere, so it inherits no rating</span>
               : !cip.value ? <span className="text-slate-500">no building above this device's position carries a rating</span>
-              : bca === 'Not BCA' ? <span className="text-slate-300">Not applicable — not a BES Cyber Asset. <span className="text-slate-500">The building <NodeLink id={cip.nodeId} name={cip.nodeName} /> is rated {cip.value}; that applies to the cyber assets it houses, not to this relay.</span></span>
+              : bca === 'Not BCA' ? <span className="text-slate-300">Not applicable — not a cyber asset. <span className="text-slate-500">The building <NodeLink id={cip.nodeId} name={cip.nodeName} /> is rated {cip.value}; that applies to the cyber assets it houses, not to this relay.</span></span>
               : <><Pill tone={cip.value === 'High' ? 'bad' : cip.value === 'Medium' ? 'warn' : 'neutral'}>{cip.value}</Pill>
                   <span className="ml-2">— {bca === 'BCA' ? 'a BES Cyber Asset in' : 'the rating of'} <NodeLink id={cip.nodeId} name={cip.nodeName} /> <span className="text-xs text-slate-500">{cip.nodeType}{cip.at ? ' · ' + fmtWhen(cip.at) : ''}{bca === 'BCA' ? '' : ' · cyber status not derived yet — evaluate below'}</span></span></>}
             <div className="text-xs text-slate-600">CIP-002: the building's rating, taken by the BES Cyber Assets it houses (#173, #195); whether this device is one is derived above.</div>

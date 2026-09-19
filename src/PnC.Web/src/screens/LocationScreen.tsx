@@ -120,7 +120,7 @@ export default function LocationScreen({ params: p, id }: { screen: Screen; para
                       const bca = bcaQ.data?.[0]?.ClassificationValue
                       return <span>{s(x.AssetName)} <span className="text-slate-500">({tech || 'technology unknown'})</span> — {bca === 'BCA'
                         ? <span className="text-amber-200">BES Cyber Asset{rated ? `: ${s(rated.c!.ClassificationValue)} impact, from the building` : ''}</span>
-                        : bca === 'Not BCA' ? <span className="text-slate-300">not a BES Cyber Asset; the building's rating does not apply to it</span>
+                        : bca === 'Not BCA' ? <span className="text-slate-300">not a cyber asset; the building's rating does not apply to it</span>
                         : <span className="text-slate-500">cyber status not derived yet — evaluate compliance on its settings record</span>}</span>
                     })()] as [string, ReactNode]] : [])]} />}
                   <Status>The CIP-002 impact rating is recorded on a building — the BES Cyber Systems it houses take it. {s(r.NodeTypeCode) === 'Station' ? 'This station\'s buildings and their ratings are in the list below.' : 'Open the building to change it.'}</Status>
