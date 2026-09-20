@@ -12,6 +12,7 @@ CREATE PROCEDURE [asset].[InstrumentWinding_Revise]
     @KneePointVoltageV DECIMAL(10,2) = NULL,
     @RatedSecondary NVARCHAR(20) = NULL,
     @Connection NVARCHAR(20) = NULL,
+    @TapInUseEntityId UNIQUEIDENTIFIER = NULL,
     @Notes NVARCHAR(400) = NULL,
     @ValidFrom DATETIMEOFFSET(7) = NULL,
     @ValidFromQuality TINYINT = 0,
@@ -32,9 +33,9 @@ BEGIN
     UPDATE [asset].[InstrumentWinding] SET [ValidTo] = @ValidFrom, [ModifiedBy] = @ActorId, [ModifiedAt] = @now
     WHERE [EntityId] = @EntityId AND [IsDeleted] = 0 AND [ValidTo] IS NULL AND [ValidFrom] <= @ValidFrom;
     DECLARE @out TABLE ([RowId] UNIQUEIDENTIFIER);
-    INSERT [asset].[InstrumentWinding] ([EntityId], [ValidFrom], [ValidFromQuality], [CreatedBy], [CreatedAt], [ModifiedBy], [ModifiedAt], [MigrationRunId], [AssetEntityId], [WindingNo], [Code], [Purpose], [RatioTaps], [RatioInUse], [AccuracyClass], [RatedBurden], [KneePointVoltageV], [RatedSecondary], [Connection], [Notes])
+    INSERT [asset].[InstrumentWinding] ([EntityId], [ValidFrom], [ValidFromQuality], [CreatedBy], [CreatedAt], [ModifiedBy], [ModifiedAt], [MigrationRunId], [AssetEntityId], [WindingNo], [Code], [Purpose], [RatioTaps], [RatioInUse], [AccuracyClass], [RatedBurden], [KneePointVoltageV], [RatedSecondary], [Connection], [TapInUseEntityId], [Notes])
     OUTPUT inserted.[RowId] INTO @out
-    VALUES (@EntityId, @ValidFrom, @ValidFromQuality, @ActorId, @now, @ActorId, @now, @MigrationRunId, @AssetEntityId, @WindingNo, @Code, @Purpose, @RatioTaps, @RatioInUse, @AccuracyClass, @RatedBurden, @KneePointVoltageV, @RatedSecondary, @Connection, @Notes);
+    VALUES (@EntityId, @ValidFrom, @ValidFromQuality, @ActorId, @now, @ActorId, @now, @MigrationRunId, @AssetEntityId, @WindingNo, @Code, @Purpose, @RatioTaps, @RatioInUse, @AccuracyClass, @RatedBurden, @KneePointVoltageV, @RatedSecondary, @Connection, @TapInUseEntityId, @Notes);
     SELECT @RowId = [RowId] FROM @out;
     COMMIT TRANSACTION;
 END;

@@ -36,6 +36,7 @@ CREATE TABLE [asset].[InstrumentWinding] (
     [KneePointVoltageV]  DECIMAL(10,2)    NULL,
     [RatedSecondary]     NVARCHAR(20)     NULL,       -- 5 A, 1 A, 115 V, 66.4 V
     [Connection]         NVARCHAR(20)     NULL     CONSTRAINT [CK_InstrumentWinding_Connection] CHECK ([Connection] IN (N'Wye', N'Delta', N'OpenDelta', N'BrokenDelta', N'Single')),
+    [TapInUseEntityId]   UNIQUEIDENTIFIER NULL     CONSTRAINT [FK_InstrumentWinding_TapInUse] REFERENCES [asset].[WindingTapRegistry] ([EntityId]),   -- #213: the tap the wires are landed on; set only through asset.SetWindingTap, which copies its ratio into RatioInUse
     [Notes]              NVARCHAR(400)    NULL,
     CONSTRAINT [PK_InstrumentWinding] PRIMARY KEY CLUSTERED ([RowSeq]),
     CONSTRAINT [UQ_InstrumentWinding_RowId] UNIQUE NONCLUSTERED ([RowId])

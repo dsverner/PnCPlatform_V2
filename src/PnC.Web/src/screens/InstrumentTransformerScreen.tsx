@@ -11,7 +11,7 @@
 // What the page shows: what it is and where it is, its nameplate (the CT_Template / VT_Template characteristics, editable),
 // the schemes it feeds, and its tests (#204). Plain React (#167); the INSTRUMENT_TRANSFORMER definition names
 // asset.vInstrumentTransformer and this component reads it.
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router'
 import { ApiError, fmtDate, fmtWhen, proc, s, view, viewAll, type Row } from '@/lib/api'
@@ -232,7 +232,7 @@ function Windings({ r, editable, canRemove, onChanged }: { r: Row; editable: boo
   const q = useViewAll('asset', 'vTransformerWinding', { AssetEntityId: asset }, 'WindingNo', !!asset)
   const rows = q.data ?? []
   const isCurrent = sourceRoleFor(s(r.AssetTypeCode)) === 'CtSource'
-  const [editing, setEditing] = useState(false); const [edit, setEdit] = useState<Record<string, Row>>({}); const [adding, setAdding] = useState(false)
+  const [editing, setEditing] = useState(false); const [edit, setEdit] = useState<Record<string, Row>>({}); const [adding, setAdding] = useState(false); const [tapsOpen, setTapsOpen] = useState<Record<string, boolean>>({})
   const blank = { Code: '', Purpose: 'Protection', RatioTaps: '', RatioInUse: '', AccuracyClass: '', RatedBurden: '', KneePointVoltageV: '', RatedSecondary: '', Connection: '', Notes: '' }
   const [add, setAdd] = useState<Record<string, string>>({ ...blank })
   const [busy, setBusy] = useState(false); const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null)
@@ -260,11 +260,12 @@ function Windings({ r, editable, canRemove, onChanged }: { r: Row; editable: boo
               const id = s(w.WindingEntityId); const f = edit[id]; const g = (k: string) => s(f?.[k] ?? '')
               const setF = (k: string) => (v: string) => setEdit({ ...edit, [id]: { ...f, [k]: v } })
               return (
-                <tr key={id} className="border-t border-slate-800 align-top">
+                <Fragment key={id}>
+                <tr className="border-t border-slate-800 align-top">
                   <td className="py-1 pr-2 font-semibold text-slate-100">{f ? field('Code', g('Code'), setF('Code'), 'w-16') : <>{s(w.Code)} <span className="text-xs font-normal text-slate-500">#{s(w.WindingNo)}</span></>}</td>
                   <td className="py-1 pr-2 text-slate-300">{f ? purposeSel(g('Purpose'), setF('Purpose')) : (s(w.Purpose) || '—')}</td>
                   <td className="py-1 pr-2 text-slate-300">{f ? field('RatioTaps', g('RatioTaps'), setF('RatioTaps'), 'w-full', '600:5, 1200:5') : (s(w.RatioTaps) || '—')}</td>
-                  <td className="py-1 pr-2 text-slate-200">{f ? field('RatioInUse', g('RatioInUse'), setF('RatioInUse'), 'w-24', '1200:5') : <>{s(w.RatioInUse) || '—'}{w.Ratio != null ? <span className="text-xs text-slate-500"> = {Number(w.Ratio)}</span> : null}</>}</td>
+                  <td className="py-1 pr-2 text-slate-200">{f && Number(w.TapCount ?? 0) === 0 ? field('RatioInUse', g('RatioInUse'), setF('RatioInUse'), 'w-24', '1200:5') : <>{s(w.RatioInUse) || '—'}{w.Ratio != null ? <span className="text-xs text-slate-500"> = {Number(w.Ratio)}</span> : null}{w.TapInUseTerminals ? <span className="text-xs text-slate-400"> · {s(w.TapInUseTerminals)}</span> : null}{Number(w.TapCount ?? 0) === 0 ? <span className="text-xs text-slate-600" title="the nameplate's taps are not listed yet"> · taps not recorded</span> : !w.TapInUseEntityId ? <span className="text-xs text-amber-300" title="taps are listed but none is marked as the one landed"> · tap not landed</span> : null}</>}</td>
                   <td className="py-1 pr-2 text-slate-300">{f ? field('AccuracyClass', g('AccuracyClass'), setF('AccuracyClass'), 'w-20', 'C400') : (s(w.AccuracyClass) || '—')}</td>
                   <td className="py-1 pr-2 text-slate-300">{f ? field('RatedBurden', g('RatedBurden'), setF('RatedBurden'), 'w-20') : (s(w.RatedBurden) || '—')}</td>
                   {isCurrent && <td className="py-1 pr-2 text-slate-300">{f ? field('KneePointVoltageV', g('KneePointVoltageV'), setF('KneePointVoltageV'), 'w-16') : (w.KneePointVoltageV != null ? `${Number(w.KneePointVoltageV)} V` : '—')}</td>}
@@ -274,9 +275,12 @@ function Windings({ r, editable, canRemove, onChanged }: { r: Row; editable: boo
                   {editing && <td className="py-1"><span className="flex flex-wrap gap-1 text-xs">
                     {!f && <Button kind="mini" disabled={busy} onClick={() => setEdit({ ...edit, [id]: { Code: w.Code, Purpose: w.Purpose ?? 'Protection', RatioTaps: w.RatioTaps ?? '', RatioInUse: w.RatioInUse ?? '', AccuracyClass: w.AccuracyClass ?? '', RatedBurden: w.RatedBurden ?? '', KneePointVoltageV: w.KneePointVoltageV ?? '', RatedSecondary: w.RatedSecondary ?? '', Connection: w.Connection ?? '', Notes: w.Notes ?? '' } })}>Edit</Button>}
                     {f && <><Button kind="mini" disabled={busy} onClick={() => save(w)}>Save</Button><Button kind="mini" disabled={busy} onClick={() => setEdit((x) => { const n = { ...x }; delete n[id]; return n })}>Cancel</Button></>}
+                    {!f && <Button kind="mini" disabled={busy} onClick={() => setTapsOpen({ ...tapsOpen, [id]: !tapsOpen[id] })}>{tapsOpen[id] ? 'Hide taps' : 'Taps'}</Button>}
                     {canRemove && !f && (Number(w.UseCount ?? 0) === 0 ? <Button kind="mini" disabled={busy} onClick={() => remove(w)}>Remove</Button> : <span className="text-slate-500" title={s(w.UsedBy)}>used — free it first</span>)}
                   </span></td>}
-                </tr>)
+                </tr>
+                {(tapsOpen[id] || (!editing && Number(w.TapCount ?? 0) > 0)) && <tr><td colSpan={editing ? 11 : 10} className="pb-2 pl-4"><Taps winding={w} editing={editing} canRemove={canRemove} onChanged={onChanged} /></td></tr>}
+                </Fragment>)
             })}
           </tbody>
         </table>)}
@@ -297,8 +301,60 @@ function Windings({ r, editable, canRemove, onChanged }: { r: Row; editable: boo
           <Button disabled={busy} onClick={() => setAdding(false)}>Cancel</Button>
         </div>)}
       {msg && <Status bad={msg.bad}>{msg.text}</Status>}
-      <Status>Each secondary winding has its own ratio, class and burden and feeds its own circuit; a scheme names the winding it uses (Feeds, below), and the relay's ratio setting is checked against that winding. The taps are kept as text until the cabling phase gives them terminals.</Status>
+      <Status>Each secondary winding has its own ratio, class and burden and feeds its own circuit; a scheme names the winding it uses (Feeds, below), and the relay's ratio setting is checked against that winding. A winding's taps are its terminal pairs and their ratios; the ratio in use is the tap the wires are landed on — list the taps and land one, and the typed ratio gives way to it.</Status>
     </Panel>
+  )
+}
+
+/** #213: a winding's taps — its terminal pairs and their ratios (asset.vTransformerTap; the generator owns vWindingTap) — and which one the wires are landed on.
+ * The owner: "Every CT has discrete tap capabilities which should be listed even though they may not be known at this time."
+ * Landing a tap goes through asset.SetWindingTap, the one way, which copies the tap's ratio into the winding's ratio in use;
+ * a winding whose taps are not listed keeps its typed ratio. Edit mode adds a tap (terminals optional), removes one not
+ * landed, lands one, or returns to the typed ratio. */
+function Taps({ winding, editing, canRemove, onChanged }: { winding: Row; editing: boolean; canRemove: boolean; onChanged: () => void }) {
+  const wid = s(winding.WindingEntityId)
+  const q = useViewAll('asset', 'vTransformerTap', { WindingEntityId: wid }, 'TapNo', !!wid)
+  const rows = q.data ?? []
+  const [adding, setAdding] = useState(false); const [terminals, setTerminals] = useState(''); const [ratio, setRatio] = useState('')
+  const [busy, setBusy] = useState(false); const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null)
+  const run = async (fn: () => Promise<void>, said: string) => { setBusy(true); setMsg(null); try { await fn(); setMsg({ text: said }); onChanged() } catch (e) { setMsg({ text: e instanceof ApiError ? e.message : String(e), bad: true }) } finally { setBusy(false) } }
+  const nextNo = Math.max(0, ...rows.map((x) => Number(x.TapNo ?? 0))) + 1
+  const add = () => { if (!ratio.trim()) { setMsg({ text: 'A tap needs its ratio (1200:5).', bad: true }); return }
+    void run(async () => { await proc('asset', 'WindingTap_Add', { WindingEntityId: wid, TapNo: nextNo, Terminals: terminals.trim() || null, Ratio: ratio.trim() }); setTerminals(''); setRatio(''); setAdding(false) }, `tap ${nextNo} added.`) }
+  const land = (tap: Row | null) => void run(async () => { await proc('asset', 'SetWindingTap', { WindingEntityId: wid, TapEntityId: tap ? tap.TapEntityId : null }) }, tap ? `landed on ${s(tap.Terminals) || 'tap ' + s(tap.TapNo)} — ratio in use ${s(tap.RatioText)}.` : 'the typed ratio is in use again.')
+  const remove = (tap: Row) => void run(async () => { await proc('asset', 'WindingTap_SoftDelete', { EntityId: tap.TapEntityId }) }, `tap ${s(tap.TapNo)} removed.`)
+  return (
+    <div className="text-xs">
+      <div className="mb-1 uppercase tracking-wide text-slate-500">Taps of {s(winding.Code)}{q.isPending ? ' …' : rows.length ? '' : ' — not recorded'}</div>
+      {rows.length > 0 && (
+        <table className="w-auto text-xs">
+          <thead><tr className="text-left uppercase tracking-wide text-slate-600"><th className="pr-3 font-normal">Tap</th><th className="pr-3 font-normal">Terminals</th><th className="pr-3 font-normal">Ratio</th><th className="pr-3 font-normal">Landed</th>{editing && <th className="font-normal">Actions</th>}</tr></thead>
+          <tbody>
+            {rows.map((x) => (
+              <tr key={s(x.TapEntityId)} className="align-top">
+                <td className="pr-3 text-slate-400">{s(x.TapNo)}</td>
+                <td className="pr-3 text-slate-200">{s(x.Terminals) || <span className="text-slate-600">—</span>}</td>
+                <td className="pr-3 text-slate-200">{s(x.RatioText)}{x.Ratio != null ? <span className="text-slate-500"> = {Number(x.Ratio)}</span> : null}</td>
+                <td className="pr-3">{x.IsInUse === true ? <Pill tone="good">landed</Pill> : <span className="text-slate-600">—</span>}</td>
+                {editing && <td><span className="flex flex-wrap gap-1">
+                  {!x.IsInUse && <Button kind="mini" disabled={busy} onClick={() => land(x)}>Land on this tap</Button>}
+                  {!!x.IsInUse && <Button kind="mini" disabled={busy} title="clear the tap; the ratio in use stays as it reads until typed over" onClick={() => land(null)}>Use the typed ratio</Button>}
+                  {canRemove && !x.IsInUse && <Button kind="mini" disabled={busy} onClick={() => remove(x)}>Remove</Button>}
+                </span></td>}
+              </tr>))}
+          </tbody>
+        </table>)}
+      {editing && !adding && <div className="mt-1"><Button kind="mini" disabled={busy} onClick={() => setAdding(true)}>Add a tap</Button></div>}
+      {editing && adding && (
+        <div className="mt-1 flex flex-wrap items-end gap-2">
+          <span className="text-slate-400">Tap {nextNo}:</span>
+          <label className="flex flex-col gap-1 text-slate-400">Terminals (optional)<input className={`${inputClass} w-24`} value={terminals} disabled={busy} placeholder="X1-X3" onChange={(e) => setTerminals(e.target.value)} /></label>
+          <label className="flex flex-col gap-1 text-slate-400">Ratio<input className={`${inputClass} w-24`} value={ratio} disabled={busy} placeholder="1200:5" onChange={(e) => setRatio(e.target.value)} /></label>
+          <Button kind="primary" disabled={busy} onClick={() => add()}>Add</Button>
+          <Button disabled={busy} onClick={() => setAdding(false)}>Cancel</Button>
+        </div>)}
+      {msg && <Status bad={msg.bad}>{msg.text}</Status>}
+    </div>
   )
 }
 

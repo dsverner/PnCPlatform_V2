@@ -63,6 +63,7 @@
 
   "procedures": {
     "asset.PlaceAsset":                    "Asset.Modify",
+    "asset.SetWindingTap":                 "Asset.Modify",
     "asset.RecordClassification":          "Asset.Modify",
     "asset.RecordAssetRating":             "Asset.Modify",
     "asset.DeriveClassification":          null,                     

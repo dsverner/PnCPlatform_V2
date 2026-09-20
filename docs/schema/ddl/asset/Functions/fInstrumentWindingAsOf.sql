@@ -3,9 +3,9 @@ CREATE FUNCTION [asset].[fInstrumentWindingAsOf] (@validAt DATETIMEOFFSET(7), @b
 RETURNS TABLE AS RETURN
 -- bi-temporal as-of (decision 69): rows valid at @validAt as the database believed them at
 -- @believedAtUtc (system time, UTC). A row deleted after @believedAtUtc is still returned.
-SELECT [RowSeq], [RowId], [EntityId], [ValidFrom], [ValidTo], [ValidFromQuality], [CreatedBy], [CreatedAt], [ModifiedBy], [ModifiedAt], [IsDeleted], [DeletedBy], [DeletedAt], [MigrationRunId], [AssetEntityId], [WindingNo], [Code], [Purpose], [RatioTaps], [RatioInUse], [AccuracyClass], [RatedBurden], [KneePointVoltageV], [RatedSecondary], [Connection], [Notes], [SysStart], [SysEnd]
+SELECT [RowSeq], [RowId], [EntityId], [ValidFrom], [ValidTo], [ValidFromQuality], [CreatedBy], [CreatedAt], [ModifiedBy], [ModifiedAt], [IsDeleted], [DeletedBy], [DeletedAt], [MigrationRunId], [AssetEntityId], [WindingNo], [Code], [Purpose], [RatioTaps], [RatioInUse], [AccuracyClass], [RatedBurden], [KneePointVoltageV], [RatedSecondary], [Connection], [TapInUseEntityId], [Notes], [SysStart], [SysEnd]
 FROM (
-    SELECT [RowSeq], [RowId], [EntityId], [ValidFrom], [ValidTo], [ValidFromQuality], [CreatedBy], [CreatedAt], [ModifiedBy], [ModifiedAt], [IsDeleted], [DeletedBy], [DeletedAt], [MigrationRunId], [AssetEntityId], [WindingNo], [Code], [Purpose], [RatioTaps], [RatioInUse], [AccuracyClass], [RatedBurden], [KneePointVoltageV], [RatedSecondary], [Connection], [Notes], [SysStart], [SysEnd],
+    SELECT [RowSeq], [RowId], [EntityId], [ValidFrom], [ValidTo], [ValidFromQuality], [CreatedBy], [CreatedAt], [ModifiedBy], [ModifiedAt], [IsDeleted], [DeletedBy], [DeletedAt], [MigrationRunId], [AssetEntityId], [WindingNo], [Code], [Purpose], [RatioTaps], [RatioInUse], [AccuracyClass], [RatedBurden], [KneePointVoltageV], [RatedSecondary], [Connection], [TapInUseEntityId], [Notes], [SysStart], [SysEnd],
            ROW_NUMBER() OVER (PARTITION BY [EntityId] ORDER BY [ValidFrom] DESC, [RowSeq] DESC) AS _rn
     FROM [asset].[InstrumentWinding] FOR SYSTEM_TIME AS OF @believedAtUtc
     WHERE [IsDeleted] = 0

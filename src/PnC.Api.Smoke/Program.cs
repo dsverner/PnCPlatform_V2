@@ -1685,6 +1685,39 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
                 $"#212: another transformer's winding is refused in the rule's words ({(int)k212_xs} {k212_xb?["detail"]}); ReadOnly may not add a winding ({(int)k212_ros}); the winding knows what uses it ({k212_used})");
         }
 
+        // ======== #213 (2026-09-20): a winding's taps are discrete rows and the ratio in use is the tap landed — the owner: "Every CT
+        // has discrete tap capabilities which should be listed even though they may not be known at this time." SetWindingTap is the
+        // one way to land one: it checks the tap is the winding's (50274) and writes the winding's ratio from the tap's.
+        {
+            var (_, k213_ctb) = await Get(admin, $"api/v1/asset/vInstrumentTransformer?Name={Uri.EscapeDataString($"{tag} line CT (S2 winding)")}&take=1");
+            var k213_ct = Id((k213_ctb?["rows"] as JsonArray)?.FirstOrDefault());
+            var (_, k213_wb) = await Get(admin, $"api/v1/asset/vTransformerWinding?AssetEntityId={k213_ct}&take=10");
+            var k213_s2 = ((k213_wb?["rows"] as JsonArray) ?? []).OrderByDescending(x => x?["WindingNo"]?.GetValue<int>() ?? 0).FirstOrDefault();   // the winding #212 added (600:5)
+            var k213_w = k213_s2?["WindingEntityId"]?.ToString();
+            var (k213_t1s, k213_t1b) = await Post(admin, "api/v1/asset/WindingTap_Add", new { WindingEntityId = k213_w, TapNo = 1, Terminals = "X1-X2", Ratio = "600:5" });
+            var (k213_t2s, k213_t2b) = await Post(admin, "api/v1/asset/WindingTap_Add", new { WindingEntityId = k213_w, TapNo = 2, Terminals = "X1-X3", Ratio = "1200:5" });
+            var (_, k213_lb) = await Get(admin, $"api/v1/asset/vTransformerTap?WindingEntityId={k213_w}&take=10");
+            var k213_taps = (k213_lb?["rows"] as JsonArray) ?? [];
+            var (k213_ss, k213_sb) = await Post(admin, "api/v1/asset/SetWindingTap", new { WindingEntityId = k213_w, TapEntityId = Id(k213_t2b) });
+            var (_, k213_w2b) = await Get(admin, $"api/v1/asset/vTransformerWinding?WindingEntityId={k213_w}&take=1");
+            var k213_after = (k213_w2b?["rows"] as JsonArray)?.FirstOrDefault();
+            var (_, k213_srcb) = await Get(admin, $"api/v1/scheme/vSchemeSource?AssetEntityId={k213_ct}&take=5");
+            var k213_src = (k213_srcb?["rows"] as JsonArray)?.FirstOrDefault();   // #212 moved the membership to this winding
+            Must(k213_t1s == HttpStatusCode.OK && k213_t2s == HttpStatusCode.OK && k213_taps.Count == 2 && k213_ss == HttpStatusCode.OK
+                 && k213_after?["RatioInUse"]?.ToString() == "1200:5" && k213_after?["TapInUseTerminals"]?.ToString() == "X1-X3" && k213_after?["TapCount"]?.GetValue<int>() == 2
+                 && Math.Abs((k213_src?["Ratio"]?.GetValue<decimal>() ?? 0) - 240m) < 0.01m,
+                $"#213: two taps listed on the winding ({(int)k213_t1s} {Code(k213_t1b)}, {(int)k213_t2s} {Code(k213_t2b)}; {k213_taps.Count}); landed on X1-X3 ({(int)k213_ss} {Code(k213_sb)}) — the winding reads {k213_after?["RatioInUse"]} · {k213_after?["TapInUseTerminals"]} and the scheme's source ratio {k213_src?["Ratio"]}");
+            var (_, k213_ob) = await Get(admin, "api/v1/asset/vTransformerTap?take=50");
+            var k213_other = ((k213_ob?["rows"] as JsonArray) ?? []).FirstOrDefault(x => x?["WindingEntityId"]?.ToString()?.Equals(k213_w, StringComparison.OrdinalIgnoreCase) == false)?["TapEntityId"]?.ToString();
+            var (k213_xs, k213_xb) = k213_other is null ? (HttpStatusCode.Conflict, (JsonNode?)new JsonObject { ["detail"] = "no other winding has a tap yet — nothing to refuse" }) : await Post(admin, "api/v1/asset/SetWindingTap", new { WindingEntityId = k213_w, TapEntityId = k213_other });
+            var (k213_cs, _) = await Post(admin, "api/v1/asset/SetWindingTap", new { WindingEntityId = k213_w, TapEntityId = (string?)null });
+            var (_, k213_w3b) = await Get(admin, $"api/v1/asset/vTransformerWinding?WindingEntityId={k213_w}&take=1");
+            var k213_cleared = (k213_w3b?["rows"] as JsonArray)?.FirstOrDefault();
+            var (k213_ros, _) = await Post(readOnly!, "api/v1/asset/SetWindingTap", new { WindingEntityId = k213_w, TapEntityId = Id(k213_t1b) });
+            Must(k213_xs == HttpStatusCode.Conflict && k213_cs == HttpStatusCode.OK && k213_cleared?["TapInUseEntityId"] is null && k213_cleared?["RatioInUse"]?.ToString() == "1200:5" && k213_ros == HttpStatusCode.Forbidden,
+                $"#213: another winding's tap is refused ({(int)k213_xs} {k213_xb?["detail"]}); clearing the tap keeps the ratio as it reads ({(int)k213_cs}: {k213_cleared?["RatioInUse"]}, tap {k213_cleared?["TapInUseEntityId"] ?? "none"}); ReadOnly may not land one ({(int)k213_ros})");
+        }
+
         // ======== #187 (2026-09-18): a new relay from its position, its first settings from the template, and the record that
         // says where it is and what it wears. The owner went the intuitive way — building, panel, record — and read "no FLOC" as
         // "not placed" and could not tell whether the relay "had a template applied". No screen created a relay; "New setting

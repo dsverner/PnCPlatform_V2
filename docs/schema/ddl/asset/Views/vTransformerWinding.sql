@@ -19,6 +19,9 @@ SELECT w.[EntityId]             AS [WindingEntityId],   -- not EntityId: the API
        w.[RatedSecondary],
        w.[Connection],
        w.[Notes],
+       w.[TapInUseEntityId],   -- #213
+       tp.[Terminals]          AS [TapInUseTerminals],
+       ISNULL(tc.[N], 0)       AS [TapCount],
        ISNULL(u.[UseCount], 0) AS [UseCount],
        u.[UsedBy],
        w.[ValidFrom],
@@ -30,6 +33,8 @@ OUTER APPLY (SELECT TRY_CONVERT(DECIMAL(18,4), LTRIM(RTRIM(LEFT(x.[T], x.[P] - 1
              FROM (SELECT REPLACE(REPLACE(w.[RatioInUse], N'-', N':'), N'/', N':') AS [T]) y
              CROSS APPLY (SELECT y.[T], CHARINDEX(N':', y.[T]) AS [P]) x
              WHERE x.[P] > 1) r
+LEFT JOIN [asset].[WindingTap] tp ON tp.[EntityId] = w.[TapInUseEntityId] AND tp.[ValidTo] IS NULL AND tp.[IsDeleted] = 0
+OUTER APPLY (SELECT COUNT(*) AS [N] FROM [asset].[WindingTap] x WHERE x.[WindingEntityId] = w.[EntityId] AND x.[ValidTo] IS NULL AND x.[IsDeleted] = 0) tc
 OUTER APPLY (SELECT COUNT(*) AS [UseCount],
                     STRING_AGG(sc.[Name] + ISNULL(N' · ' + ai.[InputCode], N''), N'; ') WITHIN GROUP (ORDER BY sc.[Name]) AS [UsedBy]
              FROM [scheme].[SchemeMember] sm
