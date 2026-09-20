@@ -41,9 +41,11 @@ import { ClassificationPanel, NODE_KINDS, NodeLink, bit } from './PrimaryAssetSc
 import { INSTRUMENT_TRANSFORMER_TYPES } from './InstrumentTransformerScreen'
 import { saveAssetCharacteristic, useTemplateDefs } from '@/components/CharacteristicsPanel'
 
-/** #201: the node types an instrument transformer stands at — the yard and its bays and equipment positions for a CT, VT
- * or CVT; a panel for an auxiliary CT or VT; the station or building for one not yet placed finer. */
-const IT_NODE_TYPES = ['Yard', 'Bay', 'EquipmentPosition', 'Panel', 'Station', 'Building']
+/** #202 (the owner, 2026-09-19): on the transmission network an instrument transformer is a child of the Yard, not of a bay
+ * ("later on … bays within buildings … for now, they are in the yards only"); a panel-mounted auxiliary CT or VT stands at a
+ * Panel. asset.PlaceAsset refuses anything else (50218), so the form is offered only where the database will accept it. */
+const IT_NODE_TYPES = ['Yard', 'Panel']
+const IT_TYPES_AT: Record<string, string[]> = { Yard: ['CT', 'VT', 'COUPLING_CAPACITOR_VT', 'CCPD', 'METERING_UNIT'], Panel: ['CT_AUX', 'VT_AUX'] }
 
 /** The node types location.vFloc treats as a position — the places a device is installed (and the only node types
  * asset.PlaceAsset accepts for a device: it demands NodeTypeCode = 'DevicePosition' and throws 50215 otherwise). */
@@ -817,7 +819,7 @@ function InstrumentTransformersHere({ node, canEdit }: { node: Row; canEdit: boo
   return (
     <Panel title={`Instrument transformers here · ${q.isPending ? '…' : rows.length}`}>
       {q.isError && <Status bad>Could not read the transformers here: {(q.error as Error).message}</Status>}
-      {!q.isPending && !rows.length && <Status>No CT, VT or auxiliary transformer is placed at {s(node.Name)}.</Status>}
+      {!q.isPending && !rows.length && <Status>{s(node.NodeTypeCode) === 'Panel' ? 'No auxiliary CT or VT is mounted on' : 'No CT, VT or CVT stands in'} {s(node.Name)}.</Status>}
       {rows.length > 0 && (
         <ul className="space-y-1 text-sm">
           {rows.map((x) => (
@@ -839,9 +841,10 @@ function InstrumentTransformersHere({ node, canEdit }: { node: Row; canEdit: boo
  * part-way leaves what was written and names it. */
 function NewInstrumentTransformerForm({ node, onDone }: { node: Row; onDone: () => void }) {
   const typesQ = useViewAll('ref', 'vAssetType', {}, 'Name')
-  const types = (typesQ.data ?? []).filter((t) => INSTRUMENT_TRANSFORMER_TYPES.includes(s(t.AssetTypeCode)))
+  const allowed = IT_TYPES_AT[s(node.NodeTypeCode)] ?? INSTRUMENT_TRANSFORMER_TYPES
+  const types = (typesQ.data ?? []).filter((t) => allowed.includes(s(t.AssetTypeCode)))
   const [open, setOpen] = useState(false)
-  const [type, setType] = useState('CT')
+  const [type, setType] = useState(allowed[0])
   const [name, setName] = useState('')
   const [serial, setSerial] = useState('')
   const [ratio, setRatio] = useState('')
@@ -860,7 +863,7 @@ function NewInstrumentTransformerForm({ node, onDone }: { node: Row; onDone: () 
       await proc('asset', 'PlaceAsset', { AssetEntityId: assetId, NodeEntityId: node.EntityId, PlacementKind: 'Installed' })
       const def = (defsQ.data ?? []).find((d) => s(d.CharacteristicKey) === 'RatioInUse')
       if (ratio.trim() && def) await saveAssetCharacteristic(assetId, def, ratio.trim())
-      setMsg({ text: `${name.trim()} (${s(chosen.Name)}${ratio.trim() ? ', ' + ratio.trim() : ''}${serial.trim() ? ', serial ' + serial.trim() : ''}) is placed at ${s(node.Name)}.${ratio.trim() && !def ? ' The ratio was not saved: the type names no nameplate template.' : ''}` })
+      setMsg({ text: `${name.trim()} (${s(chosen.Name)}${ratio.trim() ? ', ' + ratio.trim() : ''}${serial.trim() ? ', serial ' + serial.trim() : ''}) ${s(node.NodeTypeCode) === 'Panel' ? 'is mounted on' : 'stands in'} ${s(node.Name)}.${ratio.trim() && !def ? ' The ratio was not saved: the type names no nameplate template.' : ''}` })
       setName(''); setSerial(''); setRatio(''); setOpen(false); onDone()
     } catch (e) {
       const why = e instanceof ApiError ? e.message : String(e)

@@ -50,6 +50,21 @@ BEGIN
             DECLARE @m1 NVARCHAR(400) = CONCAT(N'asset.PlaceAsset: a device is placed at a DevicePosition or in custody, not at a ', @nodeType, N' (§4.4).');
             THROW 50215, @m1, 1;
         END;
+        -- #202 (the owner, 2026-09-19): "instrument transformers on a transmission network are not installed in a bay, as they
+        -- are on a distribution network. On the transmission network they are located in a yard, so they are a child of the
+        -- Yard … later on we may place bays within buildings and then auxiliaries could also be placed as a child of bays, but
+        -- for now they are in the yards only." A CT, VT, CVT, CCPD or metering unit stands in a Yard; a panel-mounted auxiliary
+        -- CT or VT stands at a Panel. Widening this to bays is one line here when that day comes.
+        IF @typeCode IN (N'CT', N'VT', N'COUPLING_CAPACITOR_VT', N'CCPD', N'METERING_UNIT') AND @nodeType <> N'Yard'
+        BEGIN
+            DECLARE @m3 NVARCHAR(400) = CONCAT(N'asset.PlaceAsset: an instrument transformer stands in a Yard on the transmission network, not at a ', @nodeType, N' (the owner, 2026-09-19).');
+            THROW 50218, @m3, 1;
+        END;
+        IF @typeCode IN (N'CT_AUX', N'VT_AUX') AND @nodeType <> N'Panel'
+        BEGIN
+            DECLARE @m4 NVARCHAR(400) = CONCAT(N'asset.PlaceAsset: an auxiliary CT or VT is panel-mounted — it stands at a Panel, not at a ', @nodeType, N'.');
+            THROW 50218, @m4, 1;
+        END;
     END
     ELSE IF NOT EXISTS (SELECT 1 FROM [location].[vCustodyLocation] WHERE [EntityId] = @CustodyLocationEntityId)
         THROW 50214, N'asset.PlaceAsset: the custody location is not current.', 1;
