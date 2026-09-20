@@ -8,13 +8,14 @@ CREATE PROCEDURE [compliance].[RuleEvaluationRun_Complete]
     @InstancesOpened INT = NULL,
     @InstancesClosed INT = NULL,
     @InstancesUnchanged INT = NULL,
-    @ResultDocumentEntityId UNIQUEIDENTIFIER = NULL
+    @ResultDocumentEntityId UNIQUEIDENTIFIER = NULL,
+    @Notes NVARCHAR(MAX) = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
     UPDATE [compliance].[RuleEvaluationRun]
        SET [CompletedAt] = @CompletedAt, [SubjectsScoped] = @SubjectsScoped, [InstancesOpened] = @InstancesOpened,
-           [InstancesClosed] = @InstancesClosed, [InstancesUnchanged] = @InstancesUnchanged, [ResultDocumentEntityId] = @ResultDocumentEntityId
+           [InstancesClosed] = @InstancesClosed, [InstancesUnchanged] = @InstancesUnchanged, [ResultDocumentEntityId] = @ResultDocumentEntityId, [Notes] = @Notes
      WHERE [RunId] = @RunId AND [CompletedAt] IS NULL;
     IF @@ROWCOUNT = 0 THROW 50172, N'RuleEvaluationRun_Complete: no open run has that id.', 1;
 END;

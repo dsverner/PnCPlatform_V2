@@ -11,7 +11,8 @@ CREATE TABLE [compliance].[RuleEvaluationRun] (
     [InstancesOpened]    INT              NULL,
     [InstancesClosed]    INT              NULL,
     [InstancesUnchanged] INT              NULL,
-    [ResultDocumentEntityId] UNIQUEIDENTIFIER NULL CONSTRAINT [FK_RuleEvaluationRun_ResultDocument] REFERENCES [document].[DocumentRegistry] ([EntityId])
+    [ResultDocumentEntityId] UNIQUEIDENTIFIER NULL CONSTRAINT [FK_RuleEvaluationRun_ResultDocument] REFERENCES [document].[DocumentRegistry] ([EntityId]),
+    [Notes]              NVARCHAR(MAX)    NULL    -- #214: rule-level errors ("smoke_x_R: no scope") and the requests the pass served
 );
 GO
 EXEC sys.sp_addextendedproperty @name = N'PnC.TemporalClass', @value = N'AppendOnly',

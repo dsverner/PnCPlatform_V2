@@ -1,0 +1,29 @@
+{
+  "g": 1,
+  "kind": "screen",
+  "key": "COMPLIANCE_EVALUATION",
+  "name": "Evaluation",
+  "description": "How the platform keeps compliance evaluated (#214): the requests left by writes that changed a fact the rules read, the passes that answered them (FactChanged within seconds, the hourly pass, a rule approved), the rules a pass could not evaluate, and the one hand-run — for after a rule changes. Reads compliance.vEvaluationQueue and compliance.vRuleEvaluationRun.",
+  "menu": {
+    "group": "Compliance",
+    "label": "Evaluation",
+    "order": 42
+  },
+  "permission": "Obligation.Read",
+  "screenKind": "list",
+  "params": {
+    "view": "compliance.vEvaluationQueue",
+    "orderBy": "RequestedAt",
+    "rowKey": "RequestId",
+    "columns": [
+      { "key": "RequestedAt", "label": "Requested" },
+      { "key": "SubjectKind", "label": "About" },
+      { "key": "SubjectName", "label": "Subject" },
+      { "key": "Reason", "label": "Changed by" },
+      { "key": "RequestedByName", "label": "Who" },
+      { "key": "IsPending", "label": "Pending" },
+      { "key": "DevicesFound", "label": "Devices" }
+    ],
+    "textFilterColumns": ["SubjectName", "Reason"]
+  }
+}

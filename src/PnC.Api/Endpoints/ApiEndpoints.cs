@@ -96,6 +96,8 @@ public static class ApiEndpoints
             var (kind, id) = SubjectOf(body, map, map.SubjectClass(proc.Schema, proc.Name));
             await authz.RequireAsync(s, u, code, kind, id, $"POST {proc.Key}", http.Connection.RemoteIpAddress?.ToString() ?? "", ct);
             var result = await s.ExecuteProcedureAsync(proc, body, ct);
+            // #214: a write that changed a fact the compliance rules read leaves an evaluation request; the worker answers it
+            await PnC.Api.Engine.ComplianceTriggers.AfterWriteAsync(proc, body, s, catalog, app.Logger, ct);
             return Results.Json(result);
         });
 

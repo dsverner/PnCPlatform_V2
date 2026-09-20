@@ -1,35 +1,22 @@
 // #171 (2026-09-16): the Compliance tab of a settings record — what this device is, what it inherits from the station and
-// from the primary asset its scheme protects, the obligations standing against it, and the evaluator's own working.
-// Plain React (the #167 rule). Nothing here decides an obligation: the rules and the formulas are definitions and the
-// evaluator (POST /api/v1/compliance/evaluate) is the only thing that reads them — this screen shows what it read.
-import { useEffect, useState } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+// from the primary asset its scheme protects, the obligations standing against it, and the platform's standing verdict on
+// every rule. Plain React (the #167 rule). Nothing here decides an obligation: the rules and the formulas are definitions
+// and the evaluator is the only thing that reads them. #214 (the owner, 2026-09-20: "Should the evaluation be an automatic
+// function of what is presently known about the system?"): it is — this tab reads what the platform decided
+// (compliance.vDeviceVerdict, vDeviceEvaluation), when and why, and has no button. A change that a rule reads leaves an
+// evaluation request; the worker answers within seconds; the hourly pass is the catch-all (Compliance › Evaluation).
+import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router'
-import { ApiError, fmtDate, fmtWhen, postJson, s, view, viewAll, type Row } from '@/lib/api'
+import { fmtDate, fmtWhen, s, view, viewAll, type Row } from '@/lib/api'
 import { useCan, useViewAll } from '@/lib/hooks'
 import { screenPath } from '@/lib/screens'
 import { Panel, Pill, Button, Status, type Tone } from '@/components/ui/ui'
 import { ClassificationPanel, DEVICE_KINDS, NodeLink, kindApplies, useClassificationKindRef, useClassifications, type DerivedNote } from './PrimaryAssetScreen'
 
-/** The evaluator's report (src/PnC.Api/Engine/ComplianceEvaluator.cs, serialised camelCase). */
+/** One fact read, as the evaluator records it on a verdict (compliance.SubjectVerdict.ReadsJson) and on an obligation. */
 export interface FactRead { name: string; params: string | null; value: string }
-export interface Verdict {
-  ruleKey: string; ruleName: string; ruleVersionRowId: string; requirementEntityId: string | null
-  subjectKind: string; subjectEntityId: string; subjectName: string
-  result: 'true' | 'false' | 'unknown' | 'error'; error: string | null; unknowns: string[]; reads: FactRead[]
-  instanceRowId: string | null; action: 'open' | 'supersede' | 'close' | 'unchanged' | 'none'; evidenceNote: string | null   // #197: supersede = the obligation stood under an earlier rule version
-  requirementNumber: string | null; standardCode: string | null; standardVersion: string | null
-}
-/** What a Program.ClassificationDerivation decided for one subject in this pass (#173): the value, why, and — in an
- * Effective pass — what asset.DeriveClassification did with it (Set, RecordedStands, …; a Preview writes nothing). */
-export interface Derived {
-  key: string; kind: string; subjectKind: string; subjectEntityId: string; subjectName: string
-  value: string | null; reason: string; reads: FactRead[]; outcome: string; error: string | null
-}
-export interface EvaluationReport {
-  at: string; mode: string; rules: number; subjects: number; opened: number; closed: number; unchanged: number
-  unknown: number; errors: number; verdicts: Verdict[]; ruleErrors: string[]; runId: string; derivations: Derived[]
-}
+const readsOf = (v: Row): FactRead[] => { try { return (JSON.parse(s(v.ReadsJson) || '[]') as FactRead[]) ?? [] } catch { return [] } }
 
 /** The PRC-023 loadability working, in the order the calculation goes (the Program.Formula seeds of #171). */
 const PRC023_READS: [string, string][] = [
@@ -51,6 +38,8 @@ const statusTone = (v: unknown): Tone => {
   return 'neutral'
 }
 const resultTone = (v: string): Tone => (v === 'true' ? 'good' : v === 'false' ? 'neutral' : v === 'unknown' ? 'warn' : 'bad')
+/** The pass that last looked, in words (compliance.RuleEvaluationRun.Trigger). */
+const triggerWords = (t: unknown) => ({ Scheduled: 'the hourly pass', FactChanged: 'after a change', RuleApproved: 'after a rule was approved', Manual: 'run by hand' } as Record<string, string>)[s(t)] ?? s(t)
 
 /** What the device's scheme protects, with each primary asset's applicability classifications and the bus at the end it
  * protects from. Lifted out of RecordScreen so the Where panel and this tab ask the same question once (#171). */
@@ -100,14 +89,12 @@ export function useLocationCip(positionNodeEntityId: string, deviceEntityId: str
 
 /** The BES Cyber Asset line (#173). The value is the platform's, written by a derivation the evaluator runs — so until a
  * derived row exists this says only that no pass has run and lists the inputs as facts; it never announces the verdict
- * itself. After an Evaluate now the report's `derivations` array is the authority: its value, its reason, its outcome. */
-function besCyberAssetNote(r: Row, protectedAssets: Row[] | undefined, current: Row | undefined, report: EvaluationReport | null): DerivedNote {
-  const d = (report?.derivations ?? []).find((x) => x.kind === 'BesCyberAsset' && s(x.subjectEntityId).toLowerCase() === s(r.DeviceEntityId).toLowerCase())
-  if (d?.error) return { label: `could not be evaluated: ${d.error}`, reason: d.error }
-  if (current) return { reason: d?.reason }                       // a derived row stands; its reason is the pass's, if one has run
-  if (d && !d.value) return { label: `undetermined — ${d.reason}` }
-  if (d?.value) return { label: `${d.value} — the preview decided this; press Commit to record it (${d.reason})` }
-  return { label: `not yet evaluated — press Evaluate now. The inputs: ${besCyberAssetInputs(r, protectedAssets)}.` }
+ * itself. #214: the derivation's standing verdict (compliance.vDeviceVerdict, VerdictKind Derivation) carries its reason. */
+function besCyberAssetNote(r: Row, protectedAssets: Row[] | undefined, current: Row | undefined, derived: Row | undefined): DerivedNote {
+  if (derived?.Error) return { label: `could not be evaluated: ${s(derived.Error)}`, reason: s(derived.Error) }
+  if (current) return { reason: derived ? s(derived.Reason) : undefined }   // a derived row stands; its reason is the pass's
+  if (derived && !derived.Result) return { label: `undetermined — ${s(derived.Reason)}` }
+  return { label: `not yet evaluated — the platform evaluates within seconds of a change and every hour. The inputs: ${besCyberAssetInputs(r, protectedAssets)}.` }
 }
 
 /** The facts the derivation reads, stated as facts and nothing more (the technology and each protected element's BES status). */
@@ -126,19 +113,21 @@ export default function ComplianceTab({ r }: { r: Row }) {
   const device = s(r.DeviceEntityId)
   const protectsQ = useProtectedAssets(s(r.SchemeEntityId))     // shared by query key with the Inherited panel below
   const clsQ = useClassifications('Asset', device)              // shared by query key with the panel's own read
-  const [report, setReport] = useState<EvaluationReport | null>(null)
+  const verdictsQ = useViewAll('compliance', 'vDeviceVerdict', { DeviceEntityId: device }, 'RuleKey', !!device)   // #214: the standing verdicts
+  const verdicts = verdictsQ.data ?? []
   const bca = (clsQ.data ?? []).find((c) => s(c.ClassificationKindCode) === 'BesCyberAsset')
+  const bcaDerived = verdicts.find((v) => s(v.VerdictKind) === 'Derivation' && s(v.DerivationKind) === 'BesCyberAsset')
   return (
     <div className="space-y-3">
       <div className="grid gap-3 lg:grid-cols-2">
         <ClassificationPanel title="This device" subjectKind="Asset" subjectEntityId={device} editable={can('Asset.Modify')} kinds={DEVICE_KINDS}
-          reasons={{ BesCyberAsset: besCyberAssetNote(r, protectsQ.data, bca, report) }}
+          reasons={{ BesCyberAsset: besCyberAssetNote(r, protectsQ.data, bca, bcaDerived) }}
           note="Whether the device is a BES Cyber Asset is derived, not judged (the owner, 2026-09-17): a microprocessor-based device protecting a BES element is one, so it is stated here with its basis and no control. External routable connectivity is recorded by hand until a network-analysis module can determine it. The impact rating is the location's, beside it." />
         <Inherited r={r} bca={s(bca?.ClassificationValue)} />
       </div>
       <ElementsInService r={r} />
-      <Obligations r={r} report={report} />
-      <Evaluate device={device} report={report} setReport={setReport} />
+      <Obligations r={r} verdicts={verdicts} />
+      <Standing device={device} verdicts={verdicts} pending={verdictsQ.isPending} />
     </div>
   )
 }
@@ -170,7 +159,7 @@ function Inherited({ r, bca }: { r: Row; bca: string }) {
               : !cip.value ? <span className="text-slate-500">no building above this device's position carries a rating</span>
               : bca === 'Not BCA' ? <span className="text-slate-300">Not applicable — not a cyber asset. <span className="text-slate-500">The building <NodeLink id={cip.nodeId} name={cip.nodeName} /> is rated {cip.value}; that applies to the cyber assets it houses, not to this relay.</span></span>
               : <><Pill tone={cip.value === 'High' ? 'bad' : cip.value === 'Medium' ? 'warn' : 'neutral'}>{cip.value}</Pill>
-                  <span className="ml-2">— {bca === 'BCA' ? 'a BES Cyber Asset in' : 'the rating of'} <NodeLink id={cip.nodeId} name={cip.nodeName} /> <span className="text-xs text-slate-500">{cip.nodeType}{cip.at ? ' · ' + fmtWhen(cip.at) : ''}{bca === 'BCA' ? '' : ' · cyber status not derived yet — evaluate below'}</span></span></>}
+                  <span className="ml-2">— {bca === 'BCA' ? 'a BES Cyber Asset in' : 'the rating of'} <NodeLink id={cip.nodeId} name={cip.nodeName} /> <span className="text-xs text-slate-500">{cip.nodeType}{cip.at ? ' · ' + fmtWhen(cip.at) : ''}{bca === 'BCA' ? '' : ' · cyber status not derived yet'}</span></span></>}
             <div className="text-xs text-slate-600">CIP-002: the building's rating, taken by the BES Cyber Assets it houses (#173, #195); whether this device is one is derived above.</div>
           </dd>
         </div>
@@ -235,16 +224,16 @@ function ElementsInService({ r }: { r: Row }) {
 
 /** The obligations standing against this device. compliance.vObligationSubject carries Open and Satisfied only — an
  * obligation that is NotApplicable or Superseded is history and is not in the view (its own comment says so). */
-function Obligations({ r, report }: { r: Row; report: EvaluationReport | null }) {
+function Obligations({ r, verdicts }: { r: Row; verdicts: Row[] }) {
   const device = s(r.DeviceEntityId)
   const q = useViewAll('compliance', 'vObligationSubject', { SubjectEntityId: device }, 'RequirementNumber', !!device)
   const [open, setOpen] = useState<string | null>(null)
   const rows = q.data ?? []
-  const noteFor = (key: string) => report?.verdicts.find((v) => v.ruleKey === key)?.evidenceNote ?? null
+  const noteFor = (key: string) => s(verdicts.find((v) => s(v.RuleKey) === key)?.EvidenceNote) || null
   return (
     <Panel title={`Obligations · ${q.isPending ? '…' : rows.length}`}>
       {q.isError && <Status bad>The obligations could not be read: {(q.error as Error).message}</Status>}
-      {!q.isPending && !rows.length && <Status>No obligation stands against this device. Evaluate now (below) shows what the rules decide and why.</Status>}
+      {!q.isPending && !rows.length && <Status>No obligation stands against this device. Below: what each rule decided about it, and why.</Status>}
       {rows.length > 0 && (
         <table className="w-full text-sm">
           <thead><tr className="border-b border-slate-700 text-left text-xs uppercase tracking-wide text-slate-400">
@@ -283,97 +272,61 @@ function ObligationFacts({ instanceRowId }: { instanceRowId: string }) {
   )
 }
 
-/** Evaluate now: a Preview writes nothing and returns the verdicts with everything the rules read; Commit runs the same
- * pass as Effective, which opens and closes the obligation instances and records the facts read. */
-function Evaluate({ device, report, setReport }: { device: string; report: EvaluationReport | null; setReport: (r: EvaluationReport | null) => void }) {
-  const qc = useQueryClient(); const can = useCan()
-  const [busy, setBusy] = useState(''); const [err, setErr] = useState<string | null>(null)
-  const run = async (mode: 'Preview' | 'Effective') => {
-    setBusy(mode); setErr(null)
-    try {
-      const rep = await postJson<EvaluationReport>('/api/v1/compliance/evaluate', { subjectKind: 'Device', subjectEntityId: device, mode })
-      setReport(rep)
-      if (mode === 'Effective') { qc.invalidateQueries({ queryKey: ['view', 'compliance', 'vObligationSubject'] }); qc.invalidateQueries({ queryKey: ['view', 'compliance', 'vObligationInstanceFact'] }) }
-    } catch (e) { setErr(e instanceof ApiError ? `${e.status} ${e.message}` : String(e)) } finally { setBusy('') }
-  }
-  // #197 (owner, 2026-09-19: "there must be automatic recognition of why ... a standard does not apply"): the preview runs when
-  // the tab opens — it writes nothing — so the verdicts and their reasons are on the screen without a click.
-  useEffect(() => { if (device && !report) void run('Preview') }, [device])   // eslint-disable-line react-hooks/exhaustive-deps
-  return (
-    <Panel title="Evaluate now" actions={
-      <div className="flex gap-2">
-        <Button kind="primary" disabled={!device || !!busy} onClick={() => void run('Preview')}>{busy === 'Preview' ? 'Evaluating…' : 'Evaluate now'}</Button>
-        <Button disabled={!device || !!busy || !report} title={can('Obligation.Modify') ? 'open and close the obligations this preview decided' : 'the API refuses this without Obligation.Modify'} onClick={() => void run('Effective')}>{busy === 'Effective' ? 'Committing…' : 'Commit'}</Button>
-      </div>}>
-      {err && <Status bad>{err}</Status>}
-      {!report && !err && <Status>A preview evaluates every effective rule against this device and writes nothing. Commit runs the same pass for real (Obligation.Modify).</Status>}
-      {report && (
-        <div className="space-y-2 text-sm">
-          <Status>{report.mode} · {fmtWhen(report.at)} · {report.rules} rule(s) over {report.subjects} subject(s) — {report.opened} opened, {report.closed} closed, {report.unchanged} unchanged, {report.unknown} unknown, {report.errors} error(s). Run {s(report.runId).slice(0, 8)}.</Status>
-          {report.ruleErrors.length > 0 && <div className="rounded border border-red-800 bg-red-900/30 p-2 text-xs text-red-200"><div className="font-semibold">Rules that could not be evaluated</div><ul className="mt-1 space-y-0.5">{report.ruleErrors.map((e, i) => <li key={i}>{e}</li>)}</ul></div>}
-          {!report.verdicts.length && <Status>No rule applies to this device.</Status>}
-          <Verdicts verdicts={report.verdicts} />
-        </div>)}
-    </Panel>
-  )
-}
-
-/** #197: why a rule does not bind, in words from what it read. The function term is the case the owner raised (a neutral
- * overcurrent relay shown a PRC-023 obligation): an empty device.functions[load_responsive='true'] with the note that says
- * which element is what. Any other false scope shows the reads that decided it. */
-function whyNot(v: Verdict): string {
-  const reads = v.reads ?? []
-  const lr = reads.find((x) => x.name === 'device.functions' && (x.params ?? '').includes('load_responsive'))
-  const note = reads.find((x) => x.name === 'device.functions.note')?.value
-  if (lr && (lr.value === '{}' || lr.value === '')) return `no in-service load-responsive element${note ? ` — ${note}` : ''}`
-  const others = reads.filter((x) => x.name !== 'device.functions.note').slice(0, 3).map((x) => `${x.name}${x.params ? ` [${x.params}]` : ''} = ${x.value}`)
-  return others.length ? `it read ${others.join('; ')}` : 'its scope evaluated false'
-}
-
-/** #173 (the owner, 2026-09-17: "a standard a device is not bound by must not appear"): the rules that bind — the ones that
- * evaluated true — and the ones still undetermined, with what is missing; the rules that evaluated false are listed in one
- * line each with the reason (#197), their reads opened by the engineer who wants them. An error is shown: it is not a
- * decision that the rule does not bind. */
-function Verdicts({ verdicts }: { verdicts: Verdict[] }) {
+/** #214: the platform's standing verdict on every rule for this device — read from compliance.vDeviceVerdict (what the last
+ * Effective pass decided, its reason and its reads; SinceAt = when that verdict began) and vDeviceEvaluation (when the
+ * device was last looked at, and by which pass). The rules that bind (true) and the undetermined ones are listed first;
+ * the ones that do not apply in one line each with the reason (#197), their reads opened by the engineer who wants them.
+ * An error is shown: it is not a decision that the rule does not bind. Nothing here runs anything. */
+function Standing({ device, verdicts, pending }: { device: string; verdicts: Row[]; pending: boolean }) {
+  const evalQ = useViewAll('compliance', 'vDeviceEvaluation', { DeviceEntityId: device }, undefined, !!device)
+  const ev = (evalQ.data ?? [])[0]
+  const rules = verdicts.filter((v) => s(v.VerdictKind) === 'Rule')
+  const binding = rules.filter((v) => s(v.Result) !== 'false')
+  const notBinding = rules.filter((v) => s(v.Result) === 'false')
   const [showFalse, setShowFalse] = useState(false)
-  const binding = verdicts.filter((v) => v.result !== 'false')
-  const notBinding = verdicts.filter((v) => v.result === 'false')
   return (
-    <div className="space-y-2">
-      {!!binding.length && <ul className="space-y-2">{binding.map((v, i) => <li key={v.ruleKey + i}><VerdictCard v={v} /></li>)}</ul>}
-      {!binding.length && !!verdicts.length && <Status>No standard binds this device, and none is undetermined.</Status>}
+    <Panel title="Standards and this device">
+      {evalQ.isPending || pending ? <Status>…</Status>
+        : !ev ? <Status>Not yet evaluated — the platform evaluates a device within seconds of a change that a rule reads, and every hour. Nothing to press.</Status>
+        : <Status>Evaluated {fmtWhen(ev.LastEvaluatedAt)} · {triggerWords(ev.LastTrigger)} · {s(ev.RulesEvaluated)} rule(s)</Status>}
+      {ev && !rules.length && <Status>No rule was evaluated against this device.</Status>}
+      {!!binding.length && <ul className="mt-2 space-y-2">{binding.map((v) => <li key={s(v.RuleKey)}><VerdictCard v={v} /></li>)}</ul>}
+      {ev && !binding.length && !!rules.length && <Status>No standard binds this device, and none is undetermined.</Status>}
       {!!notBinding.length && (
-        <div className="rounded border border-slate-800 bg-slate-950 p-2 text-sm">
+        <div className="mt-2 rounded border border-slate-800 bg-slate-950 p-2 text-sm">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-slate-400">{notBinding.length} standard{notBinding.length === 1 ? '' : 's'} do{notBinding.length === 1 ? 'es' : ''} not apply to this device</span>
             <Button kind="mini" onClick={() => setShowFalse(!showFalse)}>{showFalse ? 'hide the reads' : 'show the reads'}</Button>
           </div>
           <ul className="mt-1 space-y-0.5 text-xs">
-            {notBinding.map((v, i) => <li key={'why' + v.ruleKey + i}><span className="text-slate-200">{v.standardCode ? `${v.standardCode} ${v.standardVersion ?? ''} ${v.requirementNumber ?? ''}`.replace(/\s+/g, ' ').trim() : v.ruleName}</span> <span className="text-slate-400">— does not apply: {whyNot(v)}</span></li>)}
+            {notBinding.map((v) => <li key={'why' + s(v.RuleKey)}><span className="text-slate-200">{ruleTitle(v)}</span> <span className="text-slate-400">— does not apply: {s(v.Reason)}</span> <span className="text-slate-600">since {fmtWhen(v.SinceAt)}</span></li>)}
           </ul>
-          {showFalse && <ul className="mt-2 space-y-2">{notBinding.map((v, i) => <li key={v.ruleKey + i}><VerdictCard v={v} /></li>)}</ul>}
+          {showFalse && <ul className="mt-2 space-y-2">{notBinding.map((v) => <li key={s(v.RuleKey)}><VerdictCard v={v} /></li>)}</ul>}
         </div>)}
-    </div>
+    </Panel>
   )
 }
 
-function VerdictCard({ v }: { v: Verdict }) {
+const ruleTitle = (v: Row) => (v.StandardCode ? `${s(v.StandardCode)} ${s(v.StandardVersion)} ${s(v.RequirementNumber)}`.replace(/\s+/g, ' ').trim() : s(v.RuleName))
+
+function VerdictCard({ v }: { v: Row }) {
   const [open, setOpen] = useState(false)
-  const reads = v.reads ?? []
+  const reads = readsOf(v)
   const byName = new Map(reads.map((x) => [x.name, x]))
   const working = PRC023_READS.filter(([n]) => byName.has(n))
   const others = reads.filter((x) => !PRC023_READS.some(([n]) => n === x.name))
+  const result = s(v.Result)
   return (
     <div className="rounded border border-slate-800 bg-slate-950 p-2">
       <div className="flex flex-wrap items-center gap-2">
-        <Pill tone={resultTone(v.result)}>{v.result}</Pill>
-        <span className="text-slate-200">{v.ruleName}</span>
-        <span className="text-xs text-slate-500">{v.ruleKey}{v.standardCode ? ` · ${v.standardCode} ${v.standardVersion ?? ''} ${v.requirementNumber ?? ''}` : ''} · {v.action}</span>
+        <Pill tone={resultTone(result)}>{result === 'true' ? 'applies' : result === 'false' ? 'does not apply' : result === 'unknown' ? 'undetermined' : 'error'}</Pill>
+        <span className="text-slate-200">{s(v.RuleName)}</span>
+        <span className="text-xs text-slate-500">{s(v.RuleKey)}{v.StandardCode ? ` · ${ruleTitle(v)}` : ''} · v{s(v.VersionNumber)} · since {fmtWhen(v.SinceAt)}</span>
         <Button kind="mini" onClick={() => setOpen(!open)}>{open ? 'hide the reads' : `${reads.length} read(s)`}</Button>
       </div>
-      {v.error && <div className="mt-1 text-xs text-red-300">{v.error}</div>}
-      {(v.unknowns ?? []).length > 0 && <div className="mt-1 text-xs text-amber-300">undetermined until these are known: {v.unknowns.join(', ')}</div>}
-      {v.evidenceNote && <div className="mt-1 text-xs text-slate-500">evidence: {v.evidenceNote}</div>}
+      {result !== 'true' && <div className="mt-1 text-xs text-slate-400">{s(v.Reason)}</div>}
+      {!!v.Error && <div className="mt-1 text-xs text-red-300">{s(v.Error)}</div>}
+      {!!v.EvidenceNote && <div className="mt-1 text-xs text-slate-500">evidence: {s(v.EvidenceNote)}</div>}
       {working.length > 0 && (
         <div className="mt-1">
           <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">The loadability working</div>

@@ -611,6 +611,24 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
     var devCyl = await Relay($"{tag} CYL", cyl, fwCyl, positions[2]);
     Must(devSel is not null && devBdd is not null && devCyl is not null, "fixture: three relays placed with their firmware (SEL-421 microprocessor, BDD15B and CYL electromechanical)");
 
+    // #214: the platform evaluates compliance itself — a write that a rule reads leaves an evaluation request, the worker
+    // serves the pending requests within seconds. The smoke waits for the queue to empty (a rule approval means a full pass,
+    // so up to five minutes) and reports how long the platform took; every compliance assertion below reads what the
+    // platform then holds, never a pass the smoke ran itself.
+    async Task<(bool served, long ms, int pending)> WaitForQueue(int timeoutMs = 300_000)
+    {
+        var sw = System.Diagnostics.Stopwatch.StartNew(); var pending = -1;
+        while (sw.ElapsedMilliseconds < timeoutMs)
+        {
+            var (qs, qb) = await Get(admin, "api/v1/compliance/vEvaluationQueue?orderBy=-RequestedAt&take=200");
+            if (qs != HttpStatusCode.OK) { await Task.Delay(1000); continue; }
+            pending = (qb?["rows"] as JsonArray)?.Count(r => r?["IsPending"]?.GetValue<bool>() == true) ?? -1;
+            if (pending == 0) return (true, sw.ElapsedMilliseconds, 0);
+            await Task.Delay(750);
+        }
+        return (false, sw.ElapsedMilliseconds, pending);
+    }
+
     async Task<Guid?> Definition(string kind, string key, string name, object? payload)
     {
         var (s, b) = await Post(admin, "api/v1/config/AddDefinition", new { DefinitionKind = kind, DefinitionKey = key, Name = name });
@@ -884,6 +902,8 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
             return (st0, (b0?["rows"] as JsonArray) ?? new JsonArray(), sw.ElapsedMilliseconds);
         }
         // §10 rows 1–3, 7: the grid — this request's three designed revisions
+        // #214: the fixture's writes left evaluation requests the worker is still serving; the screens are timed on an idle platform, as before
+        var k214_idle = await WaitForQueue(); Console.WriteLine($"  the queue drained before the timings ({k214_idle.ms} ms)");
         var (g1s, g1rows, g1ms) = await Timed(admin, $"api/v1/document/vSettingsRecord?WorkRequestEntityId={wr}");
         JsonNode? Row(JsonArray rows, Guid? dev) => rows.FirstOrDefault(r => string.Equals(r?["DeviceEntityId"]?.ToString(), dev?.ToString(), StringComparison.OrdinalIgnoreCase));
         var gSel = Row(g1rows, devSel); var gBdd = Row(g1rows, devBdd); var gCyl = Row(g1rows, devCyl);
@@ -1291,12 +1311,18 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
             var (k173_h1s, k173_h1b) = await Post(admin, "api/v1/asset/RecordClassification", new { SubjectKind = "Asset", SubjectEntityId = devSel, ClassificationKindCode = "BesCyberAsset", ClassificationValue = "BCA" });
             var (k173_b1s, _) = await Post(admin, "api/v1/asset/RecordClassification", new { SubjectKind = "Asset", SubjectEntityId = k173_line, ClassificationKindCode = "BesStatus", ClassificationValue = "BES" });
             var (k173_c1s, _) = await Post(admin, "api/v1/asset/RecordClassification", new { SubjectKind = "Node", SubjectEntityId = building, ClassificationKindCode = "CipImpactRating", ClassificationValue = "Medium" });
-            var (k173_v1s, k173_v1b) = await Post(admin, "api/v1/compliance/evaluate", new { subjectEntityId = devSel, mode = "Preview" });
-            var k173_d1 = (k173_v1b?["derivations"] as JsonArray)?.FirstOrDefault(d => d?["kind"]?.ToString() == "BesCyberAsset");
+            // #214: the three writes above left evaluation requests; the worker serves them — the BCA is derived and recorded without a click
+            var k214_w1 = await WaitForQueue();
+            var (k214_q1s, k214_q1b) = await Get(admin, $"api/v1/compliance/vEvaluationQueue?SubjectEntityId={k173_line}&orderBy=-RequestedAt&take=10");
+            var k214_req = (k214_q1b?["rows"] as JsonArray)?.FirstOrDefault(r => r?["Reason"]?.ToString() == "asset.RecordClassification");
+            var (k214_v1s, k214_v1b) = await Get(admin, $"api/v1/compliance/vDeviceVerdict?DeviceEntityId={devSel}&VerdictKind=Derivation");
+            var k173_d1 = (k214_v1b?["rows"] as JsonArray)?.FirstOrDefault(d => d?["DerivationKind"]?.ToString() == "BesCyberAsset");
             var (k173_cl0s, k173_cl0b) = await Get(admin, $"api/v1/asset/vClassification?SubjectEntityId={devSel}");
-            Must(k173_h1s == HttpStatusCode.Conflict && k173_b1s == HttpStatusCode.OK && k173_c1s == HttpStatusCode.OK && k173_v1s == HttpStatusCode.OK
-                 && k173_d1?["value"]?.ToString() == "BCA" && ((k173_cl0b?["rows"] as JsonArray)?.Count ?? -1) == 0,
-                $"#173: a person may not record the BES Cyber Asset flag ({(int)k173_h1s} {k173_h1b?["detail"]}); the preview derives it BCA for the microprocessor relay and writes nothing ({k173_d1?["value"]} · {k173_d1?["reason"]} · {(k173_cl0b?["rows"] as JsonArray)?.Count} rows)");
+            var k173_bca0 = (k173_cl0b?["rows"] as JsonArray)?.FirstOrDefault(r => r?["ClassificationKindCode"]?.ToString() == "BesCyberAsset");
+            Must(k173_h1s == HttpStatusCode.Conflict && k173_b1s == HttpStatusCode.OK && k173_c1s == HttpStatusCode.OK && k214_w1.served
+                 && k214_q1s == HttpStatusCode.OK && k214_req is not null && k214_req["IsPending"]?.GetValue<bool>() == false && k214_req["RunTrigger"]?.ToString() == "FactChanged"
+                 && k214_v1s == HttpStatusCode.OK && k173_d1?["Result"]?.ToString() == "BCA" && k173_bca0?["Basis"]?.ToString() == "Derived",
+                $"#173/#214: a person may not record the BES Cyber Asset flag ({(int)k173_h1s} {k173_h1b?["detail"]}); the writes left requests the platform served in {k214_w1.ms} ms (FactChanged, {k214_req?["DevicesFound"]} device(s)) — the SEL-421 is derived {k173_d1?["Result"]} ({k173_d1?["Reason"]}) and recorded with Basis {k173_bca0?["Basis"]}");
 
             // #197: from here the SEL-421 also carries a phase-distance element in service (21) beside its 87T — PRC-023 binds a relay
             // only through a load-responsive element (Attachment A); the grid and FLOC checks above saw the position as the fixture placed it
@@ -1305,34 +1331,39 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
             // (d) committed: the derived flag is written with Basis Derived, and the standards that bind open
             var k173_term = Id((await Get(admin, $"api/v1/asset/vAssetTerminalDetail?AssetEntityId={k173_line}")).body?["rows"]?[0], "TerminalEntityId");
             var (k173_t1s, _) = await Post(admin, "api/v1/asset/AssetTerminal_Revise", new { EntityId = k173_term, AssetEntityId = k173_line, TerminalNo = 1, StationNodeEntityId = station, VoltageClassCode = "230kV" });
-            var (k173_e1s, k173_e1b) = await Post(admin, "api/v1/compliance/evaluate", new { subjectEntityId = devSel, mode = "Effective" });
+            var k214_w2 = await WaitForQueue();   // #214: the 21 commissioned (a Node request) and the terminal revised (an Asset request) — served, not pressed
+            var (k214_e1s, k214_e1b) = await Get(admin, $"api/v1/compliance/vDeviceEvaluation?DeviceEntityId={devSel}");
+            var k214_ev = (k214_e1b?["rows"] as JsonArray)?.FirstOrDefault();
             var (k173_cl1s, k173_cl1b) = await Get(admin, $"api/v1/asset/vClassification?SubjectEntityId={devSel}");
             var k173_bca = (k173_cl1b?["rows"] as JsonArray)?.FirstOrDefault(r => r?["ClassificationKindCode"]?.ToString() == "BesCyberAsset");
             var (k173_o1s, k173_o1b) = await Get(admin, $"api/v1/compliance/vObligationSubject?SubjectEntityId={devSel}");
             var k173_open = (k173_o1b?["rows"] as JsonArray)?.Where(r => r?["Status"]?.ToString() == "Open").ToList() ?? new();
             var k173_prc = k173_open.FirstOrDefault(r => r?["RuleDefinitionKey"]?.ToString() == "prc023_r1");
-            Must(k173_t1s == HttpStatusCode.OK && k173_e1s == HttpStatusCode.OK && k173_bca?["ClassificationValue"]?.ToString() == "BCA" && k173_bca?["Basis"]?.ToString() == "Derived"
+            Must(k173_t1s == HttpStatusCode.OK && k214_w2.served && k214_e1s == HttpStatusCode.OK && k214_ev?["LastTrigger"]?.ToString() == "FactChanged"
+                 && k173_bca?["ClassificationValue"]?.ToString() == "BCA" && k173_bca?["Basis"]?.ToString() == "Derived"
                  && k173_open.Count == 13 && k173_prc is not null,
-                $"#173: the commit writes the derived BCA (Basis {k173_bca?["Basis"]}) and opens the 13 standards that bind the SEL-421 — 12 CIP and PRC-023 R1 ({k173_open.Count} open; rule errors: {k173_e1b?["ruleErrors"]})");
+                $"#173/#214: the served pass ({k214_w2.ms} ms; the device reads evaluated {k214_ev?["LastEvaluatedAt"]} {k214_ev?["LastTrigger"]}) writes the derived BCA (Basis {k173_bca?["Basis"]}) and opens the 13 standards that bind the SEL-421 — 12 CIP and PRC-023 R1 ({k173_open.Count} open)");
 
             // (e) the owner's rule: a standard a device is not bound by does not appear against it. An electromechanical relay holds no
             // cyber asset, so the derivation says Not BCA and not one CIP obligation stands against the BDD15B.
-            var (k173_e2s, k173_e2b) = await Post(admin, "api/v1/compliance/evaluate", new { subjectEntityId = devBdd, mode = "Effective" });
-            var k173_d2 = (k173_e2b?["derivations"] as JsonArray)?.FirstOrDefault(d => d?["kind"]?.ToString() == "BesCyberAsset");
+            var (k173_e2s, k173_e2b) = await Get(admin, $"api/v1/compliance/vDeviceVerdict?DeviceEntityId={devBdd}&VerdictKind=Derivation");
+            var k173_d2 = (k173_e2b?["rows"] as JsonArray)?.FirstOrDefault(d => d?["DerivationKind"]?.ToString() == "BesCyberAsset");
             var (k173_o2s, k173_o2b) = await Get(admin, $"api/v1/compliance/vObligationSubject?SubjectEntityId={devBdd}");
             var k173_cipRows = (k173_o2b?["rows"] as JsonArray)?.Count(r => (r?["StandardCode"]?.ToString() ?? "").StartsWith("CIP", StringComparison.Ordinal)) ?? -1;
-            Must(k173_e2s == HttpStatusCode.OK && k173_d2?["value"]?.ToString() == "Not BCA" && k173_cipRows == 0,
-                $"#173: the electromechanical relay is derived Not BCA ({k173_d2?["reason"]}) and no CIP standard appears against it ({k173_cipRows} CIP rows)");
+            Must(k173_e2s == HttpStatusCode.OK && k173_d2?["Result"]?.ToString() == "Not BCA" && k173_cipRows == 0,
+                $"#173/#214: the electromechanical relay, in the same served pass (it protects the same line), is derived Not BCA ({k173_d2?["Reason"]}) and no CIP standard appears against it ({k173_cipRows} CIP rows)");
 
             // (f) #195: the rating is the building's — a station is refused (50235); the building's Medium is what the device reads
             var (k173_c2s, k173_c2b) = await Post(admin, "api/v1/asset/RecordClassification", new { SubjectKind = "Node", SubjectEntityId = station, ClassificationKindCode = "CipImpactRating", ClassificationValue = "Low" });
-            var (k173_v2s, k173_v2b) = await Post(admin, "api/v1/compliance/evaluate", new { subjectEntityId = devSel, mode = "Preview" });
-            var k173_cipV = (k173_v2b?["verdicts"] as JsonArray)?.FirstOrDefault(v => v?["ruleKey"]?.ToString() == "cip007_r1");
-            var k173_read = (k173_cipV?["reads"] as JsonArray)?.FirstOrDefault(r => r?["name"]?.ToString() == "device.location.classification.CipImpactRating");
-            Must(k173_c2s == HttpStatusCode.Conflict && (k173_c2b?["detail"]?.ToString() ?? "").Contains("not on a Station") && k173_v2s == HttpStatusCode.OK && k173_read?["value"]?.ToString() == "Medium" && k173_cipV?["result"]?.ToString() == "true",
-                $"#173/#195: a station is not rated ({(int)k173_c2s} {k173_c2b?["detail"]}); the building's Medium is what the device reads ({k173_read?["value"]}) and CIP-007 R1 still binds ({k173_cipV?["result"]})");
+            var (k173_v2s, k173_v2b) = await Get(admin, $"api/v1/compliance/vDeviceVerdict?DeviceEntityId={devSel}&RuleKey=cip007_r1");
+            var k173_cipV = (k173_v2b?["rows"] as JsonArray)?.FirstOrDefault();
+            var k173_reads = JsonNode.Parse(k173_cipV?["ReadsJson"]?.ToString() ?? "[]") as JsonArray;
+            var k173_read = k173_reads?.FirstOrDefault(r => r?["name"]?.ToString() == "device.location.classification.CipImpactRating");
+            Must(k173_c2s == HttpStatusCode.Conflict && (k173_c2b?["detail"]?.ToString() ?? "").Contains("not on a Station") && k173_v2s == HttpStatusCode.OK && k173_read?["value"]?.ToString() == "Medium" && k173_cipV?["Result"]?.ToString() == "true",
+                $"#173/#195/#214: a station is not rated ({(int)k173_c2s} {k173_c2b?["detail"]}); the standing verdict shows the building's Medium is what the device read ({k173_read?["value"]}) and CIP-007 R1 binds ({k173_cipV?["Result"]}, {k173_cipV?["Reason"]})");
             // #195: the fixture building's rating is withdrawn at the end — no smoke run leaves a rating behind
             var (k195_ws, _) = await Post(admin, "api/v1/asset/RecordClassification", new { SubjectKind = "Node", SubjectEntityId = building, ClassificationKindCode = "CipImpactRating", ClassificationValue = "" });
+            var k214_w3 = await WaitForQueue();   // #214: a Node request — the devices under the building are re-evaluated
             var (k195_ls, k195_lb) = await Get(admin, "api/v1/asset/vClassification?SubjectKind=Node&ClassificationKindCode=CipImpactRating&take=500");
             var k195_left = 0; foreach (var c in (k195_lb?["rows"] as JsonArray) ?? new JsonArray()) { var (_, nb) = await Get(admin, $"api/v1/location/vNode?EntityId={c?["SubjectEntityId"]}&take=1"); if ((((nb?["rows"] as JsonArray)?.FirstOrDefault())?["Name"]?.ToString() ?? "").StartsWith("W4_")) k195_left++; }
             Must(k195_ws == HttpStatusCode.OK && k195_ls == HttpStatusCode.OK && k195_left == 0, $"#195: the fixture building's rating withdrawn ({(int)k195_ws}); no smoke-fixture node carries a CIP rating ({k195_left} of {(k195_lb?["rows"] as JsonArray)?.Count})");
@@ -1342,9 +1373,9 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
             var (k173_q1s, _) = await Post(readOnly!, "api/v1/compliance/evaluate", new { subjectEntityId = devSel, mode = "Preview" });
             var (k173_q2s, _) = await Post(readOnly!, "api/v1/compliance/evaluate", new { subjectEntityId = devSel, mode = "Effective" });
             var (k173_rns, k173_rnb) = await Get(admin, "api/v1/compliance/vRuleEvaluationRun?Mode=Effective&take=5");
-            Must(k173_e3s == HttpStatusCode.OK && (k173_e3b?["opened"]?.GetValue<int>() ?? -1) == 0 && (k173_e3b?["closed"]?.GetValue<int>() ?? -1) == 0
+            Must(k173_e3s == HttpStatusCode.OK && (k173_e3b?["opened"]?.GetValue<int>() ?? -1) == 0 && (k173_e3b?["closed"]?.GetValue<int>() ?? -1) == 0 && k214_w3.served
                  && k173_q1s == HttpStatusCode.OK && k173_q2s == HttpStatusCode.Forbidden && ((k173_rnb?["rows"] as JsonArray)?.Count ?? 0) >= 1,
-                $"#173: a second pass changes nothing (opened {k173_e3b?["opened"]}, closed {k173_e3b?["closed"]}); ReadOnly previews ({(int)k173_q1s}) but does not commit ({(int)k173_q2s}); the runs are on record");
+                $"#173/#214: a hand-run after the platform's own pass ({k214_w3.ms} ms) finds nothing left to do (opened {k173_e3b?["opened"]}, closed {k173_e3b?["closed"]}); ReadOnly previews ({(int)k173_q1s}) but does not commit ({(int)k173_q2s}); the runs are on record");
 
             // (h) the evidence trail of the PRC-023 obligation: the settings, the derived quantities, the ratings and the criterion
             var (k173_f1s, k173_f1b) = await Get(admin, $"api/v1/compliance/vObligationInstanceFact?ObligationInstanceRowId={k173_prc?["RowId"]}");
@@ -1387,28 +1418,50 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
             // BPS, and the relay's next pass opens npcc_d4; declared Not BPS, the next pass closes it. Nobody switched anything on.
             var (k184_t1s, k184_t1b) = await Post(admin, "api/v1/asset/AssetTerminal_Revise", new { EntityId = k173_term, AssetEntityId = k173_line, TerminalNo = 1, StationNodeEntityId = station, VoltageClassCode = "230kV", BusAssetEntityId = k173_bus });
             var (k184_b1s, k184_b1b) = await Post(admin, "api/v1/asset/RecordClassification", new { SubjectKind = "Asset", SubjectEntityId = k173_bus, ClassificationKindCode = "NpccBulkPowerSystem", ClassificationValue = "BPS" });
-            var (k184_e1s, k184_e1b) = await Post(admin, "api/v1/compliance/evaluate", new { subjectEntityId = devSel, mode = "Effective" });
+            var k184_w1 = await WaitForQueue(); var k184_e1s = k184_w1.served ? HttpStatusCode.OK : HttpStatusCode.RequestTimeout;   // #214: the bus's declaration is an Asset request
             var (k184_o1s, k184_o1b) = await Get(admin, $"api/v1/compliance/vObligationSubject?SubjectEntityId={devSel}");
             var k184_openBps = (k184_o1b?["rows"] as JsonArray)?.Where(r => r?["Status"]?.ToString() == "Open").Select(r => r?["RuleDefinitionKey"]?.ToString()).ToList() ?? new();
             var (k184_b2s, _) = await Post(admin, "api/v1/asset/RecordClassification", new { SubjectKind = "Asset", SubjectEntityId = k173_bus, ClassificationKindCode = "NpccBulkPowerSystem", ClassificationValue = "Not BPS" });
-            var (k184_e2s, k184_e2b) = await Post(admin, "api/v1/compliance/evaluate", new { subjectEntityId = devSel, mode = "Effective" });
+            var k184_w2 = await WaitForQueue(); var k184_e2s = k184_w2.served ? HttpStatusCode.OK : HttpStatusCode.RequestTimeout;
             var (k184_o2s, k184_o2b) = await Get(admin, $"api/v1/compliance/vObligationSubject?SubjectEntityId={devSel}");
             var k184_openNot = (k184_o2b?["rows"] as JsonArray)?.Where(r => r?["Status"]?.ToString() == "Open").Select(r => r?["RuleDefinitionKey"]?.ToString()).ToList() ?? new();
             var (k184_q1s, _) = await Post(readOnly!, "api/v1/asset/RecordClassification", new { SubjectKind = "Asset", SubjectEntityId = k173_bus, ClassificationKindCode = "NpccBulkPowerSystem", ClassificationValue = "BPS" });
             // #196 (owner, 2026-09-19): the A-10 declaration is entered on the protected ELEMENT; the bus's stands in when the element has none
             var (k196_l1s, k196_l1b) = await Post(admin, "api/v1/asset/RecordClassification", new { SubjectKind = "Asset", SubjectEntityId = k173_line, ClassificationKindCode = "NpccBulkPowerSystem", ClassificationValue = "BPS" });
-            var (k196_e1s, _) = await Post(admin, "api/v1/compliance/evaluate", new { subjectEntityId = devSel, mode = "Effective" });
+            var k196_w1 = await WaitForQueue(); var k196_e1s = k196_w1.served ? HttpStatusCode.OK : HttpStatusCode.RequestTimeout;
             var (_, k196_o1b) = await Get(admin, $"api/v1/compliance/vObligationSubject?SubjectEntityId={devSel}");
             var k196_openLine = (k196_o1b?["rows"] as JsonArray)?.Where(r => r?["Status"]?.ToString() == "Open").Select(r => r?["RuleDefinitionKey"]?.ToString()).ToList() ?? new();
             var (k196_l2s, _) = await Post(admin, "api/v1/asset/RecordClassification", new { SubjectKind = "Asset", SubjectEntityId = k173_line, ClassificationKindCode = "NpccBulkPowerSystem", ClassificationValue = "" });
-            var (k196_e2s, _) = await Post(admin, "api/v1/compliance/evaluate", new { subjectEntityId = devSel, mode = "Effective" });
+            var k196_w2 = await WaitForQueue(); var k196_e2s = k196_w2.served ? HttpStatusCode.OK : HttpStatusCode.RequestTimeout;
             var (_, k196_o2b) = await Get(admin, $"api/v1/compliance/vObligationSubject?SubjectEntityId={devSel}");
             var k196_openBack = (k196_o2b?["rows"] as JsonArray)?.Where(r => r?["Status"]?.ToString() == "Open").Select(r => r?["RuleDefinitionKey"]?.ToString()).ToList() ?? new();
             Must(k196_l1s == HttpStatusCode.OK && k196_e1s == HttpStatusCode.OK && k196_openLine.Contains("npcc_d4") && k196_l2s == HttpStatusCode.OK && k196_e2s == HttpStatusCode.OK && !k196_openBack.Contains("npcc_d4"),
-                $"#196: the line declared BPS (the bus Not BPS) opens npcc_d4 on its relay ({(int)k196_l1s} {Code(k196_l1b)}; open: {string.Join(", ", k196_openLine)}); the declaration withdrawn, the bus's Not BPS stands in and it closes ({string.Join(", ", k196_openBack)})");
+                $"#196/#214: the line declared BPS (the bus Not BPS) opens npcc_d4 on its relay by the platform's own pass ({(int)k196_l1s} {Code(k196_l1b)}; {k196_w1.ms} ms; open: {string.Join(", ", k196_openLine)}); the declaration withdrawn, the bus's Not BPS stands in and it closes ({k196_w2.ms} ms; {string.Join(", ", k196_openBack)})");
             Must(k184_t1s == HttpStatusCode.OK && k184_b1s == HttpStatusCode.OK && k184_e1s == HttpStatusCode.OK && k184_openBps.Contains("npcc_d4")
                  && k184_b2s == HttpStatusCode.OK && k184_e2s == HttpStatusCode.OK && !k184_openNot.Contains("npcc_d4") && k184_q1s == HttpStatusCode.Forbidden,
-                $"#184: the A-10 outcome on the protected bus decides Directory 4 — BPS opens npcc_d4 on the relay ({string.Join(", ", k184_openBps)}), Not BPS closes it ({string.Join(", ", k184_openNot)}), and ReadOnly records nothing ({(int)k184_q1s})");
+                $"#184/#214: the A-10 outcome on the protected bus decides Directory 4 — BPS opens npcc_d4 on the relay by the platform's own pass ({k184_w1.ms} ms; {string.Join(", ", k184_openBps)}), Not BPS closes it ({k184_w2.ms} ms; {string.Join(", ", k184_openNot)}), and ReadOnly records nothing ({(int)k184_q1s})");
+
+            // ======== #214 (2026-09-20): the owner, on the device sheet's Evaluate now button — "Should the evaluation be an automatic
+            // function of what is presently known about the system?" It is: the requests, the passes that served them, the standing
+            // verdicts, the process hook, and the one hand-run. Nothing above pressed a button; this block checks the record of that.
+            var (k214_a1s, k214_a1b) = await Get(admin, $"api/v1/compliance/vEvaluationQueue?SubjectEntityId={k173_bus}&orderBy=-RequestedAt&take=20");
+            var k214_busReqs = (k214_a1b?["rows"] as JsonArray)?.Where(r => r?["Reason"]?.ToString() == "asset.RecordClassification").ToList() ?? new();
+            var k214_busRuns = k214_busReqs.Select(r => r?["RunId"]?.ToString()).Where(x => !string.IsNullOrEmpty(x)).Distinct().Count();
+            var (k214_a2s, k214_a2b) = await Get(admin, "api/v1/compliance/vRuleEvaluationRun?Trigger=FactChanged&orderBy=-StartedAt&take=5");
+            var k214_run = (k214_a2b?["rows"] as JsonArray)?.FirstOrDefault();
+            var k214_took = k214_run?["StartedAt"] is not null && k214_run?["CompletedAt"] is not null
+                ? (DateTimeOffset.Parse(k214_run["CompletedAt"]!.ToString()) - DateTimeOffset.Parse(k214_run["StartedAt"]!.ToString())).TotalMilliseconds : -1;
+            Must(k214_a1s == HttpStatusCode.OK && k214_busReqs.Count >= 2 && k214_busReqs.All(r => r?["IsPending"]?.GetValue<bool>() == false && r?["RequestedByName"] is not null)
+                 && k214_a2s == HttpStatusCode.OK && k214_run is not null && (k214_run["Notes"]?.ToString() ?? "").Contains("served", StringComparison.Ordinal) && k214_took >= 0,
+                $"#214: every declaration on the bus left a request naming its procedure and who made it ({k214_busReqs.Count}, served by {k214_busRuns} pass(es)); the last FactChanged pass took {k214_took:0} ms and notes what it served ({k214_run?["Notes"]})");
+            var (k214_p1s, k214_p1b) = await Get(admin, "api/v1/compliance/vEvaluationQueue?orderBy=-RequestedAt&take=200");
+            var k214_proc = (k214_p1b?["rows"] as JsonArray)?.FirstOrDefault(r => (r?["Reason"]?.ToString() ?? "").StartsWith("process.", StringComparison.Ordinal));
+            var (k214_p2s, k214_p2b) = await Get(admin, $"api/v1/compliance/vDeviceVerdict?DeviceEntityId={devSel}&VerdictKind=Rule");
+            var k214_verdicts = (k214_p2b?["rows"] as JsonArray)?.Count ?? -1;
+            var k214_false = (k214_p2b?["rows"] as JsonArray)?.Count(r => r?["Result"]?.ToString() == "false") ?? -1;
+            Must(k214_p1s == HttpStatusCode.OK && k214_proc is not null && k214_p2s == HttpStatusCode.OK && k214_verdicts >= 13
+                 && (k214_p2b?["rows"] as JsonArray)!.All(r => !string.IsNullOrEmpty(r?["Reason"]?.ToString()) && !string.IsNullOrEmpty(r?["SinceAt"]?.ToString())),
+                $"#214: a step committed over a device left a request too ({k214_proc?["Reason"]}); the SEL-421 holds a standing verdict with a reason for every rule ({k214_verdicts} rules, {k214_false} not applying)");
         }
 
         // ======== #197 (2026-09-19): PRC-023 applies only where an element in service is load-responsive (Attachment A), and the
@@ -1423,18 +1476,21 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
             Must(k197_a1s == HttpStatusCode.OK && k197_51n?["LoadResponsive"]?.GetValue<bool>() == false && (k197_51n?["LoadResponsiveBasis"]?.ToString() ?? "").Contains("2.2")
                  && k197_pfs == HttpStatusCode.OK && k197_pf?["LoadResponsive"]?.GetValue<bool>() == false,
                 $"#197: 51N is ruled not load-responsive ({k197_51n?["LoadResponsiveBasis"]}); the position's 87T reads the ruling ({k197_pf?["LoadResponsive"]} — {k197_pf?["LoadResponsiveBasis"]})");
-            var (k197_v1s, k197_v1b) = await Post(admin, "api/v1/compliance/evaluate", new { subjectEntityId = devBdd, mode = "Preview" });
-            var k197_prc = (k197_v1b?["verdicts"] as JsonArray)?.FirstOrDefault(v => v?["ruleKey"]?.ToString() == "prc023_r1");
-            var k197_reads = (k197_prc?["reads"] as JsonArray) ?? new JsonArray();
+            // #214: the reason is on the standing verdict the platform recorded, not in a preview the smoke ran
+            var (k197_v1s, k197_v1b) = await Get(admin, $"api/v1/compliance/vDeviceVerdict?DeviceEntityId={devBdd}&RuleKey=prc023_r1");
+            var k197_prc = (k197_v1b?["rows"] as JsonArray)?.FirstOrDefault();
+            var k197_reads = JsonNode.Parse(k197_prc?["ReadsJson"]?.ToString() ?? "[]") as JsonArray ?? new JsonArray();
             var k197_fn = k197_reads.FirstOrDefault(r => r?["name"]?.ToString() == "device.functions" && r?["params"] is null)?["value"]?.ToString();
             var k197_note = k197_reads.FirstOrDefault(r => r?["name"]?.ToString() == "device.functions.note")?["value"]?.ToString() ?? "";
-            Must(k197_v1s == HttpStatusCode.OK && k197_prc?["result"]?.ToString() == "false" && k197_fn == "{87T}" && k197_note.Contains("not load-responsive") && k197_note.Contains("Attachment A"),
-                $"#197: PRC-023 R1 does not bind the 87T-only relay ({k197_prc?["result"]}); the reason is in the reads — device.functions {k197_fn}; {k197_note}");
-            var (k197_v2s, k197_v2b) = await Post(admin, "api/v1/compliance/evaluate", new { subjectEntityId = devSel, mode = "Preview" });
-            var k197_prc2 = (k197_v2b?["verdicts"] as JsonArray)?.FirstOrDefault(v => v?["ruleKey"]?.ToString() == "prc023_r1");
-            var k197_lr = (k197_prc2?["reads"] as JsonArray)?.FirstOrDefault(r => r?["name"]?.ToString() == "device.functions" && (r?["params"]?.ToString() ?? "").Contains("load_responsive"))?["value"]?.ToString();
-            Must(k197_v2s == HttpStatusCode.OK && k197_prc2?["result"]?.ToString() == "true" && k197_lr == "{21}",
-                $"#197: the relay with 21 in service is bound ({k197_prc2?["result"]}; load-responsive elements {k197_lr})");
+            var k197_reason = k197_prc?["Reason"]?.ToString() ?? "";
+            Must(k197_v1s == HttpStatusCode.OK && k197_prc?["Result"]?.ToString() == "false" && k197_fn == "{87T}" && k197_note.Contains("not load-responsive") && k197_note.Contains("Attachment A")
+                 && k197_reason.StartsWith("no in-service load-responsive element", StringComparison.Ordinal),
+                $"#197/#214: PRC-023 R1 does not bind the 87T-only relay ({k197_prc?["Result"]}); the standing verdict says why - {k197_reason}");
+            var (k197_v2s, k197_v2b) = await Get(admin, $"api/v1/compliance/vDeviceVerdict?DeviceEntityId={devSel}&RuleKey=prc023_r1");
+            var k197_prc2 = (k197_v2b?["rows"] as JsonArray)?.FirstOrDefault();
+            var k197_lr = (JsonNode.Parse(k197_prc2?["ReadsJson"]?.ToString() ?? "[]") as JsonArray)?.FirstOrDefault(r => r?["name"]?.ToString() == "device.functions" && (r?["params"]?.ToString() ?? "").Contains("load_responsive"))?["value"]?.ToString();
+            Must(k197_v2s == HttpStatusCode.OK && k197_prc2?["Result"]?.ToString() == "true" && k197_lr == "{21}",
+                $"#197/#214: the relay with 21 in service is bound ({k197_prc2?["Result"]}, {k197_prc2?["Reason"]}; load-responsive elements {k197_lr})");
         }
 
         // ======== #201 (2026-09-19): instrument transformers as equipment in their own right (the vision §4.3 / §10.1, the owner:

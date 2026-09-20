@@ -72,6 +72,7 @@ public static class ProcessEndpoints
             }, ct);
             var interp = Interp(http);
             foreach (var pi in await StartedRuns(http.Session(), id, ct)) await interp.AdvanceAsync(pi, await http.Session().NowAsync(ct), ct);
+            await ComplianceTriggers.RequestForWorkAsync(http.Session(), catalog, wf.SubjectKind, wf.Subject, wf.WorkRequest, $"process.Transition {name}", log, ct);   // #214
             return Results.Json(new { workflowInstanceEntityId = id, transition = name, toState = r["ToState"], transitionId = r["TransitionId"] });
         });
 
@@ -287,6 +288,8 @@ public static class ProcessEndpoints
             // 11 branch outcome: the enclosing member or branch ends with it
             if (result["BranchOutcome"]?.GetValue<string>() is { } bo) await interp.EndScopeAsync(instanceId, id, bo, now, ct);
             var adv = await interp.AdvanceAsync(instanceId, now, ct);
+            // #214: a step over a device may have put settings in service or written what a rule reads — the worker re-evaluates it
+            await ComplianceTriggers.RequestForWorkAsync(s, catalog, inst.SubjectKind, inst.SubjectEntityId, inst.WorkRequestEntityId ?? wr, $"process.CommitStep {row.Path}", log, ct);
             return Results.Json(new
             {
                 stepInstanceEntityId = id, outcome, recordEntityId = result["RecordEntityId"], producedEntityId = result["ProducedEntityId"], branchOutcome = result["BranchOutcome"],

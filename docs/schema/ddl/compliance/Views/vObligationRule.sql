@@ -27,6 +27,7 @@ SELECT d.[EntityId]                         AS [DefinitionEntityId],
             THEN CONVERT(BIT, 1) ELSE CONVERT(BIT, 0) END                              AS [EffectiveHasScope],
        JSON_VALUE(COALESCE(eff.[PayloadText], drafts.[PayloadText]), '$.scopeText')     AS [ScopeText],
        JSON_VALUE(COALESCE(eff.[PayloadText], drafts.[PayloadText]), '$.cadenceText')   AS [CadenceText],
+       JSON_VALUE(COALESCE(eff.[PayloadText], drafts.[PayloadText]), '$.evidenceNote')  AS [EvidenceNote],   -- #214: where the evidence lives, read by the device's tab
        -- The requirement the rule is for. A rule exists *for* a requirement — PRC-005 P1 is
        -- "microprocessor relays every six years" and the rule is how the platform knows which devices
        -- that is — so the screen hangs rules off the requirement rather than listing them apart from

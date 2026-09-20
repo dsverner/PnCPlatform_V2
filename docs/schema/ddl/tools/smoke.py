@@ -84,6 +84,14 @@ def main():
     for (mid, code) in q("SELECT ManufacturerId, ShortCode FROM ref.vManufacturer"):
         if re.fullmatch(r"[4r]_[0-9a-f]{6}", code or ""):
             cur.execute("EXEC ref.Manufacturer_Deactivate @ManufacturerId=?, @ActorId=?", mid, SYSTEM_ACTOR); swept += 1
+    # #214 (2026-09-20): the smoke's own standards too (one requirement each, Subject 'smoke') — a run that died before its
+    # end-of-run cleanup left three on Compliance > Standards; the same shapes, the same soft deletes and deactivation
+    for (code, req, svrow) in q("SELECT StandardCode, RequirementEntityId, StandardVersionRowId FROM compliance.vRequirementDetail WHERE Subject = N'smoke'"):
+        if re.fullmatch(r"[4r]_[0-9a-f]{6}", code or ""):
+            cur.execute("EXEC compliance.Requirement_SoftDelete @EntityId=?, @ActorId=?", req, SYSTEM_ACTOR)
+            for (sve,) in q("SELECT EntityId FROM compliance.StandardVersion WHERE RowId=?", svrow):
+                cur.execute("EXEC compliance.StandardVersion_SoftDelete @EntityId=?, @ActorId=?", sve, SYSTEM_ACTOR)
+            cur.execute("EXEC compliance.Standard_Deactivate @StandardCode=?, @ActorId=?", code, SYSTEM_ACTOR); swept += 1
     if swept: print(f"     swept {swept} fixture(s) an earlier run left active")
 
     # The compliance engine left the database on 2026-09-10 (.planning/CALCULATION-ENGINE-DESIGN.md §6),
@@ -900,6 +908,13 @@ def main():
     cur.execute("EXEC party.Entity_SoftDelete @EntityId=?, @ActorId=?", org4, SYSTEM_ACTOR)
     cur.execute("EXEC ref.AssetType_Deactivate @AssetTypeCode=?, @ActorId=?", W4, SYSTEM_ACTOR)
     cur.execute("EXEC ref.VoltageClass_Deactivate @VoltageClassCode=?, @ActorId=?", VC4, SYSTEM_ACTOR)
+    # #214 (2026-09-20): the rules and work type this block approved are retired here, not left for the next run's pre-clean —
+    # the owner met "smoke_w4_326314_R: no scope" as a rule the platform could not evaluate on a real device's Compliance tab,
+    # because an approved smoke rule is effective for every pass until the next schema smoke soft-deletes it.
+    for key in (rk, rk1, rk2, rk3, wt4):
+        for (de,) in q("SELECT EntityId FROM config.vDefinition WHERE DefinitionKey=?", key):
+            cur.execute("EXEC config.Definition_SoftDelete @EntityId=?, @ActorId=?", de, SYSTEM_ACTOR)
+            cur.execute("UPDATE config.DefinitionVersion SET IsDeleted=1, DeletedBy=?, DeletedAt=SYSDATETIMEOFFSET() WHERE DefinitionEntityId=? AND IsDeleted=0", SYSTEM_ACTOR, de)
 
     # ================================================================ wave 4 domain rules: PROCEDURES.md #17, #18, #19, #20, #21, #24, #29, #31
     W4r = "smoke_w4r_" + uuid.uuid4().hex[:6]
@@ -1480,7 +1495,9 @@ def main():
 
     # ---- cleanup: soft-delete the smoke definitions (never a hard delete)
     for kk in (key, k2, k3, k4, W4 + "_R1", W4 + "_R2", W4 + "_R3", W4 + "_wt"):
-        de = q("SELECT EntityId FROM config.vDefinition WHERE DefinitionKey=?", kk)[0][0]
+        found = q("SELECT EntityId FROM config.vDefinition WHERE DefinitionKey=?", kk)
+        if not found: continue   # #214: the W4 block retires its own rules as soon as it is done with them; a run that dies before here leaves none
+        de = found[0][0]
         cur.execute("EXEC config.Definition_SoftDelete @EntityId=?, @ActorId=?", de, SYSTEM_ACTOR)
         cur.execute("UPDATE config.DefinitionVersion SET IsDeleted=1, DeletedBy=?, DeletedAt=SYSDATETIMEOFFSET() WHERE DefinitionEntityId=(SELECT EntityId FROM config.Definition WHERE DefinitionKey=? AND IsDeleted=1)", SYSTEM_ACTOR, kk)
     # ---- cleanup (2026-09-19): the smoke's own standards leave the Standards screen — the owner found 30 throwaway

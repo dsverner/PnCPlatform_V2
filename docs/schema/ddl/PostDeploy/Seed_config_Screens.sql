@@ -3,6 +3,20 @@
 -- edited it (a version whose ChangeNote does not start with 'seed') or the same payload is already Effective.
 IF OBJECT_ID(N'[config].[AddDefinition]') IS NULL RETURN;   -- bootstrap (tables-only) publish
 GO
+-- compliance-evaluation.screen.json
+DECLARE @author UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000001', @approver UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000002';
+DECLARE @e UNIQUEIDENTIFIER, @v UNIQUEIDENTIFIER, @no INT, @payload NVARCHAR(MAX) = N'{"g":1,"kind":"screen","key":"COMPLIANCE_EVALUATION","name":"Evaluation","description":"How the platform keeps compliance evaluated (#214): the requests left by writes that changed a fact the rules read, the passes that answered them (FactChanged within seconds, the hourly pass, a rule approved), the rules a pass could not evaluate, and the one hand-run — for after a rule changes. Reads compliance.vEvaluationQueue and compliance.vRuleEvaluationRun.","menu":{"group":"Compliance","label":"Evaluation","order":42},"permission":"Obligation.Read","screenKind":"list","params":{"view":"compliance.vEvaluationQueue","orderBy":"RequestedAt","rowKey":"RequestId","columns":[{"key":"RequestedAt","label":"Requested"},{"key":"SubjectKind","label":"About"},{"key":"SubjectName","label":"Subject"},{"key":"Reason","label":"Changed by"},{"key":"RequestedByName","label":"Who"},{"key":"IsPending","label":"Pending"},{"key":"DevicesFound","label":"Devices"}],"textFilterColumns":["SubjectName","Reason"]}}';
+DECLARE @note NVARCHAR(200) = N'seed df4158952fc3b0f1';
+SELECT @e = EntityId FROM [config].[Definition] WHERE [DefinitionKind] = N'Program.Screen' AND [DefinitionKey] = N'COMPLIANCE_EVALUATION' AND [IsDeleted] = 0;
+IF @e IS NULL
+    EXEC [config].[AddDefinition] @DefinitionKind = N'Program.Screen', @DefinitionKey = N'COMPLIANCE_EVALUATION', @Name = N'Evaluation', @Description = N'How the platform keeps compliance evaluated (#214): the requests left by writes that changed a fact the rules read, the passes that answered them (FactChanged within seconds, the hourly pass, a rule approved), the rules a pass could not evaluate, and the one hand-run — for after a rule changes. Reads compliance.vEvaluationQueue and compliance.vRuleEvaluationRun.', @ActorId = @author, @EntityId = @e OUTPUT;
+IF NOT EXISTS (SELECT 1 FROM [config].[vDefinitionVersion] WHERE [DefinitionEntityId] = @e AND [ChangeNote] NOT LIKE N'seed %')      -- untouched by an Administrator
+   AND NOT EXISTS (SELECT 1 FROM [config].[vDefinitionVersion] WHERE [DefinitionEntityId] = @e AND [Status] = N'Effective' AND [ChangeNote] = @note)
+BEGIN
+    EXEC [config].[AddDefinitionVersion] @DefinitionKey = N'COMPLIANCE_EVALUATION', @DefinitionKind = N'Program.Screen', @ChangeNote = @note, @PayloadText = @payload, @ActorId = @author, @VersionRowId = @v OUTPUT, @VersionNumber = @no OUTPUT;
+    EXEC [config].[ApproveDefinitionVersion] @VersionRowId = @v, @ActorId = @approver;
+END
+GO
 -- device-template.screen.json
 DECLARE @author UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000001', @approver UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000002';
 DECLARE @e UNIQUEIDENTIFIER, @v UNIQUEIDENTIFIER, @no INT, @payload NVARCHAR(MAX) = N'{"g":1,"kind":"screen","key":"DEVICE_TEMPLATE","name":"Device template","description":"One device type''s template, named <MODEL>_Template (#184): everything true of the model itself, one level below a scheme - its settings list by the manual''s own groups with none hidden (#183), what it can do (#181, #182), the PRC-023 loadability inputs its settings feed, and the NPCC Directory 4 criteria that attach when the protected bus is declared BPS by the A-10 study. Compliance here is calculated from study values recorded on the primary elements, never switched on per device (the owner, 2026-09-18). Plain code; the definition names its data.","menu":null,"permission":"Asset.Read","screenKind":"record","params":{"view":"ref.vModel","key":"ModelId"}}';

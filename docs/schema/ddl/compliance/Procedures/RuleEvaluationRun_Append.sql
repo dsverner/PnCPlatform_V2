@@ -11,12 +11,13 @@ CREATE PROCEDURE [compliance].[RuleEvaluationRun_Append]
     @InstancesClosed INT = NULL,
     @InstancesUnchanged INT = NULL,
     @ResultDocumentEntityId UNIQUEIDENTIFIER = NULL,
+    @Notes NVARCHAR(MAX) = NULL,
     @RunId UNIQUEIDENTIFIER = NULL OUTPUT
 AS
 BEGIN
     SET NOCOUNT ON;
     IF @ActorId IS NULL EXEC [personnel].[ResolveActor] @ActorId = @ActorId OUTPUT;
     SET @RunId = ISNULL(@RunId, NEWID());
-    INSERT [compliance].[RuleEvaluationRun] ([RunId], [RuleDefinitionVersionRowId], [Mode], [Trigger], [StartedAt], [CompletedAt], [ActorId], [SubjectsScoped], [InstancesOpened], [InstancesClosed], [InstancesUnchanged], [ResultDocumentEntityId])
-    VALUES (@RunId, @RuleDefinitionVersionRowId, @Mode, @Trigger, @StartedAt, @CompletedAt, @ActorId, @SubjectsScoped, @InstancesOpened, @InstancesClosed, @InstancesUnchanged, @ResultDocumentEntityId);
+    INSERT [compliance].[RuleEvaluationRun] ([RunId], [RuleDefinitionVersionRowId], [Mode], [Trigger], [StartedAt], [CompletedAt], [ActorId], [SubjectsScoped], [InstancesOpened], [InstancesClosed], [InstancesUnchanged], [ResultDocumentEntityId], [Notes])
+    VALUES (@RunId, @RuleDefinitionVersionRowId, @Mode, @Trigger, @StartedAt, @CompletedAt, @ActorId, @SubjectsScoped, @InstancesOpened, @InstancesClosed, @InstancesUnchanged, @ResultDocumentEntityId, @Notes);
 END;
