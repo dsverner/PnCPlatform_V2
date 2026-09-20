@@ -38,6 +38,12 @@ import { Panel, Pill, Button, Facts, Status, inputClass } from '@/components/ui/
 import { AssetPicker, modelLabel, useModels } from '@/components/pickers'
 import { workTypes, raiseAndAdvance } from '@/lib/actions'
 import { ClassificationPanel, NODE_KINDS, NodeLink, bit } from './PrimaryAssetScreen'
+import { INSTRUMENT_TRANSFORMER_TYPES } from './InstrumentTransformerScreen'
+import { saveAssetCharacteristic, useTemplateDefs } from '@/components/CharacteristicsPanel'
+
+/** #201: the node types an instrument transformer stands at — the yard and its bays and equipment positions for a CT, VT
+ * or CVT; a panel for an auxiliary CT or VT; the station or building for one not yet placed finer. */
+const IT_NODE_TYPES = ['Yard', 'Bay', 'EquipmentPosition', 'Panel', 'Station', 'Building']
 
 /** The node types location.vFloc treats as a position — the places a device is installed (and the only node types
  * asset.PlaceAsset accepts for a device: it demands NodeTypeCode = 'DevicePosition' and throws 50215 otherwise). */
@@ -133,6 +139,9 @@ export default function LocationScreen({ params: p, id }: { screen: Screen; para
           ? <PlacedHere node={r} canPlace={can('Asset.Modify')} canRetract={can('Asset.Archive')} canRaise={can('WorkRequest.Modify')} />
           : <DevicesHere node={r} station={station} isStation={isStation} />}
       </div>
+      {/* #201: the instrument transformers placed at this node — a bay, an equipment position, a yard, a panel — and a form to
+          make one here. asset.PlaceAsset accepts a non-device asset at any node; the CT/VT is placed where it stands. */}
+      {IT_NODE_TYPES.includes(s(r.NodeTypeCode)) && <InstrumentTransformersHere node={r} canEdit={can('Asset.Modify')} />}
       {/* a terminal and a scheme are asked of a station: neither question means anything for a building, a room or a panel */}
       {isStation && (
         <div className="grid gap-3 lg:grid-cols-2">
@@ -794,6 +803,91 @@ function FirstSettings({ node, relay, canRaise }: { node: Row; relay: Row; canRa
           <span className="text-xs text-slate-500">the request opens at step [2] with {s(relay.AssetName)} already in it; its commit drafts the settings from the model's template</span>
         </div>)}
       {err && <Status bad>{err}</Status>}
+    </div>
+  )
+}
+
+/** #201: the instrument transformers placed at this node, each a link to its page, and a form to make one here. */
+function InstrumentTransformersHere({ node, canEdit }: { node: Row; canEdit: boolean }) {
+  const navigate = useNavigate(); const qc = useQueryClient()
+  const nodeId = s(node.EntityId)
+  const q = useViewAll('asset', 'vInstrumentTransformer', { NodeEntityId: nodeId }, 'Name', !!nodeId)
+  const rows = q.data ?? []
+  const refresh = () => { qc.invalidateQueries({ queryKey: ['view', 'asset'] }) }
+  return (
+    <Panel title={`Instrument transformers here · ${q.isPending ? '…' : rows.length}`}>
+      {q.isError && <Status bad>Could not read the transformers here: {(q.error as Error).message}</Status>}
+      {!q.isPending && !rows.length && <Status>No CT, VT or auxiliary transformer is placed at {s(node.Name)}.</Status>}
+      {rows.length > 0 && (
+        <ul className="space-y-1 text-sm">
+          {rows.map((x) => (
+            <li key={s(x.EntityId)} className="flex flex-wrap items-center gap-2">
+              <a className="text-sky-300 underline" href={screenPath('INSTRUMENT_TRANSFORMER', s(x.EntityId))} onClick={(e) => { e.preventDefault(); navigate(screenPath('INSTRUMENT_TRANSFORMER', s(x.EntityId))) }}>{s(x.Name)}</a>
+              <span className="text-xs text-slate-500">{s(x.AssetTypeName)}{x.RatioInUse ? ` · ${s(x.RatioInUse)}` : ' · no ratio recorded'}{x.SerialNumber ? ` · serial ${s(x.SerialNumber)}` : ''}</span>
+              <span className="text-xs text-slate-500">{x.FeedsSchemes ? `feeds ${s(x.FeedsSchemes)}` : 'feeds no scheme yet'}</span>
+            </li>))}
+        </ul>)}
+      {canEdit ? <NewInstrumentTransformerForm node={node} onDone={refresh} /> : <Status>Making a transformer here needs Asset.Modify.</Status>}
+    </Panel>
+  )
+}
+
+/** #201: a CT, VT or auxiliary transformer that is not yet in the platform, made and placed here in one go — the #187 relay
+ * form's shape. The writes, in order: asset.Asset_Add (the type chosen, InService), asset.AlternateKey_Add (SerialNumber,
+ * when given), asset.PlaceAsset (Installed here — a non-device asset may stand at any node), and the nameplate's Ratio in
+ * use as its characteristic (asset.CharacteristicValue_Add against the type's CT_Template / VT_Template). A refusal
+ * part-way leaves what was written and names it. */
+function NewInstrumentTransformerForm({ node, onDone }: { node: Row; onDone: () => void }) {
+  const typesQ = useViewAll('ref', 'vAssetType', {}, 'Name')
+  const types = (typesQ.data ?? []).filter((t) => INSTRUMENT_TRANSFORMER_TYPES.includes(s(t.AssetTypeCode)))
+  const [open, setOpen] = useState(false)
+  const [type, setType] = useState('CT')
+  const [name, setName] = useState('')
+  const [serial, setSerial] = useState('')
+  const [ratio, setRatio] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null)
+  const chosen = types.find((t) => s(t.AssetTypeCode) === type)
+  const defsQ = useTemplateDefs(s(chosen?.DefaultTemplateDefinitionEntityId))
+  const make = async () => {
+    if (!name.trim() || !chosen) return
+    setBusy(true); setMsg(null)
+    let assetId = ''
+    try {
+      const a = await proc('asset', 'Asset_Add', { AssetTypeCode: type, Name: name.trim(), Status: 'InService' })
+      assetId = s(a.EntityId)
+      if (serial.trim()) await proc('asset', 'AlternateKey_Add', { SubjectEntityId: assetId, KeyKindCode: 'SerialNumber', KeyValue: serial.trim(), IsPrimaryLabel: true })
+      await proc('asset', 'PlaceAsset', { AssetEntityId: assetId, NodeEntityId: node.EntityId, PlacementKind: 'Installed' })
+      const def = (defsQ.data ?? []).find((d) => s(d.CharacteristicKey) === 'RatioInUse')
+      if (ratio.trim() && def) await saveAssetCharacteristic(assetId, def, ratio.trim())
+      setMsg({ text: `${name.trim()} (${s(chosen.Name)}${ratio.trim() ? ', ' + ratio.trim() : ''}${serial.trim() ? ', serial ' + serial.trim() : ''}) is placed at ${s(node.Name)}.${ratio.trim() && !def ? ' The ratio was not saved: the type names no nameplate template.' : ''}` })
+      setName(''); setSerial(''); setRatio(''); setOpen(false); onDone()
+    } catch (e) {
+      const why = e instanceof ApiError ? e.message : String(e)
+      setMsg({ text: assetId ? `${name.trim()} was created but not finished: ${why} — open it from the Instrument transformers list.` : why, bad: true })
+    } finally { setBusy(false) }
+  }
+  return (
+    <div className="mt-3 space-y-2 border-t border-slate-800 pt-2 text-sm">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-slate-400">A transformer not in the platform yet?</span>
+        <Button kind="mini" disabled={busy} onClick={() => setOpen(!open)}>New instrument transformer</Button>
+      </div>
+      {open && (
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="flex flex-col gap-1 text-xs text-slate-400">Type
+            <select className={`${inputClass} w-56`} value={type} disabled={busy || typesQ.isPending} onChange={(e) => setType(e.target.value)}>
+              {types.map((t) => <option key={s(t.AssetTypeCode)} value={s(t.AssetTypeCode)}>{s(t.Name)}</option>)}
+            </select></label>
+          <label className="flex flex-col gap-1 text-xs text-slate-400">Name
+            <input className={`${inputClass} w-48`} value={name} disabled={busy} placeholder="e.g. L2103 line CT" onChange={(e) => setName(e.target.value)} /></label>
+          <label className="flex flex-col gap-1 text-xs text-slate-400">Ratio in use
+            <input className={`${inputClass} w-28`} value={ratio} disabled={busy} placeholder="1200:5" onChange={(e) => setRatio(e.target.value)} /></label>
+          <label className="flex flex-col gap-1 text-xs text-slate-400">Serial number (optional)
+            <input className={`${inputClass} w-40`} value={serial} disabled={busy} onChange={(e) => setSerial(e.target.value)} /></label>
+          <Button kind="primary" disabled={busy || !chosen || !name.trim()} onClick={() => void make()}>Create and place here</Button>
+        </div>)}
+      {msg && <Status bad={msg.bad}>{msg.text}</Status>}
     </div>
   )
 }

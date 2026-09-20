@@ -71,6 +71,9 @@ export default function RecordScreen({ params: p, id }: { screen: Screen; params
       {section === 'analog' && (
         <>
           <AnalogInputs r={r} revision={revision} editable={r.GridState === 'Outstanding' && can('ConfigurationFile.Modify')} />
+          {/* #201: the ratios the legacy record declared are its characteristics, kept as reference — the transformers themselves are
+              equipment now (Instrument transformers in the nav), named as the scheme's CT and VT sources and checked above */}
+          <Status>Declared in the legacy record — the CT and PT ratios the settings record carried as text. The transformers themselves are equipment: make them at their bay or panel and name them as the scheme's sources, and the check above reads them.</Status>
           <Characteristics r={r} revision={revision} editable={r.GridState === 'Outstanding' && can('Record.Modify')} />
         </>
       )}

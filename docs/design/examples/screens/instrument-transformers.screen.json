@@ -1,0 +1,78 @@
+{
+  "g": 1,
+  "kind": "screen",
+  "key": "INSTRUMENT_TRANSFORMERS",
+  "name": "Instrument transformers",
+  "description": "The instrument transformers as equipment in their own right (#201): CTs, VTs, auxiliaries, CVTs, metering units — where each is, its ratio in use and the schemes it feeds; a row opens the transformer.",
+  "menu": {
+    "group": "Assets and schemes",
+    "label": "Instrument transformers",
+    "order": 17
+  },
+  "permission": "Asset.Read",
+  "screenKind": "list",
+  "params": {
+    "view": "asset.vInstrumentTransformer",
+    "orderBy": "Name",
+    "rowKey": "EntityId",
+    "columns": [
+      {
+        "key": "Name",
+        "label": "Transformer"
+      },
+      {
+        "key": "AssetTypeName",
+        "label": "Type"
+      },
+      {
+        "key": "RatioInUse",
+        "label": "Ratio in use"
+      },
+      {
+        "key": "StationName",
+        "label": "Station"
+      },
+      {
+        "key": "NodeName",
+        "label": "Placed at"
+      },
+      {
+        "key": "FeedsSchemes",
+        "label": "Feeds"
+      },
+      {
+        "key": "SerialNumber",
+        "label": "Serial"
+      },
+      {
+        "key": "Status",
+        "label": "Status",
+        "format": "state"
+      }
+    ],
+    "textFilterColumns": [
+      "Name",
+      "StationName",
+      "NodeName",
+      "FeedsSchemes",
+      "SerialNumber",
+      "RatioInUse"
+    ],
+    "filters": [
+      {
+        "column": "AssetTypeName",
+        "label": "Type"
+      },
+      {
+        "column": "StationName",
+        "label": "Station"
+      }
+    ],
+    "rowOpen": {
+      "label": "Open the transformer",
+      "action": "openScreen",
+      "screen": "INSTRUMENT_TRANSFORMER",
+      "param": "EntityId"
+    }
+  }
+}

@@ -1439,6 +1439,45 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
                 $"#197: the relay with 21 in service is bound ({k197_prc2?["result"]}; load-responsive elements {k197_lr})");
         }
 
+        // ======== #201 (2026-09-19): instrument transformers as equipment in their own right (the vision §4.3 / §10.1, the owner:
+        // "Instrument transformers should be first class devices in their own right with testing"). The types the predecessor
+        // held as INTERFACE are here as Hybrid (CT, VT …) or Secondary (CT_AUX, METER — the vision's rule); a CT made at a bay
+        // with its nameplate ratio feeds the fixture scheme as CT source; the read models give the ratio as a number.
+        {
+            var (k201_t1s, k201_t1b) = await Get(admin, "api/v1/ref/vAssetType?AssetClassCode=Hybrid&take=50");
+            var k201_hybrid = ((k201_t1b?["rows"] as JsonArray) ?? []).Select(r => r?["AssetTypeCode"]?.ToString()).ToList();
+            var (_, k201_t2b) = await Get(admin, "api/v1/ref/vAssetType?AssetTypeCode=CT_AUX&take=1");
+            var k201_aux = (k201_t2b?["rows"] as JsonArray)?.FirstOrDefault();
+            Must(k201_t1s == HttpStatusCode.OK && k201_hybrid.Contains("CT") && k201_hybrid.Contains("VT") && k201_hybrid.Contains("COUPLING_CAPACITOR_VT") && k201_hybrid.Contains("WAVE_TRAP")
+                 && k201_aux?["AssetClassCode"]?.ToString() == "Secondary" && k201_aux?["DefaultTemplateDefinitionEntityId"] is not null,
+                $"#201: the instrument-transformer types are Hybrid ({k201_hybrid.Count}: {string.Join(", ", k201_hybrid)}); an auxiliary CT is Secondary by the vision's rule and carries the CT nameplate template");
+            // ref.vLocationNodeTypeParent: a Yard sits in a Station and an EquipmentPosition in a Yard (a Bay has no parent rule yet —
+            // found here, 2026-09-19); the CT stands at an equipment position in the yard, as #175 built the yard
+            var (k201_ys, k201_yb) = await Post(admin, "api/v1/location/AddNode", new { NodeTypeCode = "Yard", ParentEntityId = station, Name = $"{tag} 230 kV yard", Code = "Y230" });
+            var (k201_bs, k201_bb) = await Post(admin, "api/v1/location/AddNode", new { NodeTypeCode = "EquipmentPosition", ParentEntityId = Id(k201_yb), Name = $"{tag} line CT position", Code = "CT1" });
+            var k201_bay = Id(k201_bb);
+            var (k201_as, k201_ab) = await Post(admin, "api/v1/asset/Asset_Add", new { AssetTypeCode = "CT", Name = $"{tag} line CT", Status = "InService" });
+            var k201_ct = Id(k201_ab);
+            var (k201_ps, k201_pb) = await Post(admin, "api/v1/asset/PlaceAsset", new { AssetEntityId = k201_ct, NodeEntityId = k201_bay, PlacementKind = "Installed" });
+            var (_, k201_defsb) = await Get(admin, $"api/v1/config/vDefinitionVersion?DefinitionEntityId={k201_aux?["DefaultTemplateDefinitionEntityId"]}&Status=Effective&take=1");
+            var k201_ver = (k201_defsb?["rows"] as JsonArray)?.FirstOrDefault()?["RowId"]?.ToString();
+            var (_, k201_cdb) = await Get(admin, $"api/v1/config/vCharacteristicDefinition?DefinitionVersionRowId={k201_ver}&CharacteristicKey=RatioInUse&take=1");
+            var k201_def = (k201_cdb?["rows"] as JsonArray)?.FirstOrDefault()?["RowId"]?.ToString();
+            var (k201_cvs, k201_cvb) = await Post(admin, "api/v1/asset/CharacteristicValue_Add", new { HostEntityId = k201_ct, CharacteristicDefinitionRowId = k201_def, TextValue = "1200:5" });
+            var (k201_ms, k201_mb) = await Post(admin, "api/v1/scheme/AddSchemeMember", new { SchemeEntityId = scheme, MemberKind = "Asset", MemberEntityId = k201_ct, MemberRoleCode = "CtSource", IsInService = true });
+            Must(k201_ys == HttpStatusCode.OK && k201_bs == HttpStatusCode.OK && k201_as == HttpStatusCode.OK && k201_ps == HttpStatusCode.OK && k201_def is not null && k201_cvs == HttpStatusCode.OK && k201_ms == HttpStatusCode.OK,
+                $"#201: a CT made at the fixture yard's equipment position with its ratio in use and named the scheme's CT source ({(int)k201_ys} {Code(k201_yb)}; {(int)k201_bs} {Code(k201_bb)}; {(int)k201_as} {Code(k201_ab)}; {(int)k201_ps} {Code(k201_pb)}; def {k201_def?[..8]}; {(int)k201_cvs} {Code(k201_cvb)}; {(int)k201_ms} {Code(k201_mb)} {k201_mb?["detail"]})");
+            var (k201_its, k201_itb) = await Get(admin, $"api/v1/asset/vInstrumentTransformer?EntityId={k201_ct}&take=1");
+            var k201_it = (k201_itb?["rows"] as JsonArray)?.FirstOrDefault();
+            var (k201_ss, k201_sb) = await Get(admin, $"api/v1/scheme/vSchemeSource?SchemeEntityId={scheme}&take=10");
+            var k201_src = (k201_sb?["rows"] as JsonArray)?.FirstOrDefault(x => x?["AssetEntityId"]?.ToString()?.Equals(k201_ct?.ToString(), StringComparison.OrdinalIgnoreCase) == true);
+            Must(k201_its == HttpStatusCode.OK && k201_it?["RatioInUse"]?.ToString() == "1200:5" && k201_it?["StationName"]?.ToString() == $"{tag} station" && (k201_it?["FeedsCount"]?.GetValue<int>() ?? 0) == 1
+                 && k201_ss == HttpStatusCode.OK && k201_src?["MemberRoleCode"]?.ToString() == "CtSource" && Math.Abs((k201_src?["Ratio"]?.GetValue<decimal>() ?? 0) - 240m) < 0.001m,
+                $"#201: the transformer reads back with its station, ratio and the scheme it feeds ({k201_it?["StationName"]} · {k201_it?["RatioInUse"]} · feeds {k201_it?["FeedsCount"]}); the scheme's source reads 1200:5 as {k201_src?["Ratio"]}");
+            var (k201_rs, _) = await Post(readOnly!, "api/v1/asset/Asset_Add", new { AssetTypeCode = "VT", Name = $"{tag} stray VT", Status = "InService" });
+            Must(k201_rs == HttpStatusCode.Forbidden, $"#201: ReadOnly may not make a transformer ({(int)k201_rs})");
+        }
+
         // ======== #187 (2026-09-18): a new relay from its position, its first settings from the template, and the record that
         // says where it is and what it wears. The owner went the intuitive way — building, panel, record — and read "no FLOC" as
         // "not placed" and could not tell whether the relay "had a template applied". No screen created a relay; "New setting

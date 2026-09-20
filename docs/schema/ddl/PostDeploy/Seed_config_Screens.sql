@@ -31,6 +31,34 @@ BEGIN
     EXEC [config].[ApproveDefinitionVersion] @VersionRowId = @v, @ActorId = @approver;
 END
 GO
+-- instrument-transformer.screen.json
+DECLARE @author UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000001', @approver UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000002';
+DECLARE @e UNIQUEIDENTIFIER, @v UNIQUEIDENTIFIER, @no INT, @payload NVARCHAR(MAX) = N'{"g":1,"kind":"screen","key":"INSTRUMENT_TRANSFORMER","name":"Instrument transformer","description":"One instrument transformer as equipment (#201): what it is, where it is, its nameplate (the CT_Template / VT_Template characteristics, editable), the schemes it feeds as CT or VT source, and its tests (#202). Plain code; the definition names its data.","permission":"Asset.Read","screenKind":"record","params":{"view":"asset.vInstrumentTransformer","key":"EntityId"}}';
+DECLARE @note NVARCHAR(200) = N'seed 1886965fc9a9e142';
+SELECT @e = EntityId FROM [config].[Definition] WHERE [DefinitionKind] = N'Program.Screen' AND [DefinitionKey] = N'INSTRUMENT_TRANSFORMER' AND [IsDeleted] = 0;
+IF @e IS NULL
+    EXEC [config].[AddDefinition] @DefinitionKind = N'Program.Screen', @DefinitionKey = N'INSTRUMENT_TRANSFORMER', @Name = N'Instrument transformer', @Description = N'One instrument transformer as equipment (#201): what it is, where it is, its nameplate (the CT_Template / VT_Template characteristics, editable), the schemes it feeds as CT or VT source, and its tests (#202). Plain code; the definition names its data.', @ActorId = @author, @EntityId = @e OUTPUT;
+IF NOT EXISTS (SELECT 1 FROM [config].[vDefinitionVersion] WHERE [DefinitionEntityId] = @e AND [ChangeNote] NOT LIKE N'seed %')      -- untouched by an Administrator
+   AND NOT EXISTS (SELECT 1 FROM [config].[vDefinitionVersion] WHERE [DefinitionEntityId] = @e AND [Status] = N'Effective' AND [ChangeNote] = @note)
+BEGIN
+    EXEC [config].[AddDefinitionVersion] @DefinitionKey = N'INSTRUMENT_TRANSFORMER', @DefinitionKind = N'Program.Screen', @ChangeNote = @note, @PayloadText = @payload, @ActorId = @author, @VersionRowId = @v OUTPUT, @VersionNumber = @no OUTPUT;
+    EXEC [config].[ApproveDefinitionVersion] @VersionRowId = @v, @ActorId = @approver;
+END
+GO
+-- instrument-transformers.screen.json
+DECLARE @author UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000001', @approver UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000002';
+DECLARE @e UNIQUEIDENTIFIER, @v UNIQUEIDENTIFIER, @no INT, @payload NVARCHAR(MAX) = N'{"g":1,"kind":"screen","key":"INSTRUMENT_TRANSFORMERS","name":"Instrument transformers","description":"The instrument transformers as equipment in their own right (#201): CTs, VTs, auxiliaries, CVTs, metering units — where each is, its ratio in use and the schemes it feeds; a row opens the transformer.","menu":{"group":"Assets and schemes","label":"Instrument transformers","order":17},"permission":"Asset.Read","screenKind":"list","params":{"view":"asset.vInstrumentTransformer","orderBy":"Name","rowKey":"EntityId","columns":[{"key":"Name","label":"Transformer"},{"key":"AssetTypeName","label":"Type"},{"key":"RatioInUse","label":"Ratio in use"},{"key":"StationName","label":"Station"},{"key":"NodeName","label":"Placed at"},{"key":"FeedsSchemes","label":"Feeds"},{"key":"SerialNumber","label":"Serial"},{"key":"Status","label":"Status","format":"state"}],"textFilterColumns":["Name","StationName","NodeName","FeedsSchemes","SerialNumber","RatioInUse"],"filters":[{"column":"AssetTypeName","label":"Type"},{"column":"StationName","label":"Station"}],"rowOpen":{"label":"Open the transformer","action":"openScreen","screen":"INSTRUMENT_TRANSFORMER","param":"EntityId"}}}';
+DECLARE @note NVARCHAR(200) = N'seed 4f4b8749dad0e328';
+SELECT @e = EntityId FROM [config].[Definition] WHERE [DefinitionKind] = N'Program.Screen' AND [DefinitionKey] = N'INSTRUMENT_TRANSFORMERS' AND [IsDeleted] = 0;
+IF @e IS NULL
+    EXEC [config].[AddDefinition] @DefinitionKind = N'Program.Screen', @DefinitionKey = N'INSTRUMENT_TRANSFORMERS', @Name = N'Instrument transformers', @Description = N'The instrument transformers as equipment in their own right (#201): CTs, VTs, auxiliaries, CVTs, metering units — where each is, its ratio in use and the schemes it feeds; a row opens the transformer.', @ActorId = @author, @EntityId = @e OUTPUT;
+IF NOT EXISTS (SELECT 1 FROM [config].[vDefinitionVersion] WHERE [DefinitionEntityId] = @e AND [ChangeNote] NOT LIKE N'seed %')      -- untouched by an Administrator
+   AND NOT EXISTS (SELECT 1 FROM [config].[vDefinitionVersion] WHERE [DefinitionEntityId] = @e AND [Status] = N'Effective' AND [ChangeNote] = @note)
+BEGIN
+    EXEC [config].[AddDefinitionVersion] @DefinitionKey = N'INSTRUMENT_TRANSFORMERS', @DefinitionKind = N'Program.Screen', @ChangeNote = @note, @PayloadText = @payload, @ActorId = @author, @VersionRowId = @v OUTPUT, @VersionNumber = @no OUTPUT;
+    EXEC [config].[ApproveDefinitionVersion] @VersionRowId = @v, @ActorId = @approver;
+END
+GO
 -- location.screen.json
 DECLARE @author UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000001', @approver UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000002';
 DECLARE @e UNIQUEIDENTIFIER, @v UNIQUEIDENTIFIER, @no INT, @payload NVARCHAR(MAX) = N'{"g":1,"kind":"screen","key":"LOCATION","name":"Location","description":"One node of the location tree — a region, a station, a building, a room, a panel or a position: where it sits, its CIP-002 impact rating (recorded here because a location carries it and every BES Cyber Asset in it inherits it — the owner, 2026-09-17), what is inside it and the devices placed there; a station also shows the primary assets with a terminal here and the schemes here (#173, the STATION screen generalised). Plain code; the definition names its data.","permission":"Asset.Read","screenKind":"record","params":{"view":"location.vNode","key":"EntityId"}}';

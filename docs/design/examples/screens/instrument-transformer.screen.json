@@ -1,0 +1,13 @@
+{
+  "g": 1,
+  "kind": "screen",
+  "key": "INSTRUMENT_TRANSFORMER",
+  "name": "Instrument transformer",
+  "description": "One instrument transformer as equipment (#201): what it is, where it is, its nameplate (the CT_Template / VT_Template characteristics, editable), the schemes it feeds as CT or VT source, and its tests (#202). Plain code; the definition names its data.",
+  "permission": "Asset.Read",
+  "screenKind": "record",
+  "params": {
+    "view": "asset.vInstrumentTransformer",
+    "key": "EntityId"
+  }
+}

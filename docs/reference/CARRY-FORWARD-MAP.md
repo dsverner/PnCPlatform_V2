@@ -179,3 +179,4 @@ and is W3's to replace.
 - `PnCPlatform_QA` has not been compared with `_DEV`.
 - `docs/schema/MIGRATION-PLAN.md` and `docs/schema/migration/` (the rehearsal scripts and reports) sit in the
   working tree uncommitted until W7 re-copies them under their own decision (#82).
+- `ref.AssetType` — the predecessor's eleven INTERFACE (Hybrid) asset types (`PnCPlatform_DEV.ref.vAssetType`: CT, VT, CT_AUX, COUPLING_CAPACITOR_VT, CCPD, COUPLING_CAPACITOR, WAVE_TRAP, METERING_UNIT, METER, RECTIFIER_TRANSFORMER, VOLTAGE_REGULATOR) lifted into `Seed_ref_AssetType_Hybrid.sql` on 2026-09-19 (#201), re-justified against the vision §10.1 rule: CT_AUX and METER become Secondary; VT_AUX added.

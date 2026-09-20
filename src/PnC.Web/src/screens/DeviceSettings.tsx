@@ -41,6 +41,8 @@ export function AnalogInputs({ r, revision, editable = false }: { r: Row; revisi
   const parsedQ = useViewAll('document', 'vParsedSettingNamed', { ConfigurationFileRevisionRowId: revision }, 'DisplayOrder')
   const parsed = parsedQ.data ?? []
   const values = useMemo(() => new Map(parsed.map((p) => [s(p.SettingCode), p])), [parsed])
+  // #201: the instrument transformers the scheme names as its CT and VT sources (scheme.vSchemeSource), read beside the settings
+  const sourcesQ = useViewAll('scheme', 'vSchemeSource', { SchemeEntityId: s(r.SchemeEntityId) }, 'AssetName', !!r.SchemeEntityId)
   if (tq.isPending) return <Status>Loading the template…</Status>
   if (!tq.data) return <Status>No settings template for this model; the instrument transformers below are the record of its analog inputs.</Status>
   const ratios = tq.data.rows.filter(isRatio)
@@ -48,7 +50,45 @@ export function AnalogInputs({ r, revision, editable = false }: { r: Row; revisi
     <Panel title={`Analog inputs · ${tq.data.name}`}>
       {!ratios.length && <Status>The template carries no ratio settings.</Status>}
       {ratios.length > 0 && <SettingsGrid rows={ratios} values={values} revision={revision} editable={editable} deviceId={s(r.DeviceEntityId)} />}
+      {ratios.length > 0 && <FedBy ratios={ratios} values={values} sources={sourcesQ.data ?? []} pending={sourcesQ.isPending && !!r.SchemeEntityId} schemeName={s(r.SchemeName)} hasScheme={!!r.SchemeEntityId} />}
     </Panel>
+  )
+}
+
+/** #201: for each ratio setting, the instrument transformer(s) the scheme names as that kind of source — a current setting
+ * (CTR and the like) against the CT sources, a voltage setting (PTR, SPTR) against the VT sources — with the number the
+ * nameplate ratio makes and whether the setting agrees with it (to half a percent). The check is only as good as the
+ * scheme's source list: a setting with no source named is said so, not judged. */
+function FedBy({ ratios, values, sources, pending, schemeName, hasScheme }: { ratios: Row[]; values: Map<string, Row>; sources: Row[]; pending: boolean; schemeName: string; hasScheme: boolean }) {
+  const isCurrent = (r: Row) => /^CT|current/i.test(s(r.SettingCode) + ' ' + s(r.Name))
+  return (
+    <div className="mt-3 border-t border-slate-800 pt-2 text-sm">
+      <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Fed by</div>
+      {!hasScheme && <Status>This record is in no scheme, so nothing names the transformers that feed it.</Status>}
+      {hasScheme && pending && <Status>Reading the scheme's sources…</Status>}
+      {hasScheme && !pending && (
+        <ul className="mt-1 space-y-1">
+          {ratios.map((r) => {
+            const role = isCurrent(r) ? 'CtSource' : 'VtSource'
+            const mine = sources.filter((x) => s(x.MemberRoleCode) === role)
+            const v = values.get(s(r.SettingCode)); const setting = v ? Number(s(v.RawValue ?? v.DisplayValue)) : NaN
+            return (
+              <li key={s(r.SettingCode)} className="flex flex-wrap items-center gap-2">
+                <span className="text-slate-200">{s(r.SettingCode)}</span>
+                <span className="text-slate-400">{Number.isFinite(setting) ? `= ${setting}` : 'not set'}</span>
+                {!mine.length && <span className="text-slate-500">— {schemeName || 'the scheme'} names no {role === 'CtSource' ? 'CT' : 'VT'} source; the setting cannot be checked</span>}
+                {mine.map((x) => {
+                  const ratio = x.Ratio == null ? NaN : Number(x.Ratio)
+                  const verdict = !Number.isFinite(ratio) ? { text: 'ratio not readable', tone: 'warn' as const }
+                    : !Number.isFinite(setting) ? { text: 'setting not set', tone: 'warn' as const }
+                    : Math.abs(ratio - setting) <= Math.max(0.005 * ratio, 0.01) ? { text: 'matches', tone: 'good' as const }
+                    : { text: `differs from the setting`, tone: 'bad' as const }
+                  return <span key={s(x.MemberEntityId)} className="flex items-center gap-1">— <span className="text-slate-200">{s(x.AssetName)}</span> <span className="text-slate-400">{s(x.RatioInUse) || 'no ratio recorded'}{Number.isFinite(ratio) ? ` = ${ratio}` : ''}</span> <Pill tone={verdict.tone}>{verdict.text}</Pill></span>
+                })}
+              </li>)
+          })}
+        </ul>)}
+    </div>
   )
 }
 
