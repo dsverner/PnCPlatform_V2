@@ -32,6 +32,10 @@ USING (VALUES
     (N'Bay',                N'Yard'),
     (N'EquipmentPosition',  N'Bay'),
     (N'JunctionBox',        N'Bay'),
+    -- #203 (2026-09-19), the owner: "bays will be children of a building" — the bay that may come inside a building, where
+    -- auxiliaries could later stand ("later on … we may place bays within buildings and then auxiliaries could also be placed
+    -- as a child of bays but for now, they are in the yards only", #202). Active; what may sit under such a bay is a later ruling.
+    (N'Bay',                N'Building'),
     (N'TerminalBlock',      N'JunctionBox'),
     (N'Segment',            N'Raceway'),
     (N'Structure',          N'RightOfWay'),
@@ -43,11 +47,16 @@ WHEN NOT MATCHED BY TARGET
          VALUES (s.[ChildNodeTypeCode], s.[ParentNodeTypeCode], 0, @actor, @now, @actor, @now);
 GO
 GO
--- #174: the bay level is not used by this client (see the note above). Deactivated, not removed.
+-- #174: the bay level in the YARD is not used by this client (see the note above). Deactivated, not removed. #203 keeps
+-- the building's bay active: it is the owner's ruling of 2026-09-19, not the yard bay #174 set aside.
 UPDATE [ref].[LocationNodeTypeParent]
    SET [IsActive] = 0, [ModifiedBy] = '00000000-0000-0000-0000-000000000001', [ModifiedAt] = SYSDATETIMEOFFSET()
  WHERE [IsActive] = 1
-   AND ([ChildNodeTypeCode] = N'Bay' OR [ParentNodeTypeCode] = N'Bay');
+   AND ([ChildNodeTypeCode] = N'Bay' OR [ParentNodeTypeCode] = N'Bay')
+   AND NOT ([ChildNodeTypeCode] = N'Bay' AND [ParentNodeTypeCode] = N'Building');
+UPDATE [ref].[LocationNodeTypeParent]
+   SET [IsActive] = 1, [ModifiedBy] = '00000000-0000-0000-0000-000000000001', [ModifiedAt] = SYSDATETIMEOFFSET()
+ WHERE [IsActive] = 0 AND [ChildNodeTypeCode] = N'Bay' AND [ParentNodeTypeCode] = N'Building';
 GO
 
 -- #181 (2026-09-17): a protection function is no longer a NODE. The owner, on the elements inside a microprocessor

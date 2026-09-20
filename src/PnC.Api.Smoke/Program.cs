@@ -1457,6 +1457,10 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
             var k201_bay = Id(k201_yb); var k201_bs = k201_ys; var k201_bb = k201_yb;
             var (k201_as, k201_ab) = await Post(admin, "api/v1/asset/Asset_Add", new { AssetTypeCode = "CT", Name = $"{tag} line CT", Status = "InService" });
             var k201_ct = Id(k201_ab);
+            // #203 (the owner, 2026-09-19): "bays will be children of a building" — the rule is a row of ref.LocationNodeTypeParent
+            var (k203_bs, k203_bb) = await Post(admin, "api/v1/location/AddNode", new { NodeTypeCode = "Bay", ParentEntityId = building, Name = $"{tag} bay 1", Code = "BAY1" });
+            var (k203_ys, k203_yb) = await Post(admin, "api/v1/location/AddNode", new { NodeTypeCode = "Bay", ParentEntityId = Id(k201_yb), Name = $"{tag} yard bay", Code = "BAY9" });
+            Must(k203_bs == HttpStatusCode.OK && k203_ys == HttpStatusCode.Conflict, $"#203: a bay is a child of a building ({(int)k203_bs} {Code(k203_bb)} {k203_bb?["detail"]}) and not of a yard ({(int)k203_ys} {k203_yb?["detail"]})");
             var (k201_xs, k201_xb) = await Post(admin, "api/v1/asset/PlaceAsset", new { AssetEntityId = k201_ct, NodeEntityId = panel, PlacementKind = "Installed" });
             Must(k201_xs == HttpStatusCode.Conflict && (k201_xb?["detail"]?.ToString() ?? "").Contains("stands in a Yard"), $"#202: a CT at a panel is refused in the owner's words ({(int)k201_xs} {k201_xb?["detail"]})");
             var (k201_ps, k201_pb) = await Post(admin, "api/v1/asset/PlaceAsset", new { AssetEntityId = k201_ct, NodeEntityId = k201_bay, PlacementKind = "Installed" });
