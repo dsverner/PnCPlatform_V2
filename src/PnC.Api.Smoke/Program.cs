@@ -1643,6 +1643,21 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
             await Post(admin, "api/v1/ref/VoltageClass_Deactivate", new { VoltageClassCode = k210_code });   // cleanup
         }
 
+        // ======== #211 (2026-09-20): an empty analog input can be removed (the owner ended #208's checks with an empty "Current 2"
+        // and asked whether the user could correct it); removing the last source of an input removes the input with it (the
+        // page does that through the same two procedures). The tailoring of the add form by the relay's template is UI.
+        {
+            var (k211_as, k211_ab) = await Post(admin, "api/v1/scheme/AnalogInput_Add", new { SchemeEntityId = scheme, InputCode = "Current 9", InputKind = "Current" });
+            var k211_in = Id(k211_ab);
+            var (_, k211_lb) = await Get(admin, $"api/v1/scheme/vSchemeInput?EntityId={k211_in}&take=1");
+            var k211_row = (k211_lb?["rows"] as JsonArray)?.FirstOrDefault();
+            var (k211_ds, k211_db) = await Post(admin, "api/v1/scheme/AnalogInput_SoftDelete", new { EntityId = k211_in });
+            var (_, k211_l2b) = await Get(admin, $"api/v1/scheme/vSchemeInput?EntityId={k211_in}&take=1");
+            var (k211_rs, _) = await Post(readOnly!, "api/v1/scheme/AnalogInput_SoftDelete", new { EntityId = k211_in });
+            Must(k211_as == HttpStatusCode.OK && k211_row?["SourceCount"]?.GetValue<int>() == 0 && k211_ds == HttpStatusCode.OK && ((k211_l2b?["rows"] as JsonArray) ?? []).Count == 0 && k211_rs == HttpStatusCode.Forbidden,
+                $"#211: an empty input made ({(int)k211_as} {Code(k211_ab)}; {k211_row?["SourceCount"]} sources) and removed ({(int)k211_ds} {Code(k211_db)}; listed {((k211_l2b?["rows"] as JsonArray) ?? []).Count}); ReadOnly may not ({(int)k211_rs})");
+        }
+
         // ======== #187 (2026-09-18): a new relay from its position, its first settings from the template, and the record that
         // says where it is and what it wears. The owner went the intuitive way — building, panel, record — and read "no FLOC" as
         // "not placed" and could not tell whether the relay "had a template applied". No screen created a relay; "New setting

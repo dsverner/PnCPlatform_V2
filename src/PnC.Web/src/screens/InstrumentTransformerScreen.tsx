@@ -160,14 +160,16 @@ function WhereItStands({ r, canPlace, canMakeNode, onChanged }: { r: Row; canPla
   )
 }
 
-/** The schemes this transformer feeds, each with its role, in-service state and connection note (#206: SchemeSourceActions), and a
- * way to add one: the schemes at its station, in the role chosen (the type's default; a voltage type may be the sync VT source). */
+/** The schemes this transformer feeds, each with its role, input, in-service state and connection note. #211: read first, edit
+ * on purpose — view mode is information only; Edit feeds turns on an Actions column (SchemeSourceActions) and the add form:
+ * the schemes at its station, in the role chosen (the type's default; a voltage type may be the sync VT source). */
 function Feeds({ r, editable, canRemove, onChanged }: { r: Row; editable: boolean; canRemove: boolean; onChanged: () => void }) {
   const navigate = useNavigate()
   const asset = s(r.EntityId)
   const feedsQ = useViewAll('scheme', 'vSchemeSource', { AssetEntityId: asset }, undefined, !!asset)
   const schemesQ = useViewAll('scheme', 'vSchemeStation', { StationNodeEntityId: s(r.StationNodeEntityId) }, 'SchemeName', !!r.StationNodeEntityId && editable)
   const roles = rolesFor(s(r.AssetTypeCode))
+  const [editing, setEditing] = useState(false)
   const [scheme, setScheme] = useState(''); const [role, setRole] = useState(roles[0]); const [busy, setBusy] = useState(false); const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null)
   const rows = feedsQ.data ?? []
   const add = async () => {
@@ -175,26 +177,28 @@ function Feeds({ r, editable, canRemove, onChanged }: { r: Row; editable: boolea
     setBusy(true); setMsg(null)
     try {
       await proc('scheme', 'AddSchemeMember', { SchemeEntityId: scheme, MemberKind: 'Asset', MemberEntityId: asset, MemberRoleCode: role, IsInService: true })
-      setMsg({ text: `${s(r.Name)} now feeds ${s((schemesQ.data ?? []).find((x) => s(x.SchemeEntityId) === scheme)?.SchemeName)} as ${sourceRoleLabel(role)}.` })
+      setMsg({ text: `${s(r.Name)} now feeds ${s((schemesQ.data ?? []).find((x) => s(x.SchemeEntityId) === scheme)?.SchemeName)} as ${sourceRoleLabel(role)} — on that scheme's first input of the kind, or a new one; the record's Analog inputs tab moves it if it belongs elsewhere.` })
       setScheme(''); onChanged()
     } catch (e) { setMsg({ text: e instanceof ApiError ? e.message : String(e), bad: true }) } finally { setBusy(false) }
   }
   return (
-    <Panel title={`Feeds · ${feedsQ.isPending ? '…' : rows.length}`}>
-      {!feedsQ.isPending && !rows.length && <Status>No scheme names this transformer as a source yet. A relay's CTR or PTR can only be checked once it does.</Status>}
+    <Panel title={`Feeds · ${feedsQ.isPending ? '…' : rows.length}`} actions={editable ? <Button kind={editing ? 'primary' : 'default'} onClick={() => setEditing(!editing)}>{editing ? 'Done' : 'Edit feeds'}</Button> : undefined}>
+      {!feedsQ.isPending && !rows.length && <Status>No scheme names this transformer as a source yet. A relay's CTR or PTR can only be checked once it does.{editable ? ' Edit feeds to name one.' : ''}</Status>}
       {rows.length > 0 && (
-        <ul className="space-y-1 text-sm">
-          {rows.map((x) => (
-            <li key={s(x.MemberEntityId)} className="flex flex-wrap items-center gap-2">
-              <SchemeName id={s(x.SchemeEntityId)} onOpen={() => navigate(screenPath('SCHEME', s(x.SchemeEntityId)))} />
-              <span className="text-xs text-slate-500">{sourceRoleLabel(x.MemberRoleCode)}{x.InputCode ? ` · ${s(x.InputCode)}` : ''}{x.RatioInUse ? ` · ${s(x.RatioInUse)}${x.Ratio != null ? ` = ${s(x.Ratio)}` : ' (ratio not read)'}` : ''}</span>
-              {Number(x.ParallelCount ?? 0) >= 2 && <InputPartners inputId={s(x.AnalogInputEntityId)} self={s(r.Name)} />}
-              {x.IsInService === false && <Pill tone="warn">not in service</Pill>}
-              {!!x.Notes && <span className="text-xs text-slate-300" title="the connection note">— {s(x.Notes)}</span>}
-              <SchemeSourceActions x={x} canModify={editable} canRemove={canRemove} onChanged={onChanged} />
-            </li>))}
-        </ul>)}
-      {editable && !!r.StationNodeEntityId && (
+        <table className="w-full text-sm">
+          <thead><tr className="text-left text-xs uppercase tracking-wide text-slate-500"><th className="py-1 pr-2 font-normal">Scheme</th><th className="py-1 pr-2 font-normal">Role · input</th><th className="py-1 pr-2 font-normal">Status</th><th className="py-1 pr-2 font-normal">Note</th>{editing && <th className="py-1 font-normal">Actions</th>}</tr></thead>
+          <tbody>
+            {rows.map((x) => (
+              <tr key={s(x.MemberEntityId)} className="border-t border-slate-800 align-top">
+                <td className="py-1 pr-2"><SchemeName id={s(x.SchemeEntityId)} onOpen={() => navigate(screenPath('SCHEME', s(x.SchemeEntityId)))} /></td>
+                <td className="py-1 pr-2 text-slate-300">{sourceRoleLabel(x.MemberRoleCode)}{x.InputCode ? ` · ${s(x.InputCode)}` : ''}{x.RatioInUse ? <span className="text-xs text-slate-500"> · {s(x.RatioInUse)}{x.Ratio != null ? ` = ${s(x.Ratio)}` : ''}</span> : null}</td>
+                <td className="py-1 pr-2"><span className="flex flex-wrap gap-1">{x.IsInService === false ? <Pill tone="warn">not in service</Pill> : <Pill tone="good">in service</Pill>}{Number(x.ParallelCount ?? 0) >= 2 && <InputPartners inputId={s(x.AnalogInputEntityId)} self={s(r.Name)} />}</span></td>
+                <td className="py-1 pr-2 text-xs text-slate-300">{s(x.Notes) || <span className="text-slate-600">—</span>}</td>
+                {editing && <td className="py-1"><SchemeSourceActions x={x} canModify={editable} canRemove={canRemove} onChanged={onChanged} /></td>}
+              </tr>))}
+          </tbody>
+        </table>)}
+      {editing && editable && !!r.StationNodeEntityId && (
         <div className="mt-2 flex flex-wrap items-end gap-2 border-t border-slate-800 pt-2 text-sm">
           <label className="flex flex-col gap-1 text-xs text-slate-400">Feed a scheme at {s(r.StationName)}
             <select className={`${inputClass} w-72`} value={scheme} disabled={busy} onChange={(e) => setScheme(e.target.value)}>
@@ -205,7 +209,7 @@ function Feeds({ r, editable, canRemove, onChanged }: { r: Row; editable: boolea
             <select className={`${inputClass} w-40`} value={role} disabled={busy} onChange={(e) => setRole(e.target.value)}>{roles.map((x) => <option key={x} value={x}>{sourceRoleLabel(x)}</option>)}</select></label>}
           <Button kind="primary" disabled={busy || !scheme} onClick={() => void add()}>Add as {sourceRoleLabel(role)}</Button>
         </div>)}
-      {editable && !r.StationNodeEntityId && <Status>Place the transformer first; the schemes offered are its station's.</Status>}
+      {editing && editable && !r.StationNodeEntityId && <Status>Place the transformer first; the schemes offered are its station's.</Status>}
       {msg && <Status bad={msg.bad}>{msg.text}</Status>}
     </Panel>
   )

@@ -32,36 +32,54 @@ export function useTemplate(modelId: string | null | undefined) {
   } })
 }
 
-const isRatio = (r: Row) => /current and potential inputs|transformer ratio/i.test(s(r.Category))
+const isRatio = (r: Row) => /^(CTR|PTR|SPTR)/i.test(s(r.SettingCode)) || /^ratio$/i.test(s(r.Unit ?? r.UnitCode)) || /current and potential inputs|transformer ratio/i.test(s(r.Category))   // #211: a ratio setting is an analog input
 const rangeText = (r: Row) => (r.MinValue == null && r.MaxValue == null ? '' : `${r.MinValue ?? '…'} – ${r.MaxValue ?? '…'}`)
 
 
+/** What the relay can take (#211, the owner: "have the application recognize the capabilities of the device being applied
+ * and tailor these questions based on those capabilities"): a settings template carries one ratio setting per analog
+ * input — the SEL-221F's CTR, PTR, SPTR are one current, one voltage and one sync input; an SEL-551's CTR and CTRN two
+ * current inputs. Recognised by code (CTR*, PTR*, SPTR*), unit (ratio) or the ratio category, grouped by kind in template
+ * order. A model with no template has no known capability and the question stays plain; nothing is invented for it. */
+export const inputKindOf = (x: Row) => (s(x.AnsiCode) === '25' || /^(SPTR|PTRS)|sync/i.test(s(x.SettingCode) + ' ' + s(x.Name)) ? 'SyncVoltage' : /^CT|current/i.test(s(x.SettingCode) + ' ' + s(x.Name)) ? 'Current' : 'Voltage')
+export function deviceInputs(rows: Row[]): Record<string, Row[]> {
+  const by: Record<string, Row[]> = { Current: [], Voltage: [], SyncVoltage: [] }
+  for (const x of rows.filter(isRatio)) by[inputKindOf(x)].push(x)
+  return by
+}
+const KIND_LABEL: Record<string, string> = { Current: 'current', Voltage: 'voltage', SyncVoltage: 'sync voltage' }
+const KIND_CODE: Record<string, string> = { Current: 'Current', Voltage: 'Voltage', SyncVoltage: 'Sync voltage' }
+
 /** The Analog inputs tab (#200, reshaped by #205 — owner, 2026-09-20: "the analog inputs tab should only contain information
- * on the CTs and PTs which are feeding the protections and not device specific settings"; #206: the sources are added,
- * connected and removed here too; #208: grouped by the scheme's ANALOG INPUTS — "Current 1", "Voltage", "Sync voltage" —
- * the relay-side endpoints the transformers feed; two or more CTs on one current input are PARALLELED, the owner: "they will
- * always be connected in parallel so a more appropriate method may be just to allow the user to add parallel CTs to the CT
- * input"). Each input lists its transformers (scheme.vSchemeSource) with ratio, phases, placement, in-service state, note and
- * actions, and is judged as one: the relay setting the input's kind feeds (CTR ↔ Current, PTR ↔ Voltage, SPTR ↔ Sync voltage)
- * against the input's ratio — "matches" when every paralleled ratio equals the setting, "paralleled ratios differ" when the
- * transformers on one input disagree with each other (arithmetic, not a standard's claim), "differs" when they agree with
- * each other and not with the setting. The relay's ratio settings themselves are read and edited in the settings book. */
+ * on the CTs and PTs which are feeding the protections and not device specific settings"; #208: grouped by the scheme's
+ * ANALOG INPUTS — the relay-side endpoints the transformers feed; two or more CTs on one current input are PARALLELED;
+ * #211: READ FIRST, EDIT ON PURPOSE — the owner: "Data input is still too confusing"; the badge-style buttons "are very
+ * confusing as I don't know whether they are simply information tags, buttons, status"). View mode is information only:
+ * the inputs, their transformers, ratios, phases, placement, notes, and status pills. Edit inputs turns on an Actions
+ * column of plain labelled buttons and the add forms; Done returns to view. Each scheme input of a kind is matched to the
+ * relay's i-th ratio setting of that kind ("Current 1 · CTR") and judged as one against it: matches when every paralleled
+ * ratio equals the setting, "paralleled ratios differ" when the CTs on an input disagree (arithmetic, not a standard's
+ * claim), differs otherwise; an input beyond the relay's count is flagged so and can be removed when empty. */
 export function AnalogInputs({ r, revision, canEditAssets = false, canEditScheme = false }: { r: Row; revision: string; canEditAssets?: boolean; canEditScheme?: boolean }) {
   const navigate = useNavigate(); const qc = useQueryClient()
   const tq = useTemplate(s(r.ModelId) || null)
   const parsedQ = useViewAll('document', 'vParsedSettingNamed', { ConfigurationFileRevisionRowId: revision }, 'DisplayOrder')
   const values = useMemo(() => new Map((parsedQ.data ?? []).map((p) => [s(p.SettingCode), p])), [parsedQ.data])
   const hasScheme = !!r.SchemeEntityId; const schemeId = s(r.SchemeEntityId); const schemeName = s(r.SchemeName) || 'the scheme'
+  const deviceName = s(r.ModelCode) || s(r.ModelName) || 'this relay'
   const sourcesQ = useViewAll('scheme', 'vSchemeSource', { SchemeEntityId: schemeId }, 'AssetName', hasScheme)
   const inputsQ = useViewAll('scheme', 'vSchemeInput', { SchemeEntityId: schemeId }, 'InputCode', hasScheme)
   const sources = sourcesQ.data ?? []; const inputs = useMemo(() => sortInputs(inputsQ.data ?? []), [inputsQ.data])
-  const ratios = (tq.data?.rows ?? []).filter(isRatio)
-  const kindOfSetting = (x: Row) => (s(x.AnsiCode) === '25' || /^SPTR|sync/i.test(s(x.SettingCode) + ' ' + s(x.Name)) ? 'SyncVoltage' : /^CT|current/i.test(s(x.SettingCode) + ' ' + s(x.Name)) ? 'Current' : 'Voltage')
+  const capability = tq.data ? deviceInputs(tq.data.rows) : null
   const settingOf = (x: Row) => { const v = values.get(s(x.SettingCode)); return v ? Number(s(v.RawValue ?? v.DisplayValue)) : NaN }
-  const [addTo, setAddTo] = useState<Row | null>(null)   // the input a paralleled CT is being added to
+  const [editing, setEditing] = useState(false); const [addTo, setAddTo] = useState<Row | null>(null); const [busy, setBusy] = useState(false); const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null)
   const refresh = () => { qc.invalidateQueries({ queryKey: ['view', 'scheme'] }); qc.invalidateQueries({ queryKey: ['view', 'asset'] }) }
-  // the verdict of one input against the relay's settings of its kind
-  const judge = (input: Row, mine: Row[]) => ratios.filter((x) => kindOfSetting(x) === s(input.InputKind)).map((x) => {
+  const canEdit = canEditAssets && canEditScheme
+  // the relay's setting an input feeds: the i-th of its kind, in template order
+  const settingFor = (input: Row) => { if (!capability) return null; const kind = s(input.InputKind); const i = inputs.filter((x) => s(x.InputKind) === kind).findIndex((x) => s(x.EntityId) === s(input.EntityId)); return capability[kind]?.[i] ?? null }
+  const beyond = (input: Row) => !!capability && settingFor(input) === null
+  const judge = (input: Row, mine: Row[]) => {
+    const x = settingFor(input); if (!x) return null
     const setting = settingOf(x); const nums = [...new Set(mine.map((m) => (m.Ratio == null ? NaN : Number(m.Ratio))).filter((n) => Number.isFinite(n)))]
     const verdict = !mine.length ? { text: 'nothing named', tone: 'warn' as const }
       : !nums.length ? { text: 'ratio not recorded', tone: 'warn' as const }
@@ -70,102 +88,125 @@ export function AnalogInputs({ r, revision, canEditAssets = false, canEditScheme
       : Math.abs(nums[0] - setting) <= Math.max(0.005 * nums[0], 0.01) ? { text: 'matches', tone: 'good' as const }
       : { text: `differs — ${s(x.SettingCode)} is ${setting}`, tone: 'bad' as const }
     return { code: s(x.SettingCode), verdict }
-  })
+  }
+  const removeInput = async (input: Row) => {
+    setBusy(true); setMsg(null)
+    try { await proc('scheme', 'AnalogInput_SoftDelete', { EntityId: input.EntityId }); setMsg({ text: `${s(input.InputCode)} removed.` }); refresh() }
+    catch (e) { setMsg({ text: e instanceof ApiError ? e.message : String(e), bad: true }) } finally { setBusy(false) }
+  }
   const orphans = sources.filter((x) => !x.AnalogInputEntityId)
-  const unfedKinds = ['Current', 'Voltage', 'SyncVoltage'].filter((k) => ratios.some((x) => kindOfSetting(x) === k) && !inputs.some((i) => s(i.InputKind) === k && Number(i.SourceCount ?? 0) > 0))
-  const kindLabel: Record<string, string> = { Current: 'current', Voltage: 'voltage', SyncVoltage: 'sync voltage' }
+  const unfed = capability ? (['Current', 'Voltage', 'SyncVoltage'] as const).flatMap((k) => capability[k].slice(inputs.filter((i) => s(i.InputKind) === k && Number(i.SourceCount ?? 0) > 0).length)) : []
   return (
-    <Panel title={`Feeding this protection · ${sources.length ? `${sources.length} transformer${sources.length === 1 ? '' : 's'} on ${inputs.length} input${inputs.length === 1 ? '' : 's'}` : 'none named'}`}>
+    <Panel title={`Feeding this protection · ${sources.length ? `${sources.length} transformer${sources.length === 1 ? '' : 's'} on ${inputs.length} input${inputs.length === 1 ? '' : 's'}` : 'none named'}`}
+      actions={hasScheme && canEdit ? <Button kind={editing ? 'primary' : 'default'} onClick={() => { setEditing(!editing); setAddTo(null) }}>{editing ? 'Done' : 'Edit inputs'}</Button> : undefined}>
       {!hasScheme && <Status>This record is in no scheme, so nothing names the transformers that feed it.</Status>}
       {hasScheme && (sourcesQ.isPending || inputsQ.isPending) && <Status>Reading the scheme's inputs…</Status>}
-      {hasScheme && !sourcesQ.isPending && !inputsQ.isPending && !sources.length && !inputs.length && <Status>{schemeName} names no CT or VT source yet. Add one below, or name a transformer as its source from the transformer's page (Instrument transformers in the nav).</Status>}
+      {hasScheme && !sourcesQ.isPending && !inputsQ.isPending && !sources.length && !inputs.length && <Status>{schemeName} names no CT or VT source yet.{canEdit ? ' Edit inputs to add one.' : ''}</Status>}
+      {capability && <Status>{deviceName} takes {capability.Current.length} current input{capability.Current.length === 1 ? '' : 's'}{capability.Current.length ? ` (${capability.Current.map((x) => s(x.SettingCode)).join(', ')})` : ''}, {capability.Voltage.length} voltage{capability.Voltage.length ? ` (${capability.Voltage.map((x) => s(x.SettingCode)).join(', ')})` : ''} and {capability.SyncVoltage.length} sync voltage{capability.SyncVoltage.length ? ` (${capability.SyncVoltage.map((x) => s(x.SettingCode)).join(', ')})` : ''} — read from its settings template.</Status>}
       {inputs.length > 0 && (
         <div className="space-y-3 text-sm">
           {inputs.map((input) => {
             const mine = sources.filter((x) => s(x.AnalogInputEntityId).toLowerCase() === s(input.EntityId).toLowerCase())
-            const verdicts = judge(input, mine); const parallel = mine.length >= 2
+            const verdict = judge(input, mine); const parallel = mine.length >= 2; const over = beyond(input); const setting = settingFor(input)
             return (
-              <div key={s(input.EntityId)} className="rounded border border-slate-800 p-2">
+              <div key={s(input.EntityId)} className={`rounded border p-2 ${over ? 'border-amber-900' : 'border-slate-800'}`}>
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-semibold text-slate-100">{s(input.InputCode)}</span>
+                  {setting && <span className="text-xs text-slate-400">· {s(setting.SettingCode)}</span>}
                   <span className="text-xs text-slate-500">{mine.length ? `${mine.length} ${mine.length === 1 ? 'transformer' : (input.InputKind === 'Current' ? 'CTs' : 'transformers')}` : 'nothing named yet'}</span>
                   {parallel && <Pill tone="accent" title="two or more CTs feed this one input: they are connected in parallel before the relay">in parallel</Pill>}
-                  {verdicts.map((f) => <span key={f.code} className="flex items-center gap-1 text-slate-400">· feeds {f.code} <Pill tone={f.verdict.tone}>{f.verdict.text}</Pill></span>)}
-                  {tq.data && !verdicts.length && <span className="text-xs text-slate-500">· the template carries no {kindLabel[s(input.InputKind)]} ratio setting for it to feed</span>}
+                  {verdict && <span className="flex items-center gap-1 text-slate-400">· feeds {verdict.code} <Pill tone={verdict.verdict.tone}>{verdict.verdict.text}</Pill></span>}
+                  {over && <Pill tone="warn" title="the relay's settings template has no ratio setting for this input">beyond this relay's inputs — {deviceName} has {capability![s(input.InputKind)].length} {KIND_LABEL[s(input.InputKind)]}{capability![s(input.InputKind)].length ? ` (${capability![s(input.InputKind)].map((x) => s(x.SettingCode)).join(', ')})` : ''}</Pill>}
                   {!!input.Notes && <span className="text-xs text-slate-300">— {s(input.Notes)}</span>}
-                  {canEditAssets && canEditScheme && input.InputKind === 'Current' && <Button kind="mini" onClick={() => setAddTo(addTo && s(addTo.EntityId) === s(input.EntityId) ? null : input)}>{parallel ? 'Add another paralleled CT' : 'Add a paralleled CT'}</Button>}
                 </div>
                 {mine.length > 0 && (
-                  <ul className="mt-1 space-y-1 pl-3">
-                    {mine.map((src) => {
-                      const ratio = src.Ratio == null ? NaN : Number(src.Ratio); const path = screenPath('INSTRUMENT_TRANSFORMER', s(src.AssetEntityId))
-                      return (
-                        <li key={s(src.MemberEntityId)} className="flex flex-wrap items-center gap-2">
-                          <a className="text-sky-300 underline" href={path} onClick={(e) => { e.preventDefault(); navigate(path) }}>{s(src.AssetName)}</a>
-                          <span className="text-xs text-slate-500">{s(src.AssetTypeCode)}{src.Phases != null ? ` · ${s(src.Phases) === '1' ? 'single-phase' : `${s(src.Phases)}-phase`}` : ''}</span>
-                          <span className="text-slate-400">{s(src.RatioInUse) ? `${s(src.RatioInUse)}${Number.isFinite(ratio) ? ` = ${ratio}` : ' (ratio not read)'}` : 'no ratio recorded'}</span>
-                          {src.IsPlaced === false && <Pill tone="neutral" title="nothing says where it stands yet — place it from its page">not placed</Pill>}
-                          {src.IsInService === false && <Pill tone="warn">not in service</Pill>}
-                          {!!src.Notes && <span className="text-xs text-slate-300" title="the connection note">— {s(src.Notes)}</span>}
-                          <SchemeSourceActions x={src} canModify={canEditScheme} canRemove={canEditScheme} onChanged={refresh} />
-                        </li>)
-                    })}
-                  </ul>)}
-                {addTo && s(addTo.EntityId) === s(input.EntityId) && <AddSourceForm schemeEntityId={schemeId} schemeName={schemeName} inputs={inputs} fixedInput={input} onDone={() => { setAddTo(null); refresh() }} open />}
+                  <table className="mt-1 w-full text-sm">
+                    <thead><tr className="text-left text-xs uppercase tracking-wide text-slate-500"><th className="py-1 pr-2 font-normal">Transformer</th><th className="py-1 pr-2 font-normal">Ratio</th><th className="py-1 pr-2 font-normal">Status</th><th className="py-1 pr-2 font-normal">Note</th>{editing && <th className="py-1 font-normal">Actions</th>}</tr></thead>
+                    <tbody>
+                      {mine.map((src) => {
+                        const ratio = src.Ratio == null ? NaN : Number(src.Ratio); const path = screenPath('INSTRUMENT_TRANSFORMER', s(src.AssetEntityId))
+                        return (
+                          <tr key={s(src.MemberEntityId)} className="border-t border-slate-800 align-top">
+                            <td className="py-1 pr-2"><a className="text-sky-300 underline" href={path} onClick={(e) => { e.preventDefault(); navigate(path) }}>{s(src.AssetName)}</a> <span className="text-xs text-slate-500">{s(src.AssetTypeCode)}{src.Phases != null ? ` · ${s(src.Phases) === '1' ? 'single-phase' : `${s(src.Phases)}-phase`}` : ''}</span></td>
+                            <td className="py-1 pr-2 text-slate-300">{s(src.RatioInUse) ? `${s(src.RatioInUse)}${Number.isFinite(ratio) ? ` = ${ratio}` : ' (not readable)'}` : 'not recorded'}</td>
+                            <td className="py-1 pr-2"><span className="flex flex-wrap gap-1">{src.IsPlaced === false && <Pill tone="neutral" title="nothing says where it stands yet — place it from its page">not placed</Pill>}{src.IsInService === false ? <Pill tone="warn">not in service</Pill> : <Pill tone="good">in service</Pill>}</span></td>
+                            <td className="py-1 pr-2 text-xs text-slate-300">{s(src.Notes) || <span className="text-slate-600">—</span>}</td>
+                            {editing && <td className="py-1"><SchemeSourceActions x={src} canModify={canEditScheme} canRemove={canEditScheme} onChanged={refresh} /></td>}
+                          </tr>)
+                      })}
+                    </tbody>
+                  </table>)}
+                {editing && (
+                  <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-slate-800 pt-2 text-xs">
+                    <span className="uppercase tracking-wide text-slate-500">Actions on {s(input.InputCode)}</span>
+                    {input.InputKind === 'Current' && !over && <Button kind="mini" disabled={busy} onClick={() => setAddTo(addTo && s(addTo.EntityId) === s(input.EntityId) ? null : input)}>{parallel ? 'Add another paralleled CT' : mine.length ? 'Add a paralleled CT' : 'Add a CT'}</Button>}
+                    {!mine.length && <Button kind="mini" disabled={busy} onClick={() => void removeInput(input)}>Remove this input</Button>}
+                    {mine.length > 0 && over && <span className="text-slate-500">move its transformers off it (Remove from scheme) and it can be removed</span>}
+                  </div>)}
+                {editing && addTo && s(addTo.EntityId) === s(input.EntityId) && <AddSourceForm schemeEntityId={schemeId} schemeName={schemeName} inputs={inputs} sources={sources} capability={capability} deviceName={deviceName} fixedInput={input} onDone={() => { setAddTo(null); refresh() }} />}
               </div>)
           })}
         </div>)}
       {orphans.length > 0 && <Status bad>{orphans.length} source{orphans.length === 1 ? ' has' : 's have'} no analog input yet ({orphans.map((x) => s(x.AssetName)).join(', ')}) — the next deploy's catch-up gives them one.</Status>}
-      {hasScheme && !inputsQ.isPending && unfedKinds.length > 0 && (
+      {hasScheme && !inputsQ.isPending && unfed.length > 0 && (
         <ul className="mt-2 space-y-1 border-t border-slate-800 pt-2 text-sm">
-          {unfedKinds.map((k) => <li key={k} className="text-slate-500"><span className="text-slate-300">{ratios.filter((x) => kindOfSetting(x) === k).map((x) => s(x.SettingCode)).join(', ')}</span> — {schemeName} has no {kindLabel[k]} input with a transformer on it; add one below or name it from the transformer's page.</li>)}
+          {unfed.map((x) => <li key={s(x.SettingCode)} className="text-slate-500"><span className="text-slate-300">{s(x.SettingCode)}</span> — no {KIND_LABEL[inputKindOf(x)]} input with a transformer on it feeds this setting yet{canEdit ? (editing ? '; add one below' : '; Edit inputs to add one') : ''}.</li>)}
         </ul>)}
-      {hasScheme && canEditAssets && canEditScheme && <AddSourceForm schemeEntityId={schemeId} schemeName={schemeName} inputs={inputs} onDone={refresh} />}
+      {editing && <AddSourceForm schemeEntityId={schemeId} schemeName={schemeName} inputs={inputs} sources={sources} capability={capability} deviceName={deviceName} onDone={refresh} />}
+      {msg && <Status bad={msg.bad}>{msg.text}</Status>}
       {tq.isPending && <Status>Reading the template…</Status>}
-      {!tq.isPending && !tq.data && <Status>No settings template for this model, so which setting each input feeds is not known.</Status>}
+      {!tq.isPending && !tq.data && <Status>No settings template for this model, so what {deviceName} can take is not known; the inputs are shown as the scheme has them.</Status>}
     </Panel>
   )
 }
 
-/** Inputs in reading order: the current inputs by number, then Voltage, then Sync voltage. */
+/** Inputs in reading order: the current inputs by number, then voltage, then sync voltage. */
 function sortInputs(rows: Row[]): Row[] {
   const rank = (x: Row) => (x.InputKind === 'Current' ? 0 : x.InputKind === 'Voltage' ? 1 : 2)
   const num = (x: Row) => Number((s(x.InputCode).match(/(\d+)$/) ?? [])[1] ?? 0)
   return [...rows].sort((a, b) => rank(a) - rank(b) || num(a) - num(b) || s(a.InputCode).localeCompare(s(b.InputCode)))
 }
-
 /** The next free code of a kind for a scheme: "Current n", "Voltage n", "Sync voltage n". */
-const nextCode = (inputs: Row[], kind: string) => `${kind === 'Current' ? 'Current' : kind === 'Voltage' ? 'Voltage' : 'Sync voltage'} ${Math.max(0, ...inputs.filter((i) => s(i.InputKind) === kind).map((i) => Number((s(i.InputCode).match(/(\d+)$/) ?? [])[1] ?? 0))) + 1}`
+const nextCode = (inputs: Row[], kind: string) => `${KIND_CODE[kind]} ${Math.max(0, ...inputs.filter((i) => s(i.InputKind) === kind).map((i) => Number((s(i.InputCode).match(/(\d+)$/) ?? [])[1] ?? 0))) + 1}`
 
-/** #206/#208: a transformer feeding this protection that the platform does not have — made here (asset.Asset_Add, the nameplate's
- * ratio in use and phases through the type's template) unplaced, and named the scheme's source on an analog input: the one
- * given (a paralleled CT joins the input it is added to), an existing input chosen, or a new one made first (scheme.AnalogInput_Add).
- * The owner: reality (paralleled CTs, separate secondaries) "will need to be corrected by the user by adding another set of
- * instrument transformers, indicating a parallel connection etc." Placement is the transformer page's (a yard, #202). */
-function AddSourceForm({ schemeEntityId, schemeName, inputs, fixedInput, onDone, open: openAtStart = false }: { schemeEntityId: string; schemeName: string; inputs: Row[]; fixedInput?: Row; onDone: () => void; open?: boolean }) {
+/** #206/#208/#211: a transformer feeding this protection that the platform does not have — made here (asset.Asset_Add, its
+ * nameplate ratio and phases) unplaced, and named the scheme's source on an analog input. WHERE it lands is decided by what
+ * the relay can take (the owner, 2026-09-20): a relay with one input of the kind and that input already fed parallels the
+ * set in with no question (the SEL-221F: "one possible CT input"); a relay with more inputs than the scheme has asks one
+ * plain choice — paralleled into an existing input, or a separate input, named by the relay setting it would feed; a
+ * model with no template asks the same choice without the names, paralleled the default. Placement is the transformer
+ * page's (a yard, #202). */
+function AddSourceForm({ schemeEntityId, schemeName, inputs, sources, capability, deviceName, fixedInput, onDone }: { schemeEntityId: string; schemeName: string; inputs: Row[]; sources: Row[]; capability: Record<string, Row[]> | null; deviceName: string; fixedInput?: Row; onDone: () => void }) {
   const typesQ = useViewAll('ref', 'vAssetType', {}, 'Name')
   const types = (typesQ.data ?? []).filter((t) => (fixedInput ? ['CT'] : ['CT', 'VT', 'COUPLING_CAPACITOR_VT', 'CCPD']).includes(s(t.AssetTypeCode)))
-  const [open, setOpen] = useState(openAtStart); const [type, setType] = useState('CT'); const [role, setRole] = useState('CtSource'); const [phases, setPhases] = useState('3')
-  const [ratio, setRatio] = useState(''); const [name, setName] = useState(''); const [note, setNote] = useState(''); const [inputChoice, setInputChoice] = useState('new')
+  const [type, setType] = useState('CT'); const [role, setRole] = useState('CtSource'); const [phases, setPhases] = useState('3')
+  const [ratio, setRatio] = useState(''); const [name, setName] = useState(''); const [note, setNote] = useState(''); const [target, setTarget] = useState<string>('')   // an input id, or 'new'
   const [busy, setBusy] = useState(false); const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null)
   const chosen = types.find((t) => s(t.AssetTypeCode) === type)
   const defsQ = useTemplateDefs(s(chosen?.DefaultTemplateDefinitionEntityId))
   const roles = type === 'CT' ? ['CtSource'] : ['VtSource', 'SyncVtSource']
   const kind = role === 'CtSource' ? 'Current' : role === 'VtSource' ? 'Voltage' : 'SyncVoltage'
-  const candidates = inputs.filter((i) => s(i.InputKind) === kind)
-  const pickType = (code: string) => { setType(code); const rs = code === 'CT' ? ['CtSource'] : ['VtSource', 'SyncVtSource']; const nr = rs.includes(role) ? role : rs[0]; setRole(nr); if (code === 'CCPD' || (code !== 'CT' && nr === 'SyncVtSource')) setPhases('1'); setInputChoice(code === 'CT' ? 'new' : (inputs.find((i) => s(i.InputKind) === (nr === 'VtSource' ? 'Voltage' : 'SyncVoltage'))?.EntityId ? s(inputs.find((i) => s(i.InputKind) === (nr === 'VtSource' ? 'Voltage' : 'SyncVoltage'))!.EntityId) : 'new')) }   // #207: the S&C potential device is single-phase
-  const pickRole = (x: string) => { setRole(x); if (x === 'SyncVtSource') setPhases('1'); const k = x === 'CtSource' ? 'Current' : x === 'VtSource' ? 'Voltage' : 'SyncVoltage'; const ex = inputs.find((i) => s(i.InputKind) === k); setInputChoice(x === 'CtSource' ? 'new' : ex ? s(ex.EntityId) : 'new') }
-  const suggested = fixedInput ? `${schemeName} CTs${ratio.trim() ? ' ' + ratio.trim() : ''} (${s(fixedInput.InputCode)}, paralleled)` : `${schemeName} ${type === 'CT' ? 'CTs' : role === 'SyncVtSource' ? 'sync PT' : 'PTs'}${ratio.trim() ? ' ' + ratio.trim() : ''}`
+  const existing = inputs.filter((i) => s(i.InputKind) === kind)
+  const namesOn = (i: Row) => sources.filter((x) => s(x.AnalogInputEntityId).toLowerCase() === s(i.EntityId).toLowerCase()).map((x) => s(x.AssetName)).join(', ')
+  const canTake = capability ? capability[kind].length : null                 // how many inputs of the kind the relay has; null = unknown
+  const separateAllowed = canTake === null || existing.length < canTake     // a separate input only when the relay has one to spare
+  const nextSetting = capability ? capability[kind][existing.length] : null
+  // the choice, decided by the relay: fixed input → that; no input yet → a new one; one input and none to spare → paralleled, said; else asked
+  const decided = fixedInput ? s(fixedInput.EntityId) : !existing.length ? 'new' : !separateAllowed && existing.length === 1 ? s(existing[0].EntityId) : ''
+  const effective = decided || target || (existing.length ? s(existing[0].EntityId) : 'new')
+  const explain = fixedInput ? `Paralleled into ${s(fixedInput.InputCode)}${namesOn(fixedInput) ? ` with ${namesOn(fixedInput)}` : ''}.`
+    : !existing.length ? `The first ${KIND_LABEL[kind]} input of ${schemeName} — ${nextCode(inputs, kind)}${nextSetting ? ` (${deviceName}'s ${s(nextSetting.SettingCode)})` : ''}.`
+    : decided ? `${deviceName} has one ${KIND_LABEL[kind]} input${capability ? ` (${capability[kind].map((x) => s(x.SettingCode)).join(', ')})` : ''}: this set is paralleled into ${s(existing[0].InputCode)}${namesOn(existing[0]) ? ` with ${namesOn(existing[0])}` : ''}.` : ''
+  const pickType = (code: string) => { setType(code); const rs = code === 'CT' ? ['CtSource'] : ['VtSource', 'SyncVtSource']; const nr = rs.includes(role) ? role : rs[0]; setRole(nr); if (code === 'CCPD' || (code !== 'CT' && nr === 'SyncVtSource')) setPhases('1'); setTarget('') }   // #207: the S&C potential device is single-phase
+  const pickRole = (x: string) => { setRole(x); if (x === 'SyncVtSource') setPhases('1'); setTarget('') }
+  const suggested = `${schemeName} ${type === 'CT' ? 'CTs' : role === 'SyncVtSource' ? 'sync PT' : 'PTs'}${ratio.trim() ? ' ' + ratio.trim() : ''}`
   const make = async () => {
     if (!chosen) return
     setBusy(true); setMsg(null)
     let assetId = ''
     try {
-      let inputId = fixedInput ? s(fixedInput.EntityId) : inputChoice === 'new' ? '' : inputChoice
-      if (!inputId) {
-        const code = nextCode(inputs, kind)
-        const made = await proc('scheme', 'AnalogInput_Add', { SchemeEntityId: schemeEntityId, InputCode: code, InputKind: kind }); inputId = s(made.EntityId)
-      }
+      let inputId = effective
+      if (inputId === 'new') { const made = await proc('scheme', 'AnalogInput_Add', { SchemeEntityId: schemeEntityId, InputCode: nextCode(inputs, kind), InputKind: kind }); inputId = s(made.EntityId) }
       const a = await proc('asset', 'Asset_Add', { AssetTypeCode: type, Name: (name.trim() || suggested), Status: 'InService' })
       assetId = s(a.EntityId)
       const defs = defsQ.data ?? []
@@ -173,8 +214,9 @@ function AddSourceForm({ schemeEntityId, schemeName, inputs, fixedInput, onDone,
       if (ratio.trim() && rdef) await saveAssetCharacteristic(assetId, rdef, ratio.trim())
       if (phases && pdef) await saveAssetCharacteristic(assetId, pdef, phases)
       await proc('scheme', 'AddSchemeMember', { SchemeEntityId: schemeEntityId, MemberKind: 'Asset', MemberEntityId: assetId, MemberRoleCode: role, IsInService: true, Notes: note.trim() || null, AnalogInputEntityId: inputId })
-      setMsg({ text: `${name.trim() || suggested} now feeds ${schemeName} as ${sourceRoleLabel(role)}${fixedInput ? `, paralleled on ${s(fixedInput.InputCode)}` : ''}; it is not placed yet — place it from its page.` })
-      setRatio(''); setName(''); setNote(''); setOpen(openAtStart); onDone()
+      const where = inputs.find((i) => s(i.EntityId) === inputId)
+      setMsg({ text: `${name.trim() || suggested} now feeds ${schemeName} on ${where ? s(where.InputCode) : nextCode(inputs, kind)}; it is not placed yet — place it from its page.` })
+      setRatio(''); setName(''); setNote(''); setTarget(''); onDone()
     } catch (e) {
       const why = e instanceof ApiError ? e.message : String(e)
       setMsg({ text: assetId ? `${name.trim() || suggested} was created but not finished: ${why} — open it from the Instrument transformers list.` : why, bad: true })
@@ -182,35 +224,31 @@ function AddSourceForm({ schemeEntityId, schemeName, inputs, fixedInput, onDone,
   }
   return (
     <div className={`${fixedInput ? 'mt-2 pl-3' : 'mt-2 border-t border-slate-800 pt-2'} space-y-2 text-sm`}>
-      {!fixedInput && (
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-slate-400">A transformer feeding this protection that is not named yet?</span>
-          <Button kind="mini" disabled={busy} onClick={() => setOpen(!open)}>Add a transformer feeding this protection</Button>
+      {!fixedInput && <div className="text-xs uppercase tracking-wide text-slate-500">Add a transformer feeding this protection</div>}
+      <div className="flex flex-wrap items-end gap-2">
+        {fixedInput && <span className="text-xs text-slate-400">A CT paralleled into {s(fixedInput.InputCode)}:</span>}
+        <label className="flex flex-col gap-1 text-xs text-slate-400">Type
+          <select className={`${inputClass} w-52`} value={type} disabled={busy || typesQ.isPending || !!fixedInput} onChange={(e) => pickType(e.target.value)}>
+            {types.map((t) => <option key={s(t.AssetTypeCode)} value={s(t.AssetTypeCode)}>{s(t.Name)}</option>)}
+          </select></label>
+        {roles.length > 1 && <label className="flex flex-col gap-1 text-xs text-slate-400">Feeds as
+          <select className={`${inputClass} w-36`} value={role} disabled={busy} onChange={(e) => pickRole(e.target.value)}>{roles.map((x) => <option key={x} value={x}>{sourceRoleLabel(x)}</option>)}</select></label>}
+        <label className="flex flex-col gap-1 text-xs text-slate-400">Phases
+          <select className={`${inputClass} w-20`} value={phases} disabled={busy} onChange={(e) => setPhases(e.target.value)}><option value="3">3</option><option value="1">1</option></select></label>
+        <label className="flex flex-col gap-1 text-xs text-slate-400">Ratio in use
+          <input className={`${inputClass} w-28`} value={ratio} disabled={busy} placeholder="1200:5" onChange={(e) => setRatio(e.target.value)} /></label>
+        <label className="flex flex-col gap-1 text-xs text-slate-400">Name
+          <input className={`${inputClass} w-64`} value={name} disabled={busy} placeholder={suggested} onChange={(e) => setName(e.target.value)} /></label>
+        <label className="flex flex-col gap-1 text-xs text-slate-400">Connection note (optional)
+          <input className={`${inputClass} w-64`} value={note} disabled={busy} placeholder={fixedInput ? 'e.g. the E2103-TC4 breaker side' : 'e.g. secondary winding S2'} onChange={(e) => setNote(e.target.value)} /></label>
+      </div>
+      {explain ? <div className="text-xs text-slate-300">{explain}</div> : (
+        <div className="flex flex-col gap-1 text-xs text-slate-300">
+          <span className="text-slate-500">Where does it connect?{canTake !== null ? ` ${deviceName} has ${canTake} ${KIND_LABEL[kind]} input${canTake === 1 ? '' : 's'} (${capability![kind].map((x) => s(x.SettingCode)).join(', ')}); ${schemeName} uses ${existing.length}.` : ` What ${deviceName} can take is not known (no settings template).`}</span>
+          {existing.map((i) => <label key={s(i.EntityId)} className="flex items-center gap-2"><input type="radio" name="target" checked={effective === s(i.EntityId)} disabled={busy} onChange={() => setTarget(s(i.EntityId))} /> Paralleled into {s(i.InputCode)}{namesOn(i) ? ` with ${namesOn(i)}` : ''}</label>)}
+          {separateAllowed && <label className="flex items-center gap-2"><input type="radio" name="target" checked={effective === 'new'} disabled={busy} onChange={() => setTarget('new')} /> A separate input — {nextCode(inputs, kind)}{nextSetting ? ` (${deviceName}'s ${s(nextSetting.SettingCode)})` : ''}</label>}
         </div>)}
-      {open && (
-        <div className="flex flex-wrap items-end gap-2">
-          {fixedInput && <span className="text-xs text-slate-400">A CT paralleled into {s(fixedInput.InputCode)}:</span>}
-          <label className="flex flex-col gap-1 text-xs text-slate-400">Type
-            <select className={`${inputClass} w-52`} value={type} disabled={busy || typesQ.isPending || !!fixedInput} onChange={(e) => pickType(e.target.value)}>
-              {types.map((t) => <option key={s(t.AssetTypeCode)} value={s(t.AssetTypeCode)}>{s(t.Name)}</option>)}
-            </select></label>
-          {roles.length > 1 && <label className="flex flex-col gap-1 text-xs text-slate-400">Feeds as
-            <select className={`${inputClass} w-36`} value={role} disabled={busy} onChange={(e) => pickRole(e.target.value)}>{roles.map((x) => <option key={x} value={x}>{sourceRoleLabel(x)}</option>)}</select></label>}
-          {!fixedInput && <label className="flex flex-col gap-1 text-xs text-slate-400">On input
-            <select className={`${inputClass} w-44`} value={inputChoice} disabled={busy} onChange={(e) => setInputChoice(e.target.value)}>
-              <option value="new">a new input ({nextCode(inputs, kind)})</option>
-              {candidates.map((i) => <option key={s(i.EntityId)} value={s(i.EntityId)}>{s(i.InputCode)}{Number(i.SourceCount ?? 0) > 0 ? ` (paralleled with ${s(i.Transformers)})` : ''}</option>)}
-            </select></label>}
-          <label className="flex flex-col gap-1 text-xs text-slate-400">Phases
-            <select className={`${inputClass} w-20`} value={phases} disabled={busy} onChange={(e) => setPhases(e.target.value)}><option value="3">3</option><option value="1">1</option></select></label>
-          <label className="flex flex-col gap-1 text-xs text-slate-400">Ratio in use
-            <input className={`${inputClass} w-28`} value={ratio} disabled={busy} placeholder="1200:5" onChange={(e) => setRatio(e.target.value)} /></label>
-          <label className="flex flex-col gap-1 text-xs text-slate-400">Name
-            <input className={`${inputClass} w-64`} value={name} disabled={busy} placeholder={suggested} onChange={(e) => setName(e.target.value)} /></label>
-          <label className="flex flex-col gap-1 text-xs text-slate-400">Connection note (optional)
-            <input className={`${inputClass} w-64`} value={note} disabled={busy} placeholder={fixedInput ? 'e.g. the E2103-TC4 breaker side' : 'e.g. secondary winding S2'} onChange={(e) => setNote(e.target.value)} /></label>
-          <Button kind="primary" disabled={busy || !chosen} onClick={() => void make()}>{fixedInput ? 'Create and parallel it in' : 'Create and name as source'}</Button>
-        </div>)}
+      <div><Button kind="primary" disabled={busy || !chosen} onClick={() => void make()}>{fixedInput || (decided && decided !== 'new') || (!decided && effective !== 'new') ? 'Create and parallel it in' : 'Create and name as source'}</Button></div>
       {msg && <Status bad={msg.bad}>{msg.text}</Status>}
     </div>
   )
