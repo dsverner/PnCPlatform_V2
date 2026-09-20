@@ -126,8 +126,7 @@ export default function ComplianceTab({ r }: { r: Row }) {
         <Inherited r={r} bca={s(bca?.ClassificationValue)} />
       </div>
       <ElementsInService r={r} />
-      <Obligations r={r} verdicts={verdicts} />
-      <Standing device={device} verdicts={verdicts} pending={verdictsQ.isPending} />
+      <Standards r={r} verdicts={verdicts} pending={verdictsQ.isPending} />
     </div>
   )
 }
@@ -222,43 +221,118 @@ function ElementsInService({ r }: { r: Row }) {
   )
 }
 
-/** The obligations standing against this device. compliance.vObligationSubject carries Open and Satisfied only — an
- * obligation that is NotApplicable or Superseded is history and is not in the view (its own comment says so). */
-function Obligations({ r, verdicts }: { r: Row; verdicts: Row[] }) {
+/** #214 follow-up (the owner, 2026-09-20: "agreed on your one list suggestion"): ONE list per rule, in standard order. A rule
+ * that applies carries its obligation on the row — status, period, the facts read when it opened (compliance.vObligationSubject:
+ * Open and Satisfied; NotApplicable and Superseded are history); an undetermined rule says what is not known; an error is shown
+ * (it is not a decision that the rule does not bind). The rules that do not apply sit behind one closed line at the bottom with
+ * their reasons (#197, the owner: "there must be a reason" — kept, not spread). The verdicts are the platform's standing
+ * decision (compliance.vDeviceVerdict, vDeviceEvaluation); nothing here runs anything. */
+function Standards({ r, verdicts, pending }: { r: Row; verdicts: Row[]; pending: boolean }) {
   const device = s(r.DeviceEntityId)
-  const q = useViewAll('compliance', 'vObligationSubject', { SubjectEntityId: device }, 'RequirementNumber', !!device)
+  const evalQ = useViewAll('compliance', 'vDeviceEvaluation', { DeviceEntityId: device }, undefined, !!device)
+  const obQ = useViewAll('compliance', 'vObligationSubject', { SubjectEntityId: device }, 'RequirementNumber', !!device)
+  const ev = (evalQ.data ?? [])[0]
+  const obligations = obQ.data ?? []
+  const byRule = new Map(obligations.map((o) => [s(o.RuleDefinitionKey), o]))
+  const rules = verdicts.filter((v) => s(v.VerdictKind) === 'Rule')
+  const sortKey = (v: Row) => `${s(v.StandardCode)} ${s(v.RequirementNumber)} ${s(v.RuleKey)}`
+  const binding = rules.filter((v) => s(v.Result) !== 'false').sort((x, y) => sortKey(x).localeCompare(sortKey(y)))
+  const notBinding = rules.filter((v) => s(v.Result) === 'false').sort((x, y) => sortKey(x).localeCompare(sortKey(y)))
+  // an obligation whose rule has no standing verdict yet (the platform has not evaluated the device since #214) still shows
+  const orphans = obligations.filter((o) => !rules.some((v) => s(v.RuleKey) === s(o.RuleDefinitionKey)))
   const [open, setOpen] = useState<string | null>(null)
-  const rows = q.data ?? []
-  const noteFor = (key: string) => s(verdicts.find((v) => s(v.RuleKey) === key)?.EvidenceNote) || null
+  const [showWhy, setShowWhy] = useState(false)
+  const busy = pending || evalQ.isPending || obQ.isPending
+  const count = binding.length + orphans.length
   return (
-    <Panel title={`Obligations · ${q.isPending ? '…' : rows.length}`}>
-      {q.isError && <Status bad>The obligations could not be read: {(q.error as Error).message}</Status>}
-      {!q.isPending && !rows.length && <Status>No obligation stands against this device. Below: what each rule decided about it, and why.</Status>}
-      {rows.length > 0 && (
+    <Panel title={`Standards · ${busy ? '…' : count}`}>
+      {obQ.isError && <Status bad>The obligations could not be read: {(obQ.error as Error).message}</Status>}
+      {!busy && (ev
+        ? <Status>Evaluated {fmtWhen(ev.LastEvaluatedAt)} · {triggerWords(ev.LastTrigger)} · {s(ev.RulesEvaluated)} rule(s)</Status>
+        : <Status>Not yet evaluated — the platform evaluates a device within seconds of a change that a rule reads, and every hour. Nothing to press.</Status>)}
+      {!busy && !count && !!rules.length && <Status>No standard binds this device, and none is undetermined.</Status>}
+      {count > 0 && (
         <table className="w-full text-sm">
           <thead><tr className="border-b border-slate-700 text-left text-xs uppercase tracking-wide text-slate-400">
             <th className="py-1 pr-2">Standard</th><th className="py-1 pr-2">Requirement</th><th className="py-1 pr-2">Rule</th>
             <th className="py-1 pr-2">Status</th><th className="py-1 pr-2">Period</th><th className="py-1">Facts read</th></tr></thead>
           <tbody>
-            {rows.map((o) => { const id = s(o.RowId); const note = noteFor(s(o.RuleDefinitionKey))
+            {binding.map((v) => { const key = s(v.RuleKey); const o = byRule.get(key); const result = s(v.Result); const id = o ? s(o.RowId) : 'v:' + key
+              return (
+                <tr key={key} className="border-b border-slate-800 align-top">
+                  <td className="py-1 pr-2 text-slate-200">{s(v.StandardCode)}<div className="text-xs text-slate-500">{s(v.StandardVersion)}</div></td>
+                  <td className="py-1 pr-2 text-slate-200">{s(v.RequirementNumber)}<div className="text-xs text-slate-500">{s(v.RequirementTitle)}</div></td>
+                  <td className="py-1 pr-2 text-slate-200">{s(v.RuleName)}
+                    {result === 'unknown' && <div className="text-xs text-amber-300">{s(v.Reason)}</div>}
+                    {result === 'error' && <div className="text-xs text-red-300">{s(v.Reason)}</div>}
+                    {!!v.EvidenceNote && <div className="text-xs text-slate-500">evidence: {s(v.EvidenceNote)}</div>}</td>
+                  <td className="py-1 pr-2">
+                    {o ? <Pill tone={statusTone(o.Status)}>{s(o.Status)}</Pill>
+                      : result === 'true' ? <Pill tone="warn" title="the rule applies but no obligation row stands yet — the next pass opens it">applies</Pill>
+                      : <Pill tone={resultTone(result)}>{result === 'unknown' ? 'undetermined' : 'error'}</Pill>}
+                    <div className="text-xs text-slate-600">since {fmtWhen(v.SinceAt)}</div>
+                  </td>
+                  <td className="py-1 pr-2 text-xs text-slate-400">{o ? <>{fmtDate(o.PeriodStartAt)}{o.PeriodEndAt ? ' – ' + fmtDate(o.PeriodEndAt) : ' – open'}</> : '—'}</td>
+                  <td className="py-1">
+                    <Button kind="mini" onClick={() => setOpen(open === id ? null : id)}>{open === id ? 'hide' : 'show'}</Button>
+                    {open === id && (o ? <ObligationFacts instanceRowId={s(o.RowId)} /> : <VerdictReads v={v} />)}
+                    {open === id && <Working v={v} />}
+                  </td>
+                </tr>) })}
+            {orphans.map((o) => { const id = s(o.RowId)
               return (
                 <tr key={id} className="border-b border-slate-800 align-top">
                   <td className="py-1 pr-2 text-slate-200">{s(o.StandardCode)}<div className="text-xs text-slate-500">{s(o.StandardVersion)}</div></td>
                   <td className="py-1 pr-2 text-slate-200">{s(o.RequirementNumber)}{o.SubRequirement ? '.' + s(o.SubRequirement) : ''}<div className="text-xs text-slate-500">{s(o.RequirementTitle)}</div></td>
-                  <td className="py-1 pr-2 text-slate-200">{s(o.RuleName)}{note && <div className="text-xs text-slate-500">evidence: {note}</div>}</td>
+                  <td className="py-1 pr-2 text-slate-200">{s(o.RuleName)}</td>
                   <td className="py-1 pr-2"><Pill tone={statusTone(o.Status)}>{s(o.Status)}</Pill></td>
                   <td className="py-1 pr-2 text-xs text-slate-400">{fmtDate(o.PeriodStartAt)}{o.PeriodEndAt ? ' – ' + fmtDate(o.PeriodEndAt) : ' – open'}</td>
-                  <td className="py-1">
-                    <Button kind="mini" onClick={() => setOpen(open === id ? null : id)}>{open === id ? 'hide' : 'show'}</Button>
-                    {open === id && <ObligationFacts instanceRowId={id} />}
-                  </td>
+                  <td className="py-1"><Button kind="mini" onClick={() => setOpen(open === id ? null : id)}>{open === id ? 'hide' : 'show'}</Button>{open === id && <ObligationFacts instanceRowId={id} />}</td>
                 </tr>) })}
           </tbody>
         </table>)}
-      <Status>Open and Satisfied only — compliance.vObligationSubject leaves a NotApplicable or Superseded obligation to the history.</Status>
+      {!!notBinding.length && (
+        <div className="mt-2 text-xs">
+          <span className="text-slate-500">{notBinding.length} standard{notBinding.length === 1 ? '' : 's'} do{notBinding.length === 1 ? 'es' : ''} not apply to this device</span>
+          <Button kind="mini" className="ml-2" onClick={() => setShowWhy(!showWhy)}>{showWhy ? 'hide why' : 'show why'}</Button>
+          {showWhy && (
+            <ul className="mt-1 space-y-0.5">
+              {notBinding.map((v) => <li key={'why' + s(v.RuleKey)}><span className="text-slate-300">{ruleTitle(v)}</span> <span className="text-slate-400">— {s(v.Reason)}</span> <span className="text-slate-600">since {fmtWhen(v.SinceAt)}</span></li>)}
+            </ul>)}
+        </div>)}
     </Panel>
   )
 }
+
+const ruleTitle = (v: Row) => (v.StandardCode ? `${s(v.StandardCode)} ${s(v.StandardVersion)} ${s(v.RequirementNumber)}`.replace(/\s+/g, ' ').trim() : s(v.RuleName))
+
+/** The reads the standing verdict was decided on (compliance.SubjectVerdict.ReadsJson) — shown when no obligation row carries them. */
+function VerdictReads({ v }: { v: Row }) {
+  const reads = readsOf(v).filter((x) => !PRC023_READS.some(([n]) => n === x.name))
+  if (!reads.length) return <div className="mt-1 text-xs text-slate-500">No fact was read for this verdict.</div>
+  return (
+    <ul className="mt-1 space-y-0.5 text-xs">
+      {reads.map((x, i) => <li key={x.name + i}><span className="text-slate-400">{x.name}{x.params ? ` [${x.params}]` : ''}</span> <span className="text-slate-100">{x.value}</span></li>)}
+    </ul>
+  )
+}
+
+/** The PRC-023 loadability working, from the recorded reads, when the verdict carries them (#171). */
+function Working({ v }: { v: Row }) {
+  const byName = new Map(readsOf(v).map((x) => [x.name, x]))
+  const working = PRC023_READS.filter(([n]) => byName.has(n))
+  if (!working.length) return null
+  return (
+    <div className="mt-1">
+      <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">The loadability working</div>
+      <ul className="mt-0.5 space-y-0.5 text-xs">
+        {working.map(([name, label]) => <li key={name}><span className="text-slate-400">{label}</span> <span className="text-slate-100">{byName.get(name)!.value}</span></li>)}
+      </ul>
+      <div className="mt-0.5 text-xs text-slate-600">The steady-state self-polarised circle; the memory-polarised expansion is not modelled. 50H is treated as a tripping element without decoding its MTU/MTO mask (#171).</div>
+    </div>
+  )
+}
+
 
 function ObligationFacts({ instanceRowId }: { instanceRowId: string }) {
   const q = useViewAll('compliance', 'vObligationInstanceFact', { ObligationInstanceRowId: instanceRowId }, 'FactName')
@@ -269,77 +343,5 @@ function ObligationFacts({ instanceRowId }: { instanceRowId: string }) {
     <ul className="mt-1 space-y-0.5 text-xs">
       {rows.map((f) => <li key={s(f.ObligationInstanceFactId)}><span className="text-slate-400">{s(f.FactName)}</span> <span className="text-slate-200">{s(f.ValueAsRead)}</span></li>)}
     </ul>
-  )
-}
-
-/** #214: the platform's standing verdict on every rule for this device — read from compliance.vDeviceVerdict (what the last
- * Effective pass decided, its reason and its reads; SinceAt = when that verdict began) and vDeviceEvaluation (when the
- * device was last looked at, and by which pass). The rules that bind (true) and the undetermined ones are listed first;
- * the ones that do not apply in one line each with the reason (#197), their reads opened by the engineer who wants them.
- * An error is shown: it is not a decision that the rule does not bind. Nothing here runs anything. */
-function Standing({ device, verdicts, pending }: { device: string; verdicts: Row[]; pending: boolean }) {
-  const evalQ = useViewAll('compliance', 'vDeviceEvaluation', { DeviceEntityId: device }, undefined, !!device)
-  const ev = (evalQ.data ?? [])[0]
-  const rules = verdicts.filter((v) => s(v.VerdictKind) === 'Rule')
-  const binding = rules.filter((v) => s(v.Result) !== 'false')
-  const notBinding = rules.filter((v) => s(v.Result) === 'false')
-  const [showFalse, setShowFalse] = useState(false)
-  return (
-    <Panel title="Standards and this device">
-      {evalQ.isPending || pending ? <Status>…</Status>
-        : !ev ? <Status>Not yet evaluated — the platform evaluates a device within seconds of a change that a rule reads, and every hour. Nothing to press.</Status>
-        : <Status>Evaluated {fmtWhen(ev.LastEvaluatedAt)} · {triggerWords(ev.LastTrigger)} · {s(ev.RulesEvaluated)} rule(s)</Status>}
-      {ev && !rules.length && <Status>No rule was evaluated against this device.</Status>}
-      {!!binding.length && <ul className="mt-2 space-y-2">{binding.map((v) => <li key={s(v.RuleKey)}><VerdictCard v={v} /></li>)}</ul>}
-      {ev && !binding.length && !!rules.length && <Status>No standard binds this device, and none is undetermined.</Status>}
-      {!!notBinding.length && (
-        <div className="mt-2 rounded border border-slate-800 bg-slate-950 p-2 text-sm">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-slate-400">{notBinding.length} standard{notBinding.length === 1 ? '' : 's'} do{notBinding.length === 1 ? 'es' : ''} not apply to this device</span>
-            <Button kind="mini" onClick={() => setShowFalse(!showFalse)}>{showFalse ? 'hide the reads' : 'show the reads'}</Button>
-          </div>
-          <ul className="mt-1 space-y-0.5 text-xs">
-            {notBinding.map((v) => <li key={'why' + s(v.RuleKey)}><span className="text-slate-200">{ruleTitle(v)}</span> <span className="text-slate-400">— does not apply: {s(v.Reason)}</span> <span className="text-slate-600">since {fmtWhen(v.SinceAt)}</span></li>)}
-          </ul>
-          {showFalse && <ul className="mt-2 space-y-2">{notBinding.map((v) => <li key={s(v.RuleKey)}><VerdictCard v={v} /></li>)}</ul>}
-        </div>)}
-    </Panel>
-  )
-}
-
-const ruleTitle = (v: Row) => (v.StandardCode ? `${s(v.StandardCode)} ${s(v.StandardVersion)} ${s(v.RequirementNumber)}`.replace(/\s+/g, ' ').trim() : s(v.RuleName))
-
-function VerdictCard({ v }: { v: Row }) {
-  const [open, setOpen] = useState(false)
-  const reads = readsOf(v)
-  const byName = new Map(reads.map((x) => [x.name, x]))
-  const working = PRC023_READS.filter(([n]) => byName.has(n))
-  const others = reads.filter((x) => !PRC023_READS.some(([n]) => n === x.name))
-  const result = s(v.Result)
-  return (
-    <div className="rounded border border-slate-800 bg-slate-950 p-2">
-      <div className="flex flex-wrap items-center gap-2">
-        <Pill tone={resultTone(result)}>{result === 'true' ? 'applies' : result === 'false' ? 'does not apply' : result === 'unknown' ? 'undetermined' : 'error'}</Pill>
-        <span className="text-slate-200">{s(v.RuleName)}</span>
-        <span className="text-xs text-slate-500">{s(v.RuleKey)}{v.StandardCode ? ` · ${ruleTitle(v)}` : ''} · v{s(v.VersionNumber)} · since {fmtWhen(v.SinceAt)}</span>
-        <Button kind="mini" onClick={() => setOpen(!open)}>{open ? 'hide the reads' : `${reads.length} read(s)`}</Button>
-      </div>
-      {result !== 'true' && <div className="mt-1 text-xs text-slate-400">{s(v.Reason)}</div>}
-      {!!v.Error && <div className="mt-1 text-xs text-red-300">{s(v.Error)}</div>}
-      {!!v.EvidenceNote && <div className="mt-1 text-xs text-slate-500">evidence: {s(v.EvidenceNote)}</div>}
-      {working.length > 0 && (
-        <div className="mt-1">
-          <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">The loadability working</div>
-          <ul className="mt-0.5 space-y-0.5 text-xs">
-            {working.map(([name, label]) => <li key={name}><span className="text-slate-400">{label}</span> <span className="text-slate-100">{byName.get(name)!.value}</span></li>)}
-          </ul>
-          <div className="mt-0.5 text-xs text-slate-600">The steady-state self-polarised circle; the memory-polarised expansion is not modelled. 50H is treated as a tripping element without decoding its MTU/MTO mask (#171).</div>
-        </div>)}
-      {open && (
-        <ul className="mt-1 space-y-0.5 text-xs">
-          {others.length === 0 && <li className="text-slate-500">no other read</li>}
-          {others.map((x, i) => <li key={x.name + i}><span className="text-slate-400">{x.name}{x.params ? ` [${x.params}]` : ''}</span> <span className="text-slate-100">{x.value}</span></li>)}
-        </ul>)}
-    </div>
   )
 }
