@@ -6,6 +6,7 @@ CREATE PROCEDURE [scheme].[SchemeMember_Add]
     @MemberRoleCode NVARCHAR(40),
     @IsInService BIT = 1,
     @Notes NVARCHAR(MAX) = NULL,
+    @AnalogInputEntityId UNIQUEIDENTIFIER = NULL,
     @ValidFrom DATETIMEOFFSET(7) = NULL,
     @ValidFromQuality TINYINT = 0,
     @ActorId UNIQUEIDENTIFIER = NULL,
@@ -25,9 +26,9 @@ BEGIN
     SET @EntityId = ISNULL(@EntityId, NEWID());
     INSERT [scheme].[SchemeMemberRegistry] ([EntityId]) VALUES (@EntityId);
     DECLARE @out TABLE ([RowId] UNIQUEIDENTIFIER);
-    INSERT [scheme].[SchemeMember] ([EntityId], [ValidFrom], [ValidFromQuality], [CreatedBy], [CreatedAt], [ModifiedBy], [ModifiedAt], [MigrationRunId], [SchemeEntityId], [MemberKind], [MemberEntityId], [MemberRoleCode], [IsInService], [Notes])
+    INSERT [scheme].[SchemeMember] ([EntityId], [ValidFrom], [ValidFromQuality], [CreatedBy], [CreatedAt], [ModifiedBy], [ModifiedAt], [MigrationRunId], [SchemeEntityId], [MemberKind], [MemberEntityId], [MemberRoleCode], [IsInService], [Notes], [AnalogInputEntityId])
     OUTPUT inserted.[RowId] INTO @out
-    VALUES (@EntityId, @ValidFrom, @ValidFromQuality, @ActorId, @now, @ActorId, @now, @MigrationRunId, @SchemeEntityId, @MemberKind, @MemberEntityId, @MemberRoleCode, @IsInService, @Notes);
+    VALUES (@EntityId, @ValidFrom, @ValidFromQuality, @ActorId, @now, @ActorId, @now, @MigrationRunId, @SchemeEntityId, @MemberKind, @MemberEntityId, @MemberRoleCode, @IsInService, @Notes, @AnalogInputEntityId);
     SELECT @RowId = [RowId] FROM @out;
     COMMIT TRANSACTION;
 END;

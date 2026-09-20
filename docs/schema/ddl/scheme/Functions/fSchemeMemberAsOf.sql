@@ -3,9 +3,9 @@ CREATE FUNCTION [scheme].[fSchemeMemberAsOf] (@validAt DATETIMEOFFSET(7), @belie
 RETURNS TABLE AS RETURN
 -- bi-temporal as-of (decision 69): rows valid at @validAt as the database believed them at
 -- @believedAtUtc (system time, UTC). A row deleted after @believedAtUtc is still returned.
-SELECT [RowSeq], [RowId], [EntityId], [ValidFrom], [ValidTo], [ValidFromQuality], [CreatedBy], [CreatedAt], [ModifiedBy], [ModifiedAt], [IsDeleted], [DeletedBy], [DeletedAt], [MigrationRunId], [SchemeEntityId], [MemberKind], [MemberEntityId], [MemberRoleCode], [IsInService], [Notes], [SysStart], [SysEnd]
+SELECT [RowSeq], [RowId], [EntityId], [ValidFrom], [ValidTo], [ValidFromQuality], [CreatedBy], [CreatedAt], [ModifiedBy], [ModifiedAt], [IsDeleted], [DeletedBy], [DeletedAt], [MigrationRunId], [SchemeEntityId], [MemberKind], [MemberEntityId], [MemberRoleCode], [IsInService], [Notes], [AnalogInputEntityId], [SysStart], [SysEnd]
 FROM (
-    SELECT [RowSeq], [RowId], [EntityId], [ValidFrom], [ValidTo], [ValidFromQuality], [CreatedBy], [CreatedAt], [ModifiedBy], [ModifiedAt], [IsDeleted], [DeletedBy], [DeletedAt], [MigrationRunId], [SchemeEntityId], [MemberKind], [MemberEntityId], [MemberRoleCode], [IsInService], [Notes], [SysStart], [SysEnd],
+    SELECT [RowSeq], [RowId], [EntityId], [ValidFrom], [ValidTo], [ValidFromQuality], [CreatedBy], [CreatedAt], [ModifiedBy], [ModifiedAt], [IsDeleted], [DeletedBy], [DeletedAt], [MigrationRunId], [SchemeEntityId], [MemberKind], [MemberEntityId], [MemberRoleCode], [IsInService], [Notes], [AnalogInputEntityId], [SysStart], [SysEnd],
            ROW_NUMBER() OVER (PARTITION BY [EntityId] ORDER BY [ValidFrom] DESC, [RowSeq] DESC) AS _rn
     FROM [scheme].[SchemeMember] FOR SYSTEM_TIME AS OF @believedAtUtc
     WHERE [IsDeleted] = 0

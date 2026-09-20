@@ -186,7 +186,8 @@ function Feeds({ r, editable, canRemove, onChanged }: { r: Row; editable: boolea
           {rows.map((x) => (
             <li key={s(x.MemberEntityId)} className="flex flex-wrap items-center gap-2">
               <SchemeName id={s(x.SchemeEntityId)} onOpen={() => navigate(screenPath('SCHEME', s(x.SchemeEntityId)))} />
-              <span className="text-xs text-slate-500">{sourceRoleLabel(x.MemberRoleCode)}{x.RatioInUse ? ` · ${s(x.RatioInUse)}${x.Ratio != null ? ` = ${s(x.Ratio)}` : ' (ratio not read)'}` : ''}</span>
+              <span className="text-xs text-slate-500">{sourceRoleLabel(x.MemberRoleCode)}{x.InputCode ? ` · ${s(x.InputCode)}` : ''}{x.RatioInUse ? ` · ${s(x.RatioInUse)}${x.Ratio != null ? ` = ${s(x.Ratio)}` : ' (ratio not read)'}` : ''}</span>
+              {Number(x.ParallelCount ?? 0) >= 2 && <InputPartners inputId={s(x.AnalogInputEntityId)} self={s(r.Name)} />}
               {x.IsInService === false && <Pill tone="warn">not in service</Pill>}
               {!!x.Notes && <span className="text-xs text-slate-300" title="the connection note">— {s(x.Notes)}</span>}
               <SchemeSourceActions x={x} canModify={editable} canRemove={canRemove} onChanged={onChanged} />
@@ -332,6 +333,13 @@ function Readings({ requestId, recordEntityId }: { requestId: string; recordEnti
         : <ul className="mt-0.5 space-y-0.5">{entries.map(([k, v]) => <li key={k}><span className="text-slate-400">{k}</span> <span className="whitespace-pre-wrap text-slate-200">{Array.isArray(v) ? v.join(', ') : s(v)}</span></li>)}</ul>}
     </div>
   )
+}
+
+/** #208: the other transformers paralleled into the same analog input (scheme.vSchemeInput.Transformers). */
+function InputPartners({ inputId, self }: { inputId: string; self: string }) {
+  const q = useViewAll('scheme', 'vSchemeInput', { EntityId: inputId }, undefined, !!inputId)
+  const names = s(q.data?.[0]?.Transformers).split('; ').filter((n) => n && n !== self)
+  return <Pill tone="accent" title="two or more CTs feed this one input: they are connected in parallel before the relay">in parallel{names.length ? ` with ${names.join(', ')}` : ''}</Pill>
 }
 
 function SchemeName({ id, onOpen }: { id: string; onOpen: () => void }) {

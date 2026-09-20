@@ -1579,6 +1579,43 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
                 $"#206: removed from the scheme ({(int)k206_ds} {Code(k206_dbb)}; sources left {((k206_s4b?["rows"] as JsonArray) ?? []).Count}) and deleted ({(int)k206_xs} {Code(k206_xb)}; listed {((k206_i3b?["rows"] as JsonArray) ?? []).Count}); ReadOnly may neither edit ({(int)k206_ros}) nor remove ({(int)k206_ro2})");
         }
 
+        // ======== #208 (2026-09-20): a protection's analog input is a thing — "Current 1", "Voltage", "Sync voltage" — and the CTs
+        // paralleled into it (line 2103 fed breaker-and-a-half from E2103 and E2103-TC4: "the two sets of CTs will be paralleled
+        // before being brought in to the device"). AddSchemeMember lands every source on an input (found or made); a second CT
+        // on the same input is paralleled; an input of another scheme is refused; the tests stay per transformer.
+        {
+            var (_, k208_ctb) = await Get(admin, $"api/v1/asset/vInstrumentTransformer?Name={Uri.EscapeDataString($"{tag} line CT (S2 winding)")}&take=1");
+            var k208_ct = Id((k208_ctb?["rows"] as JsonArray)?.FirstOrDefault());
+            var (k208_ss, k208_sb) = await Get(admin, $"api/v1/scheme/vSchemeSource?AssetEntityId={k208_ct}&take=1");
+            var k208_src = (k208_sb?["rows"] as JsonArray)?.FirstOrDefault();
+            var k208_input = k208_src?["AnalogInputEntityId"]?.ToString();
+            Must(k208_ss == HttpStatusCode.OK && k208_src?["InputCode"]?.ToString() == "Current 1" && k208_src?["InputKind"]?.ToString() == "Current" && k208_src?["ParallelCount"]?.GetValue<int>() == 1,
+                $"#208: the fixture CT, named a source before inputs existed, feeds an input made for it ({k208_src?["InputCode"]} · {k208_src?["InputKind"]} · {k208_src?["ParallelCount"]} on it)");
+            // the second breaker's CT set, paralleled into the same input
+            var (k208_as, k208_ab) = await Post(admin, "api/v1/asset/Asset_Add", new { AssetTypeCode = "CT", Name = $"{tag} line CT (TC4 side)", Status = "InService" });
+            var k208_ct2 = Id(k208_ab);
+            var (_, k208_tb) = await Get(admin, "api/v1/ref/vAssetType?AssetTypeCode=CT&take=1");
+            var (_, k208_vb) = await Get(admin, $"api/v1/config/vDefinitionVersion?DefinitionEntityId={(k208_tb?["rows"] as JsonArray)?.FirstOrDefault()?["DefaultTemplateDefinitionEntityId"]}&Status=Effective&take=1");
+            var (_, k208_cdb) = await Get(admin, $"api/v1/config/vCharacteristicDefinition?DefinitionVersionRowId={(k208_vb?["rows"] as JsonArray)?.FirstOrDefault()?["RowId"]}&CharacteristicKey=RatioInUse&take=1");
+            var (k208_cvs, _) = await Post(admin, "api/v1/asset/CharacteristicValue_Add", new { HostEntityId = k208_ct2, CharacteristicDefinitionRowId = (k208_cdb?["rows"] as JsonArray)?.FirstOrDefault()?["RowId"]?.ToString(), TextValue = "1200:5" });
+            var (k208_ms, k208_mb) = await Post(admin, "api/v1/scheme/AddSchemeMember", new { SchemeEntityId = scheme, MemberKind = "Asset", MemberEntityId = k208_ct2, MemberRoleCode = "CtSource", IsInService = true, AnalogInputEntityId = k208_input, Notes = "the E2103-TC4 breaker side" });
+            var (_, k208_s2b) = await Get(admin, $"api/v1/scheme/vSchemeSource?AnalogInputEntityId={k208_input}&take=10");
+            var k208_on = (k208_s2b?["rows"] as JsonArray) ?? [];
+            var (_, k208_ib) = await Get(admin, $"api/v1/scheme/vSchemeInput?EntityId={k208_input}&take=1");
+            var k208_in = (k208_ib?["rows"] as JsonArray)?.FirstOrDefault();
+            Must(k208_as == HttpStatusCode.OK && k208_cvs == HttpStatusCode.OK && k208_ms == HttpStatusCode.OK && k208_on.Count == 2 && k208_on.All(x => x?["ParallelCount"]?.GetValue<int>() == 2)
+                 && k208_in?["IsParallel"]?.GetValue<bool>() == true && k208_in?["SourceCount"]?.GetValue<int>() == 2 && k208_in?["DistinctRatios"]?.GetValue<int>() == 1,
+                $"#208: the TC4-side CT paralleled into {k208_src?["InputCode"]} ({(int)k208_ms} {Code(k208_mb)} {k208_mb?["detail"]}): {k208_on.Count} CTs on it, each reading {k208_on.FirstOrDefault()?["ParallelCount"]} in parallel; the input reads parallel {k208_in?["IsParallel"]}, {k208_in?["SourceCount"]} sources, {k208_in?["DistinctRatios"]} distinct ratio ({k208_in?["Ratios"]})");
+            // an input of another scheme is refused; ReadOnly may not make an input
+            var (_, k208_ob) = await Get(admin, $"api/v1/document/vSettingsRecord?GridState=Active&SchemeName={Uri.EscapeDataString("2103 B-PROT")}&StationName={Uri.EscapeDataString("BATHURST TERMINAL")}&take=1");
+            var (_, k208_oib) = await Get(admin, $"api/v1/scheme/vSchemeInput?SchemeEntityId={(k208_ob?["rows"] as JsonArray)?.FirstOrDefault()?["SchemeEntityId"]}&take=1");
+            var k208_other = (k208_oib?["rows"] as JsonArray)?.FirstOrDefault()?["EntityId"]?.ToString();
+            var (k208_xs, k208_xb) = await Post(admin, "api/v1/scheme/AddSchemeMember", new { SchemeEntityId = scheme, MemberKind = "Asset", MemberEntityId = k208_ct2, MemberRoleCode = "CtSource", IsInService = true, AnalogInputEntityId = k208_other });
+            var (k208_rs, _) = await Post(readOnly!, "api/v1/scheme/AnalogInput_Add", new { SchemeEntityId = scheme, InputCode = "Current 9", InputKind = "Current" });
+            Must(k208_other is not null && k208_xs == HttpStatusCode.Conflict && (k208_xb?["detail"]?.ToString() ?? "").Contains("not a current input of this scheme") && k208_rs == HttpStatusCode.Forbidden,
+                $"#208: another scheme's input is refused in the rule's words ({(int)k208_xs} {k208_xb?["detail"]}); ReadOnly may not make an input ({(int)k208_rs})");
+        }
+
         // ======== #187 (2026-09-18): a new relay from its position, its first settings from the template, and the record that
         // says where it is and what it wears. The owner went the intuitive way — building, panel, record — and read "no FLOC" as
         // "not placed" and could not tell whether the relay "had a template applied". No screen created a relay; "New setting

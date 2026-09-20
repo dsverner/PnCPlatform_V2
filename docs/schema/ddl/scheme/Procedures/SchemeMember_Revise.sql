@@ -7,6 +7,7 @@ CREATE PROCEDURE [scheme].[SchemeMember_Revise]
     @MemberRoleCode NVARCHAR(40),
     @IsInService BIT = 1,
     @Notes NVARCHAR(MAX) = NULL,
+    @AnalogInputEntityId UNIQUEIDENTIFIER = NULL,
     @ValidFrom DATETIMEOFFSET(7) = NULL,
     @ValidFromQuality TINYINT = 0,
     @ActorId UNIQUEIDENTIFIER = NULL,
@@ -28,9 +29,9 @@ BEGIN
     UPDATE [scheme].[SchemeMember] SET [ValidTo] = @ValidFrom, [ModifiedBy] = @ActorId, [ModifiedAt] = @now
     WHERE [EntityId] = @EntityId AND [IsDeleted] = 0 AND [ValidTo] IS NULL AND [ValidFrom] <= @ValidFrom;
     DECLARE @out TABLE ([RowId] UNIQUEIDENTIFIER);
-    INSERT [scheme].[SchemeMember] ([EntityId], [ValidFrom], [ValidFromQuality], [CreatedBy], [CreatedAt], [ModifiedBy], [ModifiedAt], [MigrationRunId], [SchemeEntityId], [MemberKind], [MemberEntityId], [MemberRoleCode], [IsInService], [Notes])
+    INSERT [scheme].[SchemeMember] ([EntityId], [ValidFrom], [ValidFromQuality], [CreatedBy], [CreatedAt], [ModifiedBy], [ModifiedAt], [MigrationRunId], [SchemeEntityId], [MemberKind], [MemberEntityId], [MemberRoleCode], [IsInService], [Notes], [AnalogInputEntityId])
     OUTPUT inserted.[RowId] INTO @out
-    VALUES (@EntityId, @ValidFrom, @ValidFromQuality, @ActorId, @now, @ActorId, @now, @MigrationRunId, @SchemeEntityId, @MemberKind, @MemberEntityId, @MemberRoleCode, @IsInService, @Notes);
+    VALUES (@EntityId, @ValidFrom, @ValidFromQuality, @ActorId, @now, @ActorId, @now, @MigrationRunId, @SchemeEntityId, @MemberKind, @MemberEntityId, @MemberRoleCode, @IsInService, @Notes, @AnalogInputEntityId);
     SELECT @RowId = [RowId] FROM @out;
     COMMIT TRANSACTION;
 END;

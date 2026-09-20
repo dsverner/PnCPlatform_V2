@@ -24,6 +24,7 @@ CREATE TABLE [scheme].[SchemeMember] (
     [MemberRoleCode]     NVARCHAR(40)     NOT NULL CONSTRAINT [FK_SchemeMember_Role] REFERENCES [ref].[SchemeMemberRole] ([MemberRoleCode]),
     [IsInService]        BIT              NOT NULL CONSTRAINT [DF_SchemeMember_IsInService] DEFAULT 1,
     [Notes]              NVARCHAR(MAX)    NULL,
+    [AnalogInputEntityId] UNIQUEIDENTIFIER NULL CONSTRAINT [FK_SchemeMember_AnalogInput] REFERENCES [scheme].[AnalogInputRegistry] ([EntityId]),   -- #208: the input a source feeds; members on the same current input are paralleled
     CONSTRAINT [PK_SchemeMember] PRIMARY KEY CLUSTERED ([RowSeq]),
     CONSTRAINT [UQ_SchemeMember_RowId] UNIQUE NONCLUSTERED ([RowId])
 ) WITH (SYSTEM_VERSIONING = ON (HISTORY_TABLE = [scheme].[SchemeMember_History]));
@@ -33,6 +34,8 @@ GO
 CREATE INDEX [IX_SchemeMember_Scheme] ON [scheme].[SchemeMember] ([SchemeEntityId]) WHERE [ValidTo] IS NULL AND [IsDeleted] = 0;
 GO
 CREATE INDEX [IX_SchemeMember_Member] ON [scheme].[SchemeMember] ([MemberKind], [MemberEntityId]) WHERE [ValidTo] IS NULL AND [IsDeleted] = 0;
+GO
+CREATE INDEX [IX_SchemeMember_AnalogInput] ON [scheme].[SchemeMember] ([AnalogInputEntityId]) WHERE [ValidTo] IS NULL AND [IsDeleted] = 0 AND [AnalogInputEntityId] IS NOT NULL;   -- #208
 GO
 EXEC sys.sp_addextendedproperty @name = N'PnC.TemporalClass', @value = N'BiTemporal',
     @level0type = N'SCHEMA', @level0name = N'scheme', @level1type = N'TABLE', @level1name = N'SchemeMember';
