@@ -121,6 +121,15 @@ BEGIN
              @ValidFrom = @OccurredAt, @ValidFromQuality = @ValidFromQuality, @ActorId = @ActorId, @MigrationRunId = @MigrationRunId, @RowId = @RowId OUTPUT;
     END;
 
+    -- #206 (2026-09-20): how many may stand at the node. A DevicePosition holds one device and an EquipmentPosition one piece of
+    -- primary plant (UX_Placement_InstalledAtNode, the predecessor's rule); a Yard holds every CT and PT in it (#202), a Panel every
+    -- auxiliary mounted on it, a Station or Building whatever stands there. The row is written as holding alone (SharesNode NULL) and
+    -- corrected here in the same transaction (SharesNode = 1 where many stand), so the generated Placement_Add needs no new parameter; the first deploy found a
+    -- second transformer in the 230 kV yard refused by the index.
+    IF @NodeEntityId IS NOT NULL AND @nodeType NOT IN (N'DevicePosition', N'EquipmentPosition')
+        UPDATE [asset].[Placement] SET [SharesNode] = 1
+        WHERE [RowId] = @RowId AND [SharesNode] IS NULL;
+
     -- lifecycle events for devices, in the same transaction (§5.4)
     IF @isDevice = 1
     BEGIN

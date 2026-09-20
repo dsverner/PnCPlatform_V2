@@ -52,7 +52,8 @@ record is `LEGACY-FIELDS.md`. A rehearsal (`run_rehearsal.py`) proves the import
 
 | Rule | Seed |
 |---|---|
-| #194 the legacy classification columns are dropped (untrusted); the CT/PT ratio columns stay as characteristics | `Seed_config_CharacteristicSchema_SettingsRecord.sql` |
+| #206 a scheme's CT and PT sets are made from its in-service devices' legacy CT_MAIN/PT_MAIN strings (one set per distinct ratio) and from the inputs the devices' functions need (a set with the ratio unknown; a single-phase sync PT for a 25); each device's CT_AUX/PT_AUX strings become auxiliary transformers at its panel; never a duplicate of a source the scheme already has; a set stands unplaced until a person places it | `Seed_asset_InstrumentTransformersFromLegacy.sql` |
+| #206 the legacy CT/PT ratio columns are no longer characteristics of the record — they become the scheme's instrument transformers (Seed_asset_InstrumentTransformersFromLegacy); the SETTINGS_RECORD characteristic schema is retired (#194's classification drop stands) | `Seed_config_CharacteristicSchema_SettingsRecord.sql` |
 | #178/#179 a migrated LOCATION is a building under its station (a placeholder building coded BDG1, named as the station); station and building names in capitals | `Seed_location_BuildingCodes.sql` |
 | #181 a migrated ProtectionFunction node is retired; its commissioned functions point at the device position and the relay itself is the scheme member | `Seed_scheme_RepointCommissionedFunctions.sql` |
 

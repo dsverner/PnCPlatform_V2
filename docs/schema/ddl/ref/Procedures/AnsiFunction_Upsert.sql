@@ -8,6 +8,8 @@ CREATE PROCEDURE [ref].[AnsiFunction_Upsert]
     @IsDeviceNumber BIT = NULL,
     @LoadResponsive BIT = NULL,
     @LoadResponsiveBasis NVARCHAR(200) = NULL,
+    @AnalogInputs NVARCHAR(10) = NULL,
+    @AnalogInputsBasis NVARCHAR(200) = NULL,
     @ActorId UNIQUEIDENTIFIER = NULL,
     @MigrationRunId UNIQUEIDENTIFIER = NULL
 AS
@@ -16,7 +18,7 @@ BEGIN
     DECLARE @now DATETIMEOFFSET(7) = SYSDATETIMEOFFSET();
     IF @ActorId IS NULL EXEC [personnel].[ResolveActor] @ActorId = @ActorId OUTPUT;
     IF EXISTS (SELECT 1 FROM [ref].[AnsiFunction] t WHERE t.[AnsiCode] = @AnsiCode)
-        UPDATE t SET [Name] = @Name, [Description] = @Description, [Category] = @Category, [DefaultLnClass] = @DefaultLnClass, [IsDeviceNumber] = @IsDeviceNumber, [LoadResponsive] = @LoadResponsive, [LoadResponsiveBasis] = @LoadResponsiveBasis, [IsActive] = 1, [ModifiedBy] = @ActorId, [ModifiedAt] = @now FROM [ref].[AnsiFunction] t WHERE t.[AnsiCode] = @AnsiCode;
+        UPDATE t SET [Name] = @Name, [Description] = @Description, [Category] = @Category, [DefaultLnClass] = @DefaultLnClass, [IsDeviceNumber] = @IsDeviceNumber, [LoadResponsive] = @LoadResponsive, [LoadResponsiveBasis] = @LoadResponsiveBasis, [AnalogInputs] = @AnalogInputs, [AnalogInputsBasis] = @AnalogInputsBasis, [IsActive] = 1, [ModifiedBy] = @ActorId, [ModifiedAt] = @now FROM [ref].[AnsiFunction] t WHERE t.[AnsiCode] = @AnsiCode;
     ELSE
-        INSERT [ref].[AnsiFunction] ([AnsiCode], [Name], [Description], [Category], [DefaultLnClass], [IsDeviceNumber], [LoadResponsive], [LoadResponsiveBasis], [CreatedBy], [CreatedAt], [ModifiedBy], [ModifiedAt], [MigrationRunId]) VALUES (@AnsiCode, @Name, @Description, @Category, @DefaultLnClass, @IsDeviceNumber, @LoadResponsive, @LoadResponsiveBasis, @ActorId, @now, @ActorId, @now, @MigrationRunId);
+        INSERT [ref].[AnsiFunction] ([AnsiCode], [Name], [Description], [Category], [DefaultLnClass], [IsDeviceNumber], [LoadResponsive], [LoadResponsiveBasis], [AnalogInputs], [AnalogInputsBasis], [CreatedBy], [CreatedAt], [ModifiedBy], [ModifiedAt], [MigrationRunId]) VALUES (@AnsiCode, @Name, @Description, @Category, @DefaultLnClass, @IsDeviceNumber, @LoadResponsive, @LoadResponsiveBasis, @AnalogInputs, @AnalogInputsBasis, @ActorId, @now, @ActorId, @now, @MigrationRunId);
 END;

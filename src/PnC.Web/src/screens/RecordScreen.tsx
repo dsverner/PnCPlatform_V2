@@ -4,10 +4,10 @@
 // while the revision is a draft — the direct save with audit of #163), the notes, the parsed settings, the settings text
 // as filed, the files and records, and Compare with another revision of the same device. What the platform does not
 // model is said so, never invented.
-import { useMemo, useState } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMemo } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { useNavigate, useLocation } from 'react-router'
-import { ApiError, fmtDate, fmtWhen, s, view, viewAll, proc, type Row } from '@/lib/api'
+import { fmtDate, fmtWhen, s, view, type Row } from '@/lib/api'
 import { useCan, useEntryState, useViewAll } from '@/lib/hooks'
 import { legacyFree, legacyDetail } from '@/lib/legacy'
 import { settingsText } from '@/lib/actions'
@@ -18,7 +18,6 @@ import DeviceSettings, { useTemplate, AnalogInputs, BasisPanel } from './DeviceS
 import ComplianceTab, { useProtectedAssets } from './ComplianceTab'
 import { NodeLink } from './PrimaryAssetScreen'
 
-const CHARACTERISTIC_SCHEMA = 'SETTINGS_RECORD'   // CharacteristicSchema.RecordTemplate seeded for the settings record (#167)
 
 export default function RecordScreen({ params: p, id }: { screen: Screen; params: RecordParams; id?: string }) {
   const [schema, vw] = splitView(p.view); const navigate = useNavigate(); const loc = useLocation(); const can = useCan()
@@ -66,15 +65,9 @@ export default function RecordScreen({ params: p, id }: { screen: Screen; params
             {parsed.length > 0 ? <DataGrid rows={parsed} columns={PARSED_COLS} rowKey={(x) => s(x.SettingCode) + '|' + s(x.GroupNumber)} /> : <Status>No settings template for this model yet; the text as filed is the record.</Status>}
           </Panel>)}
       {/* #200 (owner, 2026-09-19): the CTs and PTs on a tab of their own; #205 (owner, 2026-09-20): only the transformers that feed
-          the protection — the relay's ratio settings went back to the book. Above, the scheme's CT and VT sources with what each
-          feeds; below, the instrument-transformer characteristics the legacy record declared (every record's, template or not) */}
-      {section === 'analog' && (
-        <>
-          <AnalogInputs r={r} revision={revision} />
-          <Status>Declared in the legacy record — the CT and PT ratios the settings record carried as text. The transformers themselves are equipment: make them at their yard or panel and name them as the scheme's sources, and the panel above reads them.</Status>
-          <Characteristics r={r} revision={revision} editable={r.GridState === 'Outstanding' && can('Record.Modify')} />
-        </>
-      )}
+          the protection — the relay's ratio settings went back to the book; #206: the legacy declared-ratio section is retired
+          (its strings became the scheme's transformers by the migration rule) and the tab adds, connects and removes sources */}
+      {section === 'analog' && <AnalogInputs r={r} revision={revision} canEditAssets={can('Asset.Modify')} canEditScheme={can('Scheme.Modify')} />}
       {/* #188: the relay, its placement and scheme, and the dates and state — a tab, not the top of every view. The owner,
           2026-09-18: the three panels "take up too much room and should really just be another tab"; "Where" renamed */}
       {section === 'record' && (
@@ -100,8 +93,8 @@ export default function RecordScreen({ params: p, id }: { screen: Screen; params
       </div>
         </>
       )}
-      {/* #194: the Classification tab is gone (its eight legacy fields dropped as untrusted); the instrument-transformer
-          characteristics kept a home on the Record tab until #200 moved them to the Analog inputs tab */}
+      {/* #194: the Classification tab is gone (its eight legacy fields dropped as untrusted); the legacy instrument-transformer
+          characteristics moved to the Analog inputs tab in #200 and were retired in #206 */}
       {/* #171: what the device is, what it inherits from the station and the protected asset, its obligations and the evaluator's working */}
       {section === 'compliance' && <ComplianceTab r={r} />}
       {section === 'notes' && <Notes r={r} revision={revision} />}
@@ -141,59 +134,6 @@ const PARSED_COLS: Column<Row>[] = [
  * the eight classification fields left in #194 — untrusted): the schema's definitions by display group; a migrated record's
  * values read from its summary until the values are migrated; a draft revision's values saved directly
  * (document.CharacteristicValue_Add/_Revise, audited). */
-function Characteristics({ r, revision, editable, hideGroups = [] }: { r: Row; revision: string; editable: boolean; hideGroups?: string[] }) {
-  const qc = useQueryClient()
-  const defsQ = useQuery({ queryKey: ['characteristicSchema', CHARACTERISTIC_SCHEMA], staleTime: 10 * 60_000, queryFn: async () => {
-    const d = (await view('config', 'vDefinition', { DefinitionKind: 'CharacteristicSchema.RecordTemplate', DefinitionKey: CHARACTERISTIC_SCHEMA }, { take: 1 })).rows[0]; if (!d) return []
-    const v = (await view('config', 'vDefinitionVersion', { DefinitionEntityId: s(d.EntityId), Status: 'Effective' }, { take: 5 })).rows[0]; if (!v) return []
-    return (await viewAll('config', 'vCharacteristicDefinition', { DefinitionVersionRowId: s(v.RowId) }, 'DisplayOrder'))
-  } })
-  const valuesQ = useViewAll('document', 'vCharacteristicValue', { HostRevisionRowId: revision })
-  const recQ = useViewAll('record', 'vRecord', { WorkRequestEntityId: s(r.WorkRequestEntityId), RecordKindCode: 'ConfigurationFileRevision' }, undefined, !!r.WorkRequestEntityId)
-  const migrated = useMemo(() => { const recs = recQ.data ?? []; const rec = recs.find((x) => s(x.SecondSubjectEntityId).toLowerCase() === revision.toLowerCase()) || (recs.length === 1 ? recs[0] : null); return rec ? legacyDetail(rec.Summary) : { notes: [], mp: [], it: [] } }, [recQ.data, revision])
-  const [edits, setEdits] = useState<Record<string, string>>({}); const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null)
-  const defs = defsQ.data ?? []; const values = valuesQ.data ?? []
-  const valueOf = (d: Row) => { const v = values.find((x) => s(x.CharacteristicDefinitionRowId).toLowerCase() === s(d.RowId).toLowerCase()); if (!v) return null; return v.TextValue ?? v.DecimalValue ?? v.IntegerValue ?? v.BooleanValue ?? v.DateTimeValue ?? v.ReferenceEntityId }
-  const legacyValue = (d: Row) => migrated.mp.concat(migrated.it).find(([label]) => label.toLowerCase() === s(d.Name).toLowerCase())?.[1]
-  const groups = useMemo(() => { const m = new Map<string, Row[]>(); for (const d of defs) { const g = s(d.DisplayGroup) || 'Characteristics'; if (!m.has(g)) m.set(g, []); m.get(g)!.push(d) } return m }, [defs])
-  const save = async (d: Row) => {
-    const text = (edits[s(d.RowId)] ?? '').trim(); if (!text) return
-    const existing = values.find((x) => s(x.CharacteristicDefinitionRowId).toLowerCase() === s(d.RowId).toLowerCase())
-    const typed: Row = { HostRevisionRowId: revision, CharacteristicDefinitionRowId: d.RowId }
-    if (d.DataType === 'Integer') typed.IntegerValue = Number(text); else if (d.DataType === 'Decimal') typed.DecimalValue = Number(text); else if (d.DataType === 'Boolean') typed.BooleanValue = /^(1|true|yes)$/i.test(text); else typed.TextValue = text
-    try {
-      if (existing) await proc('document', 'CharacteristicValue_Revise', { EntityId: existing.EntityId, ...typed }); else await proc('document', 'CharacteristicValue_Add', typed)
-      setMsg({ text: `${s(d.Name)} saved.` }); setEdits({ ...edits, [s(d.RowId)]: '' }); qc.invalidateQueries({ queryKey: ['view', 'document', 'vCharacteristicValue'] })
-    } catch (e) { setMsg({ text: `${s(d.Name)}: ${e instanceof ApiError ? e.status + ' ' : ''}${(e as Error).message}`, bad: true }) }
-  }
-  if (defsQ.isPending) return <Status>Loading the characteristics…</Status>
-  if (!defs.length) {
-    const mp = migrated.mp.concat(migrated.it)
-    return <Panel title="Instrument transformers"><Facts pairs={mp.length ? mp : [['CT / PT ratios', 'not recorded']]} /><Status>No characteristic schema {CHARACTERISTIC_SCHEMA} is Effective; the migrated values are shown from the record.</Status></Panel>
-  }
-  return (
-    <div className="grid gap-3 lg:grid-cols-2">
-      {[...groups.entries()].filter(([g]) => !hideGroups.includes(g)).map(([g, list]) => (
-        <Panel key={g} title={g}>
-          <dl className="grid grid-cols-1 gap-x-6 gap-y-1 text-sm">
-            {list.map((d) => { const v = valueOf(d); const lv = legacyValue(d); const key = s(d.RowId)
-              return (
-                <div key={key} className="grid grid-cols-[11rem_1fr] items-center gap-2">
-                  <dt className="text-slate-400">{s(d.Name)}{d.UnitCode ? <span className="text-slate-600"> ({s(d.UnitCode)})</span> : ''}</dt>
-                  <dd className="min-w-0">
-                    {editable ? <div className="flex gap-1"><input className={`${inputClass} w-full`} placeholder={v != null ? s(v) : lv ? `${lv} (migrated)` : ''} value={edits[key] ?? ''} onChange={(e) => setEdits({ ...edits, [key]: e.target.value })} onBlur={() => save(d)} onKeyDown={(e) => { if (e.key === 'Enter') save(d) }} /></div>
-                      : <span className={v == null && !lv ? 'text-slate-500' : 'text-slate-200'}>{v != null ? s(v) : lv ? <>{lv} <span className="text-xs text-slate-500">(migrated)</span></> : '—'}</span>}
-                  </dd>
-                </div>) })}
-          </dl>
-        </Panel>
-      ))}
-      {msg && <Status bad={msg.bad}>{msg.text}</Status>}
-      {editable && <Status>Draft revision: a value saves when you leave the field (audited as your change).</Status>}
-    </div>
-  )
-}
-
 function Notes({ r, revision }: { r: Row; revision: string }) {
   const recQ = useViewAll('record', 'vRecord', { WorkRequestEntityId: s(r.WorkRequestEntityId), RecordKindCode: 'ConfigurationFileRevision' }, undefined, !!r.WorkRequestEntityId)
   const revQ = useViewAll('document', 'vRevision', { RowId: revision })

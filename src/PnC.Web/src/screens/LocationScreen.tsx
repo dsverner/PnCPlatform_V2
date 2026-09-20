@@ -848,6 +848,7 @@ function NewInstrumentTransformerForm({ node, onDone }: { node: Row; onDone: () 
   const [name, setName] = useState('')
   const [serial, setSerial] = useState('')
   const [ratio, setRatio] = useState('')
+  const [phases, setPhases] = useState('3')   // #206
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null)
   const chosen = types.find((t) => s(t.AssetTypeCode) === type)
@@ -863,6 +864,8 @@ function NewInstrumentTransformerForm({ node, onDone }: { node: Row; onDone: () 
       await proc('asset', 'PlaceAsset', { AssetEntityId: assetId, NodeEntityId: node.EntityId, PlacementKind: 'Installed' })
       const def = (defsQ.data ?? []).find((d) => s(d.CharacteristicKey) === 'RatioInUse')
       if (ratio.trim() && def) await saveAssetCharacteristic(assetId, def, ratio.trim())
+      const pdef = (defsQ.data ?? []).find((d) => s(d.CharacteristicKey) === 'Phases')
+      if (phases && pdef) await saveAssetCharacteristic(assetId, pdef, phases)
       setMsg({ text: `${name.trim()} (${s(chosen.Name)}${ratio.trim() ? ', ' + ratio.trim() : ''}${serial.trim() ? ', serial ' + serial.trim() : ''}) ${s(node.NodeTypeCode) === 'Panel' ? 'is mounted on' : 'stands in'} ${s(node.Name)}.${ratio.trim() && !def ? ' The ratio was not saved: the type names no nameplate template.' : ''}` })
       setName(''); setSerial(''); setRatio(''); setOpen(false); onDone()
     } catch (e) {
@@ -886,6 +889,8 @@ function NewInstrumentTransformerForm({ node, onDone }: { node: Row; onDone: () 
             <input className={`${inputClass} w-48`} value={name} disabled={busy} placeholder="e.g. L2103 line CT" onChange={(e) => setName(e.target.value)} /></label>
           <label className="flex flex-col gap-1 text-xs text-slate-400">Ratio in use
             <input className={`${inputClass} w-28`} value={ratio} disabled={busy} placeholder="1200:5" onChange={(e) => setRatio(e.target.value)} /></label>
+          <label className="flex flex-col gap-1 text-xs text-slate-400">Phases
+            <select className={`${inputClass} w-20`} value={phases} disabled={busy} onChange={(e) => setPhases(e.target.value)}><option value="3">3</option><option value="1">1</option></select></label>
           <label className="flex flex-col gap-1 text-xs text-slate-400">Serial number (optional)
             <input className={`${inputClass} w-40`} value={serial} disabled={busy} onChange={(e) => setSerial(e.target.value)} /></label>
           <Button kind="primary" disabled={busy || !chosen || !name.trim()} onClick={() => void make()}>Create and place here</Button>

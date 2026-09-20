@@ -26,6 +26,7 @@ CREATE TABLE [asset].[Placement] (
     [InstalledByActorId] UNIQUEIDENTIFIER NULL     CONSTRAINT [FK_Placement_InstalledBy] REFERENCES [personnel].[Actor] ([ActorId]),
     [RemovedByActorId]   UNIQUEIDENTIFIER NULL     CONSTRAINT [FK_Placement_RemovedBy] REFERENCES [personnel].[Actor] ([ActorId]),
     [WorkRequestEntityId] UNIQUEIDENTIFIER NULL     CONSTRAINT [FK_Placement_WorkRequest] REFERENCES [work].[WorkRequestRegistry] ([EntityId]),
+    [SharesNode]         BIT              NULL,   -- #206: 1 in a yard, at a panel or anywhere many stand; NULL at a device or equipment position, which holds one occupant (UX_Placement_InstalledAtNode) — set by asset.PlaceAsset from the node type (nullable: the table is system-versioned and its history takes the column as is)
     CONSTRAINT [PK_Placement] PRIMARY KEY CLUSTERED ([RowSeq]),
     CONSTRAINT [UQ_Placement_RowId] UNIQUE NONCLUSTERED ([RowId]),
     CONSTRAINT [CK_Placement_OneLocation] CHECK (([NodeEntityId] IS NOT NULL AND [CustodyLocationEntityId] IS NULL) OR ([NodeEntityId] IS NULL AND [CustodyLocationEntityId] IS NOT NULL))
@@ -34,7 +35,7 @@ GO
 CREATE INDEX [IX_Placement_Entity] ON [asset].[Placement] ([EntityId], [ValidFrom]);
 GO
 -- a device position holds at most one installed device at an instant
-CREATE UNIQUE INDEX [UX_Placement_InstalledAtNode] ON [asset].[Placement] ([NodeEntityId]) WHERE [PlacementKind] = N'Installed' AND [ValidTo] IS NULL AND [IsDeleted] = 0;
+CREATE UNIQUE INDEX [UX_Placement_InstalledAtNode] ON [asset].[Placement] ([NodeEntityId]) WHERE [PlacementKind] = N'Installed' AND [ValidTo] IS NULL AND [IsDeleted] = 0 AND [SharesNode] IS NULL;   -- #206: one occupant only where the row does not say it shares
 GO
 CREATE INDEX [IX_Placement_Asset] ON [asset].[Placement] ([AssetEntityId]) WHERE [ValidTo] IS NULL AND [IsDeleted] = 0;
 GO

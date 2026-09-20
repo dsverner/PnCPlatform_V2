@@ -3,9 +3,11 @@
 -- CVTs, CCPDs). Bound to the asset TYPES through ref.AssetType.DefaultTemplateDefinitionEntityId (set in
 -- Seed_ref_AssetType_Hybrid, which runs after this in name order), not to a model: a CT's nameplate is the CT's, whatever
 -- its make. The keys a relay setting is expressed against come first: RatioInUse is what the record's Analog inputs tab
--- checks CTR / PTR / SPTR against (scheme.vSchemeSource parses "1200:5" to 240). No migration rule writes these: the
--- legacy record's CT/PT strings stay the record's declared ratios (its SETTINGS_RECORD characteristics) — no transformer is
--- invented from a string (the never-fabricate rule).
+-- checks CTR / PTR / SPTR against (scheme.vSchemeSource parses "1200:5" to 240).
+-- #206 (2026-09-20): Phases (3 for a set, 1 for the single-phase sync PT) joins the Ratio group of both templates, added to
+-- the Effective version when missing rather than as a new version — the nameplate values already recorded bind to the
+-- version's definition rows, and a new version would orphan them. And the migration rule now DOES write these
+-- (Seed_asset_InstrumentTransformersFromLegacy): the legacy string is the ratio of a set the device's inputs prove exists.
 -- Idempotent: adds the version only when no Effective version carries this change note.
 IF OBJECT_ID(N'[config].[AddDefinition]') IS NULL RETURN;   -- bootstrap (tables-only) publish
 GO
@@ -53,4 +55,23 @@ BEGIN
     EXEC [config].[CharacteristicDefinition_Add] @DefinitionVersionRowId = @v, @CharacteristicKey = N'Nameplate',      @Name = N'Nameplate, other',       @DataType = N'Text',    @DisplayGroup = N'Nameplate',   @DisplayOrder = 90, @Description = N'Anything else the nameplate says: type, BIL, capacitance (CVT), year', @ActorId = @author;
     EXEC [config].[ApproveDefinitionVersion] @VersionRowId = @v, @ActorId = @approver;
 END
+GO
+
+-- #206: Phases on whichever version is Effective, when it lacks the key
+DECLARE @author206 UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000001';
+DECLARE @v206 UNIQUEIDENTIFIER, @k206 NVARCHAR(100), @name206 NVARCHAR(200);
+DECLARE c206 CURSOR LOCAL FAST_FORWARD FOR
+    SELECT v.[RowId], d.[DefinitionKey] FROM [config].[Definition] d
+    JOIN [config].[DefinitionVersion] v ON v.[DefinitionEntityId] = d.[EntityId] AND v.[IsDeleted] = 0 AND v.[Status] = N'Effective'
+    WHERE d.[DefinitionKind] = N'CharacteristicSchema.AssetTemplate' AND d.[DefinitionKey] IN (N'CT_Template', N'VT_Template') AND d.[IsDeleted] = 0
+      AND NOT EXISTS (SELECT 1 FROM [config].[CharacteristicDefinition] cd WHERE cd.[DefinitionVersionRowId] = v.[RowId] AND cd.[CharacteristicKey] = N'Phases');
+OPEN c206; FETCH NEXT FROM c206 INTO @v206, @k206;
+WHILE @@FETCH_STATUS = 0
+BEGIN
+    SET @name206 = CASE WHEN @k206 = N'CT_Template' THEN N'Phases (3 for a set, 1 for a single CT)' ELSE N'Phases (3 for a set, 1 for a single-phase PT such as a sync PT)' END;
+    EXEC [config].[CharacteristicDefinition_Add] @DefinitionVersionRowId = @v206, @CharacteristicKey = N'Phases', @Name = N'Phases', @DataType = N'Integer', @DisplayGroup = N'Ratio', @DisplayOrder = 15,
+         @Description = @name206, @ActorId = @author206;
+    FETCH NEXT FROM c206 INTO @v206, @k206;
+END
+CLOSE c206; DEALLOCATE c206;
 GO

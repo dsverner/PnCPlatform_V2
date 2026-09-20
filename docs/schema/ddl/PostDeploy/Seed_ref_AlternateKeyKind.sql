@@ -21,6 +21,7 @@ USING (VALUES
     (N'WireNumber',                N'Wire number (scoped to panel)',          N'asset',      N'Asset',               1, N'Node'),
     (N'AssetTag',                  N'Asset tag (predecessor)',                N'asset',      N'Asset',               0, NULL),
     (N'LegacyRecordNumber',        N'Legacy record number (OLD_NO)',          N'asset',      N'Asset',               0, NULL),
+    (N'MigrationSource',           N'What a migration rule made this asset from (#206: <scheme>/<role>/<ratio>); never re-created once present', N'asset', N'Asset', 0, NULL),
     (N'SapEquipmentNumber',        N'SAP equipment number',                   N'asset',      N'Asset',               0, NULL),
     (N'IedName',                   N'IEC 61850 IED name',                     N'asset',      N'Device',              0, NULL),
     (N'SchemeNumber',              N'Scheme number',                          N'scheme',     N'Scheme',              0, NULL),

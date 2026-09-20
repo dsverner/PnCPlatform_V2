@@ -6,17 +6,18 @@ const LEGACY_NO = /\s*(\[[A-Za-z]?\d{3,5}\]|—\s*[AMPD]\d{4})\s*$/
 
 export const legacyFree = (text: unknown): string => (text == null ? '' : String(text).replace(LEGACY_NO, ''))
 
-const DETAIL: Record<string, ['notes' | 'mp' | 'it', string]> = {
+const DETAIL: Record<string, ['notes' | 'mp', string]> = {
   SETTINGS2: ['notes', 'Settings (continued)'], DESC1: ['notes', 'Description 1'], DESC2: ['notes', 'Description 2'], DESC3: ['notes', 'Description 3'], DESC4: ['notes', 'Description 4'],
   REMARKS1: ['notes', 'Remarks 1'], REMARKS2: ['notes', 'Remarks 2'], REMARKS3: ['notes', 'Remarks 3'], REMARKS4: ['notes', 'Remarks 4'], REMARKS5: ['notes', 'Remarks 5'],
-  CT_MAIN1: ['it', 'CT main 1'], CT_MAIN2: ['it', 'CT main 2'], CT_MAIN3: ['it', 'CT main 3'], CT_MAIN4: ['it', 'CT main 4'], PT_MAIN: ['it', 'PT main'],
-  CT_AUX1: ['it', 'CT aux 1'], CT_AUX2: ['it', 'CT aux 2'], CT_AUX3: ['it', 'CT aux 3'], CT_AUX4: ['it', 'CT aux 4'], PT_AUX: ['it', 'PT aux'],
+  // #206 (2026-09-20): CT_MAIN1-4, PT_MAIN, CT_AUX1-4 and PT_AUX are no longer read here — the owner: the legacy section "can be
+  // retired completely"; the migration rule makes the scheme's instrument transformers from those strings, and the record's
+  // Analog inputs tab shows the transformers. The segments stay in the summary as the imported text the rule reads.
   // #194 (2026-09-19): CLASS, USE, RESPONSIBILITY, Bulk_Power_Element, Protection_Group, ELEMENT, LINE_TYPE and NUMBER OF RELAYS
   // are no longer read — the owner: "I do not trust any of the data in those fields"; the importer no longer carries them.
 }
-export interface LegacyDetail { notes: [string, string][]; mp: [string, string][]; it: [string, string][] }
+export interface LegacyDetail { notes: [string, string][]; mp: [string, string][] }
 export function legacyDetail(summary: unknown): LegacyDetail {
-  const out: LegacyDetail = { notes: [], mp: [], it: [] }
+  const out: LegacyDetail = { notes: [], mp: [] }
   for (const seg of String(summary ?? '').split(';')) {
     const i = seg.indexOf('='); if (i < 0) continue
     const key = seg.slice(0, i).trim(), value = seg.slice(i + 1).trim(); const d = DETAIL[key]

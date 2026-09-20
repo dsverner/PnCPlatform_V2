@@ -9,7 +9,9 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getText, proc, view, viewAll, s, ApiError, type Row } from '@/lib/api'
 import { useViewAll } from '@/lib/hooks'
 import { screenPath } from '@/lib/screens'
-import { Panel, Pill, Tabs, Status, Button } from '@/components/ui/ui'
+import { useTemplateDefs, saveAssetCharacteristic } from '@/components/CharacteristicsPanel'
+import { SchemeSourceActions, sourceRoleLabel } from '@/components/SchemeSourceActions'
+import { Panel, Pill, Tabs, Status, Button, inputClass } from '@/components/ui/ui'
 import { DataGrid, type Column } from '@/components/ui/data-grid'
 
 export interface Template { definitionEntityId: string; versionRowId: string; name: string; rows: Row[]; ansi: Map<string, string> }
@@ -35,13 +37,16 @@ const rangeText = (r: Row) => (r.MinValue == null && r.MaxValue == null ? '' : `
 
 
 /** The Analog inputs tab (#200, reshaped by #205 — owner, 2026-09-20: "the analog inputs tab should only contain information
- * on the CTs and PTs which are feeding the protections and not device specific settings"): the instrument transformers the
- * scheme names as its CT and VT sources (scheme.vSchemeSource, #201), each with its ratio, whether it is in service, and
- * which of the relay's ratio settings it feeds and whether the two agree (to half a percent). The relay's ratio settings
- * themselves (CTR, PTR, SPTR on an SEL-221F) are read and edited in the settings book like every other setting; here a
- * setting is only named and judged. A ratio setting with no source of its kind named is said so, not judged. */
-export function AnalogInputs({ r, revision }: { r: Row; revision: string }) {
-  const navigate = useNavigate()
+ * on the CTs and PTs which are feeding the protections and not device specific settings"; #206: the sources are added,
+ * connected and removed here too, and most of them now come from the migration rule): the instrument transformers the
+ * scheme names as its CT, VT and sync-VT sources (scheme.vSchemeSource, #201), each with its ratio, phases, whether it is
+ * placed and in service, its connection note, and which of the relay's ratio settings it feeds and whether the two agree
+ * (to half a percent). The relay's ratio settings themselves (CTR, PTR, SPTR on an SEL-221F) are read and edited in the
+ * settings book like every other setting; here a setting is only named and judged. A ratio setting with no source of
+ * its kind named is said so, not judged. Adding a transformer here makes it (asset.Asset_Add, its nameplate ratio and
+ * phases) unplaced and names it as the scheme's source; it is placed from its own page. */
+export function AnalogInputs({ r, revision, canEditAssets = false, canEditScheme = false }: { r: Row; revision: string; canEditAssets?: boolean; canEditScheme?: boolean }) {
+  const navigate = useNavigate(); const qc = useQueryClient()
   const tq = useTemplate(s(r.ModelId) || null)
   const parsedQ = useViewAll('document', 'vParsedSettingNamed', { ConfigurationFileRevisionRowId: revision }, 'DisplayOrder')
   const values = useMemo(() => new Map((parsedQ.data ?? []).map((p) => [s(p.SettingCode), p])), [parsedQ.data])
@@ -49,24 +54,24 @@ export function AnalogInputs({ r, revision }: { r: Row; revision: string }) {
   const sourcesQ = useViewAll('scheme', 'vSchemeSource', { SchemeEntityId: s(r.SchemeEntityId) }, 'AssetName', hasScheme)
   const sources = sourcesQ.data ?? []
   const ratios = (tq.data?.rows ?? []).filter(isRatio)
-  const isCurrent = (x: Row) => /^CT|current/i.test(s(x.SettingCode) + ' ' + s(x.Name))
-  const roleOf = (x: Row) => (isCurrent(x) ? 'CtSource' : 'VtSource')
+  const roleOf = (x: Row) => (s(x.AnsiCode) === '25' || /^SPTR|sync/i.test(s(x.SettingCode) + ' ' + s(x.Name)) ? 'SyncVtSource' : /^CT|current/i.test(s(x.SettingCode) + ' ' + s(x.Name)) ? 'CtSource' : 'VtSource')
   const settingOf = (x: Row) => { const v = values.get(s(x.SettingCode)); return v ? Number(s(v.RawValue ?? v.DisplayValue)) : NaN }
   // the relay's ratio settings a transformer of this role feeds, each with a verdict against the nameplate ratio
   const feeds = (src: Row) => ratios.filter((x) => roleOf(x) === s(src.MemberRoleCode)).map((x) => {
     const setting = settingOf(x); const ratio = src.Ratio == null ? NaN : Number(src.Ratio)
-    const verdict = !Number.isFinite(ratio) ? { text: 'ratio not readable', tone: 'warn' as const }
+    const verdict = !Number.isFinite(ratio) ? { text: 'ratio not recorded', tone: 'warn' as const }
       : !Number.isFinite(setting) ? { text: `${s(x.SettingCode)} not set`, tone: 'warn' as const }
       : Math.abs(ratio - setting) <= Math.max(0.005 * ratio, 0.01) ? { text: 'matches', tone: 'good' as const }
       : { text: `differs — ${s(x.SettingCode)} is ${setting}`, tone: 'bad' as const }
     return { code: s(x.SettingCode), verdict }
   })
   const unfed = ratios.filter((x) => !sources.some((src) => s(src.MemberRoleCode) === roleOf(x)))
+  const refresh = () => { qc.invalidateQueries({ queryKey: ['view', 'scheme'] }); qc.invalidateQueries({ queryKey: ['view', 'asset'] }) }
   return (
     <Panel title={`Feeding this protection · ${sources.length ? `${sources.length} transformer${sources.length === 1 ? '' : 's'}` : 'none named'}`}>
       {!hasScheme && <Status>This record is in no scheme, so nothing names the transformers that feed it.</Status>}
       {hasScheme && sourcesQ.isPending && <Status>Reading the scheme's sources…</Status>}
-      {hasScheme && !sourcesQ.isPending && !sources.length && <Status>{schemeName} names no CT or VT source yet. Name a transformer as its source from the transformer's page (Instrument transformers in the nav).</Status>}
+      {hasScheme && !sourcesQ.isPending && !sources.length && <Status>{schemeName} names no CT or VT source yet. Add one below, or name a transformer as its source from the transformer's page (Instrument transformers in the nav).</Status>}
       {sources.length > 0 && (
         <ul className="space-y-1 text-sm">
           {sources.map((src) => {
@@ -74,21 +79,89 @@ export function AnalogInputs({ r, revision }: { r: Row; revision: string }) {
             return (
               <li key={s(src.MemberEntityId)} className="flex flex-wrap items-center gap-2">
                 <a className="text-sky-300 underline" href={path} onClick={(e) => { e.preventDefault(); navigate(path) }}>{s(src.AssetName)}</a>
-                <span className="text-xs text-slate-500">{s(src.AssetTypeCode)} · {src.MemberRoleCode === 'CtSource' ? 'CT source' : 'VT source'}</span>
+                <span className="text-xs text-slate-500">{s(src.AssetTypeCode)} · {sourceRoleLabel(src.MemberRoleCode)}{src.Phases != null ? ` · ${s(src.Phases) === '1' ? 'single-phase' : `${s(src.Phases)}-phase`}` : ''}</span>
                 <span className="text-slate-400">{s(src.RatioInUse) ? `${s(src.RatioInUse)}${Number.isFinite(ratio) ? ` = ${ratio}` : ' (ratio not read)'}` : 'no ratio recorded'}</span>
+                {src.IsPlaced === false && <Pill tone="neutral" title="nothing says where it stands yet — place it from its page">not placed</Pill>}
                 {src.IsInService === false && <Pill tone="warn">not in service</Pill>}
                 {fed.map((f) => <span key={f.code} className="flex items-center gap-1 text-slate-400">· feeds {f.code} <Pill tone={f.verdict.tone}>{f.verdict.text}</Pill></span>)}
-                {tq.data && !fed.length && <span className="text-xs text-slate-500">· the template carries no {src.MemberRoleCode === 'CtSource' ? 'current' : 'voltage'} ratio setting for it to feed</span>}
+                {tq.data && !fed.length && <span className="text-xs text-slate-500">· the template carries no {src.MemberRoleCode === 'CtSource' ? 'current' : src.MemberRoleCode === 'SyncVtSource' ? 'sync voltage' : 'voltage'} ratio setting for it to feed</span>}
+                {!!src.Notes && <span className="text-xs text-slate-300" title="the connection note">— {s(src.Notes)}</span>}
+                <SchemeSourceActions x={src} canModify={canEditScheme} canRemove={canEditScheme} onChanged={refresh} />
               </li>)
           })}
         </ul>)}
       {hasScheme && !sourcesQ.isPending && unfed.length > 0 && (
         <ul className="mt-2 space-y-1 border-t border-slate-800 pt-2 text-sm">
-          {unfed.map((x) => <li key={s(x.SettingCode)} className="text-slate-500"><span className="text-slate-300">{s(x.SettingCode)}</span> — {schemeName} names no {isCurrent(x) ? 'CT' : 'VT'} source; name it from the transformer's page.</li>)}
+          {unfed.map((x) => <li key={s(x.SettingCode)} className="text-slate-500"><span className="text-slate-300">{s(x.SettingCode)}</span> — {schemeName} names no {sourceRoleLabel(roleOf(x))}; add one below or name it from the transformer's page.</li>)}
         </ul>)}
+      {hasScheme && canEditAssets && canEditScheme && <AddSourceForm schemeEntityId={s(r.SchemeEntityId)} schemeName={schemeName} onDone={refresh} />}
       {tq.isPending && <Status>Reading the template…</Status>}
       {!tq.isPending && !tq.data && <Status>No settings template for this model, so which setting each transformer feeds is not known.</Status>}
     </Panel>
+  )
+}
+
+/** #206: a transformer feeding this protection that the platform does not have — made here (asset.Asset_Add, the nameplate's
+ * ratio in use and phases through the type's template) unplaced, and named the scheme's source in the role chosen.
+ * The owner: reality (paralleled CTs, separate secondaries) "will need to be corrected by the user by adding another set of
+ * instrument transformers, indicating a parallel connection etc." Placement is the transformer page's (a yard, #202). */
+function AddSourceForm({ schemeEntityId, schemeName, onDone }: { schemeEntityId: string; schemeName: string; onDone: () => void }) {
+  const typesQ = useViewAll('ref', 'vAssetType', {}, 'Name')
+  const types = (typesQ.data ?? []).filter((t) => ['CT', 'VT', 'COUPLING_CAPACITOR_VT', 'CCPD'].includes(s(t.AssetTypeCode)))
+  const [open, setOpen] = useState(false); const [type, setType] = useState('CT'); const [role, setRole] = useState('CtSource'); const [phases, setPhases] = useState('3')
+  const [ratio, setRatio] = useState(''); const [name, setName] = useState(''); const [note, setNote] = useState('')
+  const [busy, setBusy] = useState(false); const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null)
+  const chosen = types.find((t) => s(t.AssetTypeCode) === type)
+  const defsQ = useTemplateDefs(s(chosen?.DefaultTemplateDefinitionEntityId))
+  const roles = type === 'CT' ? ['CtSource'] : ['VtSource', 'SyncVtSource']
+  const pickType = (code: string) => { setType(code); const rs = code === 'CT' ? ['CtSource'] : ['VtSource', 'SyncVtSource']; if (!rs.includes(role)) setRole(rs[0]); if (code !== 'CT' && role === 'SyncVtSource') setPhases('1') }
+  const pickRole = (x: string) => { setRole(x); if (x === 'SyncVtSource') setPhases('1') }
+  const suggested = `${schemeName} ${type === 'CT' ? 'CTs' : role === 'SyncVtSource' ? 'sync PT' : 'PTs'}${ratio.trim() ? ' ' + ratio.trim() : ''}`
+  const make = async () => {
+    if (!chosen) return
+    setBusy(true); setMsg(null)
+    let assetId = ''
+    try {
+      const a = await proc('asset', 'Asset_Add', { AssetTypeCode: type, Name: (name.trim() || suggested), Status: 'InService' })
+      assetId = s(a.EntityId)
+      const defs = defsQ.data ?? []
+      const rdef = defs.find((d) => s(d.CharacteristicKey) === 'RatioInUse'); const pdef = defs.find((d) => s(d.CharacteristicKey) === 'Phases')
+      if (ratio.trim() && rdef) await saveAssetCharacteristic(assetId, rdef, ratio.trim())
+      if (phases && pdef) await saveAssetCharacteristic(assetId, pdef, phases)
+      await proc('scheme', 'AddSchemeMember', { SchemeEntityId: schemeEntityId, MemberKind: 'Asset', MemberEntityId: assetId, MemberRoleCode: role, IsInService: true, Notes: note.trim() || null })
+      setMsg({ text: `${name.trim() || suggested} now feeds ${schemeName} as ${sourceRoleLabel(role)}; it is not placed yet — place it from its page.` })
+      setRatio(''); setName(''); setNote(''); setOpen(false); onDone()
+    } catch (e) {
+      const why = e instanceof ApiError ? e.message : String(e)
+      setMsg({ text: assetId ? `${name.trim() || suggested} was created but not finished: ${why} — open it from the Instrument transformers list.` : why, bad: true })
+    } finally { setBusy(false) }
+  }
+  return (
+    <div className="mt-2 space-y-2 border-t border-slate-800 pt-2 text-sm">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-slate-400">A transformer feeding this protection that is not named yet?</span>
+        <Button kind="mini" disabled={busy} onClick={() => setOpen(!open)}>Add a transformer feeding this protection</Button>
+      </div>
+      {open && (
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="flex flex-col gap-1 text-xs text-slate-400">Type
+            <select className={`${inputClass} w-52`} value={type} disabled={busy || typesQ.isPending} onChange={(e) => pickType(e.target.value)}>
+              {types.map((t) => <option key={s(t.AssetTypeCode)} value={s(t.AssetTypeCode)}>{s(t.Name)}</option>)}
+            </select></label>
+          {roles.length > 1 && <label className="flex flex-col gap-1 text-xs text-slate-400">Feeds as
+            <select className={`${inputClass} w-36`} value={role} disabled={busy} onChange={(e) => pickRole(e.target.value)}>{roles.map((x) => <option key={x} value={x}>{sourceRoleLabel(x)}</option>)}</select></label>}
+          <label className="flex flex-col gap-1 text-xs text-slate-400">Phases
+            <select className={`${inputClass} w-20`} value={phases} disabled={busy} onChange={(e) => setPhases(e.target.value)}><option value="3">3</option><option value="1">1</option></select></label>
+          <label className="flex flex-col gap-1 text-xs text-slate-400">Ratio in use
+            <input className={`${inputClass} w-28`} value={ratio} disabled={busy} placeholder="1200:5" onChange={(e) => setRatio(e.target.value)} /></label>
+          <label className="flex flex-col gap-1 text-xs text-slate-400">Name
+            <input className={`${inputClass} w-56`} value={name} disabled={busy} placeholder={suggested} onChange={(e) => setName(e.target.value)} /></label>
+          <label className="flex flex-col gap-1 text-xs text-slate-400">Connection note (optional)
+            <input className={`${inputClass} w-64`} value={note} disabled={busy} placeholder="e.g. paralleled with the other set; secondary S2" onChange={(e) => setNote(e.target.value)} /></label>
+          <Button kind="primary" disabled={busy || !chosen} onClick={() => void make()}>Create and name as source</Button>
+        </div>)}
+      {msg && <Status bad={msg.bad}>{msg.text}</Status>}
+    </div>
   )
 }
 

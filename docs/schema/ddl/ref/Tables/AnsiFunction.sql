@@ -21,6 +21,8 @@ CREATE TABLE [ref].[AnsiFunction] (
     -- names the clause. Set by the core seed for the C37.2 numbers; a legacy string is read through ref.fAnsiLoadResponsive.
     [LoadResponsive]    BIT               NULL,
     [LoadResponsiveBasis] NVARCHAR(200)   NULL,
+    [AnalogInputs]      NVARCHAR(10)      NULL,   -- #206: I, V, IV, VSYNC, NONE — the analog inputs a function of this number needs; NULL = not ruled
+    [AnalogInputsBasis] NVARCHAR(200)     NULL,
     [SysStart]          DATETIME2(7) GENERATED ALWAYS AS ROW START HIDDEN NOT NULL,
     [SysEnd]            DATETIME2(7) GENERATED ALWAYS AS ROW END   HIDDEN NOT NULL,
     PERIOD FOR SYSTEM_TIME ([SysStart], [SysEnd]),

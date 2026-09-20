@@ -8,6 +8,7 @@ CREATE PROCEDURE [asset].[Placement_Revise]
     @InstalledByActorId UNIQUEIDENTIFIER = NULL,
     @RemovedByActorId UNIQUEIDENTIFIER = NULL,
     @WorkRequestEntityId UNIQUEIDENTIFIER = NULL,
+    @SharesNode BIT = NULL,
     @ValidFrom DATETIMEOFFSET(7) = NULL,
     @ValidFromQuality TINYINT = 0,
     @ActorId UNIQUEIDENTIFIER = NULL,
@@ -27,9 +28,9 @@ BEGIN
     UPDATE [asset].[Placement] SET [ValidTo] = @ValidFrom, [ModifiedBy] = @ActorId, [ModifiedAt] = @now
     WHERE [EntityId] = @EntityId AND [IsDeleted] = 0 AND [ValidTo] IS NULL AND [ValidFrom] <= @ValidFrom;
     DECLARE @out TABLE ([RowId] UNIQUEIDENTIFIER);
-    INSERT [asset].[Placement] ([EntityId], [ValidFrom], [ValidFromQuality], [CreatedBy], [CreatedAt], [ModifiedBy], [ModifiedAt], [MigrationRunId], [AssetEntityId], [NodeEntityId], [CustodyLocationEntityId], [PlacementKind], [InstalledByActorId], [RemovedByActorId], [WorkRequestEntityId])
+    INSERT [asset].[Placement] ([EntityId], [ValidFrom], [ValidFromQuality], [CreatedBy], [CreatedAt], [ModifiedBy], [ModifiedAt], [MigrationRunId], [AssetEntityId], [NodeEntityId], [CustodyLocationEntityId], [PlacementKind], [InstalledByActorId], [RemovedByActorId], [WorkRequestEntityId], [SharesNode])
     OUTPUT inserted.[RowId] INTO @out
-    VALUES (@EntityId, @ValidFrom, @ValidFromQuality, @ActorId, @now, @ActorId, @now, @MigrationRunId, @AssetEntityId, @NodeEntityId, @CustodyLocationEntityId, @PlacementKind, @InstalledByActorId, @RemovedByActorId, @WorkRequestEntityId);
+    VALUES (@EntityId, @ValidFrom, @ValidFromQuality, @ActorId, @now, @ActorId, @now, @MigrationRunId, @AssetEntityId, @NodeEntityId, @CustodyLocationEntityId, @PlacementKind, @InstalledByActorId, @RemovedByActorId, @WorkRequestEntityId, @SharesNode);
     SELECT @RowId = [RowId] FROM @out;
     COMMIT TRANSACTION;
 END;

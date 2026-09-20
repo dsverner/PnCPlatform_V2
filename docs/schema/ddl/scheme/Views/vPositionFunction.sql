@@ -27,6 +27,10 @@ SELECT cf.[EntityId],
        lr.[LoadResponsive],        -- #197: PRC-023-6 Attachment A, read through ref.fAnsiLoadResponsive (a legacy string such as 50/51N is judged by its numbers)
        lr.[LoadResponsiveBasis],
        lr.[BaseCodes],
+       lr.[NeedsCurrent],          -- #206: the analog inputs the element needs (ref.AnsiFunction.AnalogInputs over the same base codes); NULL when no part is ruled
+       lr.[NeedsVoltage],
+       lr.[NeedsSyncVoltage],
+       lr.[AnalogInputsBasis],
        cf.[ValidFrom],
        cf.[ValidFromQuality],
        cf.[CreatedBy],

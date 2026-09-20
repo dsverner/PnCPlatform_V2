@@ -321,15 +321,16 @@ else Skip("W8 grants (needs the Administrator and Hydro identities and the fixtu
 
 if (admin is not null && fixtureOk)
 {
-    var (ast, ab) = await Get(admin, "api/v1/asset/vAsset?take=10000");
-    var ids = Ids(ab);
-    Check(ast == HttpStatusCode.OK && ids.Contains(hydroAsset.ToString()!.ToLowerInvariant()) && ids.Contains(txAsset.ToString()!.ToLowerInvariant()), "as Administrator (Global), both assets are listed");
+    // #206: the estate holds more assets than one page (the rule made ~3 200 instrument transformers), so each fixture asset is read by id
+    var (ast, ab) = await Get(admin, $"api/v1/asset/vAsset?EntityId={hydroAsset}&take=1"); var (ast2, ab2) = await Get(admin, $"api/v1/asset/vAsset?EntityId={txAsset}&take=1");
+    var ids = Ids(ab).Concat(Ids(ab2)).ToList();
+    Check(ast == HttpStatusCode.OK && ast2 == HttpStatusCode.OK && ids.Contains(hydroAsset.ToString()!.ToLowerInvariant()) && ids.Contains(txAsset.ToString()!.ToLowerInvariant()), "as Administrator (Global), both assets are listed");
 }
 if (readOnly is not null && fixtureOk)
 {
-    var (ast, ab) = await Get(readOnly, "api/v1/asset/vAsset?take=10000");
-    var ids = Ids(ab);
-    Check(ast == HttpStatusCode.OK && ids.Contains(hydroAsset.ToString()!.ToLowerInvariant()) && ids.Contains(txAsset.ToString()!.ToLowerInvariant()), "as ReadOnly (Global), both assets are listed");
+    var (ast, ab) = await Get(readOnly, $"api/v1/asset/vAsset?EntityId={hydroAsset}&take=1"); var (ast2, ab2) = await Get(readOnly, $"api/v1/asset/vAsset?EntityId={txAsset}&take=1");
+    var ids = Ids(ab).Concat(Ids(ab2)).ToList();
+    Check(ast == HttpStatusCode.OK && ast2 == HttpStatusCode.OK && ids.Contains(hydroAsset.ToString()!.ToLowerInvariant()) && ids.Contains(txAsset.ToString()!.ToLowerInvariant()), "as ReadOnly (Global), both assets are listed");
 }
 if (admin is not null || readOnly is not null)
 {
@@ -1211,14 +1212,11 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
             // #194 (2026-09-19): the eight legacy classification fields are gone — the template's Effective version has no Classification
             // group and a migrated record's summary no longer carries CLASS=
             var (k194_ds, k194_db) = await Get(readOnly!, "api/v1/config/vDefinition?DefinitionKind=CharacteristicSchema.RecordTemplate&DefinitionKey=SETTINGS_RECORD&take=1");
-            var (k194_vs, k194_vb) = await Get(readOnly!, $"api/v1/config/vDefinitionVersion?DefinitionEntityId={Id((k194_db?["rows"] as JsonArray)?.FirstOrDefault())}&Status=Effective&take=5");
-            var k194_ver = (k194_vb?["rows"] as JsonArray)?.OrderByDescending(r => (int?)r?["VersionNumber"] ?? 0).FirstOrDefault();
-            var (k194_cs, k194_cb) = await Get(readOnly!, $"api/v1/config/vCharacteristicDefinition?DefinitionVersionRowId={k194_ver?["RowId"]}&take=50");
-            var k194_groups = (k194_cb?["rows"] as JsonArray)?.Select(r => r?["DisplayGroup"]?.ToString()).Distinct().ToList() ?? new();
             var (k194_rs, k194_rb) = await Get(admin, "api/v1/record/vRecord?RecordKindCode=ConfigurationFileRevision&take=200");
             var k194_class = (k194_rb?["rows"] as JsonArray)?.Count(r => (r?["Summary"]?.ToString() ?? "").Contains("CLASS=")) ?? -1;
-            Must(k194_ds == HttpStatusCode.OK && k194_cs == HttpStatusCode.OK && k194_groups.Count == 1 && k194_groups[0] == "Instrument transformers" && k194_rs == HttpStatusCode.OK && k194_class == 0,
-                $"#194: SETTINGS_RECORD v{k194_ver?["VersionNumber"]} carries only the instrument-transformer group ({string.Join(", ", k194_groups)}); no migrated summary carries CLASS= ({k194_class} of {(k194_rb?["rows"] as JsonArray)?.Count})");
+            // #206 (2026-09-20): the SETTINGS_RECORD schema itself is retired — the CT/PT strings became the scheme's transformers
+            Must(k194_ds == HttpStatusCode.OK && ((k194_db?["rows"] as JsonArray)?.Count ?? -1) == 0 && k194_rs == HttpStatusCode.OK && k194_class == 0,
+                $"#194/#206: the SETTINGS_RECORD characteristic schema is retired ({(k194_db?["rows"] as JsonArray)?.Count} readable); no migrated summary carries CLASS= ({k194_class} of {(k194_rb?["rows"] as JsonArray)?.Count})");
             // 2026-09-19: the schema smoke withdraws its own standards; none of its "smoke" subjects is on the Standards list
             var (k193_ss, k193_sb) = await Get(readOnly!, "api/v1/compliance/vRequirementDetail?Subject=smoke&take=10");
             Must(k193_ss == HttpStatusCode.OK && ((k193_sb?["rows"] as JsonArray)?.Count ?? -1) == 0, $"the Standards list carries no smoke-fixture standard ({(k193_sb?["rows"] as JsonArray)?.Count})");
@@ -1518,6 +1516,67 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
             var (k204_rs, _) = await Post(readOnly!, "api/v1/work/WorkRequest_Add", new { WorkTypeDefinitionVersionRowId = k204_wtv, Title = $"{tag} stray test", ScopeKind = "Asset", ScopeEntityId = k201_ct });
             Must(k204_rs == HttpStatusCode.Forbidden, $"#204: ReadOnly may not raise a test ({(int)k204_rs})");
             inst = k204_saved;
+        }
+
+        // ======== #206 (2026-09-20): the instrument transformers a protection needs exist — made by the migration rule from the
+        // legacy record's CT/PT strings and the devices' functions (Seed_asset_InstrumentTransformersFromLegacy), and edited,
+        // placed, connected, retired and deleted by a person. The owner: "when a particular device indicates that it has CT and
+        // PT inputs, it is reasonable to assume that they exist because without them, the protection is useless."
+        {
+            // the rule on the migrated estate: 2103 B-PROT at BATHURST TERMINAL (an in-service SEL-221F declaring CT_MAIN1 = 1200-5,
+            // PT_MAIN = 2000-1 on DEV) has a CT set of ratio 240 and a PT set of ratio 2000, three-phase, unplaced, with the rule's key
+            var (k206_rs, k206_rb) = await Get(admin, $"api/v1/document/vSettingsRecord?GridState=Active&SchemeName={Uri.EscapeDataString("2103 B-PROT")}&StationName={Uri.EscapeDataString("BATHURST TERMINAL")}&take=5");
+            var k206_scheme = (k206_rb?["rows"] as JsonArray)?.FirstOrDefault()?["SchemeEntityId"]?.ToString();
+            var (k206_ss, k206_sb) = await Get(admin, $"api/v1/scheme/vSchemeSource?SchemeEntityId={k206_scheme}&take=20");
+            var k206_src = (k206_sb?["rows"] as JsonArray) ?? [];
+            var k206_ct = k206_src.FirstOrDefault(x => x?["MemberRoleCode"]?.ToString() == "CtSource" && Math.Abs((x?["Ratio"]?.GetValue<decimal>() ?? 0) - 240m) < 0.01m);
+            var k206_pt = k206_src.FirstOrDefault(x => x?["MemberRoleCode"]?.ToString() == "VtSource" && Math.Abs((x?["Ratio"]?.GetValue<decimal>() ?? 0) - 2000m) < 0.01m);
+            var (_, k206_itb) = await Get(admin, $"api/v1/asset/vInstrumentTransformer?EntityId={k206_ct?["AssetEntityId"]}&take=1");
+            var k206_it = (k206_itb?["rows"] as JsonArray)?.FirstOrDefault();
+            Must(k206_rs == HttpStatusCode.OK && k206_scheme is not null && k206_ss == HttpStatusCode.OK && k206_ct is not null && k206_pt is not null
+                 && k206_ct?["Phases"]?.GetValue<int>() == 3 && k206_ct?["IsPlaced"]?.GetValue<bool>() == false
+                 && k206_it?["MigrationSource"]?.ToString()?.EndsWith("/CtSource/1200:5") == true && k206_it?["StationSource"]?.ToString() == "scheme" && k206_it?["StationName"]?.ToString() == "BATHURST TERMINAL",
+                $"#206: the rule made 2103 B-PROT (BATHURST TERMINAL) its CT set ({k206_ct?["AssetName"]} · {k206_ct?["RatioInUse"]} = {k206_ct?["Ratio"]} · {k206_ct?["Phases"]}-phase · placed {k206_ct?["IsPlaced"]}) and PT set ({k206_pt?["AssetName"]} = {k206_pt?["Ratio"]}); the set knows its station through the scheme ({k206_it?["StationName"]} by {k206_it?["StationSource"]}) and carries the rule's key ({k206_it?["MigrationSource"]})");
+            // never a duplicate: the #201 fixture scheme keeps exactly one CtSource (its fixture CT); a scheme with a 25 device has its sync PT
+            var (_, k206_fb) = await Get(admin, $"api/v1/scheme/vSchemeSource?SchemeEntityId={scheme}&MemberRoleCode=CtSource&take=10");
+            var k206_fix = ((k206_fb?["rows"] as JsonArray) ?? []).Count;
+            var (_, k206_syb) = await Get(admin, "api/v1/scheme/vSchemeSource?MemberRoleCode=SyncVtSource&take=1");
+            var k206_sync = (k206_syb?["rows"] as JsonArray)?.FirstOrDefault();
+            var (_, k206_ab) = await Get(admin, "api/v1/ref/vAnsiFunction?AnsiCode=21&take=1");
+            var k206_21 = (k206_ab?["rows"] as JsonArray)?.FirstOrDefault();
+            var (_, k206_db) = await Get(admin, "api/v1/config/vDefinition?DefinitionKind=CharacteristicSchema.RecordTemplate&DefinitionKey=SETTINGS_RECORD&take=1");
+            Must(k206_fix == 1 && k206_sync is not null && k206_sync?["Phases"]?.GetValue<int>() == 1 && k206_21?["AnalogInputs"]?.ToString() == "IV" && ((k206_db?["rows"] as JsonArray) ?? []).Count == 0,
+                $"#206: the fixture scheme keeps one CT source ({k206_fix}); a 25 scheme has its single-phase sync PT ({k206_sync?["AssetName"]} · {k206_sync?["Phases"]}-phase); 21 needs {k206_21?["AnalogInputs"]}; the legacy SETTINGS_RECORD characteristic schema is retired");
+            // a person corrects: rename the fixture CT, make a PT, a new yard for it, place it, name it the sync VT source, set it not in service with a note, remove it, delete it
+            var (_, k206_ctb) = await Get(admin, $"api/v1/asset/vInstrumentTransformer?Name={Uri.EscapeDataString($"{tag} line CT")}&take=1");   // the #201 fixture CT (that block's scope has closed)
+            var k201_ct = Id((k206_ctb?["rows"] as JsonArray)?.FirstOrDefault());
+            var (k206_es, k206_eb) = await Post(admin, "api/v1/asset/Asset_Revise", new { EntityId = k201_ct, AssetTypeCode = "CT", Name = $"{tag} line CT (S2 winding)", Status = "InService", Notes = "the B protection is on the S2 winding" });
+            var (_, k206_e2b) = await Get(admin, $"api/v1/asset/vInstrumentTransformer?EntityId={k201_ct}&take=1");
+            var k206_renamed = (k206_e2b?["rows"] as JsonArray)?.FirstOrDefault()?["Name"]?.ToString();
+            var (k206_vs, k206_vb) = await Post(admin, "api/v1/asset/Asset_Add", new { AssetTypeCode = "VT", Name = $"{tag} sync PT", Status = "InService" });
+            var k206_vt = Id(k206_vb);
+            var (k206_ys, k206_yb) = await Post(admin, "api/v1/location/AddNode", new { NodeTypeCode = "Yard", ParentEntityId = station, Name = $"{tag} 138 kV yard", Code = "Y138" });
+            var (k206_ps, k206_pb) = await Post(admin, "api/v1/asset/PlaceAsset", new { AssetEntityId = k206_vt, NodeEntityId = Id(k206_yb), PlacementKind = "Installed" });
+            var (k206_ms, k206_mb) = await Post(admin, "api/v1/scheme/AddSchemeMember", new { SchemeEntityId = scheme, MemberKind = "Asset", MemberEntityId = k206_vt, MemberRoleCode = "SyncVtSource", IsInService = true });
+            var (_, k206_s2b) = await Get(admin, $"api/v1/scheme/vSchemeSource?AssetEntityId={k206_vt}&take=1");
+            var k206_mem = (k206_s2b?["rows"] as JsonArray)?.FirstOrDefault();
+            var (k206_rvs, k206_rvb) = await Post(admin, "api/v1/scheme/SchemeMember_Revise", new { EntityId = k206_mem?["MemberEntityId"], SchemeEntityId = scheme, MemberKind = "Asset", MemberEntityId = k206_vt, MemberRoleCode = "SyncVtSource", IsInService = false, Notes = "a winding of the A protection's PT set" });
+            var (_, k206_s3b) = await Get(admin, $"api/v1/scheme/vSchemeSource?AssetEntityId={k206_vt}&take=1");
+            var k206_mem2 = (k206_s3b?["rows"] as JsonArray)?.FirstOrDefault();
+            var (_, k206_i2b) = await Get(admin, $"api/v1/asset/vInstrumentTransformer?EntityId={k206_vt}&take=1");
+            var k206_it2 = (k206_i2b?["rows"] as JsonArray)?.FirstOrDefault();
+            Must(k206_es == HttpStatusCode.OK && k206_renamed == $"{tag} line CT (S2 winding)" && k206_vs == HttpStatusCode.OK && k206_ys == HttpStatusCode.OK && k206_ps == HttpStatusCode.OK && k206_ms == HttpStatusCode.OK
+                 && k206_rvs == HttpStatusCode.OK && k206_mem2?["IsInService"]?.GetValue<bool>() == false && k206_mem2?["Notes"]?.ToString() == "a winding of the A protection's PT set"
+                 && k206_it2?["IsPlaced"]?.GetValue<bool>() == true && k206_it2?["StationSource"]?.ToString() == "placement",
+                $"#206: the fixture CT renamed ({(int)k206_es} {Code(k206_eb)} → {k206_renamed}); a sync PT made ({(int)k206_vs}), a new yard ({(int)k206_ys} {Code(k206_yb)}), placed there ({(int)k206_ps} {Code(k206_pb)}; placed {k206_it2?["IsPlaced"]} by {k206_it2?["StationSource"]}), named the scheme's sync VT source ({(int)k206_ms} {Code(k206_mb)}), set not in service with its connection note ({(int)k206_rvs} {Code(k206_rvb)}: {k206_mem2?["Notes"]})");
+            var (k206_ds, k206_dbb) = await Post(admin, "api/v1/scheme/SchemeMember_SoftDelete", new { EntityId = k206_mem?["MemberEntityId"] });
+            var (_, k206_s4b) = await Get(admin, $"api/v1/scheme/vSchemeSource?AssetEntityId={k206_vt}&take=1");
+            var (k206_xs, k206_xb) = await Post(admin, "api/v1/asset/Asset_SoftDelete", new { EntityId = k206_vt });
+            var (_, k206_i3b) = await Get(admin, $"api/v1/asset/vInstrumentTransformer?EntityId={k206_vt}&take=1");
+            var (k206_ros, _) = await Post(readOnly!, "api/v1/asset/Asset_Revise", new { EntityId = k201_ct, AssetTypeCode = "CT", Name = $"{tag} stray rename", Status = "InService" });
+            var (k206_ro2, _) = await Post(readOnly!, "api/v1/scheme/SchemeMember_SoftDelete", new { EntityId = k201_ct });
+            Must(k206_ds == HttpStatusCode.OK && ((k206_s4b?["rows"] as JsonArray) ?? []).Count == 0 && k206_xs == HttpStatusCode.OK && ((k206_i3b?["rows"] as JsonArray) ?? []).Count == 0 && k206_ros == HttpStatusCode.Forbidden && k206_ro2 == HttpStatusCode.Forbidden,
+                $"#206: removed from the scheme ({(int)k206_ds} {Code(k206_dbb)}; sources left {((k206_s4b?["rows"] as JsonArray) ?? []).Count}) and deleted ({(int)k206_xs} {Code(k206_xb)}; listed {((k206_i3b?["rows"] as JsonArray) ?? []).Count}); ReadOnly may neither edit ({(int)k206_ros}) nor remove ({(int)k206_ro2})");
         }
 
         // ======== #187 (2026-09-18): a new relay from its position, its first settings from the template, and the record that

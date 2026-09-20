@@ -56,6 +56,8 @@
 :r .\Seed_scheme_FunctionCapability_SEL221F.sql
 :r .\Seed_config_AssetTemplate_SEL221F.sql
 :r .\Seed_scheme_RepointCommissionedFunctions.sql
+:r .\Seed_asset_PlacementOccupancy.sql
+:r .\Seed_asset_InstrumentTransformersFromLegacy.sql
 :r .\Seed_compliance_Standards_NB.sql
 :r .\Seed_compliance_Standards_NPCC.sql
 :r .\Seed_config_Formulas_PRC023.sql

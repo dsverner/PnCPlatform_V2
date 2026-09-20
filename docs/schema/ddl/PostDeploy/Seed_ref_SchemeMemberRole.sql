@@ -9,6 +9,7 @@ USING (VALUES
     (N'TrippedBreaker',   N'Tripped breaker'),
     (N'CtSource',         N'CT source'),
     (N'VtSource',         N'VT source'),
+    (N'SyncVtSource',     N'Sync VT source'),          -- #206: the single-phase PT feeding a 25's sync input
     (N'DcSource',         N'DC source'),
     (N'Channel',          N'Channel'),
     (N'BlockingInput',    N'Blocking input'),

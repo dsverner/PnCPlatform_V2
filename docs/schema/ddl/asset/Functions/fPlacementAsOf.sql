@@ -3,9 +3,9 @@ CREATE FUNCTION [asset].[fPlacementAsOf] (@validAt DATETIMEOFFSET(7), @believedA
 RETURNS TABLE AS RETURN
 -- bi-temporal as-of (decision 69): rows valid at @validAt as the database believed them at
 -- @believedAtUtc (system time, UTC). A row deleted after @believedAtUtc is still returned.
-SELECT [RowSeq], [RowId], [EntityId], [ValidFrom], [ValidTo], [ValidFromQuality], [CreatedBy], [CreatedAt], [ModifiedBy], [ModifiedAt], [IsDeleted], [DeletedBy], [DeletedAt], [MigrationRunId], [AssetEntityId], [NodeEntityId], [CustodyLocationEntityId], [PlacementKind], [InstalledByActorId], [RemovedByActorId], [WorkRequestEntityId], [SysStart], [SysEnd]
+SELECT [RowSeq], [RowId], [EntityId], [ValidFrom], [ValidTo], [ValidFromQuality], [CreatedBy], [CreatedAt], [ModifiedBy], [ModifiedAt], [IsDeleted], [DeletedBy], [DeletedAt], [MigrationRunId], [AssetEntityId], [NodeEntityId], [CustodyLocationEntityId], [PlacementKind], [InstalledByActorId], [RemovedByActorId], [WorkRequestEntityId], [SharesNode], [SysStart], [SysEnd]
 FROM (
-    SELECT [RowSeq], [RowId], [EntityId], [ValidFrom], [ValidTo], [ValidFromQuality], [CreatedBy], [CreatedAt], [ModifiedBy], [ModifiedAt], [IsDeleted], [DeletedBy], [DeletedAt], [MigrationRunId], [AssetEntityId], [NodeEntityId], [CustodyLocationEntityId], [PlacementKind], [InstalledByActorId], [RemovedByActorId], [WorkRequestEntityId], [SysStart], [SysEnd],
+    SELECT [RowSeq], [RowId], [EntityId], [ValidFrom], [ValidTo], [ValidFromQuality], [CreatedBy], [CreatedAt], [ModifiedBy], [ModifiedAt], [IsDeleted], [DeletedBy], [DeletedAt], [MigrationRunId], [AssetEntityId], [NodeEntityId], [CustodyLocationEntityId], [PlacementKind], [InstalledByActorId], [RemovedByActorId], [WorkRequestEntityId], [SharesNode], [SysStart], [SysEnd],
            ROW_NUMBER() OVER (PARTITION BY [EntityId] ORDER BY [ValidFrom] DESC, [RowSeq] DESC) AS _rn
     FROM [asset].[Placement] FOR SYSTEM_TIME AS OF @believedAtUtc
     WHERE [IsDeleted] = 0
