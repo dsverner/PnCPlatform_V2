@@ -92,7 +92,8 @@ function EditEquipment({ r, onDone }: { r: Row; onDone: () => void }) {
       <label className="flex flex-col gap-1 text-xs text-slate-400">Voltage class
         <select className={`${inputClass} w-48`} value={voltage} disabled={busy} onChange={(e) => setVoltage(e.target.value)}>
           <option value="">—</option>
-          {(voltagesQ.data ?? []).map((v) => <option key={s(v.VoltageClassCode)} value={s(v.VoltageClassCode)}>{s(v.VoltageClassCode)}{v.NominalKv != null ? ` (${s(v.NominalKv)} kV)` : ''}</option>)}
+          {voltage && voltagesQ.data && !voltagesQ.data.some((v) => s(v.VoltageClassCode) === voltage) && <option value={voltage}>{voltage} (retired)</option>}
+          {(voltagesQ.data ?? []).map((v) => <option key={s(v.VoltageClassCode)} value={s(v.VoltageClassCode)}>{s(v.VoltageClassCode)}{v.NominalKv != null ? ` (${Number(v.NominalKv)} kV)` : ''}</option>)}
         </select></label>
       <label className="flex flex-col gap-1 text-xs text-slate-400">Notes<textarea className={`${inputClass} w-full`} rows={3} value={notes} disabled={busy} onChange={(e) => setNotes(e.target.value)} /></label>
       <div className="flex gap-2"><Button kind="primary" disabled={busy || !name.trim()} onClick={() => void save()}>Save</Button></div>

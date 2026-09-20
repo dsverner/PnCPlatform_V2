@@ -13,6 +13,7 @@ import LocationScreen from '@/screens/LocationScreen'
 import DeviceTemplateScreen from '@/screens/DeviceTemplateScreen'
 import InstrumentTransformerScreen from '@/screens/InstrumentTransformerScreen'
 import LocationsScreen from '@/screens/LocationsScreen'
+import ReferenceDataScreen from '@/screens/ReferenceDataScreen'
 
 export default function ScreenPage() {
   const { key = '', id } = useParams()
@@ -28,7 +29,9 @@ function ScreenBody({ screen, id }: { screen: Screen; id?: string }) {
   switch (screen.screenKind) {
     case 'settingsBook': return <SettingsBookScreen screen={screen} params={screen.params as SettingsBookParams} />
     // #173: the locations index is plain code — the generic list cannot join a station to the buildings inside it
-    case 'list': return screen.key === 'LOCATIONS' ? <LocationsScreen /> : <ListScreen screen={screen} params={screen.params as ListParams} />
+    case 'list': return screen.key === 'LOCATIONS' ? <LocationsScreen />
+      : (screen.params as { view?: string }).view === 'ref.vVoltageClass' ? <ReferenceDataScreen screen={screen} params={screen.params as ListParams} id={id} />   // #210: the reference lists, kept from their own page
+      : <ListScreen screen={screen} params={screen.params as ListParams} />
     case 'workItem': return <WorkItemScreen screen={screen} params={screen.params as WorkItemParams} id={id} />
     case 'step': return <StepScreen screen={screen} params={screen.params as StepParams} id={id} />
     case 'record': {

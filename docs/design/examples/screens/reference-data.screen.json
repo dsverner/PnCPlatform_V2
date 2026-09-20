@@ -1,0 +1,26 @@
+{
+  "g": 1,
+  "kind": "screen",
+  "key": "REFERENCE_DATA",
+  "name": "Reference data",
+  "description": "The reference lists the forms draw from (#210): the voltage classes first — added, corrected and retired here by the people who hold Definition.Modify and Definition.Archive; the list every voltage-class select reads.",
+  "menu": {
+    "group": "Administration",
+    "label": "Reference data",
+    "order": 30
+  },
+  "permission": "Definition.Read",
+  "screenKind": "list",
+  "params": {
+    "view": "ref.vVoltageClass",
+    "orderBy": "DisplayOrder",
+    "rowKey": "VoltageClassCode",
+    "columns": [
+      { "key": "VoltageClassCode", "label": "Code" },
+      { "key": "NominalKv", "label": "Nominal kV" },
+      { "key": "IsTransmission", "label": "Transmission" },
+      { "key": "DisplayOrder", "label": "Order" }
+    ],
+    "textFilterColumns": ["VoltageClassCode"]
+  }
+}

@@ -1616,6 +1616,33 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
                 $"#208: another scheme's input is refused in the rule's words ({(int)k208_xs} {k208_xb?["detail"]}); ReadOnly may not make an input ({(int)k208_rs})");
         }
 
+        // ======== #210 (2026-09-20): reference data kept from a screen — the voltage classes added, corrected and retired through the
+        // reference procedures the API exposes under the Definition class (ref → Definition): Upsert needs Definition.Modify,
+        // Deactivate needs Definition.Archive. A retired code added again is reinstated.
+        {
+            var k210_code = $"{tag[^6..]}kV";
+            var (k210_as, k210_ab) = await Post(admin, "api/v1/ref/VoltageClass_Upsert", new { VoltageClassCode = k210_code, NominalKv = 500, IsTransmission = true, DisplayOrder = 99 });
+            var (_, k210_lb) = await Get(admin, $"api/v1/ref/vVoltageClass?VoltageClassCode={k210_code}&take=1");
+            var k210_row = (k210_lb?["rows"] as JsonArray)?.FirstOrDefault();
+            var (k210_us, _) = await Post(admin, "api/v1/ref/VoltageClass_Upsert", new { VoltageClassCode = k210_code, NominalKv = 515, IsTransmission = true, DisplayOrder = 99 });
+            var (_, k210_l2b) = await Get(admin, $"api/v1/ref/vVoltageClass?VoltageClassCode={k210_code}&take=1");
+            var k210_kv2 = (k210_l2b?["rows"] as JsonArray)?.FirstOrDefault()?["NominalKv"]?.GetValue<decimal>();
+            var (k210_ds, k210_db) = await Post(admin, "api/v1/ref/VoltageClass_Deactivate", new { VoltageClassCode = k210_code });
+            var (_, k210_l3b) = await Get(admin, $"api/v1/ref/vVoltageClass?VoltageClassCode={k210_code}&take=1");
+            var k210_gone = ((k210_l3b?["rows"] as JsonArray) ?? []).Count == 0;
+            var (k210_rs, _) = await Post(admin, "api/v1/ref/VoltageClass_Upsert", new { VoltageClassCode = k210_code, NominalKv = 515, IsTransmission = true, DisplayOrder = 99 });
+            var (_, k210_l4b) = await Get(admin, $"api/v1/ref/vVoltageClass?VoltageClassCode={k210_code}&take=1");
+            var k210_back = ((k210_l4b?["rows"] as JsonArray) ?? []).Count == 1;
+            Must(k210_as == HttpStatusCode.OK && k210_row?["NominalKv"]?.GetValue<decimal>() == 500m && k210_us == HttpStatusCode.OK && k210_kv2 == 515m && k210_ds == HttpStatusCode.OK && k210_gone && k210_rs == HttpStatusCode.OK && k210_back,
+                $"#210: a voltage class added ({(int)k210_as} {Code(k210_ab)}: {k210_code} = {k210_row?["NominalKv"]} kV), corrected ({k210_kv2} kV), retired ({(int)k210_ds} {Code(k210_db)}; listed {!k210_gone}) and reinstated by adding it again (listed {k210_back})");
+            var (k210_ros, _) = await Post(readOnly!, "api/v1/ref/VoltageClass_Upsert", new { VoltageClassCode = k210_code + "x", NominalKv = 1, IsTransmission = false, DisplayOrder = 0 });
+            var (k210_ts, _) = await Post(tech!, "api/v1/ref/VoltageClass_Upsert", new { VoltageClassCode = k210_code + "x", NominalKv = 1, IsTransmission = false, DisplayOrder = 0 });
+            var (k210_tds, _) = await Post(tech!, "api/v1/ref/VoltageClass_Deactivate", new { VoltageClassCode = k210_code });
+            Must(k210_ros == HttpStatusCode.Forbidden && k210_ts == HttpStatusCode.Forbidden && k210_tds == HttpStatusCode.Forbidden,
+                $"#210: ReadOnly ({(int)k210_ros}) and a technician ({(int)k210_ts} add, {(int)k210_tds} retire) may not keep the reference lists");
+            await Post(admin, "api/v1/ref/VoltageClass_Deactivate", new { VoltageClassCode = k210_code });   // cleanup
+        }
+
         // ======== #187 (2026-09-18): a new relay from its position, its first settings from the template, and the record that
         // says where it is and what it wears. The owner went the intuitive way — building, panel, record — and read "no FLOC" as
         // "not placed" and could not tell whether the relay "had a template applied". No screen created a relay; "New setting
