@@ -69,7 +69,11 @@ They are joined in both directions, and nowhere else.
 settings-change request starts a `SETTINGS_CHANGE` instance over that request, pinned to the
 procedure's approved version at that instant. A transition's `requires` may name a `procedure` and
 an `outcome`: *Close* requires `SETTINGS_CHANGE` to have completed. The engine satisfies that guard
-from the procedure instance's outcome, not from anything a person asserts.
+from the procedure instance's outcome, not from anything a person asserts. The procedure runs over
+the subject its document names (#204): a procedure declaring `subjectKind: Asset`, started by a
+workflow over a request scoped to an asset, runs over that asset — its steps' records stand against
+the asset and the request stays on the instance; a request scoped to anything else is refused
+(50148). A procedure declaring `WorkRequest` (or `Any`) runs over the request itself.
 
 **Procedure → workflow.** A step's `advances` names a workflow, a subject and a transition. When
 the *Approve* step commits with outcome *Approved*, it fires *Approve* on the package's

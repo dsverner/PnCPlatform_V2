@@ -94,7 +94,7 @@ LEFT JOIN [config].[vDefinition] rwk ON rwk.[EntityId] = rwv.[DefinitionEntityId
 OUTER APPLY (SELECT TOP (1) p.[EntityId], p.[State], p.[Outcome], p.[StartedAt], p.[CompletedAt],
                     [PackageRevisionRowId] = TRY_CONVERT(UNIQUEIDENTIFIER, JSON_VALUE(p.[Produced], '$.package'))
              FROM [process].[ProcedureInstance] p
-             WHERE p.[IsDeleted] = 0 AND p.[SubjectKind] = N'WorkRequest' AND p.[SubjectEntityId] = w.[EntityId] AND p.[ParentInstanceEntityId] IS NULL
+             WHERE p.[IsDeleted] = 0 AND p.[WorkRequestEntityId] = w.[EntityId] AND p.[ParentInstanceEntityId] IS NULL   -- by the request it serves, not its subject: a test's subject is the transformer (#204)
              ORDER BY p.[StartedAt] DESC) pi
 LEFT JOIN [process].[vWorkflowInstance] lc ON lc.[SubjectKind] = N'SettingsIssuePackage' AND lc.[SubjectEntityId] = pi.[PackageRevisionRowId]
 OUTER APPLY (SELECT TOP (1) b.[State], b.[Outcome], b.[CompletedAt] FROM [process].[BlockInstance] b

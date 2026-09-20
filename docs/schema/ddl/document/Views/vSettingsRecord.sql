@@ -118,7 +118,7 @@ OUTER APPLY (SELECT TOP (1) bw.[EntityId], bw.[Title] FROM [work].[WorkRequest] 
 LEFT JOIN [config].[vDefinitionVersion] wtv ON wtv.[RowId] = w.[WorkTypeDefinitionVersionRowId]
 LEFT JOIN [config].[vDefinition] wt ON wt.[EntityId] = wtv.[DefinitionEntityId]
 OUTER APPLY (SELECT TOP (1) p.[EntityId], p.[State] FROM [process].[ProcedureInstance] p
-             WHERE p.[IsDeleted] = 0 AND p.[SubjectKind] = N'WorkRequest' AND p.[SubjectEntityId] = w.[EntityId] AND p.[ParentInstanceEntityId] IS NULL
+             WHERE p.[IsDeleted] = 0 AND p.[WorkRequestEntityId] = w.[EntityId] AND p.[ParentInstanceEntityId] IS NULL   -- by the request (#204)
                AND TRY_CONVERT(UNIQUEIDENTIFIER, JSON_VALUE(p.[Produced], '$.package')) = it.[PackageRevisionRowId]
              ORDER BY p.[StartedAt] DESC) pi
 OUTER APPLY (SELECT TOP (1) s.[EntityId] AS [StepInstanceEntityId], s.[State], s.[CommittedAt]

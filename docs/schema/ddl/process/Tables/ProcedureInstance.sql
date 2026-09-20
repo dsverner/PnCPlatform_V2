@@ -41,6 +41,8 @@ CREATE INDEX [IX_ProcedureInstance_Subject] ON [process].[ProcedureInstance] ([S
 GO
 CREATE INDEX [IX_ProcedureInstance_Version] ON [process].[ProcedureInstance] ([DefinitionVersionRowId]) WHERE [IsDeleted] = 0;
 GO
+CREATE INDEX [IX_ProcedureInstance_WorkRequest] ON [process].[ProcedureInstance] ([WorkRequestEntityId]) INCLUDE ([ParentInstanceEntityId], [StartedAt]) WHERE [IsDeleted] = 0;   -- the request's root run (#204)
+GO
 EXEC sys.sp_addextendedproperty @name = N'PnC.TemporalClass', @value = N'Versioned',
     @level0type = N'SCHEMA', @level0name = N'process', @level1type = N'TABLE', @level1name = N'ProcedureInstance';
 GO

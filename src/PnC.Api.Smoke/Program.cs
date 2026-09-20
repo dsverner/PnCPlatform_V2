@@ -1481,6 +1481,43 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
                 $"#201: the transformer reads back with its station, ratio and the scheme it feeds ({k201_it?["StationName"]} · {k201_it?["RatioInUse"]} · feeds {k201_it?["FeedsCount"]}); the scheme's source reads 1200:5 as {k201_src?["Ratio"]}");
             var (k201_rs, _) = await Post(readOnly!, "api/v1/asset/Asset_Add", new { AssetTypeCode = "VT", Name = $"{tag} stray VT", Status = "InService" });
             Must(k201_rs == HttpStatusCode.Forbidden, $"#201: ReadOnly may not make a transformer ({(int)k201_rs})");
+
+            // ======== #204 (2026-09-19): the transformer's tests — the CT_TEST procedure (ratio, polarity, excitation, review) run
+            // under a request scoped to the CT; each step's captures are the readings, each commit a TestSheet record against
+            // the CT; a required capture missing is refused; the engineer's review is an Attestation; the request closes.
+            var (k204_wts, k204_wtb) = await Get(admin, "api/v1/config/vDefinition?DefinitionKind=Program.WorkType&DefinitionKey=CT_TEST&take=1");
+            var k204_wt = Id((k204_wtb?["rows"] as JsonArray)?.FirstOrDefault());
+            var (_, k204_vb) = await Get(admin, $"api/v1/config/vDefinitionVersion?DefinitionEntityId={k204_wt}&Status=Effective&take=1");
+            var k204_wtv = (k204_vb?["rows"] as JsonArray)?.FirstOrDefault()?["RowId"]?.ToString();
+            var (k204_ws, k204_wb) = await Post(admin, "api/v1/work/WorkRequest_Add", new { WorkTypeDefinitionVersionRowId = k204_wtv, Title = $"{tag} line CT test", ScopeKind = "Asset", ScopeEntityId = k201_ct });
+            var k204_wr = Id(k204_wb);
+            var (k204_ss, k204_sb) = await Post(admin, "api/v1/process/workflows/start", new { workflowKey = "CT_TEST_REQUEST", subjectKind = "WorkRequest", subjectEntityId = k204_wr });
+            var k204_wf = Id(k204_sb, "workflowInstanceEntityId");
+            var (k204_ts, k204_tb) = await Post(admin, $"api/v1/process/workflow-instances/{k204_wf}/transitions", new { name = "Start" });
+            var (_, k204_pib) = await Get(admin, $"api/v1/process/vProcedureInstance?WorkRequestEntityId={k204_wr}&take=5");
+            var k204_inst = Id((k204_pib?["rows"] as JsonArray)?.FirstOrDefault(x => x?["ParentInstanceEntityId"] is null));
+            Must(k204_wts == HttpStatusCode.OK && k204_wtv is not null && k204_ws == HttpStatusCode.OK && k204_ss == HttpStatusCode.OK && k204_ts == HttpStatusCode.OK && k204_inst is not null,
+                $"#204: a CT test request on the transformer starts CT_TEST ({(int)k204_ws} {Code(k204_wb)}; {(int)k204_ss} {Code(k204_sb)} {k204_sb?["detail"]}; {(int)k204_ts} {k204_tb?["toState"]}; instance {k204_inst?.ToString()[..8]})");
+            var k204_saved = inst; inst = k204_inst;
+            var k204_r = await ReadyStep("RATIO", null, 2);
+            var (k204_c1s, k204_c1b) = await Post(tech, $"api/v1/process/step-instances/{k204_r}/claim", new { });
+            var (k204_x1s, k204_x1b) = await Post(tech, $"api/v1/process/step-instances/{k204_r}/commit", new { outcome = "Pass", capture = new { ratioMeasured = 240 } });
+            var (k204_x2s, k204_x2b) = await Post(tech, $"api/v1/process/step-instances/{k204_r}/commit", new { outcome = "Pass", capture = new { tap = "1200:5", appliedPrimaryA = 600, measuredSecondaryA = 2.5, ratioMeasured = 240, ratioErrorPercent = 0, method = "Primary injection" } });
+            Must(k204_r is not null && k204_c1s == HttpStatusCode.OK && k204_x1s == HttpStatusCode.Conflict && (k204_x1b?["detail"]?.ToString() ?? "").Contains("required captures are missing")
+                 && k204_x2s == HttpStatusCode.OK,
+                $"#204: the ratio sheet — a commit without the tap is refused in the procedure's words ({(int)k204_x1s} {k204_x1b?["detail"]}); with the readings it commits ({(int)k204_x2s} {Code(k204_x2b)} {k204_x2b?["detail"]})");
+            await RunStep(tech, "POLARITY", new { outcome = "Pass", capture = new { polarity = "Correct", method = "DC kick" } });
+            await RunStep(tech, "EXCITATION", new { outcome = "Pass", capture = new { kneePointVoltageV = 410, kneePointCurrentA = 0.1, points = "100, 0.02\n200, 0.04\n410, 0.1\n450, 0.5", method = "Test set" } });
+            await RunStep(admin, "REVIEW", new { outcome = "Accepted", capture = new { remarks = "ratio and knee point agree with the nameplate" } });
+            await Post(admin, $"api/v1/process/procedure-instances/{inst}/evaluate", new { });
+            var (_, k204_recb) = await Get(admin, $"api/v1/record/vRecord?SubjectKind=Asset&SubjectEntityId={k201_ct}&take=20");
+            var k204_kinds = ((k204_recb?["rows"] as JsonArray) ?? []).GroupBy(x => x?["RecordKindCode"]?.ToString() ?? "").ToDictionary(g => g.Key, g => g.Count());
+            var (k204_cls, k204_clb) = await Post(admin, $"api/v1/process/workflow-instances/{k204_wf}/transitions", new { name = "Close" });
+            Must(k204_kinds.GetValueOrDefault("TestSheet") == 3 && k204_kinds.GetValueOrDefault("Attestation") == 1 && k204_cls == HttpStatusCode.OK,
+                $"#204: three test sheets and the engineer's attestation stand against the CT ({string.Join(", ", k204_kinds.Select(kv => kv.Key + " " + kv.Value))}); the request closes on the completed procedure ({(int)k204_cls} {k204_clb?["toState"]} {k204_clb?["detail"]})");
+            var (k204_rs, _) = await Post(readOnly!, "api/v1/work/WorkRequest_Add", new { WorkTypeDefinitionVersionRowId = k204_wtv, Title = $"{tag} stray test", ScopeKind = "Asset", ScopeEntityId = k201_ct });
+            Must(k204_rs == HttpStatusCode.Forbidden, $"#204: ReadOnly may not raise a test ({(int)k204_rs})");
+            inst = k204_saved;
         }
 
         // ======== #187 (2026-09-18): a new relay from its position, its first settings from the template, and the record that

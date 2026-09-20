@@ -6,10 +6,11 @@
 // the schemes it feeds as CT or VT source (and a way to add one), and its tests — which are #202's. Plain React (#167);
 // the INSTRUMENT_TRANSFORMER definition names asset.vInstrumentTransformer and this component reads it.
 import { useState } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router'
-import { ApiError, fmtDate, proc, s, type Row } from '@/lib/api'
+import { ApiError, fmtDate, fmtWhen, proc, s, view, viewAll, type Row } from '@/lib/api'
 import { useCan, useViewAll } from '@/lib/hooks'
+import { workTypes, raiseAndStart } from '@/lib/actions'
 import { type RecordParams, type Screen, screenPath } from '@/lib/screens'
 import { Panel, Pill, Button, Facts, Status, inputClass } from '@/components/ui/ui'
 import { AssetCharacteristics } from '@/components/CharacteristicsPanel'
@@ -49,9 +50,7 @@ export default function InstrumentTransformerScreen({ params: p, id }: { screen:
       </div>
       <AssetCharacteristics assetEntityId={s(r.EntityId)} definitionEntityId={template} editable={editable}
         emptyNote={typeQ.isPending ? 'Loading the type…' : `The type ${s(r.AssetTypeCode)} names no nameplate template yet.`} />
-      <Panel title="Tests">
-        <Status>Ratio, polarity and excitation (saturation) curve tests are the next increment (#202): a test plan per kind, recorded against this transformer with its readings, so the relay's commissioning package can cite them. Nothing is recorded here yet.</Status>
-      </Panel>
+      <Tests r={r} canRaise={can('WorkRequest.Modify')} />
     </div>
   )
 }
@@ -93,6 +92,93 @@ function Feeds({ r, editable }: { r: Row; editable: boolean }) {
       {editable && !r.StationNodeEntityId && <Status>Place the transformer first; the schemes offered are its station's.</Status>}
       {msg && <Status bad={msg.bad}>{msg.text}</Status>}
     </Panel>
+  )
+}
+
+/** #204: the transformer's tests. A test is a procedure (CT_TEST: ratio, polarity, excitation curve, engineer's review;
+ * VT_TEST: ratio, polarity, review) run under a request scoped to this transformer; each step's captures are the readings
+ * and each commit is a test sheet (record.Record, kind TestSheet; the review an Attestation). Nothing here computes a
+ * verdict — the technician's outcome and the engineer's review are the record. The bi-temporal acceptance of a sheet
+ * (record.AcceptRecord) and the record.TestSheet / TestReading rows are the Doble-import shape, not written yet. */
+function Tests({ r, canRaise }: { r: Row; canRaise: boolean }) {
+  const navigate = useNavigate()
+  const asset = s(r.EntityId)
+  const typeKey = sourceRoleFor(s(r.AssetTypeCode)) === 'CtSource' ? 'CT_TEST' : 'VT_TEST'
+  const typesQ = useQuery({ queryKey: ['workTypes'], queryFn: workTypes, staleTime: 5 * 60_000 })
+  const wt = (typesQ.data ?? []).find((t) => t.key === typeKey)
+  const reqQ = useViewAll('work', 'vChangeRequestStatus', { ScopeKind: 'Asset', ScopeEntityId: asset }, '-RequestedAt', !!asset)
+  const recQ = useViewAll('record', 'vRecord', { SubjectKind: 'Asset', SubjectEntityId: asset }, '-OccurredAt', !!asset)
+  const [busy, setBusy] = useState(false); const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null)
+  const requests = (reqQ.data ?? []).filter((x) => ['CT_TEST', 'VT_TEST'].includes(s(x.WorkTypeKey)))
+  const sheets = (recQ.data ?? []).filter((x) => ['TestSheet', 'Attestation'].includes(s(x.RecordKindCode)))
+  const raise_ = async () => {
+    if (!wt) return
+    setBusy(true); setMsg(null)
+    try {
+      const id = await raiseAndStart({ workTypeVersionRowId: wt.versionRowId, title: `${s(r.Name)} — ${typeKey === 'CT_TEST' ? 'ratio, polarity and excitation' : 'ratio and polarity'} test`, scopeKind: 'Asset', scopeEntityId: asset, workflowKey: wt.workflowKey })
+      navigate(screenPath('WORK_ITEM', id))
+    } catch (e) { setMsg({ text: e instanceof ApiError ? e.message : String(e), bad: true }); setBusy(false) }
+  }
+  return (
+    <Panel title={`Tests · ${recQ.isPending ? '…' : sheets.length} sheet${sheets.length === 1 ? '' : 's'}`} actions={canRaise
+      ? <Button kind="primary" disabled={busy || !wt} title={wt ? `raises a ${wt.name} request on this transformer and opens it` : typesQ.isPending ? 'loading the work types' : `no Effective work type ${typeKey}`} onClick={() => void raise_()}>{busy ? 'Raising…' : 'Test this transformer'}</Button>
+      : undefined}>
+      {msg && <Status bad={msg.bad}>{msg.text}</Status>}
+      {requests.length > 0 && (
+        <div className="mb-2 text-sm">
+          <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Test requests</div>
+          <ul className="mt-1 space-y-1">
+            {requests.map((x) => (
+              <li key={s(x.WorkRequestEntityId)} className="flex flex-wrap items-center gap-2">
+                <a className="text-sky-300 underline" href={screenPath('WORK_ITEM', s(x.WorkRequestEntityId))} onClick={(e) => { e.preventDefault(); navigate(screenPath('WORK_ITEM', s(x.WorkRequestEntityId))) }}>{s(x.Title)}</a>
+                <Pill tone={x.RequestState === 'Closed' ? 'good' : x.RequestState === 'Cancelled' ? 'neutral' : 'warn'}>{s(x.RequestState) || 'raised'}</Pill>
+                <span className="text-xs text-slate-500">{s(x.WorkTypeName)} · {fmtWhen(x.RequestedAt)}{x.RequestedByDisplayName ? ` · ${s(x.RequestedByDisplayName)}` : ''}</span>
+              </li>))}
+          </ul>
+        </div>)}
+      {!recQ.isPending && !sheets.length && <Status>No test sheet is recorded against this transformer yet. {canRaise ? 'Test this transformer raises the request; the technician records the ratio, the polarity and the excitation curve step by step, and the engineer reviews.' : ''}</Status>}
+      {sheets.length > 0 && (
+        <table className="w-full text-sm">
+          <thead><tr className="border-b border-slate-700 text-left text-xs uppercase tracking-wide text-slate-400">
+            <th className="py-1 pr-2">When</th><th className="py-1 pr-2">Sheet</th><th className="py-1 pr-2">Outcome</th><th className="py-1">Readings</th></tr></thead>
+          <tbody>
+            {sheets.map((x) => (
+              <tr key={s(x.RowId)} className="border-b border-slate-800 align-top">
+                <td className="py-1 pr-2 text-xs text-slate-400">{fmtWhen(x.OccurredAt)}</td>
+                <td className="py-1 pr-2 text-slate-200">{x.RecordKindCode === 'Attestation' ? 'Engineer review' : 'Test sheet'}<div className="text-xs text-slate-500">{s(x.Summary)}</div></td>
+                <td className="py-1 pr-2"><Pill tone={['Pass', 'Accepted'].includes(s(x.OverallResult)) ? 'good' : ['Fail', 'Rejected'].includes(s(x.OverallResult)) ? 'bad' : 'neutral'}>{s(x.OverallResult) || '—'}</Pill></td>
+                <td className="py-1"><Readings requestId={s(x.WorkRequestEntityId)} recordEntityId={s(x.EntityId)} /></td>
+              </tr>))}
+          </tbody>
+        </table>)}
+      <Status>A test is the CT_TEST or VT_TEST procedure run under a request on this transformer: each step's captures are its readings and each commit a sheet. No reading limit is enforced yet — a ratio-error acceptance depends on the accuracy class, a rule to come as data; the technician's outcome and the engineer's review are the verdict.</Status>
+    </Panel>
+  )
+}
+
+/** The captures the committed step of a request wrote as this record (process.vStepInstance.Draft, CommittedRecordEntityId). */
+function Readings({ requestId, recordEntityId }: { requestId: string; recordEntityId: string }) {
+  const q = useQuery({ queryKey: ['testReadings', requestId, recordEntityId], enabled: !!requestId && !!recordEntityId, staleTime: 60_000, queryFn: async () => {
+    const insts = (await view('process', 'vProcedureInstance', { WorkRequestEntityId: requestId }, { take: 10 })).rows
+    for (const inst of insts) {
+      const blocks = await viewAll('process', 'vBlockInstance', { ProcedureInstanceEntityId: s(inst.EntityId) })
+      for (const b of blocks) {
+        const steps = await viewAll('process', 'vStepInstance', { BlockInstanceEntityId: s(b.EntityId), State: 'Committed' })
+        const hit = steps.find((st) => s(st.CommittedRecordEntityId).toLowerCase() === recordEntityId.toLowerCase())
+        if (hit) { let draft: Record<string, unknown> = {}; try { draft = JSON.parse(s(hit.Draft) || '{}') } catch { /* an unreadable draft shows as none */ } return { stepId: s(hit.StepId), draft } }
+      }
+    }
+    return null
+  } })
+  if (q.isPending) return <span className="text-xs text-slate-500">…</span>
+  if (!q.data) return <span className="text-xs text-slate-500">no captured readings found for this sheet</span>
+  const entries = Object.entries(q.data.draft)
+  return (
+    <div className="text-xs">
+      <span className="text-slate-400">{q.data.stepId}</span>
+      {entries.length === 0 ? <span className="ml-1 text-slate-500">— no fields captured</span>
+        : <ul className="mt-0.5 space-y-0.5">{entries.map(([k, v]) => <li key={k}><span className="text-slate-400">{k}</span> <span className="whitespace-pre-wrap text-slate-200">{Array.isArray(v) ? v.join(', ') : s(v)}</span></li>)}</ul>}
+    </div>
   )
 }
 

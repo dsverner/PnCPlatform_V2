@@ -4,7 +4,10 @@
 -- "which procedure did this request follow" has exactly one answer (#40). A child run (a call block) is started with
 -- the version its parent pinned and inherits the parent's set. The root block is materialised and set Running; the
 -- interpreter (PnC.Api Engine) evaluates and advances from there.
---   50140 the key has no Effective version   50141 a callee has none   50142 unknown subject
+-- The subject (#204): a procedure runs over the subject its document names. A root run started over a WorkRequest by a
+-- procedure whose subjectKind is another kind runs over the request's scope when the scope is of that kind (a CT_TEST's
+-- sheets stand against the transformer, the request stays on the instance); a scope of the wrong kind is refused.
+--   50140 the key has no Effective version   50141 a callee has none   50142 unknown subject   50148 the request's scope is not the kind the procedure is about
 CREATE PROCEDURE [process].[StartProcedure]
     @ProcedureKey NVARCHAR(100),
     @SubjectKind NVARCHAR(40),
@@ -69,6 +72,22 @@ BEGIN
         END
     END
 
+    -- the subject the document names (#204)
+    DECLARE @doc NVARCHAR(MAX) = (SELECT [PayloadText] FROM [config].[DefinitionVersion] WHERE [RowId] = @DefinitionVersionRowId);
+    DECLARE @declared NVARCHAR(40) = JSON_VALUE(@doc, '$.subjectKind');
+    IF @ParentInstanceEntityId IS NULL AND @SubjectKind = N'WorkRequest' AND @declared IS NOT NULL AND @declared NOT IN (N'WorkRequest', N'Any')
+    BEGIN
+        DECLARE @scopeKind NVARCHAR(40), @scope UNIQUEIDENTIFIER;
+        SELECT @scopeKind = [ScopeKind], @scope = [ScopeEntityId] FROM [work].[WorkRequest] WHERE [EntityId] = @SubjectEntityId AND [ValidTo] IS NULL AND [IsDeleted] = 0;
+        IF @scopeKind IS NULL OR @scopeKind <> @declared
+        BEGIN
+            DECLARE @m2 NVARCHAR(400) = N'process.StartProcedure: ' + @ProcedureKey + N' is about a ' + @declared + N'; the request''s scope is ' + ISNULL(N'a ' + @scopeKind, N'not found') + N'.';
+            THROW 50148, @m2, 1;
+        END
+        SET @WorkRequestEntityId = @SubjectEntityId; SET @SubjectKind = @scopeKind; SET @SubjectEntityId = @scope;
+        IF [meta].[fEntityExists](@SubjectKind, @SubjectEntityId) = 0 THROW 50142, N'process.StartProcedure: the request''s scope is not a live entity.', 1;
+    END
+
     BEGIN TRANSACTION;
     EXEC [process].[ProcedureInstance_Add]
         @DefinitionVersionRowId = @DefinitionVersionRowId, @ParentInstanceEntityId = @ParentInstanceEntityId, @CallBlockPath = @CallBlockPath,
@@ -86,7 +105,6 @@ BEGIN
     END
     CLOSE pc; DEALLOCATE pc;
 
-    DECLARE @doc NVARCHAR(MAX) = (SELECT [PayloadText] FROM [config].[DefinitionVersion] WHERE [RowId] = @DefinitionVersionRowId);
     DECLARE @rootPath NVARCHAR(400) = JSON_VALUE(@doc, '$.body.id'), @rootKind NVARCHAR(20) = JSON_VALUE(@doc, '$.body.block'), @root UNIQUEIDENTIFIER;
     EXEC [process].[MaterialiseBlock] @ProcedureInstanceEntityId = @EntityId, @BlockPath = @rootPath, @BlockKind = @rootKind, @IncludeRoot = 1, @ActorId = @ActorId, @MigrationRunId = @MigrationRunId, @RootEntityId = @root OUTPUT;
     UPDATE [process].[BlockInstance] SET [State] = N'Running', [StartedAt] = @now, [ModifiedBy] = @ActorId, [ModifiedAt] = @now WHERE [EntityId] = @root AND [IsDeleted] = 0;
