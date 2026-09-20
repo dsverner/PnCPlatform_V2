@@ -65,15 +65,13 @@ export default function RecordScreen({ params: p, id }: { screen: Screen; params
         : <Panel title={parsed.length ? `Settings · ${parsed.length} parsed from the ${s(r.FileKind)} file` : r.FileKind === 'NativeSettings' ? 'Settings · the native (vendor) file is stored as is; no reader exists for it yet (#113)' : 'Settings · no parsed settings; the text as filed is the record'}>
             {parsed.length > 0 ? <DataGrid rows={parsed} columns={PARSED_COLS} rowKey={(x) => s(x.SettingCode) + '|' + s(x.GroupNumber)} /> : <Status>No settings template for this model yet; the text as filed is the record.</Status>}
           </Panel>)}
-      {/* #200 (owner, 2026-09-19): the CTs and PTs on a tab of their own — the template's ratio settings (CTR, PTR, SPTR on an
-          SEL-221F) with their edit, then the instrument-transformer characteristics, which were the Record tab's and only
-          shown when the model had no template; now every record's, template or not */}
+      {/* #200 (owner, 2026-09-19): the CTs and PTs on a tab of their own; #205 (owner, 2026-09-20): only the transformers that feed
+          the protection — the relay's ratio settings went back to the book. Above, the scheme's CT and VT sources with what each
+          feeds; below, the instrument-transformer characteristics the legacy record declared (every record's, template or not) */}
       {section === 'analog' && (
         <>
-          <AnalogInputs r={r} revision={revision} editable={r.GridState === 'Outstanding' && can('ConfigurationFile.Modify')} />
-          {/* #201: the ratios the legacy record declared are its characteristics, kept as reference — the transformers themselves are
-              equipment now (Instrument transformers in the nav), named as the scheme's CT and VT sources and checked above */}
-          <Status>Declared in the legacy record — the CT and PT ratios the settings record carried as text. The transformers themselves are equipment: make them at their bay or panel and name them as the scheme's sources, and the check above reads them.</Status>
+          <AnalogInputs r={r} revision={revision} />
+          <Status>Declared in the legacy record — the CT and PT ratios the settings record carried as text. The transformers themselves are equipment: make them at their yard or panel and name them as the scheme's sources, and the panel above reads them.</Status>
           <Characteristics r={r} revision={revision} editable={r.GridState === 'Outstanding' && can('Record.Modify')} />
         </>
       )}

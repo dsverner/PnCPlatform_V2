@@ -4,9 +4,11 @@
 // is the template's ANSI codes; its inputs are the ratio settings the template carries. Nothing here is per model in
 // code: a template for another relay draws the same way.
 import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getText, proc, view, viewAll, s, ApiError, type Row } from '@/lib/api'
 import { useViewAll } from '@/lib/hooks'
+import { screenPath } from '@/lib/screens'
 import { Panel, Pill, Tabs, Status, Button } from '@/components/ui/ui'
 import { DataGrid, type Column } from '@/components/ui/data-grid'
 
@@ -32,70 +34,68 @@ const isRatio = (r: Row) => /current and potential inputs|transformer ratio/i.te
 const rangeText = (r: Row) => (r.MinValue == null && r.MaxValue == null ? '' : `${r.MinValue ?? '…'} – ${r.MaxValue ?? '…'}`)
 
 
-/** #200 (owner, 2026-09-19: "I would prefer to have the CTs and PTs located on a separate tab called something like 'Analog
- * Inputs'"): the template's ratio settings — what the relay is fed by — on the record's Analog inputs tab, as the same grid
- * with the same per-field edit the settings book uses; they no longer appear in the book. The Inputs panel that sat above
- * the book is gone with them. */
-export function AnalogInputs({ r, revision, editable = false }: { r: Row; revision: string; editable?: boolean }) {
+/** The Analog inputs tab (#200, reshaped by #205 — owner, 2026-09-20: "the analog inputs tab should only contain information
+ * on the CTs and PTs which are feeding the protections and not device specific settings"): the instrument transformers the
+ * scheme names as its CT and VT sources (scheme.vSchemeSource, #201), each with its ratio, whether it is in service, and
+ * which of the relay's ratio settings it feeds and whether the two agree (to half a percent). The relay's ratio settings
+ * themselves (CTR, PTR, SPTR on an SEL-221F) are read and edited in the settings book like every other setting; here a
+ * setting is only named and judged. A ratio setting with no source of its kind named is said so, not judged. */
+export function AnalogInputs({ r, revision }: { r: Row; revision: string }) {
+  const navigate = useNavigate()
   const tq = useTemplate(s(r.ModelId) || null)
   const parsedQ = useViewAll('document', 'vParsedSettingNamed', { ConfigurationFileRevisionRowId: revision }, 'DisplayOrder')
-  const parsed = parsedQ.data ?? []
-  const values = useMemo(() => new Map(parsed.map((p) => [s(p.SettingCode), p])), [parsed])
-  // #201: the instrument transformers the scheme names as its CT and VT sources (scheme.vSchemeSource), read beside the settings
-  const sourcesQ = useViewAll('scheme', 'vSchemeSource', { SchemeEntityId: s(r.SchemeEntityId) }, 'AssetName', !!r.SchemeEntityId)
-  if (tq.isPending) return <Status>Loading the template…</Status>
-  if (!tq.data) return <Status>No settings template for this model; the instrument transformers below are the record of its analog inputs.</Status>
-  const ratios = tq.data.rows.filter(isRatio)
+  const values = useMemo(() => new Map((parsedQ.data ?? []).map((p) => [s(p.SettingCode), p])), [parsedQ.data])
+  const hasScheme = !!r.SchemeEntityId; const schemeName = s(r.SchemeName) || 'the scheme'
+  const sourcesQ = useViewAll('scheme', 'vSchemeSource', { SchemeEntityId: s(r.SchemeEntityId) }, 'AssetName', hasScheme)
+  const sources = sourcesQ.data ?? []
+  const ratios = (tq.data?.rows ?? []).filter(isRatio)
+  const isCurrent = (x: Row) => /^CT|current/i.test(s(x.SettingCode) + ' ' + s(x.Name))
+  const roleOf = (x: Row) => (isCurrent(x) ? 'CtSource' : 'VtSource')
+  const settingOf = (x: Row) => { const v = values.get(s(x.SettingCode)); return v ? Number(s(v.RawValue ?? v.DisplayValue)) : NaN }
+  // the relay's ratio settings a transformer of this role feeds, each with a verdict against the nameplate ratio
+  const feeds = (src: Row) => ratios.filter((x) => roleOf(x) === s(src.MemberRoleCode)).map((x) => {
+    const setting = settingOf(x); const ratio = src.Ratio == null ? NaN : Number(src.Ratio)
+    const verdict = !Number.isFinite(ratio) ? { text: 'ratio not readable', tone: 'warn' as const }
+      : !Number.isFinite(setting) ? { text: `${s(x.SettingCode)} not set`, tone: 'warn' as const }
+      : Math.abs(ratio - setting) <= Math.max(0.005 * ratio, 0.01) ? { text: 'matches', tone: 'good' as const }
+      : { text: `differs — ${s(x.SettingCode)} is ${setting}`, tone: 'bad' as const }
+    return { code: s(x.SettingCode), verdict }
+  })
+  const unfed = ratios.filter((x) => !sources.some((src) => s(src.MemberRoleCode) === roleOf(x)))
   return (
-    <Panel title={`Analog inputs · ${tq.data.name}`}>
-      {!ratios.length && <Status>The template carries no ratio settings.</Status>}
-      {ratios.length > 0 && <SettingsGrid rows={ratios} values={values} revision={revision} editable={editable} deviceId={s(r.DeviceEntityId)} />}
-      {ratios.length > 0 && <FedBy ratios={ratios} values={values} sources={sourcesQ.data ?? []} pending={sourcesQ.isPending && !!r.SchemeEntityId} schemeName={s(r.SchemeName)} hasScheme={!!r.SchemeEntityId} />}
-    </Panel>
-  )
-}
-
-/** #201: for each ratio setting, the instrument transformer(s) the scheme names as that kind of source — a current setting
- * (CTR and the like) against the CT sources, a voltage setting (PTR, SPTR) against the VT sources — with the number the
- * nameplate ratio makes and whether the setting agrees with it (to half a percent). The check is only as good as the
- * scheme's source list: a setting with no source named is said so, not judged. */
-function FedBy({ ratios, values, sources, pending, schemeName, hasScheme }: { ratios: Row[]; values: Map<string, Row>; sources: Row[]; pending: boolean; schemeName: string; hasScheme: boolean }) {
-  const isCurrent = (r: Row) => /^CT|current/i.test(s(r.SettingCode) + ' ' + s(r.Name))
-  return (
-    <div className="mt-3 border-t border-slate-800 pt-2 text-sm">
-      <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Fed by</div>
+    <Panel title={`Feeding this protection · ${sources.length ? `${sources.length} transformer${sources.length === 1 ? '' : 's'}` : 'none named'}`}>
       {!hasScheme && <Status>This record is in no scheme, so nothing names the transformers that feed it.</Status>}
-      {hasScheme && pending && <Status>Reading the scheme's sources…</Status>}
-      {hasScheme && !pending && (
-        <ul className="mt-1 space-y-1">
-          {ratios.map((r) => {
-            const role = isCurrent(r) ? 'CtSource' : 'VtSource'
-            const mine = sources.filter((x) => s(x.MemberRoleCode) === role)
-            const v = values.get(s(r.SettingCode)); const setting = v ? Number(s(v.RawValue ?? v.DisplayValue)) : NaN
+      {hasScheme && sourcesQ.isPending && <Status>Reading the scheme's sources…</Status>}
+      {hasScheme && !sourcesQ.isPending && !sources.length && <Status>{schemeName} names no CT or VT source yet. Name a transformer as its source from the transformer's page (Instrument transformers in the nav).</Status>}
+      {sources.length > 0 && (
+        <ul className="space-y-1 text-sm">
+          {sources.map((src) => {
+            const ratio = src.Ratio == null ? NaN : Number(src.Ratio); const path = screenPath('INSTRUMENT_TRANSFORMER', s(src.AssetEntityId)); const fed = feeds(src)
             return (
-              <li key={s(r.SettingCode)} className="flex flex-wrap items-center gap-2">
-                <span className="text-slate-200">{s(r.SettingCode)}</span>
-                <span className="text-slate-400">{Number.isFinite(setting) ? `= ${setting}` : 'not set'}</span>
-                {!mine.length && <span className="text-slate-500">— {schemeName || 'the scheme'} names no {role === 'CtSource' ? 'CT' : 'VT'} source; the setting cannot be checked</span>}
-                {mine.map((x) => {
-                  const ratio = x.Ratio == null ? NaN : Number(x.Ratio)
-                  const verdict = !Number.isFinite(ratio) ? { text: 'ratio not readable', tone: 'warn' as const }
-                    : !Number.isFinite(setting) ? { text: 'setting not set', tone: 'warn' as const }
-                    : Math.abs(ratio - setting) <= Math.max(0.005 * ratio, 0.01) ? { text: 'matches', tone: 'good' as const }
-                    : { text: `differs from the setting`, tone: 'bad' as const }
-                  return <span key={s(x.MemberEntityId)} className="flex items-center gap-1">— <span className="text-slate-200">{s(x.AssetName)}</span> <span className="text-slate-400">{s(x.RatioInUse) || 'no ratio recorded'}{Number.isFinite(ratio) ? ` = ${ratio}` : ''}</span> <Pill tone={verdict.tone}>{verdict.text}</Pill></span>
-                })}
+              <li key={s(src.MemberEntityId)} className="flex flex-wrap items-center gap-2">
+                <a className="text-sky-300 underline" href={path} onClick={(e) => { e.preventDefault(); navigate(path) }}>{s(src.AssetName)}</a>
+                <span className="text-xs text-slate-500">{s(src.AssetTypeCode)} · {src.MemberRoleCode === 'CtSource' ? 'CT source' : 'VT source'}</span>
+                <span className="text-slate-400">{s(src.RatioInUse) ? `${s(src.RatioInUse)}${Number.isFinite(ratio) ? ` = ${ratio}` : ' (ratio not read)'}` : 'no ratio recorded'}</span>
+                {src.IsInService === false && <Pill tone="warn">not in service</Pill>}
+                {fed.map((f) => <span key={f.code} className="flex items-center gap-1 text-slate-400">· feeds {f.code} <Pill tone={f.verdict.tone}>{f.verdict.text}</Pill></span>)}
+                {tq.data && !fed.length && <span className="text-xs text-slate-500">· the template carries no {src.MemberRoleCode === 'CtSource' ? 'current' : 'voltage'} ratio setting for it to feed</span>}
               </li>)
           })}
         </ul>)}
-    </div>
+      {hasScheme && !sourcesQ.isPending && unfed.length > 0 && (
+        <ul className="mt-2 space-y-1 border-t border-slate-800 pt-2 text-sm">
+          {unfed.map((x) => <li key={s(x.SettingCode)} className="text-slate-500"><span className="text-slate-300">{s(x.SettingCode)}</span> — {schemeName} names no {isCurrent(x) ? 'CT' : 'VT'} source; name it from the transformer's page.</li>)}
+        </ul>)}
+      {tq.isPending && <Status>Reading the template…</Status>}
+      {!tq.isPending && !tq.data && <Status>No settings template for this model, so which setting each transformer feeds is not known.</Status>}
+    </Panel>
   )
 }
 
 /** The settings grid: the template rows given, each with the revision's value or "not set"; a value edits in place when the
  * revision is outstanding (#168 increment 2: process.SetParsedSetting reads it as the parser would — type, range, closed
  * list — closes the prior row in valid time and audits the change; the platform writes the settings file from these rows
- * at the settings step). One grid for the book and for the Analog inputs tab (#200). */
+ * at the settings step). */
 function SettingsGrid({ rows: given, values, revision, editable = false, deviceId = '' }: { rows: Row[]; values: Map<string, Row>; revision: string; editable?: boolean; deviceId?: string }) {
   const rows: (Row & { _v?: Row })[] = given.map((r) => ({ ...r, _v: values.get(s(r.SettingCode)) }))
   const qc = useQueryClient()
@@ -132,11 +132,12 @@ function SettingsGrid({ rows: given, values, revision, editable = false, deviceI
   )
 }
 
-/** The settings by function: a tab per category in the template's order (the ratio settings excepted — they are the Analog
- * inputs tab's, #200); every template row of the category, with the revision's value or "not set". */
+/** The settings by function: a tab per category in the template's order, every template row of the category with the
+ * revision's value or "not set". The ratio settings (CTR, PTR, SPTR) are a category like any other — #205 brought them back
+ * from the Analog inputs tab, which now holds the transformers that feed them. */
 export function SettingsByFunction({ template, parsed, parseStatus, parseError, revision, filedText, editable = false, deviceId = '' }: { template: Template; parsed: Row[]; parseStatus: string; parseError: string; revision: string; filedText: string | null; editable?: boolean; deviceId?: string }) {
   const values = useMemo(() => new Map(parsed.map((p) => [s(p.SettingCode), p])), [parsed])
-  const bookRows = useMemo(() => template.rows.filter((r) => !isRatio(r)), [template.rows])
+  const bookRows = template.rows
   const categories = useMemo(() => { const seen: string[] = []; for (const r of bookRows) { const c = s(r.Category) || 'Settings'; if (!seen.includes(c)) seen.push(c) } return seen }, [bookRows])
   const [tab, setTab] = useState(categories[0] ?? '')
   const current = tab || categories[0] || ''
