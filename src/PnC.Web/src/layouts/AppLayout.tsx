@@ -73,7 +73,7 @@ export default function AppLayout({ children }: { children?: ReactNode }) {
   }, [screensQ.data])
   const who = meQ.data ? (meQ.data.person.displayName || meQ.data.user.userPrincipalName) + (devUser() ? ' (DEV act-as)' : '') : meQ.isError ? 'not signed in' : '…'
   return (
-    <div className="flex min-h-screen">
+    <div className="flex h-screen overflow-hidden">   {/* the owner, 2026-09-20: the nav and the header stay; only the content pane scrolls */}
       <aside className={`flex shrink-0 flex-col border-r border-slate-800 bg-slate-900 ${collapsed ? 'w-14' : 'w-56'}`}>
         <div className="flex items-center justify-between px-3 py-3">
           <NavLink to="/" className="truncate text-sm font-semibold text-slate-100">{collapsed ? 'P&C' : 'P&C Platform'}</NavLink>
@@ -89,7 +89,7 @@ export default function AppLayout({ children }: { children?: ReactNode }) {
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex items-center justify-between border-b border-slate-800 bg-slate-900/60 px-4 py-2 text-xs text-slate-400"><BackButton />{who}</header>
-        <main className="min-w-0 flex-1 p-4">{children ?? <Outlet />}</main>
+        <main className="min-w-0 flex-1 overflow-y-auto p-4">{children ?? <Outlet />}</main>
       </div>
     </div>
   )
