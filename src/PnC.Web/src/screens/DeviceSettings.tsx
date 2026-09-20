@@ -9,7 +9,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getText, proc, view, viewAll, s, ApiError, type Row } from '@/lib/api'
 import { useViewAll } from '@/lib/hooks'
 import { screenPath } from '@/lib/screens'
-import { useTemplateDefs, saveAssetCharacteristic } from '@/components/CharacteristicsPanel'
+import { useTemplateDefs, saveAssetCharacteristic, addFirstWinding } from '@/components/CharacteristicsPanel'
 import { SchemeSourceActions, sourceRoleLabel } from '@/components/SchemeSourceActions'
 import { Panel, Pill, Tabs, Status, Button, inputClass } from '@/components/ui/ui'
 import { DataGrid, type Column } from '@/components/ui/data-grid'
@@ -129,7 +129,7 @@ export function AnalogInputs({ r, revision, canEditAssets = false, canEditScheme
                         const ratio = src.Ratio == null ? NaN : Number(src.Ratio); const path = screenPath('INSTRUMENT_TRANSFORMER', s(src.AssetEntityId))
                         return (
                           <tr key={s(src.MemberEntityId)} className="border-t border-slate-800 align-top">
-                            <td className="py-1 pr-2"><a className="text-sky-300 underline" href={path} onClick={(e) => { e.preventDefault(); navigate(path) }}>{s(src.AssetName)}</a> <span className="text-xs text-slate-500">{s(src.AssetTypeCode)}{src.Phases != null ? ` · ${s(src.Phases) === '1' ? 'single-phase' : `${s(src.Phases)}-phase`}` : ''}</span></td>
+                            <td className="py-1 pr-2"><a className="text-sky-300 underline" href={path} onClick={(e) => { e.preventDefault(); navigate(path) }}>{s(src.AssetName)}</a>{src.WindingCode ? <span className="text-slate-200"> · {s(src.WindingCode)}</span> : <span className="text-xs text-amber-300" title="which secondary winding feeds this input is not recorded"> · winding not said</span>} <span className="text-xs text-slate-500">{s(src.AssetTypeCode)}{src.Phases != null ? ` · ${s(src.Phases) === '1' ? 'single-phase' : `${s(src.Phases)}-phase`}` : ''}</span></td>
                             <td className="py-1 pr-2 text-slate-300">{s(src.RatioInUse) ? `${s(src.RatioInUse)}${Number.isFinite(ratio) ? ` = ${ratio}` : ' (not readable)'}` : 'not recorded'}</td>
                             <td className="py-1 pr-2"><span className="flex flex-wrap gap-1">{src.IsPlaced === false && <Pill tone="neutral" title="nothing says where it stands yet — place it from its page">not placed</Pill>}{src.IsInService === false ? <Pill tone="warn">not in service</Pill> : <Pill tone="good">in service</Pill>}</span></td>
                             <td className="py-1 pr-2 text-xs text-slate-300">{s(src.Notes) || <span className="text-slate-600">—</span>}</td>
@@ -212,10 +212,10 @@ function AddSourceForm({ schemeEntityId, schemeName, inputs, sources, capability
       const a = await proc('asset', 'Asset_Add', { AssetTypeCode: type, Name: (name.trim() || suggested), Status: 'InService' })
       assetId = s(a.EntityId)
       const defs = defsQ.data ?? []
-      const rdef = defs.find((d) => s(d.CharacteristicKey) === 'RatioInUse'); const pdef = defs.find((d) => s(d.CharacteristicKey) === 'Phases')
-      if (ratio.trim() && rdef) await saveAssetCharacteristic(assetId, rdef, ratio.trim())
+      const pdef = defs.find((d) => s(d.CharacteristicKey) === 'Phases')
       if (phases && pdef) await saveAssetCharacteristic(assetId, pdef, phases)
-      await proc('scheme', 'AddSchemeMember', { SchemeEntityId: schemeEntityId, MemberKind: 'Asset', MemberEntityId: assetId, MemberRoleCode: role, IsInService: true, Notes: note.trim() || null, AnalogInputEntityId: inputId })
+      const windingId = await addFirstWinding(assetId, ratio, role === 'SyncVtSource' ? 'Sync' : 'Protection')   // #212: the ratio is the winding's
+      await proc('scheme', 'AddSchemeMember', { SchemeEntityId: schemeEntityId, MemberKind: 'Asset', MemberEntityId: assetId, MemberRoleCode: role, IsInService: true, Notes: note.trim() || null, AnalogInputEntityId: inputId, WindingEntityId: windingId })
       const where = inputs.find((i) => s(i.EntityId) === inputId)
       setMsg({ text: `${name.trim() || suggested} now feeds ${schemeName} on ${where ? s(where.InputCode) : nextCode(inputs, kind)}; it is not placed yet — place it from its page.` })
       setRatio(''); setName(''); setNote(''); setTarget(''); onDone()

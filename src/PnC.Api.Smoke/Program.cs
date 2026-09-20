@@ -1462,11 +1462,9 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
             var (k201_xs, k201_xb) = await Post(admin, "api/v1/asset/PlaceAsset", new { AssetEntityId = k201_ct, NodeEntityId = panel, PlacementKind = "Installed" });
             Must(k201_xs == HttpStatusCode.Conflict && (k201_xb?["detail"]?.ToString() ?? "").Contains("stands in a Yard"), $"#202: a CT at a panel is refused in the owner's words ({(int)k201_xs} {k201_xb?["detail"]})");
             var (k201_ps, k201_pb) = await Post(admin, "api/v1/asset/PlaceAsset", new { AssetEntityId = k201_ct, NodeEntityId = k201_bay, PlacementKind = "Installed" });
-            var (_, k201_defsb) = await Get(admin, $"api/v1/config/vDefinitionVersion?DefinitionEntityId={k201_aux?["DefaultTemplateDefinitionEntityId"]}&Status=Effective&take=1");
-            var k201_ver = (k201_defsb?["rows"] as JsonArray)?.FirstOrDefault()?["RowId"]?.ToString();
-            var (_, k201_cdb) = await Get(admin, $"api/v1/config/vCharacteristicDefinition?DefinitionVersionRowId={k201_ver}&CharacteristicKey=RatioInUse&take=1");
-            var k201_def = (k201_cdb?["rows"] as JsonArray)?.FirstOrDefault()?["RowId"]?.ToString();
-            var (k201_cvs, k201_cvb) = await Post(admin, "api/v1/asset/CharacteristicValue_Add", new { HostEntityId = k201_ct, CharacteristicDefinitionRowId = k201_def, TextValue = "1200:5" });
+            // #212: the ratio is a secondary winding's, not a nameplate characteristic — the fixture CT gets S1 with its 1200:5
+            var (k201_cvs, k201_cvb) = await Post(admin, "api/v1/asset/InstrumentWinding_Add", new { AssetEntityId = k201_ct, WindingNo = 1, Code = "S1", Purpose = "Protection", RatioInUse = "1200:5" });
+            string? k201_def = Id(k201_cvb)?.ToString();
             var (k201_ms, k201_mb) = await Post(admin, "api/v1/scheme/AddSchemeMember", new { SchemeEntityId = scheme, MemberKind = "Asset", MemberEntityId = k201_ct, MemberRoleCode = "CtSource", IsInService = true });
             Must(k201_ys == HttpStatusCode.OK && k201_bs == HttpStatusCode.OK && k201_as == HttpStatusCode.OK && k201_ps == HttpStatusCode.OK && k201_def is not null && k201_cvs == HttpStatusCode.OK && k201_ms == HttpStatusCode.OK,
                 $"#201: a CT made in the fixture's yard with its ratio in use and named the scheme's CT source ({(int)k201_ys} {Code(k201_yb)}; {(int)k201_bs} {Code(k201_bb)}; {(int)k201_as} {Code(k201_ab)}; {(int)k201_ps} {Code(k201_pb)}; def {k201_def?[..8]}; {(int)k201_cvs} {Code(k201_cvb)}; {(int)k201_ms} {Code(k201_mb)} {k201_mb?["detail"]})");
@@ -1594,10 +1592,7 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
             // the second breaker's CT set, paralleled into the same input
             var (k208_as, k208_ab) = await Post(admin, "api/v1/asset/Asset_Add", new { AssetTypeCode = "CT", Name = $"{tag} line CT (TC4 side)", Status = "InService" });
             var k208_ct2 = Id(k208_ab);
-            var (_, k208_tb) = await Get(admin, "api/v1/ref/vAssetType?AssetTypeCode=CT&take=1");
-            var (_, k208_vb) = await Get(admin, $"api/v1/config/vDefinitionVersion?DefinitionEntityId={(k208_tb?["rows"] as JsonArray)?.FirstOrDefault()?["DefaultTemplateDefinitionEntityId"]}&Status=Effective&take=1");
-            var (_, k208_cdb) = await Get(admin, $"api/v1/config/vCharacteristicDefinition?DefinitionVersionRowId={(k208_vb?["rows"] as JsonArray)?.FirstOrDefault()?["RowId"]}&CharacteristicKey=RatioInUse&take=1");
-            var (k208_cvs, _) = await Post(admin, "api/v1/asset/CharacteristicValue_Add", new { HostEntityId = k208_ct2, CharacteristicDefinitionRowId = (k208_cdb?["rows"] as JsonArray)?.FirstOrDefault()?["RowId"]?.ToString(), TextValue = "1200:5" });
+            var (k208_cvs, _) = await Post(admin, "api/v1/asset/InstrumentWinding_Add", new { AssetEntityId = k208_ct2, WindingNo = 1, Code = "S1", Purpose = "Protection", RatioInUse = "1200:5" });   // #212: the ratio is the winding's
             var (k208_ms, k208_mb) = await Post(admin, "api/v1/scheme/AddSchemeMember", new { SchemeEntityId = scheme, MemberKind = "Asset", MemberEntityId = k208_ct2, MemberRoleCode = "CtSource", IsInService = true, AnalogInputEntityId = k208_input, Notes = "the E2103-TC4 breaker side" });
             var (_, k208_s2b) = await Get(admin, $"api/v1/scheme/vSchemeSource?AnalogInputEntityId={k208_input}&take=10");
             var k208_on = (k208_s2b?["rows"] as JsonArray) ?? [];
@@ -1656,6 +1651,38 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
             var (k211_rs, _) = await Post(readOnly!, "api/v1/scheme/AnalogInput_SoftDelete", new { EntityId = k211_in });
             Must(k211_as == HttpStatusCode.OK && k211_row?["SourceCount"]?.GetValue<int>() == 0 && k211_ds == HttpStatusCode.OK && ((k211_l2b?["rows"] as JsonArray) ?? []).Count == 0 && k211_rs == HttpStatusCode.Forbidden,
                 $"#211: an empty input made ({(int)k211_as} {Code(k211_ab)}; {k211_row?["SourceCount"]} sources) and removed ({(int)k211_ds} {Code(k211_db)}; listed {((k211_l2b?["rows"] as JsonArray) ?? []).Count}); ReadOnly may not ({(int)k211_rs})");
+        }
+
+        // ======== #212 (2026-09-20): an instrument transformer's secondary windings are first-class — the owner: "multiple (2, 3, 4 or 5
+        // typically) secondary windings each with its own ratio, name etc., which can be used in various protections … a physical
+        // thing that needs to have a first class place in the database." A membership names the winding it uses; the relay's
+        // setting is judged against that winding's ratio; a winding of another transformer is refused (50273).
+        {
+            var (_, k212_ctb) = await Get(admin, $"api/v1/asset/vInstrumentTransformer?Name={Uri.EscapeDataString($"{tag} line CT (S2 winding)")}&take=1");
+            var k212_ct = Id((k212_ctb?["rows"] as JsonArray)?.FirstOrDefault());
+            var (_, k212_w0b) = await Get(admin, $"api/v1/asset/vTransformerWinding?AssetEntityId={k212_ct}&take=10");
+            var k212_before = ((k212_w0b?["rows"] as JsonArray) ?? []).Count;   // the catch-up seed gave it S1 with its 1200:5
+            var (k212_ws, k212_wb) = await Post(admin, "api/v1/asset/InstrumentWinding_Add", new { AssetEntityId = k212_ct, WindingNo = k212_before + 1, Code = $"S{k212_before + 1}", Purpose = "Protection", RatioTaps = "600:5, 1200:5", RatioInUse = "600:5", AccuracyClass = "C400", RatedSecondary = "5 A" });
+            var k212_s2 = Id(k212_wb);
+            var (_, k212_w1b) = await Get(admin, $"api/v1/asset/vTransformerWinding?AssetEntityId={k212_ct}&take=10");
+            var k212_rows = (k212_w1b?["rows"] as JsonArray) ?? [];
+            var k212_s2row = k212_rows.FirstOrDefault(x => x?["WindingEntityId"]?.ToString()?.Equals(k212_s2?.ToString(), StringComparison.OrdinalIgnoreCase) == true);
+            var (_, k212_sb) = await Get(admin, $"api/v1/scheme/vSchemeSource?AssetEntityId={k212_ct}&take=5");
+            var k212_mem = (k212_sb?["rows"] as JsonArray)?.FirstOrDefault();
+            var (k212_rvs, k212_rvb) = await Post(admin, "api/v1/scheme/SchemeMember_Revise", new { EntityId = k212_mem?["MemberEntityId"], SchemeEntityId = scheme, MemberKind = "Asset", MemberEntityId = k212_ct, MemberRoleCode = "CtSource", IsInService = true, Notes = k212_mem?["Notes"]?.ToString(), AnalogInputEntityId = k212_mem?["AnalogInputEntityId"]?.ToString(), WindingEntityId = k212_s2 });
+            var (_, k212_s2b) = await Get(admin, $"api/v1/scheme/vSchemeSource?AssetEntityId={k212_ct}&take=5");
+            var k212_mem2 = (k212_s2b?["rows"] as JsonArray)?.FirstOrDefault();
+            Must(k212_before >= 1 && k212_ws == HttpStatusCode.OK && k212_rows.Count == k212_before + 1 && Math.Abs((k212_s2row?["Ratio"]?.GetValue<decimal>() ?? 0) - 120m) < 0.01m
+                 && k212_rvs == HttpStatusCode.OK && k212_mem2?["WindingCode"]?.ToString() == $"S{k212_before + 1}" && Math.Abs((k212_mem2?["Ratio"]?.GetValue<decimal>() ?? 0) - 120m) < 0.01m && (k212_s2row?["UseCount"]?.GetValue<int>() ?? -1) == 0,
+                $"#212: the fixture CT had {k212_before} winding(s) from the catch-up; S{k212_before + 1} added ({(int)k212_ws} {Code(k212_wb)}: 600:5 = {k212_s2row?["Ratio"]}, class {k212_s2row?["AccuracyClass"]}); the scheme's membership moved to it ({(int)k212_rvs} {Code(k212_rvb)}: winding {k212_mem2?["WindingCode"]}, ratio {k212_mem2?["Ratio"]})");
+            var (_, k212_ob) = await Get(admin, "api/v1/asset/vTransformerWinding?take=50");
+            var k212_other = ((k212_ob?["rows"] as JsonArray) ?? []).FirstOrDefault(x => x?["AssetEntityId"]?.ToString()?.Equals(k212_ct?.ToString(), StringComparison.OrdinalIgnoreCase) == false)?["WindingEntityId"]?.ToString();
+            var (k212_xs, k212_xb) = await Post(admin, "api/v1/scheme/AddSchemeMember", new { SchemeEntityId = scheme, MemberKind = "Asset", MemberEntityId = k212_ct, MemberRoleCode = "CtSource", IsInService = true, WindingEntityId = k212_other });
+            var (k212_ros, _) = await Post(readOnly!, "api/v1/asset/InstrumentWinding_Add", new { AssetEntityId = k212_ct, WindingNo = 9, Code = "S9" });
+            var (_, k212_w2b) = await Get(admin, $"api/v1/asset/vTransformerWinding?WindingEntityId={k212_s2}&take=1");
+            var k212_used = (k212_w2b?["rows"] as JsonArray)?.FirstOrDefault()?["UsedBy"]?.ToString() ?? "";
+            Must(k212_other is not null && k212_xs == HttpStatusCode.Conflict && (k212_xb?["detail"]?.ToString() ?? "").Contains("not a current secondary winding of this transformer") && k212_ros == HttpStatusCode.Forbidden && k212_used.Contains("Current 1"),
+                $"#212: another transformer's winding is refused in the rule's words ({(int)k212_xs} {k212_xb?["detail"]}); ReadOnly may not add a winding ({(int)k212_ros}); the winding knows what uses it ({k212_used})");
         }
 
         // ======== #187 (2026-09-18): a new relay from its position, its first settings from the template, and the record that

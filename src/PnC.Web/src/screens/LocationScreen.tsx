@@ -39,7 +39,7 @@ import { AssetPicker, modelLabel, useModels } from '@/components/pickers'
 import { workTypes, raiseAndAdvance } from '@/lib/actions'
 import { ClassificationPanel, NODE_KINDS, NodeLink, bit } from './PrimaryAssetScreen'
 import { INSTRUMENT_TRANSFORMER_TYPES } from './InstrumentTransformerScreen'
-import { saveAssetCharacteristic, useTemplateDefs } from '@/components/CharacteristicsPanel'
+import { saveAssetCharacteristic, useTemplateDefs, addFirstWinding } from '@/components/CharacteristicsPanel'
 
 /** #202 (the owner, 2026-09-19): on the transmission network an instrument transformer is a child of the Yard, not of a bay
  * ("later on … bays within buildings … for now, they are in the yards only"); a panel-mounted auxiliary CT or VT stands at a
@@ -862,8 +862,8 @@ function NewInstrumentTransformerForm({ node, onDone }: { node: Row; onDone: () 
       assetId = s(a.EntityId)
       if (serial.trim()) await proc('asset', 'AlternateKey_Add', { SubjectEntityId: assetId, KeyKindCode: 'SerialNumber', KeyValue: serial.trim(), IsPrimaryLabel: true })
       await proc('asset', 'PlaceAsset', { AssetEntityId: assetId, NodeEntityId: node.EntityId, PlacementKind: 'Installed' })
-      const def = (defsQ.data ?? []).find((d) => s(d.CharacteristicKey) === 'RatioInUse')
-      if (ratio.trim() && def) await saveAssetCharacteristic(assetId, def, ratio.trim())
+      await addFirstWinding(assetId, ratio)   // #212: the ratio is the first winding's (S1)
+      const def = true
       const pdef = (defsQ.data ?? []).find((d) => s(d.CharacteristicKey) === 'Phases')
       if (phases && pdef) await saveAssetCharacteristic(assetId, pdef, phases)
       setMsg({ text: `${name.trim()} (${s(chosen.Name)}${ratio.trim() ? ', ' + ratio.trim() : ''}${serial.trim() ? ', serial ' + serial.trim() : ''}) ${s(node.NodeTypeCode) === 'Panel' ? 'is mounted on' : 'stands in'} ${s(node.Name)}.${ratio.trim() && !def ? ' The ratio was not saved: the type names no nameplate template.' : ''}` })

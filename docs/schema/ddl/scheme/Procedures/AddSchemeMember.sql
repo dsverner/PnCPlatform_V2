@@ -16,6 +16,7 @@ CREATE PROCEDURE [scheme].[AddSchemeMember]
     @IsInService BIT = 1,
     @Notes NVARCHAR(MAX) = NULL,
     @AnalogInputEntityId UNIQUEIDENTIFIER = NULL,
+    @WindingEntityId UNIQUEIDENTIFIER = NULL,   -- #212: the source transformer's secondary winding this membership uses
     @ValidFrom DATETIMEOFFSET(7) = NULL,
     @ValidFromQuality TINYINT = 0,
     @ActorId UNIQUEIDENTIFIER = NULL,
@@ -65,8 +66,23 @@ BEGIN
     END
     ELSE SET @AnalogInputEntityId = NULL;   -- only a source feeds an input
 
+    -- #212: the winding used. Given, it must be a current winding of the member asset (50273); given none for a source, the
+    -- asset's lowest-numbered winding is used when it has one (a transformer made from the legacy record has S1).
+    IF @kind IS NOT NULL
+    BEGIN
+        IF @WindingEntityId IS NOT NULL
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM [asset].[InstrumentWinding] WHERE [EntityId] = @WindingEntityId AND [AssetEntityId] = @MemberEntityId AND [ValidTo] IS NULL AND [IsDeleted] = 0)
+                THROW 50273, N'scheme.AddSchemeMember: the winding is not a current secondary winding of this transformer.', 1;
+        END
+        ELSE
+            SELECT TOP (1) @WindingEntityId = [EntityId] FROM [asset].[InstrumentWinding]
+            WHERE [AssetEntityId] = @MemberEntityId AND [ValidTo] IS NULL AND [IsDeleted] = 0 ORDER BY [WindingNo];
+    END
+    ELSE SET @WindingEntityId = NULL;
+
     EXEC [scheme].[SchemeMember_Add] @SchemeEntityId = @SchemeEntityId, @MemberKind = @MemberKind, @MemberEntityId = @MemberEntityId, @MemberRoleCode = @MemberRoleCode,
-         @IsInService = @IsInService, @Notes = @Notes, @AnalogInputEntityId = @AnalogInputEntityId, @ValidFrom = @ValidFrom, @ValidFromQuality = @ValidFromQuality,
+         @IsInService = @IsInService, @Notes = @Notes, @AnalogInputEntityId = @AnalogInputEntityId, @WindingEntityId = @WindingEntityId, @ValidFrom = @ValidFrom, @ValidFromQuality = @ValidFromQuality,
          @ActorId = @ActorId, @MigrationRunId = @MigrationRunId, @EntityId = @EntityId OUTPUT, @RowId = @RowId OUTPUT;
 END;
 GO

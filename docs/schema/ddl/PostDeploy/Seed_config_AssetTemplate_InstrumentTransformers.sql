@@ -75,3 +75,23 @@ BEGIN
 END
 CLOSE c206; DEALLOCATE c206;
 GO
+
+-- #212 (2026-09-20): the ratio, taps, cores, rated secondary, accuracy class, burden and knee point are a WINDING's
+-- (asset.InstrumentWinding), so those keys leave the transformer's nameplate — soft-deleted from whichever version is
+-- Effective (the values already recorded keep their rows; Seed_asset_InstrumentWindings copied the ratio to winding S1);
+-- Phases, PolarityMark and Nameplate stay the transformer's own. Idempotent.
+DECLARE @sys212 UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000001', @cd212 UNIQUEIDENTIFIER;
+DECLARE c212 CURSOR LOCAL FAST_FORWARD FOR
+    SELECT cd.[EntityId] FROM [config].[Definition] d
+    JOIN [config].[DefinitionVersion] v ON v.[DefinitionEntityId] = d.[EntityId] AND v.[IsDeleted] = 0 AND v.[Status] = N'Effective'
+    JOIN [config].[CharacteristicDefinition] cd ON cd.[DefinitionVersionRowId] = v.[RowId] AND cd.[IsDeleted] = 0
+    WHERE d.[DefinitionKind] = N'CharacteristicSchema.AssetTemplate' AND d.[DefinitionKey] IN (N'CT_Template', N'VT_Template') AND d.[IsDeleted] = 0
+      AND cd.[CharacteristicKey] IN (N'RatioInUse', N'RatioTaps', N'Cores', N'RatedSecondary', N'AccuracyClass', N'RatedBurden', N'KneePointVoltage');
+OPEN c212; FETCH NEXT FROM c212 INTO @cd212;
+WHILE @@FETCH_STATUS = 0
+BEGIN
+    EXEC [config].[CharacteristicDefinition_SoftDelete] @EntityId = @cd212, @ActorId = @sys212;
+    FETCH NEXT FROM c212 INTO @cd212;
+END
+CLOSE c212; DEALLOCATE c212;
+GO

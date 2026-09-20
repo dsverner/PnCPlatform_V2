@@ -31,9 +31,10 @@ SELECT a.[EntityId],
        COALESCE(st.[EntityId], fst.[EntityId]) AS [StationNodeEntityId],
        COALESCE(st.[Name], fst.[Name])         AS [StationName],
        CASE WHEN st.[EntityId] IS NOT NULL THEN N'placement' WHEN fst.[EntityId] IS NOT NULL THEN N'scheme' END AS [StationSource],
-       ru.[TextValue]               AS [RatioInUse],
+       COALESCE(wr.[Ratios], ru.[TextValue]) AS [RatioInUse],   -- #212: the windings' ratios in winding order ("1200:5; 600:5"); the old nameplate characteristic as the fallback
        ph.[IntegerValue]            AS [Phases],
        mk.[KeyValue]                AS [MigrationSource],
+       ISNULL(wc.[N], 0)            AS [WindingCount],   -- #212
        feeds.[FeedsSchemes],
        ISNULL(feeds.[FeedsCount], 0) AS [FeedsCount],
        a.[ValidFrom],
@@ -77,6 +78,8 @@ OUTER APPLY (SELECT TOP (1) cv.[IntegerValue] FROM [asset].[CharacteristicValue]
              JOIN [config].[CharacteristicDefinition] cd ON cd.[RowId] = cv.[CharacteristicDefinitionRowId] AND cd.[CharacteristicKey] = N'Phases'
              WHERE cv.[HostEntityId] = a.[EntityId] AND cv.[ValidTo] IS NULL AND cv.[IsDeleted] = 0
              ORDER BY cv.[RowSeq] DESC) ph
+OUTER APPLY (SELECT COUNT(*) AS [N] FROM [asset].[InstrumentWinding] w WHERE w.[AssetEntityId] = a.[EntityId] AND w.[ValidTo] IS NULL AND w.[IsDeleted] = 0) wc
+OUTER APPLY (SELECT STRING_AGG(w.[RatioInUse], N'; ') WITHIN GROUP (ORDER BY w.[WindingNo]) AS [Ratios] FROM [asset].[InstrumentWinding] w WHERE w.[AssetEntityId] = a.[EntityId] AND w.[RatioInUse] IS NOT NULL AND w.[ValidTo] IS NULL AND w.[IsDeleted] = 0) wr
 OUTER APPLY (SELECT COUNT(*) AS [FeedsCount],
                     STRING_AGG(sc.[Name] + N' (' + sm.[MemberRoleCode] + N')', N'; ') WITHIN GROUP (ORDER BY sc.[Name]) AS [FeedsSchemes]
              FROM [scheme].[SchemeMember] sm

@@ -6,6 +6,8 @@
 -- the transformer is placed yet, and the member's Notes (the connection note a person writes) come with each row.
 -- #208 (2026-09-20): the analog input the source feeds (AnalogInputEntityId, InputCode, InputKind) and how many sources feed
 -- that input (ParallelCount: two or more on a current input are paralleled). A source not yet given an input reads NULL.
+-- #212 (2026-09-20): the WINDING the membership uses (WindingEntityId, WindingCode) — the ratio is the winding's when the
+-- membership names one, else the transformer's RatioInUse characteristic (the way before windings existed, kept as the fallback).
 -- Hand-written; base tables in the current-row form (#169).
 CREATE VIEW [scheme].[vSchemeSource] AS
 SELECT sm.[SchemeEntityId],
@@ -16,11 +18,13 @@ SELECT sm.[SchemeEntityId],
        a.[Name]                AS [AssetName],
        a.[AssetTypeCode],
        a.[Status]              AS [AssetStatus],
-       ru.[TextValue]          AS [RatioInUse],
+       COALESCE(w.[RatioInUse], ru.[TextValue]) AS [RatioInUse],
        CASE WHEN r.[Primary] IS NOT NULL AND r.[Secondary] IS NOT NULL AND r.[Secondary] <> 0 THEN r.[Primary] / r.[Secondary] END AS [Ratio],
        ph.[IntegerValue]       AS [Phases],
        CONVERT(BIT, CASE WHEN pl.[NodeEntityId] IS NULL THEN 0 ELSE 1 END) AS [IsPlaced],
        sm.[Notes],
+       sm.[WindingEntityId],
+       w.[Code]                AS [WindingCode],
        sm.[AnalogInputEntityId],
        ai.[InputCode],
        ai.[InputKind],
@@ -28,6 +32,7 @@ SELECT sm.[SchemeEntityId],
 FROM [scheme].[SchemeMember] sm
 JOIN [asset].[Asset] a ON a.[EntityId] = sm.[MemberEntityId] AND a.[ValidTo] IS NULL AND a.[IsDeleted] = 0
 LEFT JOIN [scheme].[AnalogInput] ai ON ai.[EntityId] = sm.[AnalogInputEntityId] AND ai.[ValidTo] IS NULL AND ai.[IsDeleted] = 0
+LEFT JOIN [asset].[InstrumentWinding] w ON w.[EntityId] = sm.[WindingEntityId] AND w.[ValidTo] IS NULL AND w.[IsDeleted] = 0
 OUTER APPLY (SELECT COUNT(*) AS [N] FROM [scheme].[SchemeMember] o
              WHERE o.[AnalogInputEntityId] = sm.[AnalogInputEntityId] AND o.[MemberKind] = N'Asset' AND o.[ValidTo] IS NULL AND o.[IsDeleted] = 0) par
 OUTER APPLY (SELECT TOP (1) cv.[TextValue] FROM [asset].[CharacteristicValue] cv
@@ -43,7 +48,7 @@ OUTER APPLY (SELECT TOP (1) p.[NodeEntityId] FROM [asset].[Placement] p
              ORDER BY p.[RowSeq] DESC) pl
 OUTER APPLY (SELECT TRY_CONVERT(DECIMAL(18,4), LTRIM(RTRIM(LEFT(x.[T], x.[P] - 1))))      AS [Primary],
                     TRY_CONVERT(DECIMAL(18,4), LTRIM(RTRIM(SUBSTRING(x.[T], x.[P] + 1, 40)))) AS [Secondary]
-             FROM (SELECT REPLACE(REPLACE(ru.[TextValue], N'-', N':'), N'/', N':') AS [T]) y
+             FROM (SELECT REPLACE(REPLACE(COALESCE(w.[RatioInUse], ru.[TextValue]), N'-', N':'), N'/', N':') AS [T]) y
              CROSS APPLY (SELECT y.[T], CHARINDEX(N':', y.[T]) AS [P]) x
              WHERE x.[P] > 1) r
 WHERE sm.[MemberKind] = N'Asset' AND sm.[MemberRoleCode] IN (N'CtSource', N'VtSource', N'SyncVtSource')

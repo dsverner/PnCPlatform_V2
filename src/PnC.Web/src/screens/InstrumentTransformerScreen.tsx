@@ -63,6 +63,7 @@ export default function InstrumentTransformerScreen({ params: p, id }: { screen:
         </Panel>
         <WhereItStands r={r} canPlace={editable} canMakeNode={can('Node.Modify')} onChanged={refresh} />
       </div>
+      <Windings r={r} editable={editable} canRemove={can('Asset.Archive') || editable} onChanged={refresh} />
       <Feeds r={r} editable={can('Scheme.Modify')} canRemove={can('Scheme.Archive') || can('Scheme.Modify')} onChanged={refresh} />
       <AssetCharacteristics assetEntityId={s(r.EntityId)} definitionEntityId={template} editable={editable}
         emptyNote={typeQ.isPending ? 'Loading the type…' : `The type ${s(r.AssetTypeCode)} names no nameplate template yet.`} />
@@ -170,13 +171,14 @@ function Feeds({ r, editable, canRemove, onChanged }: { r: Row; editable: boolea
   const schemesQ = useViewAll('scheme', 'vSchemeStation', { StationNodeEntityId: s(r.StationNodeEntityId) }, 'SchemeName', !!r.StationNodeEntityId && editable)
   const roles = rolesFor(s(r.AssetTypeCode))
   const [editing, setEditing] = useState(false)
-  const [scheme, setScheme] = useState(''); const [role, setRole] = useState(roles[0]); const [busy, setBusy] = useState(false); const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null)
+  const [scheme, setScheme] = useState(''); const [role, setRole] = useState(roles[0]); const [winding, setWinding] = useState(''); const [busy, setBusy] = useState(false); const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null)
+  const windingsQ = useViewAll('asset', 'vTransformerWinding', { AssetEntityId: asset }, 'WindingNo', !!asset)
   const rows = feedsQ.data ?? []
   const add = async () => {
     if (!scheme) return
     setBusy(true); setMsg(null)
     try {
-      await proc('scheme', 'AddSchemeMember', { SchemeEntityId: scheme, MemberKind: 'Asset', MemberEntityId: asset, MemberRoleCode: role, IsInService: true })
+      await proc('scheme', 'AddSchemeMember', { SchemeEntityId: scheme, MemberKind: 'Asset', MemberEntityId: asset, MemberRoleCode: role, IsInService: true, WindingEntityId: winding || null })
       setMsg({ text: `${s(r.Name)} now feeds ${s((schemesQ.data ?? []).find((x) => s(x.SchemeEntityId) === scheme)?.SchemeName)} as ${sourceRoleLabel(role)} — on that scheme's first input of the kind, or a new one; the record's Analog inputs tab moves it if it belongs elsewhere.` })
       setScheme(''); onChanged()
     } catch (e) { setMsg({ text: e instanceof ApiError ? e.message : String(e), bad: true }) } finally { setBusy(false) }
@@ -191,7 +193,7 @@ function Feeds({ r, editable, canRemove, onChanged }: { r: Row; editable: boolea
             {rows.map((x) => (
               <tr key={s(x.MemberEntityId)} className="border-t border-slate-800 align-top">
                 <td className="py-1 pr-2"><SchemeName id={s(x.SchemeEntityId)} onOpen={() => navigate(screenPath('SCHEME', s(x.SchemeEntityId)))} /></td>
-                <td className="py-1 pr-2 text-slate-300">{sourceRoleLabel(x.MemberRoleCode)}{x.InputCode ? ` · ${s(x.InputCode)}` : ''}{x.RatioInUse ? <span className="text-xs text-slate-500"> · {s(x.RatioInUse)}{x.Ratio != null ? ` = ${s(x.Ratio)}` : ''}</span> : null}</td>
+                <td className="py-1 pr-2 text-slate-300">{sourceRoleLabel(x.MemberRoleCode)}{x.InputCode ? ` · ${s(x.InputCode)}` : ''}{x.WindingCode ? <span className="text-slate-200"> · winding {s(x.WindingCode)}</span> : <span className="text-xs text-amber-300"> · winding not said</span>}{x.RatioInUse ? <span className="text-xs text-slate-500"> · {s(x.RatioInUse)}{x.Ratio != null ? ` = ${s(x.Ratio)}` : ''}</span> : null}</td>
                 <td className="py-1 pr-2"><span className="flex flex-wrap gap-1">{x.IsInService === false ? <Pill tone="warn">not in service</Pill> : <Pill tone="good">in service</Pill>}{Number(x.ParallelCount ?? 0) >= 2 && <InputPartners inputId={s(x.AnalogInputEntityId)} self={s(r.Name)} />}</span></td>
                 <td className="py-1 pr-2 text-xs text-slate-300">{s(x.Notes) || <span className="text-slate-600">—</span>}</td>
                 {editing && <td className="py-1"><SchemeSourceActions x={x} canModify={editable} canRemove={canRemove} onChanged={onChanged} /></td>}
@@ -207,10 +209,95 @@ function Feeds({ r, editable, canRemove, onChanged }: { r: Row; editable: boolea
             </select></label>
           {roles.length > 1 && <label className="flex flex-col gap-1 text-xs text-slate-400">as
             <select className={`${inputClass} w-40`} value={role} disabled={busy} onChange={(e) => setRole(e.target.value)}>{roles.map((x) => <option key={x} value={x}>{sourceRoleLabel(x)}</option>)}</select></label>}
+          <label className="flex flex-col gap-1 text-xs text-slate-400">using winding
+            <select className={`${inputClass} w-44`} value={winding} disabled={busy} onChange={(e) => setWinding(e.target.value)}>
+              <option value="">{(windingsQ.data ?? []).length ? 'the first (S1)' : 'none recorded yet'}</option>
+              {(windingsQ.data ?? []).map((w) => <option key={s(w.WindingEntityId)} value={s(w.WindingEntityId)}>{s(w.Code)}{w.RatioInUse ? ` · ${s(w.RatioInUse)}` : ''}</option>)}
+            </select></label>
           <Button kind="primary" disabled={busy || !scheme} onClick={() => void add()}>Add as {sourceRoleLabel(role)}</Button>
         </div>)}
       {editing && editable && !r.StationNodeEntityId && <Status>Place the transformer first; the schemes offered are its station's.</Status>}
       {msg && <Status bad={msg.bad}>{msg.text}</Status>}
+    </Panel>
+  )
+}
+
+/** #212: the transformer's SECONDARY WINDINGS — the owner: "most if not all of them come with a single primary connection and
+ * multiple (2, 3, 4 or 5 typically) secondary windings each with its own ratio, name etc., which can be used in various
+ * protections … this is a physical thing that needs to have a first class place in the database." asset.vInstrumentWinding;
+ * two modes (view; Edit windings with an Actions column: edit in place, remove when nothing uses it) and Add a winding.
+ * Writes: asset.InstrumentWinding_Add / _Revise / _SoftDelete (Asset.Modify / Archive). */
+function Windings({ r, editable, canRemove, onChanged }: { r: Row; editable: boolean; canRemove: boolean; onChanged: () => void }) {
+  const asset = s(r.EntityId)
+  const q = useViewAll('asset', 'vTransformerWinding', { AssetEntityId: asset }, 'WindingNo', !!asset)
+  const rows = q.data ?? []
+  const isCurrent = sourceRoleFor(s(r.AssetTypeCode)) === 'CtSource'
+  const [editing, setEditing] = useState(false); const [edit, setEdit] = useState<Record<string, Row>>({}); const [adding, setAdding] = useState(false)
+  const blank = { Code: '', Purpose: 'Protection', RatioTaps: '', RatioInUse: '', AccuracyClass: '', RatedBurden: '', KneePointVoltageV: '', RatedSecondary: '', Connection: '', Notes: '' }
+  const [add, setAdd] = useState<Record<string, string>>({ ...blank })
+  const [busy, setBusy] = useState(false); const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null)
+  const nextNo = Math.max(0, ...rows.map((w) => Number(w.WindingNo ?? 0))) + 1
+  const body = (f: Record<string, unknown>) => ({ AssetEntityId: asset, WindingNo: Number(f.WindingNo), Code: s(f.Code).trim(), Purpose: s(f.Purpose) || null, RatioTaps: s(f.RatioTaps).trim() || null, RatioInUse: s(f.RatioInUse).trim() || null,
+    AccuracyClass: s(f.AccuracyClass).trim() || null, RatedBurden: s(f.RatedBurden).trim() || null, KneePointVoltageV: s(f.KneePointVoltageV).trim() ? Number(f.KneePointVoltageV) : null, RatedSecondary: s(f.RatedSecondary).trim() || null, Connection: s(f.Connection) || null, Notes: s(f.Notes).trim() || null })
+  const run = async (fn: () => Promise<void>, said: string) => { setBusy(true); setMsg(null); try { await fn(); setMsg({ text: said }); onChanged() } catch (e) { setMsg({ text: e instanceof ApiError ? e.message : String(e), bad: true }) } finally { setBusy(false) } }
+  const save = (w: Row) => { const f = edit[s(w.WindingEntityId)]; if (!f) return; if (!s(f.Code).trim()) { setMsg({ text: 'A winding needs its code (S1, 1Y, X).', bad: true }); return }
+    void run(async () => { await proc('asset', 'InstrumentWinding_Revise', { EntityId: w.WindingEntityId, ...body({ ...f, WindingNo: w.WindingNo }) }); setEdit((x) => { const n = { ...x }; delete n[s(w.WindingEntityId)]; return n }) }, `${s(f.Code)} saved.`) }
+  const create = () => { if (!add.Code.trim()) { setMsg({ text: 'A winding needs its code (S1, 1Y, X).', bad: true }); return }
+    void run(async () => { await proc('asset', 'InstrumentWinding_Add', body({ ...add, WindingNo: nextNo })); setAdd({ ...blank }); setAdding(false) }, `${add.Code.trim()} added as winding ${nextNo}.`) }
+  const remove = (w: Row) => void run(async () => { await proc('asset', 'InstrumentWinding_SoftDelete', { EntityId: w.WindingEntityId }) }, `${s(w.Code)} removed.`)
+  const field = (_key: string, val: string, set: (v: string) => void, w = 'w-24', ph = '') => <input className={`${inputClass} ${w}`} value={val} disabled={busy} placeholder={ph} onChange={(e) => set(e.target.value)} />
+  const purposeSel = (val: string, set: (v: string) => void) => <select className={`${inputClass} w-28`} value={val} disabled={busy} onChange={(e) => set(e.target.value)}>{['Protection', 'Metering', 'Sync', 'Spare', 'Other'].map((x) => <option key={x} value={x}>{x}</option>)}</select>
+  const connSel = (val: string, set: (v: string) => void) => <select className={`${inputClass} w-28`} value={val} disabled={busy} onChange={(e) => set(e.target.value)}><option value="">—</option>{['Wye', 'Delta', 'OpenDelta', 'BrokenDelta', 'Single'].map((x) => <option key={x} value={x}>{x}</option>)}</select>
+  return (
+    <Panel title={`Secondary windings · ${q.isPending ? '…' : rows.length}`} actions={editable ? <Button kind={editing ? 'primary' : 'default'} onClick={() => { setEditing(!editing); setAdding(false) }}>{editing ? 'Done' : 'Edit windings'}</Button> : undefined}>
+      {!q.isPending && !rows.length && <Status>No secondary winding is recorded yet.{editable ? ' Edit windings to add the nameplate\'s windings.' : ''}</Status>}
+      {rows.length > 0 && (
+        <table className="w-full table-fixed text-sm">
+          <colgroup><col className="w-[9%]" /><col className="w-[10%]" /><col className="w-[14%]" /><col className="w-[11%]" /><col className="w-[9%]" /><col className="w-[9%]" />{isCurrent && <col className="w-[8%]" />}<col className="w-[8%]" /><col className="w-[9%]" /><col className={editing ? 'w-[6%]' : 'w-[13%]'} />{editing && <col className="w-[7%]" />}</colgroup>
+          <thead><tr className="text-left text-xs uppercase tracking-wide text-slate-500"><th className="py-1 pr-2 font-normal">Winding</th><th className="py-1 pr-2 font-normal">Purpose</th><th className="py-1 pr-2 font-normal">Ratio taps</th><th className="py-1 pr-2 font-normal">Ratio in use</th><th className="py-1 pr-2 font-normal">Class</th><th className="py-1 pr-2 font-normal">Burden</th>{isCurrent && <th className="py-1 pr-2 font-normal">Knee V</th>}<th className="py-1 pr-2 font-normal">Rated sec.</th><th className="py-1 pr-2 font-normal">Connection</th><th className="py-1 pr-2 font-normal">Used by</th>{editing && <th className="py-1 font-normal">Actions</th>}</tr></thead>
+          <tbody>
+            {rows.map((w) => {
+              const id = s(w.WindingEntityId); const f = edit[id]; const g = (k: string) => s(f?.[k] ?? '')
+              const setF = (k: string) => (v: string) => setEdit({ ...edit, [id]: { ...f, [k]: v } })
+              return (
+                <tr key={id} className="border-t border-slate-800 align-top">
+                  <td className="py-1 pr-2 font-semibold text-slate-100">{f ? field('Code', g('Code'), setF('Code'), 'w-16') : <>{s(w.Code)} <span className="text-xs font-normal text-slate-500">#{s(w.WindingNo)}</span></>}</td>
+                  <td className="py-1 pr-2 text-slate-300">{f ? purposeSel(g('Purpose'), setF('Purpose')) : (s(w.Purpose) || '—')}</td>
+                  <td className="py-1 pr-2 text-slate-300">{f ? field('RatioTaps', g('RatioTaps'), setF('RatioTaps'), 'w-full', '600:5, 1200:5') : (s(w.RatioTaps) || '—')}</td>
+                  <td className="py-1 pr-2 text-slate-200">{f ? field('RatioInUse', g('RatioInUse'), setF('RatioInUse'), 'w-24', '1200:5') : <>{s(w.RatioInUse) || '—'}{w.Ratio != null ? <span className="text-xs text-slate-500"> = {Number(w.Ratio)}</span> : null}</>}</td>
+                  <td className="py-1 pr-2 text-slate-300">{f ? field('AccuracyClass', g('AccuracyClass'), setF('AccuracyClass'), 'w-20', 'C400') : (s(w.AccuracyClass) || '—')}</td>
+                  <td className="py-1 pr-2 text-slate-300">{f ? field('RatedBurden', g('RatedBurden'), setF('RatedBurden'), 'w-20') : (s(w.RatedBurden) || '—')}</td>
+                  {isCurrent && <td className="py-1 pr-2 text-slate-300">{f ? field('KneePointVoltageV', g('KneePointVoltageV'), setF('KneePointVoltageV'), 'w-16') : (w.KneePointVoltageV != null ? `${Number(w.KneePointVoltageV)} V` : '—')}</td>}
+                  <td className="py-1 pr-2 text-slate-300">{f ? field('RatedSecondary', g('RatedSecondary'), setF('RatedSecondary'), 'w-16', '5 A') : (s(w.RatedSecondary) || '—')}</td>
+                  <td className="py-1 pr-2 text-slate-300">{f ? connSel(g('Connection'), setF('Connection')) : (s(w.Connection) || '—')}</td>
+                  <td className="py-1 pr-2 text-xs text-slate-300">{w.UsedBy ? s(w.UsedBy) : <span className="text-slate-500">free</span>}</td>
+                  {editing && <td className="py-1"><span className="flex flex-wrap gap-1 text-xs">
+                    {!f && <Button kind="mini" disabled={busy} onClick={() => setEdit({ ...edit, [id]: { Code: w.Code, Purpose: w.Purpose ?? 'Protection', RatioTaps: w.RatioTaps ?? '', RatioInUse: w.RatioInUse ?? '', AccuracyClass: w.AccuracyClass ?? '', RatedBurden: w.RatedBurden ?? '', KneePointVoltageV: w.KneePointVoltageV ?? '', RatedSecondary: w.RatedSecondary ?? '', Connection: w.Connection ?? '', Notes: w.Notes ?? '' } })}>Edit</Button>}
+                    {f && <><Button kind="mini" disabled={busy} onClick={() => save(w)}>Save</Button><Button kind="mini" disabled={busy} onClick={() => setEdit((x) => { const n = { ...x }; delete n[id]; return n })}>Cancel</Button></>}
+                    {canRemove && !f && (Number(w.UseCount ?? 0) === 0 ? <Button kind="mini" disabled={busy} onClick={() => remove(w)}>Remove</Button> : <span className="text-slate-500" title={s(w.UsedBy)}>used — free it first</span>)}
+                  </span></td>}
+                </tr>)
+            })}
+          </tbody>
+        </table>)}
+      {editing && !adding && <div className="mt-2"><Button kind="mini" disabled={busy} onClick={() => setAdding(true)}>Add a winding</Button></div>}
+      {editing && adding && (
+        <div className="mt-2 flex flex-wrap items-end gap-2 border-t border-slate-800 pt-2 text-sm">
+          <span className="text-xs text-slate-400">Winding {nextNo}:</span>
+          <label className="flex flex-col gap-1 text-xs text-slate-400">Code{field('Code', add.Code, (v) => setAdd({ ...add, Code: v }), 'w-16', `S${nextNo}`)}</label>
+          <label className="flex flex-col gap-1 text-xs text-slate-400">Purpose{purposeSel(add.Purpose, (v) => setAdd({ ...add, Purpose: v }))}</label>
+          <label className="flex flex-col gap-1 text-xs text-slate-400">Ratio taps{field('RatioTaps', add.RatioTaps, (v) => setAdd({ ...add, RatioTaps: v }), 'w-40', '600:5, 1200:5')}</label>
+          <label className="flex flex-col gap-1 text-xs text-slate-400">Ratio in use{field('RatioInUse', add.RatioInUse, (v) => setAdd({ ...add, RatioInUse: v }), 'w-24', '1200:5')}</label>
+          <label className="flex flex-col gap-1 text-xs text-slate-400">Class{field('AccuracyClass', add.AccuracyClass, (v) => setAdd({ ...add, AccuracyClass: v }), 'w-20', 'C400')}</label>
+          <label className="flex flex-col gap-1 text-xs text-slate-400">Burden{field('RatedBurden', add.RatedBurden, (v) => setAdd({ ...add, RatedBurden: v }), 'w-20')}</label>
+          {isCurrent && <label className="flex flex-col gap-1 text-xs text-slate-400">Knee V{field('KneePointVoltageV', add.KneePointVoltageV, (v) => setAdd({ ...add, KneePointVoltageV: v }), 'w-16')}</label>}
+          <label className="flex flex-col gap-1 text-xs text-slate-400">Rated sec.{field('RatedSecondary', add.RatedSecondary, (v) => setAdd({ ...add, RatedSecondary: v }), 'w-16', '5 A')}</label>
+          <label className="flex flex-col gap-1 text-xs text-slate-400">Connection{connSel(add.Connection, (v) => setAdd({ ...add, Connection: v }))}</label>
+          <Button kind="primary" disabled={busy} onClick={() => create()}>Add</Button>
+          <Button disabled={busy} onClick={() => setAdding(false)}>Cancel</Button>
+        </div>)}
+      {msg && <Status bad={msg.bad}>{msg.text}</Status>}
+      <Status>Each secondary winding has its own ratio, class and burden and feeds its own circuit; a scheme names the winding it uses (Feeds, below), and the relay's ratio setting is checked against that winding. The taps are kept as text until the cabling phase gives them terminals.</Status>
     </Panel>
   )
 }

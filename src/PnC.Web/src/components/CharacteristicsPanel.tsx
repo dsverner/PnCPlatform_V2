@@ -78,3 +78,9 @@ export function AssetCharacteristics({ assetEntityId, definitionEntityId, editab
     </div>
   )
 }
+
+/** #212: a new instrument transformer's first secondary winding, S1, carrying the ratio typed — the winding is where a ratio lives now. */
+export async function addFirstWinding(assetEntityId: string, ratioInUse: string, purpose: 'Protection' | 'Metering' | 'Sync' = 'Protection'): Promise<string> {
+  const w = await proc('asset', 'InstrumentWinding_Add', { AssetEntityId: assetEntityId, WindingNo: 1, Code: 'S1', Purpose: purpose, RatioInUse: ratioInUse.trim() || null })
+  return s(w.EntityId)
+}

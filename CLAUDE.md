@@ -97,6 +97,14 @@ Carried forward from the predecessor, after a run of avoidable mistakes there.
 - **Work in small increments.** Build one thing, show the end state, then continue.
 - **Re-check every figure against its source before writing it down.** One row count was wrong
   once in this project's history and was caught only by re-querying.
+- **Look for where the model is thinner than the plant, and say so.** Owner, 2026-09-20: instrument transformers "typically
+  do have multiple secondaries that need to be handled … bring these types of deficiencies up to me in our conversations."
+  The phases build towards one platform holding the primary system, the secondary system "right from the secondary CT
+  winding used, to the cabling, to the panels, devices", the DC and telecom systems, the 61850 network, maintenance and
+  compliance; "build our early phases such that the later phases are an addition as opposed to a complete redesign." So
+  when modelling any P&C thing, ask what the physical object really is (windings, cores, taps, phases as units, terminals,
+  cables, DC feeds) and whether the entity built now blocks that later — and raise it, with a recommendation, in the reply
+  and the plan. Never add it silently.
 - **A migration decision is a rule, never a hand edit.** Owner, 2026-09-19: the real cutover replays every decision on
   the client's verified copy of the legacy database. A decision about migrated data goes into `legacy_import.py` (a
   counted `self.rule`) or a PostDeploy seed carrying a `-- migration-rule:` line; a hand edit on DEV or QA is recorded in
