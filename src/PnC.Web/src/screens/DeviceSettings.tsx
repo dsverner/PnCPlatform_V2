@@ -66,7 +66,7 @@ export function AnalogInputs({ r, revision, canEditAssets = false, canEditScheme
   const parsedQ = useViewAll('document', 'vParsedSettingNamed', { ConfigurationFileRevisionRowId: revision }, 'DisplayOrder')
   const values = useMemo(() => new Map((parsedQ.data ?? []).map((p) => [s(p.SettingCode), p])), [parsedQ.data])
   const hasScheme = !!r.SchemeEntityId; const schemeId = s(r.SchemeEntityId); const schemeName = s(r.SchemeName) || 'the scheme'
-  const deviceName = s(r.ModelCode) || s(r.ModelName) || 'this relay'
+  const deviceName = s(r.ModelName).replace(/\s*\(legacy label [^)]*\)\s*$/i, '').trim() || s(r.ModelCode) || 'this relay'   // the short model name (owner, 2026-09-20): the legacy label stays in the record's header
   const sourcesQ = useViewAll('scheme', 'vSchemeSource', { SchemeEntityId: schemeId }, 'AssetName', hasScheme)
   const inputsQ = useViewAll('scheme', 'vSchemeInput', { SchemeEntityId: schemeId }, 'InputCode', hasScheme)
   const sources = sourcesQ.data ?? []; const inputs = useMemo(() => sortInputs(inputsQ.data ?? []), [inputsQ.data])
@@ -120,7 +120,9 @@ export function AnalogInputs({ r, revision, canEditAssets = false, canEditScheme
                   {!!input.Notes && <span className="text-xs text-slate-300">— {s(input.Notes)}</span>}
                 </div>
                 {mine.length > 0 && (
-                  <table className="mt-1 w-full text-sm">
+                  <table className="mt-1 w-full table-fixed text-sm">
+                    {/* fixed widths so the columns line up from one input to the next (owner, 2026-09-20) */}
+                    <colgroup><col className="w-[28%]" /><col className="w-[14%]" /><col className="w-[16%]" /><col className={editing ? 'w-[18%]' : 'w-[42%]'} />{editing && <col className="w-[24%]" />}</colgroup>
                     <thead><tr className="text-left text-xs uppercase tracking-wide text-slate-500"><th className="py-1 pr-2 font-normal">Transformer</th><th className="py-1 pr-2 font-normal">Ratio</th><th className="py-1 pr-2 font-normal">Status</th><th className="py-1 pr-2 font-normal">Note</th>{editing && <th className="py-1 font-normal">Actions</th>}</tr></thead>
                     <tbody>
                       {mine.map((src) => {
