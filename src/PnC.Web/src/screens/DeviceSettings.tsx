@@ -114,7 +114,7 @@ function AddSourceForm({ schemeEntityId, schemeName, onDone }: { schemeEntityId:
   const chosen = types.find((t) => s(t.AssetTypeCode) === type)
   const defsQ = useTemplateDefs(s(chosen?.DefaultTemplateDefinitionEntityId))
   const roles = type === 'CT' ? ['CtSource'] : ['VtSource', 'SyncVtSource']
-  const pickType = (code: string) => { setType(code); const rs = code === 'CT' ? ['CtSource'] : ['VtSource', 'SyncVtSource']; if (!rs.includes(role)) setRole(rs[0]); if (code !== 'CT' && role === 'SyncVtSource') setPhases('1') }
+  const pickType = (code: string) => { setType(code); const rs = code === 'CT' ? ['CtSource'] : ['VtSource', 'SyncVtSource']; if (!rs.includes(role)) setRole(rs[0]); if (code === 'CCPD' || (code !== 'CT' && role === 'SyncVtSource')) setPhases('1') }   // #207: the S&C potential device is single-phase (the bank neutral)
   const pickRole = (x: string) => { setRole(x); if (x === 'SyncVtSource') setPhases('1') }
   const suggested = `${schemeName} ${type === 'CT' ? 'CTs' : role === 'SyncVtSource' ? 'sync PT' : 'PTs'}${ratio.trim() ? ' ' + ratio.trim() : ''}`
   const make = async () => {
