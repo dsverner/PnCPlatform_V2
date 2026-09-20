@@ -10,7 +10,7 @@ Checks:
   - the definition procedures (AddDefinition → version → characteristic → approve; segregation)
   - the applies-to resolver: default, specific match, overlay, tie → error
 """
-import argparse, os, shutil, subprocess, sys, uuid, datetime, json, random, time
+import argparse, os, shutil, subprocess, sys, uuid, datetime, json, random, time, re
 # the messages carry arrows and ellipses; a redirected stdout on Windows defaults to cp1252 and would abort the run (found 2026-09-13)
 for _stream in (sys.stdout, sys.stderr):
     try: _stream.reconfigure(encoding='utf-8', errors='replace')
@@ -65,6 +65,26 @@ def main():
     cur = con.cursor()
     q = lambda s, *p: cur.execute(s, *p).fetchall()
     import formula as FG          # FORMULA-GRAMMAR.md: the canonical form the engine is given
+
+    # 2026-09-20 (#209): a run that fails before its cleanup leaves its fixtures ACTIVE — the owner met the voltage class
+    # r_a45729 (69 kV) of the 2026-09-19 09:14 run in a transformer's voltage-class list, and seven smoke asset types, a
+    # model and a manufacturer of earlier runs were active with it. So every run first retires what an earlier run left,
+    # by the smoke's own code shapes only (the throw-away codes are "<w>_<6 hex>", "smoke_<wave>_<6 hex>"), attributed to
+    # the system actor; the audit rows stay. Real reference data never carries these shapes.
+    swept = 0
+    for (code,) in q("SELECT VoltageClassCode FROM ref.vVoltageClass"):
+        if re.fullmatch(r"[4r]_[0-9a-f]{6}", code or ""):
+            cur.execute("EXEC ref.VoltageClass_Deactivate @VoltageClassCode=?, @ActorId=?", code, SYSTEM_ACTOR); swept += 1
+    for (code,) in q("SELECT AssetTypeCode FROM ref.vAssetType"):
+        if re.match(r"smoke_", code or ""):
+            cur.execute("EXEC ref.AssetType_Deactivate @AssetTypeCode=?, @ActorId=?", code, SYSTEM_ACTOR); swept += 1
+    for (mid, code) in q("SELECT ModelId, ModelCode FROM ref.vModel"):
+        if re.match(r"smoke_", code or ""):
+            cur.execute("EXEC ref.Model_Deactivate @ModelId=?, @ActorId=?", mid, SYSTEM_ACTOR); swept += 1
+    for (mid, code) in q("SELECT ManufacturerId, ShortCode FROM ref.vManufacturer"):
+        if re.fullmatch(r"[4r]_[0-9a-f]{6}", code or ""):
+            cur.execute("EXEC ref.Manufacturer_Deactivate @ManufacturerId=?, @ActorId=?", mid, SYSTEM_ACTOR); swept += 1
+    if swept: print(f"     swept {swept} fixture(s) an earlier run left active")
 
     # The compliance engine left the database on 2026-09-10 (.planning/CALCULATION-ENGINE-DESIGN.md §6),
     # so the checks below drive it through src/PnC.Engine.Cli instead of EXEC-ing a procedure. Every

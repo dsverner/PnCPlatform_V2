@@ -16,13 +16,19 @@
     {
       "date": "2026-09-19",
       "what": "#194: the eight legacy classification segments stripped from the 11,549 migrated record summaries on DEV",
-      "why": "the copy made to look as the importer now makes it \u2014 an application of rule #194, recorded in RECONCILIATION-2026-09-19-DEV-194.md",
+      "why": "the copy made to look as the importer now makes it — an application of rule #194, recorded in RECONCILIATION-2026-09-19-DEV-194.md",
       "rule": true
     },
     {
       "date": "2026-09-19",
       "what": "#195: 75 CIP impact ratings on API-smoke fixture stations and buildings (W4_...) withdrawn (empty value through asset.RecordClassification, audited)",
       "why": "fixture cleanup; the smoke now withdraws its own and a station is refused",
+      "rule": false
+    },
+    {
+      "date": "2026-09-20",
+      "what": "#209: smoke debris retired on DEV — the voltage class r_a45729 (69 kV), seven asset types smoke_w2_/w3r_/w4r_*, the model smoke_w4r_a45729-M and the manufacturer r_a45729, all left active by schema-smoke runs that failed before their cleanup; deactivated (soft) as the system actor",
+      "why": "the owner met r_a45729 in a transformer's voltage-class list; not migrated data — test fixtures. The schema smoke now sweeps such leftovers at the start of every run, so this is not needed again",
       "rule": false
     }
   ]
