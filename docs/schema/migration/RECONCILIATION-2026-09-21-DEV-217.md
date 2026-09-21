@@ -1,6 +1,6 @@
 # Reconciliation — dbRelayManagement_Legacy → PnCPlatform_V2_DEV — 2026-09-21
 
-Run `48CFA7D0-C1FD-4121-A948-16809E5CE20E` · 605 procedure calls · 445 s · limit none
+Run `D4F31998-30F8-4EE3-8B4E-03901B8FA5B6` · 46602 procedure calls · 1045 s · limit none
 
 ## Source totals
 
@@ -51,13 +51,17 @@ Sum: 48,702 (the gate: 14 211 + 8 409 + 8 409 + 8 408 + 8 408 + 825 + 32 = 48 70
 | Users → personnel.Person | 32 |
 | a Word file not named by the rotation → not loaded | 84 |
 | a Word lock file or recovery copy → skipped | 556 |
+| a change-request document whose folder is not its revision's station → loaded onto that revision, flagged | 100 |
+| a document in a folder that names no legacy location → not loaded | 105 |
 | a document whose change request belongs to a dropped D record → not loaded (R-06) | 1,190 |
-| a document whose number and change request match no revision → not loaded | 578 |
-| a document whose number has no legacy row → not loaded | 84 |
+| a document whose number and change request match no revision → not loaded | 555 |
+| a document whose number has no legacy row → not loaded | 23 |
 | a relay setting file beside the documents → skipped (not a document) | 387 |
-| a rotation-named document → the rationale of the revision with its number and change request | 3,528 |
-| an A document whose base has no A revision → not loaded | 90 |
-| an A document → the rationale of the base's in-service revision | 3,361 |
+| a rotation-named document → the rationale of the revision with its number and change request | 3,427 |
+| an A document whose folder holds no row of its number → not loaded, flagged | 224 |
+| an A document whose folder holds only a dropped record of its number → not loaded (R-06) | 34 |
+| an A document whose number now serves elsewhere → the last superseded revision of the number at the folder's station (the retired device's record) | 12 |
+| an A document → the in-service revision of its number at the folder's station | 3,161 |
 | base number → DevicePosition + Asset (+ Device, Installed) | 6,839 |
 | base number → member of its equipment group (asset + protection functions) | 6,839 |
 | chain where an archived CR exceeds the active CR → a finding (#59) | 18 |
@@ -66,8 +70,7 @@ Sum: 48,702 (the gate: 14 211 + 8 409 + 8 409 + 8 408 + 8 408 + 825 + 32 = 48 70
 | row of a base with no LOCATION/EQUIPMENT panel: counted, not written | 8 |
 | station created / confirmed | 232 |
 | station placed under the owner's marked division (card A) | 231 |
-| the same document in two station folders, identical → loaded once | 31 |
-| the same name with different content in two folders → both loaded, flagged | 85 |
+| the same document filed twice for one revision → loaded once | 44 |
 
 ### SETTINGS arithmetic
 
@@ -79,9 +82,9 @@ A 5,530 + M 350 + P 5,684 + control-switch rows 277 + D 2,360 + 2440 2 + no-pane
 |---|---:|---:|
 | `asset.Asset` | 0 | 331 |
 | `document.ConfigurationFile` | 0 | 11,563 |
-| `document.Document` | 85 | 0 |
-| `document.File` | 85 | 6,773 |
-| `document.RevisionLink` | 85 | 0 |
+| `document.Document` | 6,656 | 0 |
+| `document.File` | 6,656 | 0 |
+| `document.RevisionLink` | 6,656 | 0 |
 | `location.AlternateKey` | 0 | 225 |
 | `location.Node` | 0 | 9,072 |
 | `personnel.Person` | 0 | 32 |
@@ -102,7 +105,8 @@ A 5,530 + M 350 + P 5,684 + control-switch rows 277 + D 2,360 + 2440 2 + no-pane
 | `LandingNotRepaired` | 165 | P0007 P0007/3195512: landed earlier under other track states; a landed run is not re-shaped; P0007 P0007/3212924: landed earlier under other track states; a landed run is not re-shaped; P0028 P0028/3195968: landed earlier under other track states; a landed run is not re-shaped; P0028 P0028/3217685:  |
 | `NoTrackRows` | 6,721 | A0001 A0001/3: no legacy track row anywhere; landed complete with both tracks NA (#164); A0002 A0002/2144042: no legacy track row anywhere; landed complete with both tracks NA (#164); P0003 P0003/7268134: no legacy track row anywhere; landed complete with both tracks NA (#164); A0004 A0004/6793753:  |
 | `PrefixLowerCase` | 9 | a0193 a0193/686: the state prefix is lower case; read as A; a0547 a0547/953: the state prefix is lower case; read as A; a0566 a0566/1027: the state prefix is lower case; read as A; a0635 a0635/6594: the state prefix is lower case; read as A; a1236 a1236/5466: the state prefix is lower case; read as  |
-| `RationaleAmbiguous` | 85 | A0072.doc A0072.doc: different content in Great Falls Plant and Iroquois Terminal; both loaded; a0006.doc a0006.doc: different content in Eel River Term 138 and Iroquois Terminal; both loaded; A0025.doc A0025.doc: different content in Eel River Term 138 and Keswick Terminal; both loaded; A0827.DOC A |
+| `RationaleFolderMismatch` | 324 | M5316_3558170.doc Edmundston Terminal/M5316_3558170.doc: the revision with this number and change request is at Grand Lake Terminal; loaded there, the folder disagrees; M5430_5303515.doc Edmundston Terminal/M5430_5303515.doc: the revision with this number and change request is at Eel River Term 230; |
+| `RationaleFolderUnknown` | 6 | Grand Lake Plant Grand Lake Plant: the folder names no legacy location; its documents are not loaded; Grand Lake Unit 8 Grand Lake Unit 8: the folder names no legacy location; its documents are not loaded; Great Falls Plant Great Falls Plant: the folder names no legacy location; its documents are no |
 | `RequestNoHeader` | 5,600 | 3 CR 3: no Settings Management row; work type SETTINGS_CHANGE assumed; 7268134 CR 7268134: no Settings Management row; work type SETTINGS_CHANGE assumed; 7759879 CR 7759879: no Settings Management row; work type SETTINGS_CHANGE assumed; 6793753 CR 6793753: no Settings Management row; work type SETTI |
 | `RequestTypeUnknown` | 32 | 9177900 CR 9177900: type None; work type SETTINGS_CHANGE assumed; 7992075 CR 7992075: type None; work type SETTINGS_CHANGE assumed; 8840935 CR 8840935: type None; work type SETTINGS_CHANGE assumed; 5834222 CR 5834222: type 'add Order'; work type SETTINGS_CHANGE assumed; 6228376 CR 6228376: type 'add |
 | `RequesterNotAUser` | 1,706 | 4193909 CR 4193909: requested by 'David LeBlanc', not in Users; 4198934 CR 4198934: requested by 'David LeBlanc', not in Users; 8074893 CR 8074893: requested by 'David LeBlanc', not in Users; 8078994 CR 8078994: requested by 'David LeBlanc', not in Users; 8078592 CR 8078592: requested by 'David LeBl |

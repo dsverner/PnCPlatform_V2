@@ -766,9 +766,12 @@ class Importer:
         updated past the revision they are on — from the next change the rationale is the structured one the application makes.
         Each becomes a Document of class Rationale + one Issued revision holding the file as filed + a RevisionLink About the
         configuration-file revision it belongs to (SubjectKind DocumentRevision, the settings revision's RowId). The revision is found
-        by NUMBER and CHANGE REQUEST through the provenance key Revision:<L><number>|<CR>, any letter: measured on the folder, an M
+        by NUMBER and CHANGE REQUEST through the provenance key Revision:<L><number>|<CR>, any letter (the change request is unique;
+        a folder that disagrees is flagged): measured on the folder, an M
         file's CR often belongs to the P row the change became (the copy predates the rename), so the file's letter is the document's
-        state when copied, not the revision's identity. An A file (no CR) is the base's single A row. Idempotent by the bytes' hash."""
+        state when copied, not the revision's identity. An A file (no CR) is placed by NUMBER AND STATION — the folder is the device's
+        terminal station and a number is reused after retirement (owner, 2026-09-21) — the A row at the folder's station, else the retired
+        device's last P row there, else not loaded. Idempotent by the bytes' hash, keyed by folder and name."""
         if not self.docs:
             self.log("rationale documents: no --docs folder given; nothing loaded"); return
         cls = self.run.one("SELECT EntityId FROM config.vDefinition WHERE DefinitionKind = N'CharacteristicSchema.DocumentClass' AND DefinitionKey = N'Rationale'")
@@ -780,18 +783,37 @@ class Importer:
         for key, rid in rev_by_key.items():
             oldno, cr = key.split(":", 1)[1].split("|"); by_num_cr[(oldno[1:5], cr)].append((oldno[0], rid))
             if oldno[0] == "A": a_by_num[oldno[1:5]] = rid
-        legacy_nums = {r[0].strip()[1:5]: None for r in self.src_rows("SELECT OLD_NO FROM dbo.SETTINGS")}
-        d_crs = {(r[0].strip()[1:5], str(r[1])) for r in self.src_rows("SELECT OLD_NO, [Change Request ID] FROM dbo.SETTINGS WHERE LEFT(OLD_NO,1) NOT IN ('A','M','P')")}
+        # every legacy row of a number with its station: the owner, 2026-09-21 — "the folder should have lined up with the terminal station
+        # in all cases … numbers are reused after retirement", so a number alone names no device; a file is placed by number AND station
+        rows_by_num = defaultdict(list); loc_of = {}
+        for oldno, loc, cr in self.src_rows("SELECT OLD_NO, LOCATION, [Change Request ID] FROM dbo.SETTINGS"):
+            oldno, loc, cr = oldno.strip(), (loc or "").strip().upper(), str(cr)
+            rows_by_num[oldno[1:5]].append((oldno[0], loc, cr)); loc_of[(oldno[0], oldno[1:5], cr)] = loc
+        d_crs = {(num, r[2]) for num, rs in rows_by_num.items() for r in rs if r[0] not in "AMP"}
+        def norm(s): return re.sub(r"[^A-Z0-9]", "", s.upper().replace("TERMINAL", "TERM").replace("SUBSTATION", "SUB").replace("STATION", "STN"))
+        loc_by_norm = {}
+        for loc in sorted({r[1] for rs in rows_by_num.values() for r in rs}): loc_by_norm.setdefault(norm(loc), loc)
+        def folder_location(folder):
+            n = norm(folder)
+            if n in loc_by_norm: return loc_by_norm[n]
+            cands = [l for k, l in loc_by_norm.items() if k.startswith(n) or n.startswith(k)]
+            return cands[0] if len(cands) == 1 else None
+        # (revision, hash) pairs already placed by this rule, so one file filed twice for one revision is loaded once
+        placed = {(str(a).upper(), bytes(b)) for a, b in self.run.rows("""SELECT l.SubjectEntityId, f.Sha256 FROM migration.vProvenance p
+            JOIN document.vRevisionLink l ON l.RowId = p.TargetRowId JOIN document.vFile f ON f.RevisionRowId = l.RevisionRowId
+            WHERE p.TargetSchema = 'document' AND p.TargetTable = 'RevisionLink' AND p.SourceKey LIKE 'RationaleLink:%'""")}
         pat = re.compile(r"^([AMP])(\d{4})(?:_(\d+))?\.(docx?)$", re.I)
         mime = {"doc": "application/msword", "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"}
-        seen = {}   # lower name → (sha, path): the same name in two folders
         loaded = 0
         for station in sorted(os.listdir(self.docs)):
             folder = os.path.join(self.docs, station)
             if not os.path.isdir(folder): continue
-            for name in sorted(os.listdir(folder)):
+            floc = folder_location(station)
+            names = sorted(n for n in os.listdir(folder) if os.path.isfile(os.path.join(folder, n)))
+            if floc is None and any(pat.match(n) for n in names):
+                self.run.flag("RationaleFolderUnknown", f"{station}: the folder names no legacy location; its documents are not loaded", station)
+            for name in names:
                 path = os.path.join(folder, name)
-                if not os.path.isfile(path): continue
                 low = name.lower()
                 if low.startswith("~$") or "autorecovered" in low:
                     self.rule("a Word lock file or recovery copy → skipped", f"{station}/{name}"); continue
@@ -801,8 +823,11 @@ class Importer:
                     else: self.rule("a relay setting file beside the documents → skipped (not a document)", f"{station}/{name}")
                     continue
                 letter, num, cr, ext = m.group(1).upper(), m.group(2), m.group(3), m.group(4).lower()
-                if num not in legacy_nums:
+                if floc is None:
+                    self.rule("a document in a folder that names no legacy location → not loaded", f"{station}/{name}"); continue
+                if num not in rows_by_num:
                     self.rule("a document whose number has no legacy row → not loaded", f"{station}/{name}"); continue
+                note = None
                 if cr:
                     hits = by_num_cr.get((num, cr), [])
                     if not hits:
@@ -810,33 +835,44 @@ class Importer:
                         else: self.rule("a document whose number and change request match no revision → not loaded", f"{station}/{name}")
                         continue
                     hit = next((h for h in hits if h[0] == letter), hits[0])
-                    rev, note = hit[1], (None if hit[0] == letter else f"the file is lettered {letter}; the revision with this number and change request is the {hit[0]} row")
-                    self.rule("a rotation-named document → the rationale of the revision with its number and change request", f"{station}/{name}")
+                    rev, rloc = hit[1], loc_of.get((hit[0], num, cr), "")
+                    if hit[0] != letter: note = f"the file is lettered {letter}; the revision with this number and change request is the {hit[0]} row"
+                    if rloc != floc:
+                        # the change request is unique and agrees with the number; only the folder disagrees — loaded onto that revision and
+                        # flagged for a person (owner, 2026-09-21: "load and flag")
+                        self.run.flag("RationaleFolderMismatch", f"{station}/{name}: the revision with this number and change request is at {rloc.title()}; loaded there, the folder disagrees", name)
+                        note = (note + "; " if note else "") + f"filed under {station}; the revision is at {rloc.title()}"
+                        self.rule("a change-request document whose folder is not its revision's station → loaded onto that revision, flagged", f"{station}/{name}")
+                    else:
+                        self.rule("a rotation-named document → the rationale of the revision with its number and change request", f"{station}/{name}")
                 else:
-                    rev = a_by_num.get(num)
-                    if not rev:
-                        self.rule("an A document whose base has no A revision → not loaded", f"{station}/{name}"); continue
-                    note = None
-                    self.rule("an A document → the rationale of the base's in-service revision", f"{station}/{name}")
+                    here = [r for r in rows_by_num[num] if r[1] == floc]
+                    p_here = sorted([r for r in here if r[0] == "P" and rev_by_key.get(f"Revision:P{num}|{r[2]}")], key=lambda r: int(r[2]) if r[2].isdigit() else -1)
+                    if any(r[0] == "A" for r in here) and a_by_num.get(num):
+                        rev = a_by_num[num]
+                        self.rule("an A document → the in-service revision of its number at the folder's station", f"{station}/{name}")
+                    elif p_here:
+                        # the number now serves another device elsewhere (reused after retirement); the folder's device is the one whose last
+                        # record is the latest superseded row at this station — the chain orders by change request (§5)
+                        rev = rev_by_key[f"Revision:P{num}|{p_here[-1][2]}"]
+                        a_loc = next((r[1] for r in rows_by_num[num] if r[0] == "A"), None)
+                        note = f"the number's in-service row is {('at ' + a_loc.title()) if a_loc else 'gone'}; this is the retired device's last record at {station} (P{num}, change request {p_here[-1][2]})"
+                        self.rule("an A document whose number now serves elsewhere → the last superseded revision of the number at the folder's station (the retired device's record)", f"{station}/{name}")
+                    elif here:
+                        self.rule("an A document whose folder holds only a dropped record of its number → not loaded (R-06)", f"{station}/{name}"); continue
+                    else:
+                        self.run.flag("RationaleFolderMismatch", f"{station}/{name}: no legacy row of number {num} at {floc.title()}; not loaded", name)
+                        self.rule("an A document whose folder holds no row of its number → not loaded, flagged", f"{station}/{name}"); continue
                 data = open(path, "rb").read()
                 sha = hashlib.sha256(data).digest()
-                key = f"RationaleFile:{low}"
-                if low in seen:
-                    if seen[low][0] == sha:
-                        self.rule("the same document in two station folders, identical → loaded once", f"{station}/{name}"); continue
-                    # the same name with different content: the folder is trusted for nothing (2,199 files sit in a folder that is not
-                    # their number's location), so BOTH are loaded against the revision the name says, the later copy titled with its folder, and a
-                    # person decides which is the rationale — flagged so the reconciliation names every pair
-                    self.run.flag("RationaleAmbiguous", f"{name}: different content in {seen[low][1]} and {station}; both loaded", name)
-                    self.rule("the same name with different content in two folders → both loaded, flagged", f"{station}/{name}")
-                    key = f"RationaleFile:{low}@{station.strip().lower()}"
-                else:
-                    seen[low] = (sha, station)
+                key = f"RationaleFile:{station.strip().lower()}/{low}"
                 if self.run.already_loaded("document", "File", key, sha):
                     continue
                 if self.run.existing_row("document", "File", key):
-                    self.run.flag("RationaleChanged", f"{name}: the bytes differ from the file loaded earlier; the earlier file stands", name); continue
-                (doc,) = self.run.exec("document.Document_Add", outputs=[("EntityId", "UNIQUEIDENTIFIER")], DocumentClassDefinitionEntityId=cls, Title=(name if "@" not in key else f"{name} ({station})")[:200],
+                    self.run.flag("RationaleChanged", f"{station}/{name}: the bytes differ from the file loaded earlier; the earlier file stands", name); continue
+                if (str(rev).upper(), sha) in placed:
+                    self.rule("the same document filed twice for one revision → loaded once", f"{station}/{name}"); continue
+                (doc,) = self.run.exec("document.Document_Add", outputs=[("EntityId", "UNIQUEIDENTIFIER")], DocumentClassDefinitionEntityId=cls, Title=name[:200],
                                        Description=f"Legacy rationale document as filed (#217): {station}\\{name}" + (f"; {note}" if note else ""), ValidFrom=capture_at())
                 (drow,) = self.run.exec("document.Revision_Add", outputs=[("RowId", "UNIQUEIDENTIFIER")], DocumentEntityId=str(doc), RevisionLabel="1", Status="Issued",
                                         IssuedAt=capture_at(), ChangeNote="as filed in the legacy document folder", ValidFrom=capture_at())
@@ -852,6 +888,7 @@ class Importer:
                 self.run.provenance("document", "Document", key, sha, entity_id=str(doc), row_id=str(drow), notes=note)
                 self.run.provenance("document", "File", key, sha, entity_id=str(fent), row_id=str(frow))
                 self.run.provenance("document", "RevisionLink", "RationaleLink:" + key[len("RationaleFile:"):], sha, row_id=str(lrow))
+                placed.add((str(rev).upper(), sha))
                 loaded += 1
         self.log(f"rationale documents loaded: {loaded}")
 

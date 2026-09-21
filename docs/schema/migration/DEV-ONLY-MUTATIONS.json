@@ -30,6 +30,12 @@
       "what": "#209: smoke debris retired on DEV — the voltage class r_a45729 (69 kV), seven asset types smoke_w2_/w3r_/w4r_*, the model smoke_w4r_a45729-M and the manufacturer r_a45729, all left active by schema-smoke runs that failed before their cleanup; deactivated (soft) as the system actor",
       "why": "the owner met r_a45729 in a transformer's voltage-class list; not migrated data — test fixtures. The schema smoke now sweeps such leftovers at the start of every run, so this is not needed again",
       "rule": false
+    },
+    {
+      "date": "2026-09-21",
+      "what": "#217: the 6,858 rationale documents placed by the first form of the rule (by number alone; provenance key RationaleFile:<name>) withdrawn — RevisionLink, File, Revision and Document soft-deleted through the generated procedures, attributed to the migration actor — before the corrected rule (by number AND station; key RationaleFile:<station>/<name>) replayed onto the copy",
+      "why": "the owner, 2026-09-21: the folder is the terminal station and numbers are reused after retirement; the first placement put retired devices' documents on current records. The replay is the rule; the withdrawal is not — on the real cutover the corrected rule runs once",
+      "rule": false
     }
   ]
 }

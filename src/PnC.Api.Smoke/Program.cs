@@ -1938,7 +1938,8 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
                  && k217_v1s == HttpStatusCode.OK && ((k217_v1b?["rows"] as JsonArray)?.Count ?? 0) >= 1 && k217_l2s == HttpStatusCode.OK && k217_r2s == HttpStatusCode.OK && k217_d2s == HttpStatusCode.OK,
                 $"#217: a Rationale document links About a configuration-file revision ({(int)k217_l1s} {Code(k217_l1b)}) and the record's files read it back; retired again");
             // a migrated rationale, when this environment has them (provenance RationaleFile:<name> → the file): a Word file served as a download
-            var (k217_ps, k217_pb) = await Get(admin, "api/v1/migration/vProvenance?TargetTable=File&SourceKey~=RationaleFile%3A&take=1");
+            // the key is the folder and the name (RationaleFile:<station>/<name>): the corrected rule of 2026-09-21 (by number AND station)
+            var (k217_ps, k217_pb) = await Get(admin, "api/v1/migration/vProvenance?TargetTable=File&SourceKey~=%2Fa0&take=1");
             var k217_prov = (k217_pb?["rows"] as JsonArray)?.FirstOrDefault();
             if (k217_ps == HttpStatusCode.OK && k217_prov is not null)
             {
