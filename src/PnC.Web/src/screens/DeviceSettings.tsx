@@ -355,12 +355,9 @@ function MaskBits({ relayWord, code, value, editing, onSave, onClose }: { relayW
           </tbody>
         </table>
         <div className="space-y-1 text-xs text-slate-400">
+          {/* the owner, 2026-09-21: the manual's recommendations (typical bits, cautions, testing bits) are not shown here for now — they
+              stay in the definition for a later step; the mask's purpose and the never-bit warning remain */}
           {mask && <div><span className="text-slate-200">{mask.name}</span> — {mask.purpose} <span className="text-slate-600">({mask.cite})</span></div>}
-          {mask?.caution && <div className="text-amber-200/80">{mask.caution}</div>}
-          {mask && mask.typical.length > 0 && <div>Typical bits in the manual's example: {mask.typical.join(', ')} ({mask.example}).</div>}
-          {relayWord.testing && <div className="text-slate-500">Bits intended for relay testing: {relayWord.testing.bits.join(', ')} ({relayWord.testing.cite}).</div>}
-          {relayWord.variants.map((v) => <div key={v.code} className="text-slate-500">{v.note} ({v.cite})</div>)}
-          <div className="text-slate-500">{relayWord.bitOrder}</div>
         </div>
       </div>
       <div className="text-xs text-slate-300">{ticked.length ? <>Ticked: {ticked.map((c) => { const b = rows.flat().find((x) => x.code === c)!; return <span key={c} className="mr-2"><span className="font-mono text-slate-100">{c}</span> <span className="text-slate-500">{b.meaning}</span></span> })}</> : <span className="text-slate-500">No bit is ticked.</span>}</div>
