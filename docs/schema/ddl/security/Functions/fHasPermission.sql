@@ -40,6 +40,14 @@ BEGIN
     -- any role that carries Definition.Read, whatever the grant's scope: they have no place in the tree and every screen
     -- needs them (work types, models, procedures). Writes and approvals of definitions stay Global-only.
     IF @permissionCode = N'Definition.Read' AND (@subjectKind IS NULL OR @subjectKind IN (N'Definition', N'DefinitionVersion')) RETURN 1;
+    -- #216 (2026-09-21): a REFERENCE document — one whose revision is linked About a Definition (a model's instruction manual on
+    -- its asset template) — is read by any role that carries Document.Read, whatever the grant's scope: it is the manufacturer's
+    -- book, not a site's record, and the field staff who work at one station need it as much as anyone. Every other document
+    -- stays Global-only, as above.
+    IF @permissionCode = N'Document.Read' AND @subjectKind = N'Document' AND EXISTS (
+        SELECT 1 FROM [document].[Revision] r JOIN [document].[RevisionLink] l ON l.[RevisionRowId] = r.[RowId]
+        WHERE r.[DocumentEntityId] = @subjectEntityId AND r.[IsDeleted] = 0 AND l.[IsDeleted] = 0 AND l.[ValidTo] IS NULL
+          AND l.[LinkKind] = N'About' AND l.[SubjectKind] IN (N'Definition', N'DefinitionVersion')) RETURN 1;
     IF @subjectEntityId IS NULL RETURN 0;
 
     -- the subject's places: (node entity, asset entity) pairs the scopes are tested against

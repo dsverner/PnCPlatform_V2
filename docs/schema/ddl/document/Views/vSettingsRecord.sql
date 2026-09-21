@@ -74,6 +74,7 @@ SELECT r.[RowSeq],
        pl.[PlacedFrom],
        at.[DefinitionKey]           AS [TemplateKey],
        at.[VersionNumber]           AS [TemplateVersion],
+       at.[DefinitionEntityId]      AS [TemplateDefinitionEntityId],   -- #216: the asset template's definition (its characteristics, its manual)
        pnl.[EntityId]               AS [PanelNodeEntityId],
        pnl.[Name]                   AS [PanelName],
        bld.[BuildingEntityId]       AS [BuildingNodeEntityId],
@@ -136,7 +137,7 @@ LEFT JOIN [ref].[vFirmwareVersion] fw ON fw.[FirmwareVersionId] = COALESCE(cf.[F
 OUTER APPLY (SELECT TOP (1) k.[KeyValue] FROM [asset].[AlternateKey] k WHERE k.[ValidTo] IS NULL AND k.[IsDeleted] = 0 AND k.[SubjectEntityId] = a.[EntityId] AND k.[KeyKindCode] = N'SerialNumber' ORDER BY k.[IsPrimaryLabel] DESC, k.[RowSeq]) sn
 OUTER APPLY (SELECT TOP (1) p.[NodeEntityId], p.[ValidFrom] AS [PlacedFrom] FROM [asset].[Placement] p WHERE p.[ValidTo] IS NULL AND p.[IsDeleted] = 0 AND p.[AssetEntityId] = a.[EntityId] AND p.[PlacementKind] = N'Installed' ORDER BY p.[ValidFrom] DESC) pl
 -- #187: the device template bound to the model (config.vAssetTemplate is Effective-only; NULL when the model has none)
-OUTER APPLY (SELECT TOP (1) t.[DefinitionKey], t.[VersionNumber] FROM [config].[vAssetTemplate] t WHERE t.[ModelId] = a.[ModelId] ORDER BY t.[VersionNumber] DESC) at
+OUTER APPLY (SELECT TOP (1) t.[DefinitionKey], t.[VersionNumber], t.[DefinitionEntityId] FROM [config].[vAssetTemplate] t WHERE t.[ModelId] = a.[ModelId] ORDER BY t.[VersionNumber] DESC) at
 LEFT JOIN [location].[vNode] dp  ON dp.[EntityId]  = pl.[NodeEntityId]
 LEFT JOIN [location].[vNode] pnl ON pnl.[EntityId] = dp.[ParentEntityId]
 LEFT JOIN [location].[vNode] h2  ON h2.[EntityId]  = pnl.[ParentEntityId]

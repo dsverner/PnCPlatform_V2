@@ -20,7 +20,7 @@ CREATE TABLE [document].[RevisionLink] (
     [MigrationRunId]    UNIQUEIDENTIFIER  NULL     CONSTRAINT [FK_RevisionLink_MigrationRun] REFERENCES [migration].[Run] ([RunId]),
     [RevisionRowId]      UNIQUEIDENTIFIER NOT NULL CONSTRAINT [FK_RevisionLink_Revision] REFERENCES [document].[Revision] ([RowId]),
     [LinkKind]           NVARCHAR(20)     NOT NULL CONSTRAINT [CK_RevisionLink_Kind] CHECK ([LinkKind] IN (N'About', N'Depicts', N'PerformedTo', N'ValidAgainst', N'Cites', N'EvidenceFor', N'BasedOn')),   -- BasedOn (#191): a draft copied from another request's open draft, subject DocumentRevision
-    [SubjectKind]        NVARCHAR(40)     NOT NULL CONSTRAINT [CK_RevisionLink_SubjectKind] CHECK ([SubjectKind] IN (N'Node', N'Asset', N'Scheme', N'Connection', N'Record', N'ObligationInstance', N'DocumentRevision')),
+    [SubjectKind]        NVARCHAR(40)     NOT NULL CONSTRAINT [CK_RevisionLink_SubjectKind] CHECK ([SubjectKind] IN (N'Node', N'Asset', N'Scheme', N'Connection', N'Record', N'ObligationInstance', N'DocumentRevision', N'Definition', N'DefinitionVersion')),   -- #216: Definition — a manual About a template definition
     [SubjectEntityId]    UNIQUEIDENTIFIER NOT NULL,
     [DrawingKey]         NVARCHAR(100)    NULL,
     CONSTRAINT [PK_RevisionLink] PRIMARY KEY CLUSTERED ([RowSeq]),

@@ -49,7 +49,7 @@ if (unseen.Count > 0)
 app.Use(async (context, next) =>
 {
     var h = context.Response.Headers;
-    h["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; manifest-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
+    h["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; manifest-src 'self'; frame-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
     h["X-Content-Type-Options"] = "nosniff";
     h["Referrer-Policy"] = "no-referrer";
     h["Cache-Control"] = context.Request.Path.StartsWithSegments("/api") ? "no-store" : "no-cache";

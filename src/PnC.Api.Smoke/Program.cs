@@ -1398,7 +1398,7 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
             var k184_bound = (k184_a1b?["rows"] as JsonArray)?.Count ?? -1;
             var (k184_c1s, k184_c1b) = await Get(readOnly!, $"api/v1/config/vCharacteristicDefinition?DefinitionVersionRowId={k184_ver?["RowId"]}&take=50");
             var k184_facts = (k184_c1b?["rows"] as JsonArray)?.Count ?? -1;
-            Must(k184_d1s == HttpStatusCode.OK && k184_def is not null && k184_ver is not null && k184_bound == 2 && k184_c1s == HttpStatusCode.OK && k184_facts == 7,   // #185: the two compliance facts left the template
+            Must(k184_d1s == HttpStatusCode.OK && k184_def is not null && k184_ver is not null && k184_bound == 2 && k184_c1s == HttpStatusCode.OK && k184_facts == 11,   // #185: the two compliance facts left the template; #216: the four Hardware jumpers joined it
                 $"#184: SEL221F_Template is an Effective AssetTemplate bound to both SEL-221F model codes ({k184_bound}), and ReadOnly reads its {k184_facts} facts");
 
             // Directory 4 and A-10 are seeded from the documents, page-cited, and the screen definition is Effective
@@ -1862,6 +1862,64 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
             Must(k215_s1s == HttpStatusCode.OK && k215_p1s == HttpStatusCode.OK && k215_raw == "F0 A4 00" && k215_rend.StatusCode == HttpStatusCode.OK && k215_text.Contains("MTU=F0 A4 00")
                  && k215_s2s == HttpStatusCode.OK && k215_q1s == HttpStatusCode.Forbidden,
                 $"#215: the mask written as the editor writes it is filed byte for byte ({k215_raw}; {(int)k215_s1s} {Code(k215_s1b)}) and the file the platform writes carries MTU=F0 A4 00 after LOGIC SETTINGS; unset again ({(int)k215_s2s}); ReadOnly refused ({(int)k215_q1s})");
+
+            // ======== #216 (2026-09-21): HARDWARE configuration on the device, and the manual kept with the template. The owner, on
+            // port settings: the manual has none in SET (baud is jumper JMP105, 3-2/6-2; the data format "cannot be altered", 3-2) —
+            // the jumpers are recorded on the relay through asset.SetAssetCharacteristic (typed, checked against the closed list,
+            // audited with the work request), never in the settings file. The manual: a document About the template definition,
+            // served inline, readable at any scope.
+            var (k216_ts, k216_tb) = await Get(admin, $"api/v1/document/vSettingsRecord?RevisionRowId={k215_rev}&take=1");
+            var k216_tmplDef = (k216_tb?["rows"] as JsonArray)?.FirstOrDefault()?["TemplateDefinitionEntityId"]?.ToString();
+            var (k216_s1s, k216_s1b) = await Post(admin, "api/v1/asset/SetAssetCharacteristic", new { AssetEntityId = k187_relay, CharacteristicKey = "Jmp105Port1Baud", Value = "2400", WorkRequestEntityId = k187_wr });
+            var (k216_s2s, k216_s2b) = await Post(admin, "api/v1/asset/SetAssetCharacteristic", new { AssetEntityId = k187_relay, CharacteristicKey = "Jmp105Port1Baud", Value = "4321" });
+            var (k216_s3s, _) = await Post(admin, "api/v1/asset/SetAssetCharacteristic", new { AssetEntityId = k187_relay, CharacteristicKey = "Jmp104OpenClose", Value = "Y" });
+            var (k216_s4s, k216_s4b) = await Post(admin, "api/v1/asset/SetAssetCharacteristic", new { AssetEntityId = k187_relay, CharacteristicKey = "NoSuchJumper", Value = "1" });
+            var (k216_q1s, _) = await Post(readOnly!, "api/v1/asset/SetAssetCharacteristic", new { AssetEntityId = k187_relay, CharacteristicKey = "Jmp105Port2Baud", Value = "9600" });
+            var (k216_v1s, k216_v1b) = await Get(admin, $"api/v1/asset/vAssetCharacteristic?AssetEntityId={k187_relay}&take=50");
+            var k216_vals = (k216_v1b?["rows"] as JsonArray)?.ToDictionary(r => r?["CharacteristicKey"]?.ToString() ?? "", r => r) ?? new();
+            var (k216_a1s, k216_a1b) = await Get(admin, $"api/v1/audit/vActionLog?SubjectEntityId={k187_relay}&take=50");
+            var k216_audit = (k216_a1b?["rows"] as JsonArray)?.Select(r => r?["Detail"]?.ToString() ?? "").Where(d => d.Contains("characteristic-recorded")).ToList() ?? new();
+            var (k216_c1s, _) = await Post(admin, "api/v1/asset/SetAssetCharacteristic", new { AssetEntityId = k187_relay, CharacteristicKey = "Jmp105Port1Baud", Value = (string?)null });
+            var (_, k216_v2b) = await Get(admin, $"api/v1/asset/vAssetCharacteristic?AssetEntityId={k187_relay}&CharacteristicKey=Jmp105Port1Baud&take=5");
+            Must(!string.IsNullOrEmpty(k216_tmplDef) && k216_s1s == HttpStatusCode.OK && k216_s2s == HttpStatusCode.Conflict && (k216_s2b?["detail"]?.ToString() ?? "").Contains("allowed list")
+                 && k216_s3s == HttpStatusCode.OK && k216_s4s == HttpStatusCode.Conflict && k216_q1s == HttpStatusCode.Forbidden && k216_v1s == HttpStatusCode.OK
+                 && k216_vals.GetValueOrDefault("Jmp105Port1Baud")?["TextValue"]?.ToString() == "2400" && k216_vals.GetValueOrDefault("Jmp104OpenClose")?["BooleanValue"]?.GetValue<bool>() == true
+                 && k216_a1s == HttpStatusCode.OK && k216_audit.Any(d => d.Contains("Jmp105Port1Baud") && d.Contains(k187_wr?.ToString() ?? "-", StringComparison.OrdinalIgnoreCase))
+                 && k216_c1s == HttpStatusCode.OK && ((k216_v2b?["rows"] as JsonArray)?.Count ?? -1) == 0,
+                $"#216: the relay's hardware is recorded through one guarded procedure — PORT 1 baud 2400 ({(int)k216_s1s}), 4321 refused as not in the list ({(int)k216_s2s}), JMP104 Y → true ({(int)k216_s3s}), an unknown key refused ({(int)k216_s4s}), ReadOnly refused ({(int)k216_q1s}); audited with the work request ({k216_audit.Count} row(s)); cleared again ({(int)k216_c1s})");
+            // a manual hangs About a template definition: the link kind is accepted; the loaded SEL-221F manual, when this environment has it
+            var (k216_cls, k216_clb) = await Get(admin, "api/v1/config/vDefinition?DefinitionKind=CharacteristicSchema.DocumentClass&DefinitionKey=InstructionManual&take=1");
+            var k216_cl = Id((k216_clb?["rows"] as JsonArray)?.FirstOrDefault());
+            var (k216_d1s, k216_d1b) = await Post(admin, "api/v1/document/Document_Add", new { DocumentClassDefinitionEntityId = k216_cl, Title = $"{tag} 216 manual (no file)" });
+            var k216_doc = Id(k216_d1b);
+            var (k216_r1s, k216_r1b) = await Post(admin, "api/v1/document/Revision_Add", new { DocumentEntityId = k216_doc, RevisionLabel = "1", Status = "Issued" });
+            var k216_revRow = Id(k216_r1b, "RowId");
+            var (k216_l1s, k216_l1b) = await Post(admin, "api/v1/document/RevisionLink_Add", new { RevisionRowId = k216_revRow, LinkKind = "About", SubjectKind = "Definition", SubjectEntityId = k216_tmplDef });
+            var (k216_l2s, _) = await Post(admin, "api/v1/document/RevisionLink_SoftDelete", new { EntityId = Id(k216_l1b) });
+            var (k216_r2s, _) = await Post(admin, "api/v1/document/Revision_SoftDelete", new { EntityId = Id(k216_r1b) });
+            var (k216_d2s, _) = await Post(admin, "api/v1/document/Document_SoftDelete", new { EntityId = k216_doc });
+            Must(k216_cls == HttpStatusCode.OK && k216_cl is not null && k216_d1s == HttpStatusCode.OK && k216_r1s == HttpStatusCode.OK && k216_l1s == HttpStatusCode.OK
+                 && k216_l2s == HttpStatusCode.OK && k216_r2s == HttpStatusCode.OK && k216_d2s == HttpStatusCode.OK,
+                $"#216: a document of class InstructionManual links About the template definition ({(int)k216_l1s} {Code(k216_l1b)}); retired again");
+            var (k216_m1s, k216_m1b) = await Get(admin, $"api/v1/document/vRevisionLink?SubjectKind=Definition&SubjectEntityId={k216_tmplDef}&LinkKind=About&take=20");
+            string? k216_file = null; long k216_size = 0;
+            foreach (var l in (k216_m1b?["rows"] as JsonArray) ?? new JsonArray())
+            {
+                var (_, fb) = await Get(admin, $"api/v1/document/vFile?RevisionRowId={l?["RevisionRowId"]}&take=10");
+                var pdf = (fb?["rows"] as JsonArray)?.FirstOrDefault(f => (f?["MimeType"]?.ToString() ?? "").StartsWith("application/pdf", StringComparison.OrdinalIgnoreCase));
+                if (pdf is not null) { k216_file = pdf["RowId"]?.ToString(); k216_size = pdf["SizeBytes"]?.GetValue<long>() ?? 0; break; }
+            }
+            if (k216_m1s == HttpStatusCode.OK && k216_file is not null)
+            {
+                var k216_ga = await admin.GetAsync($"api/v1/files/{k216_file}"); var k216_ba = await k216_ga.Content.ReadAsByteArrayAsync();
+                var k216_gr = await readOnly!.GetAsync($"api/v1/files/{k216_file}"); await k216_gr.Content.ReadAsByteArrayAsync();
+                var k216_gh = hydro is null ? null : await hydro.GetAsync($"api/v1/files/{k216_file}"); if (k216_gh is not null) await k216_gh.Content.ReadAsByteArrayAsync();
+                var k216_disp = k216_ga.Content.Headers.ContentDisposition?.DispositionType;
+                Must(k216_ga.StatusCode == HttpStatusCode.OK && k216_ga.Content.Headers.ContentType?.MediaType == "application/pdf" && k216_disp == "inline" && k216_ba.LongLength == k216_size
+                     && k216_gr.StatusCode == HttpStatusCode.OK && (k216_gh is null || k216_gh.StatusCode == HttpStatusCode.OK),
+                    $"#216: the SEL-221F manual kept with its template is served inline as application/pdf ({k216_ba.LongLength} bytes, {k216_disp}); ReadOnly reads it ({(int)k216_gr.StatusCode}); the Node-scoped engineer reads it too ({(k216_gh is null ? "n/a" : ((int)k216_gh.StatusCode).ToString())}) — a manual is reference material, not a site's record");
+            }
+            else Skip("#216: no SEL-221F manual is loaded on this environment (tools/load_manual.py) — the inline serve and the scoped read are not checked");
         }
 
         // ======== #168 increment 2 (2026-09-16): the settings edited in the platform, the file written by it — the owner's four-step

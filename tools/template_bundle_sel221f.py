@@ -19,9 +19,15 @@ NL = chr(13) + chr(10)
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 KEY = "SEL221F_Template"
 MODEL_CODES = ["SEL-221F Z1-3=.125-64 OHMS", "SEL-221F"]   # the same two codes the settings template and the capabilities bind to
-NOTE = "seed (#185): the SEL-221F device template, from IM 981207 — compliance moved out to the Compliance menu"
+NOTE = "seed v3 (#216): hardware configuration — the jumper positions the manual names (3-2, 3-8, 3-22, 6-2)"
 
-# (key, name, datatype, unit, group, order, description-with-cite)
+# the closed lists a characteristic may take: (key, name, [(code, name)...]) — seeded as CharacteristicSchema.Enumeration
+ENUMS = [
+    ("SEL221F_BAUD", "SEL-221F serial port baud rate — set by jumper JMP105 (3-2, 6-2)",
+     [("300", "300 baud"), ("600", "600 baud"), ("1200", "1200 baud"), ("2400", "2400 baud"), ("4800", "4800 baud"), ("9600", "9600 baud")]),
+]
+
+# (key, name, datatype, unit, group, order, description-with-cite[, enumeration key])
 ROWS = [
     ("ManualReference", "Instruction manual", "Text", None, "Identity", 1,
      "SEL-221F-2, -3, -4 / SEL-121F-2, -3 Instruction Manual, date code 981207, Schweitzer Engineering Laboratories, "
@@ -46,6 +52,27 @@ ROWS = [
     ("Capabilities", "What it can do", "Text", None, "Bundle", 7,
      "The fifteen elements of scheme.FunctionCapability for this model (#181, #182): ten with a C37.2 device number and "
      "five named in the manual's own words."),
+    # #216 (2026-09-21): HARDWARE CONFIGURATION — per relay, not per type. The manual's port parameters are jumpers, not settings:
+    # 'The baud rates of the ports are set by jumpers located near the front of the main board ... Available rates are 300, 600,
+    # 1200, 2400, 4800, and 9600 baud' (3-2); the data format 'eight data bits, two stop bits, no parity bit ... cannot be
+    # altered' (3-2). Recorded on the device, changed under a work request, never written to the settings file.
+    ("Jmp105Port1Baud", "PORT 1 baud rate (JMP105)", "Enumeration", None, "Hardware", 10,
+     "'JMP105 provides EIA RS-232-C baud rate selection. Available baud rates are 300, 600, 1200, 2400, 4800, and 9600. To select "
+     "a baud rate for a particular port, place the jumper so it connects a pin labeled with the desired port to a pin labeled "
+     "with the desired baud rate' (6-2). 'The relay is shipped with PORT 1 set to 300 baud' (3-2). 'Do not select two baud rates "
+     "for the same port as this can damage the relay baud rate generator' (3-2).", "SEL221F_BAUD"),
+    ("Jmp105Port2Baud", "PORT 2F/2R baud rate (JMP105)", "Enumeration", None, "Hardware", 11,
+     "The same jumper, JMP105, for PORT 2 — the front PORT 2F and rear PORT 2R share it (3-2, 6-2). 'The relay is shipped with "
+     "... PORT 2F/2R set to 2400 baud' (3-2). The serial data format is fixed: 'eight data bits, two stop bits, no parity bit. This "
+     "format cannot be altered' (3-2).", "SEL221F_BAUD"),
+    ("Jmp103PasswordProtection", "JMP103 installed — password protection disabled", "Boolean", None, "Hardware", 12,
+     "'Put JMP103 in place to disable password protection. This feature is useful if passwords are not required or when "
+     "passwords are forgotten' (6-2). 'The password is required unless you install jumper JMP103' (3-8). Y = the jumper is "
+     "in place (no password asked); N = not in place (passwords required)."),
+    ("Jmp104OpenClose", "JMP104 installed — OPEN and CLOSE commands enabled", "Boolean", None, "Hardware", 13,
+     "'With jumper JMP104 in place, the OPEN and CLOSE commands are enabled. If you remove jumper JMP104, executing OPEN and "
+     "CLOSE commands results in the message: \"Aborted.\"' (6-2); 'Close circuit breaker, if Jumper JMP104 is installed' "
+     "(command summary). Y = in place (the commands work); N = not in place."),
 ]
 
 
@@ -67,7 +94,22 @@ def sql():
         "DECLARE @author UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000001', @approver UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000002';",
         "DECLARE @sel UNIQUEIDENTIFIER = (SELECT TOP (1) [ManufacturerId] FROM [ref].[vManufacturer] WHERE [ShortCode] = N'SEL');",
         "IF @sel IS NULL RETURN;",
-        "DECLARE @e UNIQUEIDENTIFIER, @v UNIQUEIDENTIFIER, @no INT, @model UNIQUEIDENTIFIER, @code NVARCHAR(200);",
+        "DECLARE @e UNIQUEIDENTIFIER, @v UNIQUEIDENTIFIER, @no INT, @model UNIQUEIDENTIFIER, @code NVARCHAR(200), @enum UNIQUEIDENTIFIER;",
+    ]
+    # the closed lists (the settings template's pattern): seeded once, never re-versioned by this tool
+    for (ekey, ename, values) in ENUMS:
+        L += [
+            "IF NOT EXISTS (SELECT 1 FROM [config].[Definition] WHERE [DefinitionKind] = N'CharacteristicSchema.Enumeration' AND [DefinitionKey] = " + q(ekey) + " AND [IsDeleted] = 0)",
+            "BEGIN",
+            "    SET @e = NULL; SET @v = NULL;",
+            "    EXEC [config].[AddDefinition] @DefinitionKind = N'CharacteristicSchema.Enumeration', @DefinitionKey = " + q(ekey) + ", @Name = " + q(ename) + ", @ActorId = @author, @EntityId = @e OUTPUT;",
+            "    EXEC [config].[AddDefinitionVersion] @DefinitionKey = " + q(ekey) + ", @DefinitionKind = N'CharacteristicSchema.Enumeration', @ChangeNote = N'seed (#216)', @ActorId = @author, @VersionRowId = @v OUTPUT, @VersionNumber = @no OUTPUT;",
+        ]
+        for i, (code, vname) in enumerate(values, 1):
+            L.append("    EXEC [config].[EnumerationValue_Add] @DefinitionVersionRowId = @v, @ValueCode = " + q(code) + ", @Name = " + q(vname) + ", @DisplayOrder = " + str(i) + ", @ActorId = @author;")
+        L += ["    EXEC [config].[ApproveDefinitionVersion] @VersionRowId = @v, @ActorId = @approver;", "END"]
+    L += [
+        "SET @e = NULL;",
         "SELECT @e = [EntityId] FROM [config].[Definition] WHERE [DefinitionKind] = N'CharacteristicSchema.AssetTemplate' AND [DefinitionKey] = " + q(KEY) + " AND [IsDeleted] = 0;",
         "IF @e IS NULL",
         "    EXEC [config].[AddDefinition] @DefinitionKind = N'CharacteristicSchema.AssetTemplate', @DefinitionKey = " + q(KEY) + ",",
@@ -77,10 +119,13 @@ def sql():
         "BEGIN",
         "    EXEC [config].[AddDefinitionVersion] @DefinitionKey = " + q(KEY) + ", @DefinitionKind = N'CharacteristicSchema.AssetTemplate', @ChangeNote = " + q(NOTE) + ", @ActorId = @author, @VersionRowId = @v OUTPUT, @VersionNumber = @no OUTPUT;",
     ]
-    for (key, name, dt, unit, group, order, desc) in ROWS:
+    for row in ROWS:
+        (key, name, dt, unit, group, order, desc) = row[:7]; ekey = row[7] if len(row) > 7 else None
+        if ekey:
+            L.append("    SELECT @enum = dv.[RowId] FROM [config].[vDefinition] d JOIN [config].[vDefinitionVersion] dv ON dv.[DefinitionEntityId] = d.[EntityId] AND dv.[Status] = N'Effective' WHERE d.[DefinitionKind] = N'CharacteristicSchema.Enumeration' AND d.[DefinitionKey] = " + q(ekey) + ";")
         L.append("    EXEC [config].[CharacteristicDefinition_Add] @DefinitionVersionRowId = @v, @CharacteristicKey = " + q(key)
                  + ", @Name = " + q(name) + ", @DataType = " + q(dt) + ", @UnitCode = " + q(unit) + ", @DisplayGroup = " + q(group)
-                 + ", @DisplayOrder = " + str(order) + ", @Description = " + q(desc) + ", @ActorId = @author;")
+                 + ", @DisplayOrder = " + str(order) + (", @AllowedValuesDefinitionRowId = @enum" if ekey else "") + ", @Description = " + q(desc) + ", @ActorId = @author;")
     L += [
         "    EXEC [config].[ApproveDefinitionVersion] @VersionRowId = @v, @ActorId = @approver;",
         "END",

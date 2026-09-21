@@ -16,7 +16,8 @@ DECLARE c CURSOR LOCAL FAST_FORWARD FOR
     SELECT * FROM (VALUES
         (N'SettingsIssuePackage', N'Settings-issue package', N'The approval subject of a settings change: a revision of this class holds the package; its items are configuration-file revisions (§8.4, PROCEDURE-ENGINE §5.1)'),
         (N'DeviceConfiguration',  N'Device configuration',   N'One document per device; each configuration-file revision — the vendor''s native file or the name=value text file (#61) — is a revision of it'),
-        (N'Evidence',             N'Step evidence',          N'Files attached at a committed procedure step; the revision links EvidenceFor the step''s record')
+        (N'Evidence',             N'Step evidence',          N'Files attached at a committed procedure step; the revision links EvidenceFor the step''s record'),
+        (N'InstructionManual',    N'Instruction manual',     N'A device model''s manual from its manufacturer (#216): a revision holds the file; the revision links About the model''s asset template definition, so every relay of the model opens it')
     ) AS s (k, n, d);
 OPEN c; FETCH NEXT FROM c INTO @k, @n, @d;
 WHILE @@FETCH_STATUS = 0

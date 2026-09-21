@@ -20,6 +20,7 @@ import { type RecordParams, type Screen } from '@/lib/screens'
 import { Panel, Pill, Button, Facts, Status } from '@/components/ui/ui'
 import { useTemplate, SettingsByFunction } from './DeviceSettings'
 import { bit } from './PrimaryAssetScreen'
+import { ManualPanel } from '@/components/ManualPanel'
 
 export default function DeviceTemplateScreen({ params: p, id }: { screen: Screen; params: RecordParams; id?: string }) {
   const navigate = useNavigate()
@@ -62,6 +63,9 @@ export default function DeviceTemplateScreen({ params: p, id }: { screen: Screen
         {!tmpl.isPending && !tmpl.data && <Status>No settings template is bound to this model.</Status>}
         {tmpl.data && <SettingsByFunction template={tmpl.data} parsed={[]} parseStatus="template" parseError="" revision="" filedText={null} />}
       </Panel>
+
+      {/* #216: the manual, kept with the template — in the page, or its own tab */}
+      {factsQ.data !== undefined && <ManualPanel templateDefinitionEntityId={factsQ.data ? s(factsQ.data.def.DefinitionEntityId) : null} modelName={code} />}
 
       {/* #186: the documentation, closed until wanted */}
       <details className="rounded border border-slate-800">

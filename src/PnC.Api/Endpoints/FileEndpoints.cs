@@ -47,6 +47,15 @@ public static class FileEndpoints
             var mime = row["MimeType"]?.GetValue<string>() ?? "application/octet-stream";
             http.Response.Headers["X-Content-Type-Options"] = "nosniff";
             http.Response.Headers["Cache-Control"] = "no-store";
+            // #216: a PDF (a model's instruction manual) or a text file opens in the browser's own viewer — inline, as the rendered
+            // settings text does (SettingsEndpoints); ?download=1 asks for the file as a download instead. Anything else downloads.
+            var wantsDownload = http.Request.Query.TryGetValue("download", out var dl) && dl.ToString() is "1" or "true";
+            var inline = !wantsDownload && (mime.Equals("application/pdf", StringComparison.OrdinalIgnoreCase) || mime.StartsWith("text/", StringComparison.OrdinalIgnoreCase));
+            if (inline)
+            {
+                http.Response.Headers.ContentDisposition = $"inline; filename=\"{name.Replace("\"", "")}\"";
+                return Results.File(bytes, mime, enableRangeProcessing: true);
+            }
             return Results.File(bytes, mime, fileDownloadName: name);
         });
     }

@@ -17,6 +17,8 @@ import { DataGrid, type Column } from '@/components/ui/data-grid'
 import DeviceSettings, { useTemplate, AnalogInputs, BasisPanel } from './DeviceSettings'
 import ComplianceTab, { useProtectedAssets } from './ComplianceTab'
 import { NodeLink } from './PrimaryAssetScreen'
+import { AssetCharacteristics } from '@/components/CharacteristicsPanel'
+import { ManualPanel } from '@/components/ManualPanel'
 
 
 export default function RecordScreen({ params: p, id }: { screen: Screen; params: RecordParams; id?: string }) {
@@ -53,13 +55,18 @@ export default function RecordScreen({ params: p, id }: { screen: Screen; params
         </div>
       </header>
       <Status>{legacyFree(r.DeviceName)} · rev {s(r.RevisionLabel) || '?'} · Revision {s(r.RevisionStatus)} · lifecycle {s(r.LifecycleState) || '—'} · {s(r.FileKind)} {s(r.ParseStatus)}</Status>
-      <Tabs value={section} onChange={setSection} tabs={[{ key: 'settings', label: 'Settings' }, { key: 'analog', label: 'Analog inputs' }, { key: 'record', label: 'Record' }, { key: 'compliance', label: 'Compliance' }, { key: 'notes', label: 'Notes' }, { key: 'text', label: 'Text as filed' }, { key: 'files', label: 'Files and records' }, ...(others.length ? [{ key: 'compare', label: 'Compare' }] : [])]} />
+      <Tabs value={section} onChange={setSection} tabs={[{ key: 'settings', label: 'Settings' }, { key: 'analog', label: 'Analog inputs' }, { key: 'record', label: 'Record' }, { key: 'compliance', label: 'Compliance' }, { key: 'notes', label: 'Notes' }, { key: 'text', label: 'Text as filed' }, { key: 'files', label: 'Files and records' }, { key: 'manual', label: 'Manual' }, ...(others.length ? [{ key: 'compare', label: 'Compare' }] : [])]} />
       {section === 'settings' && (template
         /* #168: the template's view of the device — functions, inputs, settings by function — when the model has one */
         ? <>
             {/* #192: a draft based on another request's draft — its drift and re-base sit first, being what the engineer must act on */}
             {r.GridState === 'Outstanding' && !!r.BasedOnRevisionRowId && <BasisPanel r={r} revision={revision} editable={can('ConfigurationFile.Modify')} />}
             <DeviceSettings r={r} revision={revision} filedText={textQ.data?.text ?? null} editable={r.GridState === 'Outstanding' && can('ConfigurationFile.Modify')} />
+            {/* #216 (owner, 2026-09-21): the relay's HARDWARE configuration — the jumper positions its manual names — recorded on the
+                device (not this revision), changed under a change request, never written to the settings file */}
+            {!!r.TemplateDefinitionEntityId && <AssetCharacteristics assetEntityId={s(r.DeviceEntityId)} definitionEntityId={s(r.TemplateDefinitionEntityId)} groups={['Hardware']} title="Hardware"
+              editable={r.GridState === 'Outstanding' && can('Asset.Modify')} workRequestEntityId={s(r.WorkRequestEntityId) || undefined}
+              note="The relay's own hardware — the same on every record of this device, changed here under the change request (audited as your change), never part of the settings file. Hover a name for the manual's words." />}
           </>
         : <Panel title={parsed.length ? `Settings · ${parsed.length} parsed from the ${s(r.FileKind)} file` : r.FileKind === 'NativeSettings' ? 'Settings · the native (vendor) file is stored as is; no reader exists for it yet (#113)' : 'Settings · no parsed settings; the text as filed is the record'}>
             {parsed.length > 0 ? <DataGrid rows={parsed} columns={PARSED_COLS} rowKey={(x) => s(x.SettingCode) + '|' + s(x.GroupNumber)} /> : <Status>No settings template for this model yet; the text as filed is the record.</Status>}
@@ -110,6 +117,7 @@ export default function RecordScreen({ params: p, id }: { screen: Screen; params
         </Panel>
       )}
       {section === 'files' && <FilesPanel r={r} revision={revision} />}
+      {section === 'manual' && <ManualPanel templateDefinitionEntityId={s(r.TemplateDefinitionEntityId) || null} modelName={s(r.ModelName)} />}   {/* #216 */}
     </div>
   )
 }
