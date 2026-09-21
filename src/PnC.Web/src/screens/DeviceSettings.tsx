@@ -14,7 +14,6 @@ import { SchemeSourceActions, sourceRoleLabel } from '@/components/SchemeSourceA
 import { Panel, Pill, Tabs, Status, Button, inputClass } from '@/components/ui/ui'
 import { DataGrid, type Column } from '@/components/ui/data-grid'
 import { useRelayWord, parseMask, formatMask, isMaskText, type RelayWord } from '@/lib/relayWord'
-import { AssetCharacteristics } from '@/components/CharacteristicsPanel'
 import type { ReactNode } from 'react'
 
 export interface Template { definitionEntityId: string; versionRowId: string; key: string; name: string; rows: Row[]; ansi: Map<string, string> }
@@ -420,13 +419,7 @@ function listing(rows: Row[], values: Map<string, Row>): string {
 
 /** Everything the template gives a record's Settings tab: the settings by function. Falls back to the plain parsed grid when the model has no template.
  * The function chips (2026-09-18) and the Inputs panel (#200) that sat above the book are gone: the owner wanted neither there. */
-export default function DeviceSettings({ r, revision, filedText, editable = false, canEditHardware = false }: { r: Row; revision: string; filedText: string | null; editable?: boolean; canEditHardware?: boolean }) {
-  // #216: the relay's HARDWARE configuration — the jumper positions its manual names — a tab of the settings section (the owner,
-  // 2026-09-21); recorded on the device, not this revision; changed under the change request; never in the settings file
-  const hardware: ExtraTab[] = r.TemplateDefinitionEntityId ? [{ key: 'hardware', label: 'Hardware', render: () => (
-    <AssetCharacteristics assetEntityId={s(r.DeviceEntityId)} definitionEntityId={s(r.TemplateDefinitionEntityId)} groups={['Hardware']} title="Hardware"
-      editable={canEditHardware} workRequestEntityId={s(r.WorkRequestEntityId) || undefined}
-      note="The relay's own hardware — the same on every record of this device, changed here under the change request (audited as your change), never part of the settings file. Hover a name for the manual's words." />) }] : []
+export default function DeviceSettings({ r, revision, filedText, editable = false }: { r: Row; revision: string; filedText: string | null; editable?: boolean }) {
   const tq = useTemplate(s(r.ModelId) || null)
   const parsedQ = useViewAll('document', 'vParsedSettingNamed', { ConfigurationFileRevisionRowId: revision }, 'DisplayOrder')
   const parsed = parsedQ.data ?? []
@@ -434,7 +427,7 @@ export default function DeviceSettings({ r, revision, filedText, editable = fals
   if (!tq.data) return null
   return (
     <>
-      <SettingsByFunction template={tq.data} parsed={parsed} parseStatus={s(r.ParseStatus)} parseError={s(r.ParseError)} revision={revision} filedText={filedText} editable={editable} deviceId={s(r.DeviceEntityId)} extraTabs={hardware} />
+      <SettingsByFunction template={tq.data} parsed={parsed} parseStatus={s(r.ParseStatus)} parseError={s(r.ParseError)} revision={revision} filedText={filedText} editable={editable} deviceId={s(r.DeviceEntityId)} />
     </>
   )
 }
