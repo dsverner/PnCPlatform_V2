@@ -293,7 +293,7 @@ function SettingsGrid({ rows: given, values, revision, editable = false, deviceI
     { key: '_flag', label: '', render: (r) => (r._v?.RangeCheck === 'OutOfRange' ? <Pill tone="bad" title={s(r._v.RangeCheckNote)}>out of range</Pill> : null), csv: (r) => s(r._v?.RangeCheck) },
     // #215 follow-up (the owner, 2026-09-21): a mask row says what THAT mask is for (its purpose from the Relay Word definition, one sentence
     // per mask), not the template's one sentence repeated ten times
-    { key: 'Description', label: 'The manual says', render: (r) => <span className="text-xs text-slate-400">{isMask(r) && relayWord!.masks[s(r.SettingCode)] ? relayWord!.masks[s(r.SettingCode)].purpose : s(r.Description).replace(/^§ /, '')}</span> },
+    { key: 'Description', label: 'Comments', render: (r) => <span className="text-xs text-slate-400">{isMask(r) && relayWord!.masks[s(r.SettingCode)] ? relayWord!.masks[s(r.SettingCode)].purpose : s(r.Description).replace(/^§ /, '')}</span> },
   ]
   return (
     <>
