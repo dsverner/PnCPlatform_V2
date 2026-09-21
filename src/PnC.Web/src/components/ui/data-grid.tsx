@@ -18,11 +18,12 @@ export interface GridProps<T> {
   onRowClick?: (r: T) => void
   onRowDoubleClick?: (r: T) => void   // #190: the owner's "double click the description" — opens the row's record
   detail?: (r: T) => ReactNode
+  canExpand?: (r: T) => boolean   // #215 follow-up: which rows unfold (the arrow shows only on those); default every row
   menu?: (r: T) => MenuItem[]
   emptyText?: string
 }
 
-export function DataGrid<T>({ rows, columns, rowKey, groupBy, openGroups, onToggleGroup, expandedKey, onRowClick, onRowDoubleClick, detail, menu, emptyText = 'Nothing to show.' }: GridProps<T>) {
+export function DataGrid<T>({ rows, columns, rowKey, groupBy, openGroups, onToggleGroup, expandedKey, onRowClick, onRowDoubleClick, detail, canExpand, menu, emptyText = 'Nothing to show.' }: GridProps<T>) {
   const cm = useContextMenu()
   const groups = useMemo(() => {
     const m = new Map<string, T[]>()
@@ -52,13 +53,13 @@ export function DataGrid<T>({ rows, columns, rowKey, groupBy, openGroups, onTogg
                   </td></tr>
                 )}
                 {open && list.map((r) => {
-                  const k = rowKey(r); const expanded = expandedKey === k
+                  const k = rowKey(r); const expanded = expandedKey === k; const unfolds = !!detail && (canExpand ? canExpand(r) : true)
                   return (
                     <Fragment key={k}>
-                      <tr className={`row ${expanded ? 'selected' : ''} ${onRowClick ? 'cursor-pointer' : ''}`} tabIndex={0}
+                      <tr className={`row ${expanded ? 'selected' : ''} ${onRowClick && (canExpand ? unfolds : true) ? 'cursor-pointer' : ''}`} tabIndex={0}
                         onClick={() => onRowClick?.(r)} onDoubleClick={() => onRowDoubleClick?.(r)} onContextMenu={(e) => openMenu(r, e)}
                         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onRowClick?.(r) } else if (e.shiftKey && e.key === 'F10' && menu) { e.preventDefault(); const rc = (e.currentTarget as HTMLElement).getBoundingClientRect(); cm.open(menu(r), rc.left + 24, rc.bottom) } }}>
-                        {detail && <td className="text-slate-500">{expanded ? '▾' : '▸'}</td>}
+                        {detail && <td className="text-slate-500" aria-hidden={!unfolds}>{unfolds ? (expanded ? '▾' : '▸') : ''}</td>}
                         {columns.map((c) => <td key={c.key}>{c.render ? c.render(r) : s((r as Record<string, unknown>)[c.key])}</td>)}
                         {menu && <td className="no-print"><Button kind="mini" title="Commands (right-click or Shift+F10 also)" onClick={(e) => { e.stopPropagation(); const rc = (e.currentTarget as HTMLElement).getBoundingClientRect(); cm.open(menu(r), rc.left, rc.bottom) }}>⋯</Button></td>}
                       </tr>

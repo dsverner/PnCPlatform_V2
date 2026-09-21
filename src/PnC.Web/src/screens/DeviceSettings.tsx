@@ -266,8 +266,9 @@ function SettingsGrid({ rows: given, values, revision, editable = false, deviceI
   const qc = useQueryClient()
   const [edits, setEdits] = useState<Record<string, string>>({})
   const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null)
-  // #215: a mask row (Format mask3) unfolds to its bits — read, or edited when the revision is outstanding
-  const [open, setOpen] = useState<{ code: string; editing: boolean } | null>(null)
+  // #215: a mask row (Format mask3) unfolds to its bits — read, or the editor when the revision is outstanding. The owner
+  // (2026-09-21) reached for the row's arrow before the button, so the arrow (and the row) is the one way in; no button.
+  const [open, setOpen] = useState<string | null>(null)
   const isMask = (r: Row) => r.Format === 'mask3' && !!relayWord
   const save = async (code: string, was: string) => {
     const v = edits[code]; if (v === undefined || v === was) return
@@ -282,12 +283,7 @@ function SettingsGrid({ rows: given, values, revision, editable = false, deviceI
     { key: 'Name', label: 'Setting', render: (r) => <span>{s(r.Name)} <span className="text-xs text-slate-500">{s(r.SettingCode)}</span></span> },
     { key: '_value', label: 'Value', render: (r) => {
         const was = r._v ? s(r._v.RawValue ?? r._v.DisplayValue) : ''; const code = s(r.SettingCode)
-        if (isMask(r)) return (
-          <span className="flex flex-wrap items-center gap-2">
-            {r._v ? <span className="font-mono text-slate-100">{was || <span className="text-slate-500">not set</span>}</span> : <span className="text-slate-500">not set</span>}
-            <Button kind="mini" aria-expanded={open?.code === code && !open.editing} onClick={() => setOpen(open?.code === code && !open.editing ? null : { code, editing: false })}>{open?.code === code && !open.editing ? 'Hide bits' : 'Bits'}</Button>
-            {editable && <Button kind="mini" aria-expanded={open?.code === code && open.editing} onClick={() => setOpen(open?.code === code && open.editing ? null : { code, editing: true })}>{open?.code === code && open.editing ? 'Close editor' : 'Edit bits'}</Button>}
-          </span>)
+        if (isMask(r)) return r._v && was ? <span className="font-mono text-slate-100">{was}</span> : <span className="text-slate-500">not set</span>
         if (editable) return <input className="w-32 rounded border border-slate-700 bg-slate-950 px-2 py-0.5 text-sm text-slate-100" value={edits[code] ?? was} placeholder="not set" aria-label={`${code} value`}
           onChange={(e) => setEdits((x) => ({ ...x, [code]: e.target.value }))} onBlur={() => void save(code, was)} onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }} />
         return r._v ? <span className={r._v.RangeCheck === 'OutOfRange' ? 'font-semibold text-amber-300' : 'text-slate-100'}>{was}</span> : <span className="text-slate-500">not set</span> },
@@ -302,11 +298,11 @@ function SettingsGrid({ rows: given, values, revision, editable = false, deviceI
       {msg && <Status bad={msg.bad}>{msg.text}</Status>}
       {editable && <Status>Outstanding revision: a value saves when you leave the field (audited as your change). The platform writes the settings file from these values when the settings step of the change commits.</Status>}
       <div className="mt-2"><DataGrid rows={rows} columns={cols} rowKey={(r) => s(r.SettingCode)} emptyText="No settings in this group."
-        expandedKey={open?.code ?? null}
-        detail={(r) => (open && s(r.SettingCode) === open.code && relayWord
-          ? <MaskBits relayWord={relayWord} code={open.code} value={r._v ? s(r._v.RawValue ?? r._v.DisplayValue) : ''} editing={open.editing && editable}
-              onSave={async (v) => { await proc('process', 'SetParsedSetting', { ConfigurationFileRevisionRowId: revision, DeviceEntityId: deviceId, SettingCode: open.code, RawValue: v })
-                setMsg({ text: `${open.code} saved as ${v}.` }); setOpen({ code: open.code, editing: false })
+        expandedKey={open} canExpand={isMask} onRowClick={(r) => { if (isMask(r)) setOpen(open === s(r.SettingCode) ? null : s(r.SettingCode)) }}
+        detail={(r) => (open && s(r.SettingCode) === open && relayWord
+          ? <MaskBits relayWord={relayWord} code={open} value={r._v ? s(r._v.RawValue ?? r._v.DisplayValue) : ''} editing={editable}
+              onSave={async (v) => { await proc('process', 'SetParsedSetting', { ConfigurationFileRevisionRowId: revision, DeviceEntityId: deviceId, SettingCode: open, RawValue: v })
+                setMsg({ text: `${open} saved as ${v}.` }); setOpen(null)
                 qc.invalidateQueries({ queryKey: ['view', 'document', 'vParsedSettingNamed'] }); qc.invalidateQueries({ queryKey: ['rendered', revision] }) }}
               onClose={() => setOpen(null)} />
           : null)} /></div>
