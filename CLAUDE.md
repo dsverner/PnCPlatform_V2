@@ -105,6 +105,10 @@ Carried forward from the predecessor, after a run of avoidable mistakes there.
   when modelling any P&C thing, ask what the physical object really is (windings, cores, taps, phases as units, terminals,
   cables, DC feeds) and whether the entity built now blocks that later — and raise it, with a recommendation, in the reply
   and the plan. Never add it silently.
+- **Bringing a model in follows the runbook.** `docs/runbook/BRING-A-MODEL-IN.md` holds every step, tool, ruling and trap
+  of the SEL-221F (owner, 2026-09-21: "taking notes of all of these steps so that we can repeat them again for other relays
+  without this back and forth"). An increment that adds a step, a tool or a ruling to that process adds it there in the
+  same commit; a question the runbook's "Settled" table answers is not asked again.
 - **A migration decision is a rule, never a hand edit.** Owner, 2026-09-19: the real cutover replays every decision on
   the client's verified copy of the legacy database. A decision about migrated data goes into `legacy_import.py` (a
   counted `self.rule`) or a PostDeploy seed carrying a `-- migration-rule:` line; a hand edit on DEV or QA is recorded in
