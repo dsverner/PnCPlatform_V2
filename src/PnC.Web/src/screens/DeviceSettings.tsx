@@ -14,6 +14,8 @@ import { SchemeSourceActions, sourceRoleLabel } from '@/components/SchemeSourceA
 import { Panel, Pill, Tabs, Status, Button, inputClass } from '@/components/ui/ui'
 import { DataGrid, type Column } from '@/components/ui/data-grid'
 import { useRelayWord, parseMask, formatMask, isMaskText, type RelayWord } from '@/lib/relayWord'
+import { AssetCharacteristics } from '@/components/CharacteristicsPanel'
+import type { ReactNode } from 'react'
 
 export interface Template { definitionEntityId: string; versionRowId: string; key: string; name: string; rows: Row[]; ansi: Map<string, string> }
 
@@ -373,7 +375,10 @@ function MaskBits({ relayWord, code, value, editing, onSave, onClose }: { relayW
 /** The settings by function: a tab per category in the template's order, every template row of the category with the
  * revision's value or "not set". The ratio settings (CTR, PTR, SPTR) are a category like any other — #205 brought them back
  * from the Analog inputs tab, which now holds the transformers that feed them. */
-export function SettingsByFunction({ template, parsed, parseStatus, parseError, revision, filedText, editable = false, deviceId = '' }: { template: Template; parsed: Row[]; parseStatus: string; parseError: string; revision: string; filedText: string | null; editable?: boolean; deviceId?: string }) {
+/** A tab beside the template's categories that is not a settings category (#216 follow-up: the relay's Hardware). */
+export interface ExtraTab { key: string; label: string; render: () => ReactNode }
+
+export function SettingsByFunction({ template, parsed, parseStatus, parseError, revision, filedText, editable = false, deviceId = '', extraTabs = [] }: { template: Template; parsed: Row[]; parseStatus: string; parseError: string; revision: string; filedText: string | null; editable?: boolean; deviceId?: string; extraTabs?: ExtraTab[] }) {
   const values = useMemo(() => new Map(parsed.map((p) => [s(p.SettingCode), p])), [parsed])
   const bookRows = template.rows
   const rwQ = useRelayWord(template.key)   // #215: the relay's Relay Word, when a definition names this template
@@ -387,8 +392,10 @@ export function SettingsByFunction({ template, parsed, parseStatus, parseError, 
     <Panel title={`Settings · ${template.name}`} actions={<>{parseStatus && <Pill tone={parseStatus === 'Parsed' ? 'good' : parseStatus === 'Partial' ? 'warn' : 'neutral'}>{parseStatus}</Pill>}
       {parsed.length > 0 && <a className="text-xs text-sky-300 underline" href={`/api/v1/settings/${revision}/rendered`} target="_blank" rel="noopener">the settings file as the platform writes it</a>}</>}>
       {unmatched && <Status bad>Names in the filed text that the template does not know: {unmatched}</Status>}
-      <Tabs tabs={categories.map((c) => ({ key: c, label: c.length > 42 ? c.slice(0, 40) + '…' : c }))} value={current} onChange={setTab} />
-      <SettingsGrid rows={rows} values={values} revision={revision} editable={editable} deviceId={deviceId} relayWord={rwQ.data ?? null} />
+      <Tabs tabs={[...categories.map((c) => ({ key: c, label: c.length > 42 ? c.slice(0, 40) + '…' : c })), ...extraTabs.map((x) => ({ key: x.key, label: x.label }))]} value={current} onChange={setTab} />
+      {extraTabs.find((x) => x.key === current)
+        ? extraTabs.find((x) => x.key === current)!.render()   // the owner, 2026-09-21: "hardware should really be another tab in the settings section"
+        : <SettingsGrid rows={rows} values={values} revision={revision} editable={editable} deviceId={deviceId} relayWord={rwQ.data ?? null} />}
       <details className="mt-3">
         <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wide text-slate-400">Relay listing and the file</summary>
         <div className="mt-2 grid gap-3 lg:grid-cols-2">
@@ -413,7 +420,13 @@ function listing(rows: Row[], values: Map<string, Row>): string {
 
 /** Everything the template gives a record's Settings tab: the settings by function. Falls back to the plain parsed grid when the model has no template.
  * The function chips (2026-09-18) and the Inputs panel (#200) that sat above the book are gone: the owner wanted neither there. */
-export default function DeviceSettings({ r, revision, filedText, editable = false }: { r: Row; revision: string; filedText: string | null; editable?: boolean }) {
+export default function DeviceSettings({ r, revision, filedText, editable = false, canEditHardware = false }: { r: Row; revision: string; filedText: string | null; editable?: boolean; canEditHardware?: boolean }) {
+  // #216: the relay's HARDWARE configuration — the jumper positions its manual names — a tab of the settings section (the owner,
+  // 2026-09-21); recorded on the device, not this revision; changed under the change request; never in the settings file
+  const hardware: ExtraTab[] = r.TemplateDefinitionEntityId ? [{ key: 'hardware', label: 'Hardware', render: () => (
+    <AssetCharacteristics assetEntityId={s(r.DeviceEntityId)} definitionEntityId={s(r.TemplateDefinitionEntityId)} groups={['Hardware']} title="Hardware"
+      editable={canEditHardware} workRequestEntityId={s(r.WorkRequestEntityId) || undefined}
+      note="The relay's own hardware — the same on every record of this device, changed here under the change request (audited as your change), never part of the settings file. Hover a name for the manual's words." />) }] : []
   const tq = useTemplate(s(r.ModelId) || null)
   const parsedQ = useViewAll('document', 'vParsedSettingNamed', { ConfigurationFileRevisionRowId: revision }, 'DisplayOrder')
   const parsed = parsedQ.data ?? []
@@ -421,7 +434,7 @@ export default function DeviceSettings({ r, revision, filedText, editable = fals
   if (!tq.data) return null
   return (
     <>
-      <SettingsByFunction template={tq.data} parsed={parsed} parseStatus={s(r.ParseStatus)} parseError={s(r.ParseError)} revision={revision} filedText={filedText} editable={editable} deviceId={s(r.DeviceEntityId)} />
+      <SettingsByFunction template={tq.data} parsed={parsed} parseStatus={s(r.ParseStatus)} parseError={s(r.ParseError)} revision={revision} filedText={filedText} editable={editable} deviceId={s(r.DeviceEntityId)} extraTabs={hardware} />
     </>
   )
 }
