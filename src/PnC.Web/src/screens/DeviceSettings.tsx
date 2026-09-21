@@ -291,7 +291,9 @@ function SettingsGrid({ rows: given, values, revision, editable = false, deviceI
     { key: 'UnitCode', label: 'Unit', render: (r) => s(r.UnitCode) + (r.Base ? ` (${s(r.Base).toLowerCase()})` : '') },
     { key: '_range', label: 'Range', render: (r) => rangeText(r), csv: (r) => rangeText(r) },
     { key: '_flag', label: '', render: (r) => (r._v?.RangeCheck === 'OutOfRange' ? <Pill tone="bad" title={s(r._v.RangeCheckNote)}>out of range</Pill> : null), csv: (r) => s(r._v?.RangeCheck) },
-    { key: 'Description', label: 'The manual says', render: (r) => <span className="text-xs text-slate-400">{s(r.Description).replace(/^§ /, '')}</span> },
+    // #215 follow-up (the owner, 2026-09-21): a mask row says what THAT mask is for (its purpose from the Relay Word definition, one sentence
+    // per mask), not the template's one sentence repeated ten times
+    { key: 'Description', label: 'The manual says', render: (r) => <span className="text-xs text-slate-400">{isMask(r) && relayWord!.masks[s(r.SettingCode)] ? relayWord!.masks[s(r.SettingCode)].purpose : s(r.Description).replace(/^§ /, '')}</span> },
   ]
   return (
     <>
@@ -335,7 +337,7 @@ function MaskBits({ relayWord, code, value, editing, onSave, onClose }: { relayW
   return (
     <div className="space-y-2 p-2 text-sm">
       {!readable && <Status bad>The filed value “{value}” is not {nRows} hex bytes; the bits below read it as far as they can. Saving replaces it.</Status>}
-      <div className="grid gap-3 lg:grid-cols-[auto_1fr]">
+      <div>
         <table className="w-auto text-xs">
           <tbody>
             {rows.map((row, ri) => (
@@ -353,11 +355,8 @@ function MaskBits({ relayWord, code, value, editing, onSave, onClose }: { relayW
               </tr>))}
           </tbody>
         </table>
-        <div className="space-y-1 text-xs text-slate-400">
-          {/* the owner, 2026-09-21: the manual's recommendations (typical bits, cautions, testing bits) are not shown here for now — they
-              stay in the definition for a later step; the mask's purpose and the never-bit warning remain */}
-          {mask && <div><span className="text-slate-200">{mask.name}</span> — {mask.purpose} <span className="text-slate-600">({mask.cite})</span></div>}
-        </div>
+        {/* the owner, 2026-09-21: the manual's recommendations (typical bits, cautions, testing bits) are not shown here for now — they
+            stay in the definition for a later step; the mask's purpose is on its row, the never-bit warning remains */}
       </div>
       {neverOn.length > 0 && <Status bad>{mask?.neverNote || `The manual says never to mask ${neverOn.join(', ')} into ${code}.`} ({mask?.cite})</Status>}
       {editing && (
