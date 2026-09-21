@@ -14,7 +14,7 @@ namespace PnC.Api.Security;
 public sealed record RequestUser(string IdentityName, Guid UserEntityId, Guid PersonEntityId, string UserPrincipalName, string DisplayName,
     Guid? DelegationEntityId, Guid? SponsoredPersonEntityId, string IdentityKey);
 
-public sealed class RequestUserMiddleware(RequestDelegate next, IConfiguration config, IWebHostEnvironment env, ILogger<RequestUserMiddleware> log)
+public sealed class RequestUserMiddleware(RequestDelegate next, IConfiguration config, IWebHostEnvironment env, ILogger<RequestUserMiddleware> log, FileLinkTokens fileLinks)
 {
     public const string DevHeader = "X-PnC-Dev-User";
     public const string DelegationHeader = "X-PnC-Delegation";
@@ -24,6 +24,15 @@ public sealed class RequestUserMiddleware(RequestDelegate next, IConfiguration c
     public async Task InvokeAsync(HttpContext context)
     {
         if (!context.Request.Path.StartsWithSegments("/api")) { await next(context); return; }
+        // #218: Word probes a linked file's folder with OPTIONS before it fetches (measured 2026-09-21: "OPTIONS .../link/<token>/", then
+        // HEAD and GET of the file); a 401 on the probe ends the open. The probe is answered with the methods and nothing else — no
+        // identity, no bytes, no names — for the file routes only.
+        if (HttpMethods.IsOptions(context.Request.Method) && context.Request.Path.StartsWithSegments("/api/v1/files"))
+        {
+            context.Response.StatusCode = StatusCodes.Status204NoContent;
+            context.Response.Headers.Allow = "GET, HEAD, OPTIONS";
+            return;
+        }
 
         var mode = config["Auth:Mode"] ?? "Windows";
         var isDev = env.EnvironmentName.Equals("DEV", StringComparison.OrdinalIgnoreCase);
@@ -45,6 +54,16 @@ public sealed class RequestUserMiddleware(RequestDelegate next, IConfiguration c
                 name = name[(name.LastIndexOf('\\') + 1)..] + "@" + suffix;
         }
         else throw new ApiException(500, "auth_mode", $"Auth:Mode '{mode}' is not Windows or Development.");
+
+        // #218: a request for one file's bytes carrying a file link the API issued (POST files/{id}/link) is the named user's, for
+        // that file only — a desktop application (Word) fetching a document the page handed it; the read is authorised and logged
+        // to that user as any other. A token for another file, expired or altered, names nobody.
+        if (string.IsNullOrWhiteSpace(name) && FileLinkTokens.TryGetFileRequest(context.Request, out var linkedFile, out var linkToken))
+        {
+            name = fileLinks.Read(linkedFile, linkToken);
+            if (name is null) throw new ApiException(401, "link_invalid", "The file link is not valid for this file, or has expired; open the record again.");
+            sid = null;
+        }
 
         if (string.IsNullOrWhiteSpace(name)) throw new ApiException(401, "unauthenticated", "No identity.");
         if (name.Length > 200 || name.Any(char.IsControl)) throw new ApiException(401, "unauthenticated", "Identity name is not acceptable.");

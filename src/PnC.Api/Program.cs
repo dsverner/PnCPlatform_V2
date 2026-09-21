@@ -33,6 +33,7 @@ var map = PermissionMap.Load(Path.Combine(AppContext.BaseDirectory, "api-permiss
 var unseen = map.Validate(catalog);
 var authz = new AuthorizationService();
 builder.Services.AddSingleton(catalog);
+builder.Services.AddSingleton<PnC.Api.Security.FileLinkTokens>();   // #218: short-lived links to one file for a desktop application (Word)
 builder.Services.AddHostedService<PnC.Api.Engine.SweepService>();   // W4: the scheduled sweep (PROCEDURE-ENGINE §4.1)
 builder.Services.AddHostedService<PnC.Api.Engine.ComplianceService>();   // #171: the scheduled compliance pass (obligation rules over their candidates)
 
@@ -70,7 +71,9 @@ app.UseStaticFiles();
 // 5. the endpoints (§6, §7)
 foreach (var v in app.Configuration.GetSection("Api:MaterialiseBeforePaging").Get<string[]>() ?? []) SqlSession.MaterialiseBeforePaging.Add(v);   // W7
 DefinitionEndpoints.Map(app, catalog, map, authz);
-FileEndpoints.Map(app, authz);                                           // W7: the file download (#144)
+FileEndpoints.Map(app, authz);                                           // W7: the file download (#144); #218 the file link
+var fileLinks = app.Services.GetRequiredService<PnC.Api.Security.FileLinkTokens>();
+app.Logger.LogInformation("File links: {Seconds} s, key {Source}", fileLinks.LifetimeSeconds, fileLinks.KeyFromConfig ? "from Files:LinkKey" : "drawn at startup (links outlive neither the process nor their lifetime)");
 SettingsEndpoints.Map(app, authz);                                       // #168: the rendered settings text
 ComplianceEndpoints.Map(app, catalog, authz);                            // #171: the obligation-rule evaluator (preview / effective)
 ProcessEndpoints.Map(app, catalog, map, authz, connectionString);   // W4: the procedure engine   // W3: fixed routes before the generic {schema}/{procedure}

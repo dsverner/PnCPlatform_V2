@@ -1949,6 +1949,33 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
                     $"#217: a migrated rationale ({k217_prov["SourceKey"]}) is served as a Word download ({k217_bytes.Length} bytes, {k217_mt}, {k217_g.Content.Headers.ContentDisposition?.DispositionType})");
             }
             else Skip($"#217: no legacy rationale documents are loaded on this environment, or the provenance view is not readable ({(int)k217_ps}) — the served file is not checked");
+            // ======== #218 (2026-09-21): a Word document opens in Word itself — the page asks for a short-lived link to the file (the token and
+            // the name in the path), Word fetches it with no identity of its own, and the read is the link's user's. A token opens its own file only.
+            {
+                // the migrated rationale when this environment has one (a Word document with bytes), else the #187 draft's own file
+                var (k218_fs, k218_fb) = k217_prov is not null ? await Get(admin, $"api/v1/document/vFile?RowId={k217_prov["TargetRowId"]}&take=1") : await Get(admin, $"api/v1/document/vFile?RevisionRowId={k215_rev}&take=1");
+                var k218_file = (k218_fb?["rows"] as JsonArray)?.FirstOrDefault();
+                var k218_id = k218_file?["RowId"]?.ToString();
+                var (k218_ls, k218_lb) = await Post(admin, $"api/v1/files/{k218_id}/link", new { });
+                var k218_url = k218_lb?["url"]?.ToString() ?? "";
+                var k218_g = await anonymous.GetAsync(k218_url.TrimStart('/'));
+                var k218_bytes = await k218_g.Content.ReadAsByteArrayAsync();
+                var k218_h = await anonymous.SendAsync(new HttpRequestMessage(HttpMethod.Head, k218_url.TrimStart('/')));
+                var k218_o = await anonymous.SendAsync(new HttpRequestMessage(HttpMethod.Options, k218_url[..(k218_url.LastIndexOf('/') + 1)].TrimStart('/')));
+                Must(k218_fs == HttpStatusCode.OK && k218_id is not null && k218_ls == HttpStatusCode.OK && k218_url.StartsWith($"/api/v1/files/{k218_id}/link/") && k218_url.EndsWith("/" + Uri.EscapeDataString(k218_file!["FileName"]!.ToString()))
+                     && k218_g.StatusCode == HttpStatusCode.OK && k218_bytes.Length == (int)(k218_file["SizeBytes"]?.GetValue<long>() ?? -1) && k218_h.StatusCode == HttpStatusCode.OK && k218_o.StatusCode == HttpStatusCode.NoContent,
+                    $"#218: a file link opens the file with no identity of its own — GET {(int)k218_g.StatusCode} ({k218_bytes.Length} bytes), HEAD {(int)k218_h.StatusCode}, OPTIONS on the link folder {(int)k218_o.StatusCode} (Word's probe)");
+                var k218_other = k218_url.Replace(k218_id!, Guid.NewGuid().ToString());
+                var (k218_xs, k218_xb) = await Get(anonymous, k218_other.TrimStart('/'));
+                var k218_bent = k218_url.Replace("/link/", "/link/x");
+                var (k218_ys, k218_yb) = await Get(anonymous, k218_bent.TrimStart('/'));
+                var (k218_zs, k218_zb) = await Get(anonymous, $"api/v1/files/{k218_id}");
+                Must(k218_xs == HttpStatusCode.Unauthorized && Code(k218_xb) == "link_invalid" && k218_ys == HttpStatusCode.Unauthorized && Code(k218_yb) == "link_invalid" && k218_zs == HttpStatusCode.Unauthorized && Code(k218_zb) == "unauthenticated",
+                    $"#218: the token opens its own file only — another file {(int)k218_xs} {Code(k218_xb)}, an altered token {(int)k218_ys} {Code(k218_yb)}, the file route with no link {(int)k218_zs} {Code(k218_zb)}");
+                var (k218_rs, k218_rb) = await Post(readOnly!, $"api/v1/files/{k218_id}/link", new { });
+                Must(k218_rs == HttpStatusCode.OK && (k218_rb?["officeUrl"] is null || k218_rb["officeUrl"]!.ToString().StartsWith("ms-word:ofv|u|http")),
+                    $"#218: ReadOnly (Document.Read) is issued a link too ({(int)k218_rs}); an Office document's link names its application ({k218_rb?["officeUrl"]?.ToString()?.Split('|')[0] ?? "not an Office document"})");
+            }
         }
 
         // ======== #168 increment 2 (2026-09-16): the settings edited in the platform, the file written by it — the owner's four-step
@@ -2227,7 +2254,9 @@ else Skip("W4 run (needs the Administrator, Approver, Hydro and Technician ident
             var fixturesActive = await CountAll("api/v1/document/vSettingsRecord?GridState=Active&DeviceName~=W4_");
             Check(active - fixturesActive >= 5450 && active - fixturesActive < 5650, $"the grid's Active rows: {active - fixturesActive} legacy (the A rows that carry a settings file) plus {fixturesActive} of the smoke's fixtures");
             Check(archived >= 5650 && archived < 5900, $"the grid's Archived rows: {archived} (the legacy P rows that carry a settings file, plus the fixtures')");
-            Check(outstanding >= 340 && outstanding < 500, $"the grid's Outstanding rows: {outstanding} (the legacy M rows that carry a settings file, plus the fixtures')");
+            // #218 (2026-09-21): the Outstanding rows drift the same way (151 fixtures on DEV after the day's runs, 350 legacy) — counted without them
+            var fixturesOutstanding = await CountAll("api/v1/document/vSettingsRecord?GridState=Outstanding&DeviceName~=W4_");
+            Check(outstanding - fixturesOutstanding >= 340 && outstanding - fixturesOutstanding < 500, $"the grid's Outstanding rows: {outstanding - fixturesOutstanding} legacy (the M rows that carry a settings file) plus {fixturesOutstanding} of the smoke's fixtures");
             var (fnd, fndb) = await Get(who, "api/v1/record/vFinding?FindingCategoryCode=MigrationReconciliation&take=100");
             Check(fnd == HttpStatusCode.OK && (fndb?["rows"] as JsonArray)?.Count >= 19, $"the 17 ordering violations and the 2 duplicate station numbers are findings (#59, card C), plus any the cutover rehearsal planted ({(fndb?["rows"] as JsonArray)?.Count})");
             var sw = System.Diagnostics.Stopwatch.StartNew();

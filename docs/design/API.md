@@ -304,7 +304,10 @@ process and is skipped in Windows mode.
 |---|---|---|
 | `GET /api/v1/files/{fileRowId}` | the file row and its revision's document; the bytes from `document.FileStore` by the file's stream id; the row's SHA-256 compared before anything is sent (500 `integrity` on mismatch); `RedactionStatus` other than None → 403 `redacted`; an archive-tier file (no stream id) → 404 `not_here`; **the open is a logged read** (`audit.LogRead` on `document.File`, in `config.ReadLoggedClass`); answered as an attachment with the stored name and MIME type, `Cache-Control: no-store`, `X-Content-Type-Options: nosniff` | `Document.Read` on the file's document (decided by the database) |
 
-The setting display (§9) links every file name to it.
+| `POST /api/v1/files/{fileRowId}/link` | #218: a short-lived link to this one file for a desktop application — `{ url, absoluteUrl, expiresAt, fileName, mimeType, officeUrl }`; `url` is `/api/v1/files/{id}/link/{token}/{file name}` (the token and the name in the path: Word requests nothing for a URL without a document extension and drops a query string); `officeUrl` is `ms-word:ofv|u|<absoluteUrl>` for a Word document (`ms-excel` for a workbook), null otherwise; the token names the file, the user and an expiry (`Files:LinkSeconds`, default 90) signed with `Files:LinkKey` (ignored config; a random key per process when absent) | `Document.Read` on the file's document, decided now |
+| `GET`/`HEAD /api/v1/files/{fileRowId}/link/{token}/{name}` | the same bytes as the file route, the identity being the token's user (`RequestUserMiddleware`, `FileLinkTokens`) — for that file only; another file, an altered or expired token → 401 `link_invalid`; the read is authorised and logged to that user as any other. `OPTIONS` under `/api/v1/files` answers 204 with `Allow` and no identity (Word probes the link's folder before it fetches; a 401 there ends the open) | as the file route |
+
+The setting display (§9) links every file name to it; the record's Files and records (#218) opens a Word document in Word through the link, a PDF or a text in its own tab, and saves anything else.
 
 ## 8d. Screens from definitions — W8 (2026-09-15, decisions #165, #167)
 
