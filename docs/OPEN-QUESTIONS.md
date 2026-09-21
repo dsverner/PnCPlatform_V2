@@ -94,3 +94,16 @@ the text format, and the seed for the templates. → #61.
 - **The `DRAWING_REVISION` procedure** — referenced, not authored.
 - **Repository remotes** — `github` and `origin` on `Z:` — not yet configured.
 - **Start date** — not given.
+- **The requirement page** (the owner, 2026-09-20, on the record's Standards list after #214: the list is "hardly
+  adequate to provide the users with the necessary information to feel comfortable with the requirement… the user
+  should be able to explore the details from the applicable standard requirement along with all the relevant system
+  information required to meet the standard (this may be a combination of both user decisions and research on the
+  standard). Again, this isn't really a phase 1 requirement, but I would like to take this forward"). A page (not a
+  popup) opened from an obligation row: the requirement's text as quoted from the standard in force in NB, with the
+  clause and the document named (compliance never from memory, #198); the rule's scope in words and the facts the
+  platform read; the evidence the platform holds (records, work, files) and what it does not; NB Power's documented
+  reading of the requirement (`compliance.Interpretation`, already in the schema) and the person's assertion for the
+  period (`compliance.Assertion`, `EvidenceLink`, `EvidencePackage` — the "platform assembles, a person asserts"
+  substrate of §12.6, built but without a screen). The research side — what the standard's parts require, part by
+  part — is content to be read and seeded from the standard, never written from memory. Phase 2 candidate; the
+  substrate is here, the screen is not.
