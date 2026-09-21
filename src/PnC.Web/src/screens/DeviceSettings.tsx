@@ -327,7 +327,6 @@ function MaskBits({ relayWord, code, value, editing, onSave, onClose }: { relayW
   const toggle = (i: number) => { const next = on.slice(); next[i] = !next[i]; setOn(next); setHex(formatMask(next, nRows, nBits)) }
   const typeHex = (text: string) => { setHex(text); if (isMaskText(text, nRows)) setOn(parseMask(text, nRows, nBits)) }
   const neverOn = (mask?.never ?? []).filter((c) => rows.some((row, ri) => row.some((b, bi) => b.code === c && on[ri * nBits + bi])))
-  const ticked = rows.flatMap((row, ri) => row.filter((_, bi) => on[ri * nBits + bi]).map((b) => b.code))
   const save = async () => {
     if (!isMaskText(hex, nRows)) { setErr(`Enter ${nRows} hex bytes (as ${relayWord.masks[code]?.example ?? '00 00 00'}).`); return }
     setBusy(true); setErr(null)
@@ -360,7 +359,6 @@ function MaskBits({ relayWord, code, value, editing, onSave, onClose }: { relayW
           {mask && <div><span className="text-slate-200">{mask.name}</span> — {mask.purpose} <span className="text-slate-600">({mask.cite})</span></div>}
         </div>
       </div>
-      <div className="text-xs text-slate-300">{ticked.length ? <>Ticked: {ticked.map((c) => { const b = rows.flat().find((x) => x.code === c)!; return <span key={c} className="mr-2"><span className="font-mono text-slate-100">{c}</span> <span className="text-slate-500">{b.meaning}</span></span> })}</> : <span className="text-slate-500">No bit is ticked.</span>}</div>
       {neverOn.length > 0 && <Status bad>{mask?.neverNote || `The manual says never to mask ${neverOn.join(', ')} into ${code}.`} ({mask?.cite})</Status>}
       {editing && (
         <div className="flex flex-wrap items-center gap-2">
