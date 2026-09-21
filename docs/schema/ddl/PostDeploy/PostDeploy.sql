@@ -42,6 +42,7 @@
 :r .\Seed_config_SettingsTemplates_SEL.sql
 :r .\Seed_ref_AnsiFunction_Core.sql
 :r .\Seed_config_SettingsTemplate_SEL221F.sql
+:r .\Seed_config_RelayWord_SEL221F.sql
 :r .\Seed_ref_Model_SEL421.sql
 :r .\Seed_config_Procedure_DrawingRevision.sql
 :r .\Seed_config_WorkTypes.sql

@@ -13,8 +13,9 @@ import { useTemplateDefs, saveAssetCharacteristic, addFirstWinding } from '@/com
 import { SchemeSourceActions, sourceRoleLabel } from '@/components/SchemeSourceActions'
 import { Panel, Pill, Tabs, Status, Button, inputClass } from '@/components/ui/ui'
 import { DataGrid, type Column } from '@/components/ui/data-grid'
+import { useRelayWord, parseMask, formatMask, isMaskText, type RelayWord } from '@/lib/relayWord'
 
-export interface Template { definitionEntityId: string; versionRowId: string; name: string; rows: Row[]; ansi: Map<string, string> }
+export interface Template { definitionEntityId: string; versionRowId: string; key: string; name: string; rows: Row[]; ansi: Map<string, string> }
 
 /** The settings template bound to a model (the firmware row that carries a parse transform), with its Effective rows. */
 export function useTemplate(modelId: string | null | undefined) {
@@ -28,7 +29,7 @@ export function useTemplate(modelId: string | null | undefined) {
     const codes = [...new Set(rows.map((r) => s(r.AnsiCode)).filter(Boolean))]
     const ansi = new Map<string, string>()
     for (const c of codes) { const a = (await view('ref', 'vAnsiFunction', { AnsiCode: c }, { take: 1 })).rows[0]; if (a) ansi.set(c, s(a.Name)) }
-    return { definitionEntityId: def, versionRowId: s(ver.RowId), name: s(d?.Name), rows, ansi }
+    return { definitionEntityId: def, versionRowId: s(ver.RowId), key: s(d?.DefinitionKey), name: s(d?.Name), rows, ansi }
   } })
 }
 
@@ -260,11 +261,14 @@ function AddSourceForm({ schemeEntityId, schemeName, inputs, sources, capability
  * revision is outstanding (#168 increment 2: process.SetParsedSetting reads it as the parser would — type, range, closed
  * list — closes the prior row in valid time and audits the change; the platform writes the settings file from these rows
  * at the settings step). */
-function SettingsGrid({ rows: given, values, revision, editable = false, deviceId = '' }: { rows: Row[]; values: Map<string, Row>; revision: string; editable?: boolean; deviceId?: string }) {
+function SettingsGrid({ rows: given, values, revision, editable = false, deviceId = '', relayWord = null }: { rows: Row[]; values: Map<string, Row>; revision: string; editable?: boolean; deviceId?: string; relayWord?: RelayWord | null }) {
   const rows: (Row & { _v?: Row })[] = given.map((r) => ({ ...r, _v: values.get(s(r.SettingCode)) }))
   const qc = useQueryClient()
   const [edits, setEdits] = useState<Record<string, string>>({})
   const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null)
+  // #215: a mask row (Format mask3) unfolds to its bits — read, or edited when the revision is outstanding
+  const [open, setOpen] = useState<{ code: string; editing: boolean } | null>(null)
+  const isMask = (r: Row) => r.Format === 'mask3' && !!relayWord
   const save = async (code: string, was: string) => {
     const v = edits[code]; if (v === undefined || v === was) return
     try {
@@ -278,6 +282,12 @@ function SettingsGrid({ rows: given, values, revision, editable = false, deviceI
     { key: 'Name', label: 'Setting', render: (r) => <span>{s(r.Name)} <span className="text-xs text-slate-500">{s(r.SettingCode)}</span></span> },
     { key: '_value', label: 'Value', render: (r) => {
         const was = r._v ? s(r._v.RawValue ?? r._v.DisplayValue) : ''; const code = s(r.SettingCode)
+        if (isMask(r)) return (
+          <span className="flex flex-wrap items-center gap-2">
+            {r._v ? <span className="font-mono text-slate-100">{was || <span className="text-slate-500">not set</span>}</span> : <span className="text-slate-500">not set</span>}
+            <Button kind="mini" aria-expanded={open?.code === code && !open.editing} onClick={() => setOpen(open?.code === code && !open.editing ? null : { code, editing: false })}>{open?.code === code && !open.editing ? 'Hide bits' : 'Bits'}</Button>
+            {editable && <Button kind="mini" aria-expanded={open?.code === code && open.editing} onClick={() => setOpen(open?.code === code && open.editing ? null : { code, editing: true })}>{open?.code === code && open.editing ? 'Close editor' : 'Edit bits'}</Button>}
+          </span>)
         if (editable) return <input className="w-32 rounded border border-slate-700 bg-slate-950 px-2 py-0.5 text-sm text-slate-100" value={edits[code] ?? was} placeholder="not set" aria-label={`${code} value`}
           onChange={(e) => setEdits((x) => ({ ...x, [code]: e.target.value }))} onBlur={() => void save(code, was)} onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }} />
         return r._v ? <span className={r._v.RangeCheck === 'OutOfRange' ? 'font-semibold text-amber-300' : 'text-slate-100'}>{was}</span> : <span className="text-slate-500">not set</span> },
@@ -291,8 +301,82 @@ function SettingsGrid({ rows: given, values, revision, editable = false, deviceI
     <>
       {msg && <Status bad={msg.bad}>{msg.text}</Status>}
       {editable && <Status>Outstanding revision: a value saves when you leave the field (audited as your change). The platform writes the settings file from these values when the settings step of the change commits.</Status>}
-      <div className="mt-2"><DataGrid rows={rows} columns={cols} rowKey={(r) => s(r.SettingCode)} emptyText="No settings in this group." /></div>
+      <div className="mt-2"><DataGrid rows={rows} columns={cols} rowKey={(r) => s(r.SettingCode)} emptyText="No settings in this group."
+        expandedKey={open?.code ?? null}
+        detail={(r) => (open && s(r.SettingCode) === open.code && relayWord
+          ? <MaskBits relayWord={relayWord} code={open.code} value={r._v ? s(r._v.RawValue ?? r._v.DisplayValue) : ''} editing={open.editing && editable}
+              onSave={async (v) => { await proc('process', 'SetParsedSetting', { ConfigurationFileRevisionRowId: revision, DeviceEntityId: deviceId, SettingCode: open.code, RawValue: v })
+                setMsg({ text: `${open.code} saved as ${v}.` }); setOpen({ code: open.code, editing: false })
+                qc.invalidateQueries({ queryKey: ['view', 'document', 'vParsedSettingNamed'] }); qc.invalidateQueries({ queryKey: ['rendered', revision] }) }}
+              onClose={() => setOpen(null)} />
+          : null)} /></div>
     </>
+  )
+}
+
+/** #215: a logic mask's bits, from the relay's Relay Word (the Program.RelayWord definition seeded from the manual). Read: the
+ * three rows of eight with the ticked bits named. Edit (the owner: "an editor to assist the user in selecting the appropriate
+ * bits"): tick boxes with each bit's meaning, the row's hex as it changes, a hex field kept in step, the mask's purpose and
+ * typical bits from the manual, a red line when a bit the manual says never to mask is ticked; Save writes the filed shape
+ * ("F0 A4 00") through process.SetParsedSetting like any other value. Row 3 bit 2 is named with its -3/-4 variant. */
+function MaskBits({ relayWord, code, value, editing, onSave, onClose }: { relayWord: RelayWord; code: string; value: string; editing: boolean; onSave: (v: string) => Promise<void>; onClose: () => void }) {
+  const rows = relayWord.rows; const nRows = rows.length; const nBits = rows[0]?.length ?? 8
+  const mask = relayWord.masks[code]
+  const readable = isMaskText(value, nRows)
+  const [on, setOn] = useState<boolean[]>(() => parseMask(value, nRows, nBits))
+  const [hex, setHex] = useState<string>(() => (value ? formatMask(parseMask(value, nRows, nBits), nRows, nBits) : ''))
+  const [busy, setBusy] = useState(false); const [err, setErr] = useState<string | null>(null)
+  const variantAt = (ri: number, bi: number) => relayWord.variants.find((v) => v.row === ri + 1 && v.bit === bi + 1)
+  const label = (ri: number, bi: number) => { const b = rows[ri][bi]; const v = variantAt(ri, bi); return v ? `${b.code} (${v.code} on the ${v.models})` : b.code }
+  const toggle = (i: number) => { const next = on.slice(); next[i] = !next[i]; setOn(next); setHex(formatMask(next, nRows, nBits)) }
+  const typeHex = (text: string) => { setHex(text); if (isMaskText(text, nRows)) setOn(parseMask(text, nRows, nBits)) }
+  const neverOn = (mask?.never ?? []).filter((c) => rows.some((row, ri) => row.some((b, bi) => b.code === c && on[ri * nBits + bi])))
+  const ticked = rows.flatMap((row, ri) => row.filter((_, bi) => on[ri * nBits + bi]).map((b) => b.code))
+  const save = async () => {
+    if (!isMaskText(hex, nRows)) { setErr(`Enter ${nRows} hex bytes (as ${relayWord.masks[code]?.example ?? '00 00 00'}).`); return }
+    setBusy(true); setErr(null)
+    try { await onSave(formatMask(parseMask(hex, nRows, nBits), nRows, nBits)) } catch (e) { setErr(e instanceof ApiError ? e.message : String(e)) } finally { setBusy(false) }
+  }
+  return (
+    <div className="space-y-2 p-2 text-sm">
+      {!readable && <Status bad>The filed value “{value}” is not {nRows} hex bytes; the bits below read it as far as they can. Saving replaces it.</Status>}
+      <div className="grid gap-3 lg:grid-cols-[auto_1fr]">
+        <table className="w-auto text-xs">
+          <tbody>
+            {rows.map((row, ri) => (
+              <tr key={ri} className="align-top">
+                <td className="pr-2 text-slate-500">Row {ri + 1}</td>
+                {row.map((b, bi) => { const i = ri * nBits + bi; const isOn = on[i]; const never = editing && (mask?.never ?? []).includes(b.code)
+                  return (
+                    <td key={b.code} className="px-1 pb-1">
+                      <label className={`flex flex-col items-center gap-0.5 rounded border px-1.5 py-1 ${isOn ? 'border-sky-700 bg-sky-900/30 text-sky-100' : 'border-slate-800 text-slate-400'} ${never && isOn ? 'border-red-700' : ''}`} title={`${label(ri, bi)} — ${b.meaning} (${b.cite})`}>
+                        {editing ? <input type="checkbox" checked={isOn} disabled={busy} onChange={() => toggle(i)} aria-label={`${code} ${b.code}`} /> : <span className="font-mono">{isOn ? '1' : '0'}</span>}
+                        <span className="font-mono">{b.code}</span>
+                      </label>
+                    </td>) })}
+                <td className="pl-2 font-mono text-slate-200">{formatMask(on, nRows, nBits).split(' ')[ri]}</td>
+              </tr>))}
+          </tbody>
+        </table>
+        <div className="space-y-1 text-xs text-slate-400">
+          {mask && <div><span className="text-slate-200">{mask.name}</span> — {mask.purpose} <span className="text-slate-600">({mask.cite})</span></div>}
+          {mask?.caution && <div className="text-amber-200/80">{mask.caution}</div>}
+          {mask && mask.typical.length > 0 && <div>Typical bits in the manual's example: {mask.typical.join(', ')} ({mask.example}).</div>}
+          {relayWord.testing && <div className="text-slate-500">Bits intended for relay testing: {relayWord.testing.bits.join(', ')} ({relayWord.testing.cite}).</div>}
+          {relayWord.variants.map((v) => <div key={v.code} className="text-slate-500">{v.note} ({v.cite})</div>)}
+          <div className="text-slate-500">{relayWord.bitOrder}</div>
+        </div>
+      </div>
+      <div className="text-xs text-slate-300">{ticked.length ? <>Ticked: {ticked.map((c) => { const b = rows.flat().find((x) => x.code === c)!; return <span key={c} className="mr-2"><span className="font-mono text-slate-100">{c}</span> <span className="text-slate-500">{b.meaning}</span></span> })}</> : <span className="text-slate-500">No bit is ticked.</span>}</div>
+      {neverOn.length > 0 && <Status bad>{mask?.neverNote || `The manual says never to mask ${neverOn.join(', ')} into ${code}.`} ({mask?.cite})</Status>}
+      {editing && (
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="flex items-center gap-2 text-xs text-slate-400">Hex<input className={`${inputClass} w-28 font-mono`} value={hex} disabled={busy} placeholder={mask?.example ?? '00 00 00'} onChange={(e) => typeHex(e.target.value)} aria-label={`${code} hex`} /></label>
+          <Button kind="primary" disabled={busy} onClick={() => void save()}>{busy ? 'Saving…' : 'Save'}</Button>
+          <Button disabled={busy} onClick={onClose}>Cancel</Button>
+          {err && <Status bad>{err}</Status>}
+        </div>)}
+    </div>
   )
 }
 
@@ -302,6 +386,7 @@ function SettingsGrid({ rows: given, values, revision, editable = false, deviceI
 export function SettingsByFunction({ template, parsed, parseStatus, parseError, revision, filedText, editable = false, deviceId = '' }: { template: Template; parsed: Row[]; parseStatus: string; parseError: string; revision: string; filedText: string | null; editable?: boolean; deviceId?: string }) {
   const values = useMemo(() => new Map(parsed.map((p) => [s(p.SettingCode), p])), [parsed])
   const bookRows = template.rows
+  const rwQ = useRelayWord(template.key)   // #215: the relay's Relay Word, when a definition names this template
   const categories = useMemo(() => { const seen: string[] = []; for (const r of bookRows) { const c = s(r.Category) || 'Settings'; if (!seen.includes(c)) seen.push(c) } return seen }, [bookRows])
   const [tab, setTab] = useState(categories[0] ?? '')
   const current = tab || categories[0] || ''
@@ -313,7 +398,7 @@ export function SettingsByFunction({ template, parsed, parseStatus, parseError, 
       {parsed.length > 0 && <a className="text-xs text-sky-300 underline" href={`/api/v1/settings/${revision}/rendered`} target="_blank" rel="noopener">the settings file as the platform writes it</a>}</>}>
       {unmatched && <Status bad>Names in the filed text that the template does not know: {unmatched}</Status>}
       <Tabs tabs={categories.map((c) => ({ key: c, label: c.length > 42 ? c.slice(0, 40) + '…' : c }))} value={current} onChange={setTab} />
-      <SettingsGrid rows={rows} values={values} revision={revision} editable={editable} deviceId={deviceId} />
+      <SettingsGrid rows={rows} values={values} revision={revision} editable={editable} deviceId={deviceId} relayWord={rwQ.data ?? null} />
       <details className="mt-3">
         <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wide text-slate-400">Relay listing and the file</summary>
         <div className="mt-2 grid gap-3 lg:grid-cols-2">

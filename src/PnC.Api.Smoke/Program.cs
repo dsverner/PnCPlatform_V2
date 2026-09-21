@@ -1832,6 +1832,36 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
             var k187_sel = (k187_selb?["rows"] as JsonArray)?.FirstOrDefault();
             Must(k187_sel is not null && k187_sel["TemplateKey"] is null && k187_sel["PlacedFrom"] is not null && k187_sel["PositionNodeEntityId"] is not null,
                 $"#187: the SEL-421 record carries its placement (since {k187_sel?["PlacedFrom"]?.ToString()[..10]}) and no template — the model has none");
+
+            // ======== #215 (2026-09-20): the logic mask editor. The owner: "create a logic editor for the SELOGIC settings ... an editor
+            // to assist the user in selecting the appropriate bits ... selected through the use of an edit button on the setting." The
+            // Relay Word is data from the manual (Program.RelayWord, RELAY_WORD_SEL_221F); the editor writes the mask through
+            // process.SetParsedSetting in the filed shape, so the file the platform writes keeps its form (#168).
+            var (k215_ds, k215_db) = await Get(admin, "api/v1/config/vDefinition?DefinitionKind=Program.RelayWord&DefinitionKey=RELAY_WORD_SEL_221F&take=1");
+            var k215_def = (k215_db?["rows"] as JsonArray)?.FirstOrDefault();
+            var (k215_vs, k215_vb) = await Get(admin, $"api/v1/config/vDefinitionVersion?DefinitionEntityId={k215_def?["EntityId"]}&Status=Effective&take=1");
+            var k215_doc = JsonNode.Parse((k215_vb?["rows"] as JsonArray)?.FirstOrDefault()?["PayloadText"]?.ToString() ?? "{}");
+            var k215_rows = k215_doc?["rows"] as JsonArray;
+            var k215_bits = k215_rows?.Sum(r => (r as JsonArray)?.Count ?? 0) ?? 0;
+            string Bit(int row, int bit) => k215_rows?[row - 1]?[bit - 1]?["code"]?.ToString() ?? "";
+            var k215_variant = (k215_doc?["variants"] as JsonArray)?.FirstOrDefault();
+            var k215_mtu = k215_doc?["masks"]?["MTU"];
+            Must(k215_ds == HttpStatusCode.OK && k215_def is not null && k215_vs == HttpStatusCode.OK && k215_bits == 24
+                 && Bit(1, 1) == "Z1P" && Bit(2, 6) == "50H" && Bit(3, 2) == "TRIP" && k215_variant?["code"]?.ToString() == "BFT"
+                 && k215_doc?["settingsTemplate"]?.ToString() == "SETTINGS_TEXT_SEL_221F" && (k215_mtu?["never"] as JsonArray)?.FirstOrDefault()?.ToString() == "TRIP",
+                $"#215: the SEL-221F Relay Word is an Effective definition from the manual — {k215_bits} bits, row 1 bit 1 {Bit(1, 1)}, row 2 bit 6 {Bit(2, 6)}, row 3 bit 2 {Bit(3, 2)} ({k215_variant?["code"]} on the {k215_variant?["models"]}); MTU never masks {(k215_mtu?["never"] as JsonArray)?.FirstOrDefault()}");
+            // the editor's write: MTU on the #187 relay's outstanding draft, in the filed shape; the rendered file carries it byte for byte
+            var k215_rev = k187_rec?["RevisionRowId"]?.ToString();
+            var (k215_s1s, k215_s1b) = await Post(admin, "api/v1/process/SetParsedSetting", new { ConfigurationFileRevisionRowId = k215_rev, DeviceEntityId = k187_relay, SettingCode = "MTU", RawValue = "F0 A4 00" });
+            var (k215_p1s, k215_p1b) = await Get(admin, $"api/v1/document/vParsedSettingNamed?ConfigurationFileRevisionRowId={k215_rev}&SettingCode=MTU&take=1");
+            var k215_raw = (k215_p1b?["rows"] as JsonArray)?.FirstOrDefault()?["RawValue"]?.ToString();
+            var k215_rend = await admin.GetAsync($"api/v1/settings/{k215_rev}/rendered");
+            var k215_text = await k215_rend.Content.ReadAsStringAsync();
+            var (k215_s2s, _) = await Post(admin, "api/v1/process/SetParsedSetting", new { ConfigurationFileRevisionRowId = k215_rev, DeviceEntityId = k187_relay, SettingCode = "MTU", RawValue = "" });
+            var (k215_q1s, _) = await Post(readOnly!, "api/v1/process/SetParsedSetting", new { ConfigurationFileRevisionRowId = k215_rev, DeviceEntityId = k187_relay, SettingCode = "MTU", RawValue = "F0 A4 00" });
+            Must(k215_s1s == HttpStatusCode.OK && k215_p1s == HttpStatusCode.OK && k215_raw == "F0 A4 00" && k215_rend.StatusCode == HttpStatusCode.OK && k215_text.Contains("MTU=F0 A4 00")
+                 && k215_s2s == HttpStatusCode.OK && k215_q1s == HttpStatusCode.Forbidden,
+                $"#215: the mask written as the editor writes it is filed byte for byte ({k215_raw}; {(int)k215_s1s} {Code(k215_s1b)}) and the file the platform writes carries MTU=F0 A4 00 after LOGIC SETTINGS; unset again ({(int)k215_s2s}); ReadOnly refused ({(int)k215_q1s})");
         }
 
         // ======== #168 increment 2 (2026-09-16): the settings edited in the platform, the file written by it — the owner's four-step
@@ -2105,7 +2135,10 @@ else Skip("W4 run (needs the Administrator, Approver, Hydro and Technician ident
             var outstanding = await CountAll("api/v1/document/vSettingsRecord?GridState=Outstanding");
             // the legacy rows that become configuration-file revisions: A 5 641, P 5 850, M 357, less the 277 control-switch rows (no file, R-06)
             // and the 9 rows of the 3 bases with no LOCATION (RECONCILIATION-2026-09-12.md); the fixtures add a few of each
-            Check(active >= 5500 && active < 5700, $"the grid's Active rows: {active} (the legacy A rows that carry a settings file, plus the fixtures')");
+            // #215 (2026-09-20): every run leaves its W4 fixtures' Active rows behind (170 on DEV after the day's runs), so the estate is
+            // counted without them — the legacy rows are the number the migration fixed, the fixtures are not
+            var fixturesActive = await CountAll("api/v1/document/vSettingsRecord?GridState=Active&DeviceName~=W4_");
+            Check(active - fixturesActive >= 5450 && active - fixturesActive < 5650, $"the grid's Active rows: {active - fixturesActive} legacy (the A rows that carry a settings file) plus {fixturesActive} of the smoke's fixtures");
             Check(archived >= 5650 && archived < 5900, $"the grid's Archived rows: {archived} (the legacy P rows that carry a settings file, plus the fixtures')");
             Check(outstanding >= 340 && outstanding < 500, $"the grid's Outstanding rows: {outstanding} (the legacy M rows that carry a settings file, plus the fixtures')");
             var (fnd, fndb) = await Get(who, "api/v1/record/vFinding?FindingCategoryCode=MigrationReconciliation&take=100");
