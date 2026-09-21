@@ -14,7 +14,7 @@ import { settingsText } from '@/lib/actions'
 import { type RecordParams, type Screen, splitView, screenPath } from '@/lib/screens'
 import { Panel, Pill, stateTone, Button, Facts, Status, Field, Tabs, inputClass } from '@/components/ui/ui'
 import { DataGrid, type Column } from '@/components/ui/data-grid'
-import DeviceSettings, { useTemplate, AnalogInputs, BasisPanel } from './DeviceSettings'
+import DeviceSettings, { useTemplate, AnalogInputs, BasisPanel, RelayListingAndFile } from './DeviceSettings'
 import ComplianceTab, { useProtectedAssets } from './ComplianceTab'
 import { NodeLink } from './PrimaryAssetScreen'
 import { ManualPanel } from '@/components/ManualPanel'
@@ -116,7 +116,12 @@ export default function RecordScreen({ params: p, id }: { screen: Screen; params
           {compareId && <Compare mine={parsed} mineText={textQ.data?.text ?? ''} mineLabel={s(r.RevisionLabel)} other={others.find((x) => s(x.RevisionRowId) === compareId)!} />}
         </Panel>
       )}
-      {section === 'files' && <FilesPanel r={r} revision={revision} />}
+      {section === 'files' && (
+        <>
+          {/* #216 follow-up (the owner, 2026-09-21): the relay's listing and the file the platform writes belong with the files */}
+          {template && <Panel title="Relay listing and the file the platform writes"><RelayListingAndFile template={template} parsed={parsed} revision={revision} filedText={textQ.data?.text ?? null} bare /></Panel>}
+          <FilesPanel r={r} revision={revision} />
+        </>)}
       {section === 'manual' && <ManualPanel templateDefinitionEntityId={s(r.TemplateDefinitionEntityId) || null} modelName={s(r.ModelName)} />}   {/* #216 */}
     </div>
   )

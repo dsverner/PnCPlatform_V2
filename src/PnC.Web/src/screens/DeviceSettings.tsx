@@ -377,7 +377,7 @@ function MaskBits({ relayWord, code, value, editing, onSave, onClose }: { relayW
 /** A tab beside the template's categories that is not a settings category (#216 follow-up: the relay's Hardware). */
 export interface ExtraTab { key: string; label: string; render: () => ReactNode }
 
-export function SettingsByFunction({ template, parsed, parseStatus, parseError, revision, filedText, editable = false, deviceId = '', extraTabs = [] }: { template: Template; parsed: Row[]; parseStatus: string; parseError: string; revision: string; filedText: string | null; editable?: boolean; deviceId?: string; extraTabs?: ExtraTab[] }) {
+export function SettingsByFunction({ template, parsed, parseStatus, parseError, revision, filedText, editable = false, deviceId = '', extraTabs = [], showListing = true }: { template: Template; parsed: Row[]; parseStatus: string; parseError: string; revision: string; filedText: string | null; editable?: boolean; deviceId?: string; extraTabs?: ExtraTab[]; showListing?: boolean }) {
   const values = useMemo(() => new Map(parsed.map((p) => [s(p.SettingCode), p])), [parsed])
   const bookRows = template.rows
   const rwQ = useRelayWord(template.key)   // #215: the relay's Relay Word, when a definition names this template
@@ -385,7 +385,6 @@ export function SettingsByFunction({ template, parsed, parseStatus, parseError, 
   const [tab, setTab] = useState(categories[0] ?? '')
   const current = tab || categories[0] || ''
   const rows = bookRows.filter((r) => (s(r.Category) || 'Settings') === current)
-  const renderedQ = useQuery({ queryKey: ['rendered', revision], queryFn: () => getText(`/api/v1/settings/${revision}/rendered`), staleTime: 60_000, enabled: parsed.length > 0 })
   const unmatched = parseError && /not in the template: ([^;]+)/.exec(parseError)?.[1]
   return (
     <Panel title={`Settings · ${template.name}`} actions={<>{parseStatus && <Pill tone={parseStatus === 'Parsed' ? 'good' : parseStatus === 'Partial' ? 'warn' : 'neutral'}>{parseStatus}</Pill>}
@@ -395,15 +394,28 @@ export function SettingsByFunction({ template, parsed, parseStatus, parseError, 
       {extraTabs.find((x) => x.key === current)
         ? extraTabs.find((x) => x.key === current)!.render()   // the owner, 2026-09-21: "hardware should really be another tab in the settings section"
         : <SettingsGrid rows={rows} values={values} revision={revision} editable={editable} deviceId={deviceId} relayWord={rwQ.data ?? null} />}
-      <details className="mt-3">
-        <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wide text-slate-400">Relay listing and the file</summary>
-        <div className="mt-2 grid gap-3 lg:grid-cols-2">
-          <div><h4 className="text-xs text-slate-500">Listing (the template's order, as the relay lists it)</h4><pre className="mt-1 overflow-auto rounded border border-slate-800 bg-slate-950 p-2 text-xs">{listing(template.rows, values)}</pre></div>
-          <div><h4 className="text-xs text-slate-500">The file the platform writes{renderedQ.data != null && filedText != null ? (renderedQ.data === filedText ? ' — identical to the file as filed' : ' — differs from the file as filed (order or spelling; the values are what was parsed)') : ''}</h4>
-            <pre className="mt-1 max-h-64 overflow-auto rounded border border-slate-800 bg-slate-950 p-2 text-xs whitespace-pre-wrap">{renderedQ.isPending ? '…' : renderedQ.isError ? 'not available' : renderedQ.data}</pre></div>
-        </div>
-      </details>
+      {showListing && <RelayListingAndFile template={template} parsed={parsed} revision={revision} filedText={filedText} />}
     </Panel>
+  )
+}
+
+/** The relay's listing and the file the platform writes from these values, beside the file as filed (#168). The owner,
+ * 2026-09-21: it belongs with the files — the record mounts it on Files and records; the template screen keeps it under the book. */
+export function RelayListingAndFile({ template, parsed, revision, filedText, bare = false }: { template: Template; parsed: Row[]; revision: string; filedText: string | null; bare?: boolean }) {
+  const values = useMemo(() => new Map(parsed.map((p) => [s(p.SettingCode), p])), [parsed])
+  const renderedQ = useQuery({ queryKey: ['rendered', revision], queryFn: () => getText(`/api/v1/settings/${revision}/rendered`), staleTime: 60_000, enabled: !!revision && parsed.length > 0 })
+  const body = (
+      <div className="mt-2 grid gap-3 lg:grid-cols-2">
+        <div><h4 className="text-xs text-slate-500">Listing (the template's order, as the relay lists it)</h4><pre className="mt-1 overflow-auto rounded border border-slate-800 bg-slate-950 p-2 text-xs">{listing(template.rows, values)}</pre></div>
+        <div><h4 className="text-xs text-slate-500">The file the platform writes{renderedQ.data != null && filedText != null ? (renderedQ.data === filedText ? ' — identical to the file as filed' : ' — differs from the file as filed (order or spelling; the values are what was parsed)') : ''}</h4>
+          <pre className="mt-1 max-h-64 overflow-auto rounded border border-slate-800 bg-slate-950 p-2 text-xs whitespace-pre-wrap">{!revision || !parsed.length ? 'no revision' : renderedQ.isPending ? '…' : renderedQ.isError ? 'not available' : renderedQ.data}</pre></div>
+      </div>)
+  if (bare) return body
+  return (
+    <details className="mt-3">
+      <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wide text-slate-400">Relay listing and the file</summary>
+      {body}
+    </details>
   )
 }
 
@@ -427,7 +439,7 @@ export default function DeviceSettings({ r, revision, filedText, editable = fals
   if (!tq.data) return null
   return (
     <>
-      <SettingsByFunction template={tq.data} parsed={parsed} parseStatus={s(r.ParseStatus)} parseError={s(r.ParseError)} revision={revision} filedText={filedText} editable={editable} deviceId={s(r.DeviceEntityId)} />
+      <SettingsByFunction template={tq.data} parsed={parsed} parseStatus={s(r.ParseStatus)} parseError={s(r.ParseError)} revision={revision} filedText={filedText} editable={editable} deviceId={s(r.DeviceEntityId)} showListing={false} />
     </>
   )
 }
