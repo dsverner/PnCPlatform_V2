@@ -22,7 +22,8 @@ Stages, in order (each stage's source keys and rules are in MIGRATION-PLAN.md §
   9 findings       the 17 chains where an archived CR exceeds the active CR → record.Finding (#59, #142)
  10 report         the reconciliation: every input row under exactly one rule; totals; flags
 """
-import argparse, csv, datetime, json, os, re, sys, time
+import argparse
+import hashlib, csv, datetime, json, os, re, sys, time
 from collections import Counter, defaultdict, OrderedDict
 import pyodbc
 import common
@@ -67,9 +68,10 @@ def read_csv(name):
 
 
 class Importer:
-    def __init__(self, run, limit=None, source_db=None):
+    def __init__(self, run, limit=None, source_db=None, docs=None):
         self.run = run
         self.limit = limit
+        self.docs = docs                     # #217: the folder of legacy rationale documents (Z:\...\Backup\Documents), or None
         self.src = common.connect(source_db or SOURCE_DB).cursor()   # W8: the cutover rehearsal reads the client's copy; provenance still names SOURCE
         self.rules = Counter()               # reconciliation: rule → rows
         self.examples = defaultdict(list)
@@ -756,6 +758,103 @@ class Importer:
             self.run.provenance("record", "Finding", key, h, entity_id=rec, row_id=rrow)
             self.rule("chain where an archived CR exceeds the active CR → a finding (#59)", base)
 
+    # ------------------------------------------------------------------ 9c the legacy rationale documents (#217)
+    def rationale_stage(self):
+        """The Word rationale documents of the legacy program, from a folder of station folders (Z:\\Archive-WorkingData-Cloud\\Work\\
+        Backup\\Documents\\<Station>\\<file>), named by the rotation: A9999.doc (the in-service document), M9999_<CR>.doc (the open
+        change's), P9999_<CR>.doc (superseded). The owner, 2026-09-21: import them to get the system up reliably; they are never
+        updated past the revision they are on — from the next change the rationale is the structured one the application makes.
+        Each becomes a Document of class Rationale + one Issued revision holding the file as filed + a RevisionLink About the
+        configuration-file revision it belongs to (SubjectKind DocumentRevision, the settings revision's RowId). The revision is found
+        by NUMBER and CHANGE REQUEST through the provenance key Revision:<L><number>|<CR>, any letter: measured on the folder, an M
+        file's CR often belongs to the P row the change became (the copy predates the rename), so the file's letter is the document's
+        state when copied, not the revision's identity. An A file (no CR) is the base's single A row. Idempotent by the bytes' hash."""
+        if not self.docs:
+            self.log("rationale documents: no --docs folder given; nothing loaded"); return
+        cls = self.run.one("SELECT EntityId FROM config.vDefinition WHERE DefinitionKind = N'CharacteristicSchema.DocumentClass' AND DefinitionKey = N'Rationale'")
+        if not cls:
+            self.run.flag("RationaleClassMissing", "the document class Rationale is not seeded on the target; the documents are not loaded"); return
+        cls = str(cls)
+        rev_by_key = {k[2]: v[2] for k, v in self.run._existing.items() if k[0] == "document" and k[1] == "ConfigurationFile" and k[2].startswith("Revision:")}
+        by_num_cr = defaultdict(list); a_by_num = {}
+        for key, rid in rev_by_key.items():
+            oldno, cr = key.split(":", 1)[1].split("|"); by_num_cr[(oldno[1:5], cr)].append((oldno[0], rid))
+            if oldno[0] == "A": a_by_num[oldno[1:5]] = rid
+        legacy_nums = {r[0].strip()[1:5]: None for r in self.src_rows("SELECT OLD_NO FROM dbo.SETTINGS")}
+        d_crs = {(r[0].strip()[1:5], str(r[1])) for r in self.src_rows("SELECT OLD_NO, [Change Request ID] FROM dbo.SETTINGS WHERE LEFT(OLD_NO,1) NOT IN ('A','M','P')")}
+        pat = re.compile(r"^([AMP])(\d{4})(?:_(\d+))?\.(docx?)$", re.I)
+        mime = {"doc": "application/msword", "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"}
+        seen = {}   # lower name → (sha, path): the same name in two folders
+        loaded = 0
+        for station in sorted(os.listdir(self.docs)):
+            folder = os.path.join(self.docs, station)
+            if not os.path.isdir(folder): continue
+            for name in sorted(os.listdir(folder)):
+                path = os.path.join(folder, name)
+                if not os.path.isfile(path): continue
+                low = name.lower()
+                if low.startswith("~$") or "autorecovered" in low:
+                    self.rule("a Word lock file or recovery copy → skipped", f"{station}/{name}"); continue
+                m = pat.match(name)
+                if not m:
+                    if low.endswith((".doc", ".docx")): self.rule("a Word file not named by the rotation → not loaded", f"{station}/{name}")
+                    else: self.rule("a relay setting file beside the documents → skipped (not a document)", f"{station}/{name}")
+                    continue
+                letter, num, cr, ext = m.group(1).upper(), m.group(2), m.group(3), m.group(4).lower()
+                if num not in legacy_nums:
+                    self.rule("a document whose number has no legacy row → not loaded", f"{station}/{name}"); continue
+                if cr:
+                    hits = by_num_cr.get((num, cr), [])
+                    if not hits:
+                        if (num, cr) in d_crs: self.rule("a document whose change request belongs to a dropped D record → not loaded (R-06)", f"{station}/{name}")
+                        else: self.rule("a document whose number and change request match no revision → not loaded", f"{station}/{name}")
+                        continue
+                    hit = next((h for h in hits if h[0] == letter), hits[0])
+                    rev, note = hit[1], (None if hit[0] == letter else f"the file is lettered {letter}; the revision with this number and change request is the {hit[0]} row")
+                    self.rule("a rotation-named document → the rationale of the revision with its number and change request", f"{station}/{name}")
+                else:
+                    rev = a_by_num.get(num)
+                    if not rev:
+                        self.rule("an A document whose base has no A revision → not loaded", f"{station}/{name}"); continue
+                    note = None
+                    self.rule("an A document → the rationale of the base's in-service revision", f"{station}/{name}")
+                data = open(path, "rb").read()
+                sha = hashlib.sha256(data).digest()
+                key = f"RationaleFile:{low}"
+                if low in seen:
+                    if seen[low][0] == sha:
+                        self.rule("the same document in two station folders, identical → loaded once", f"{station}/{name}"); continue
+                    # the same name with different content: the folder is trusted for nothing (2,199 files sit in a folder that is not
+                    # their number's location), so BOTH are loaded against the revision the name says, the later copy titled with its folder, and a
+                    # person decides which is the rationale — flagged so the reconciliation names every pair
+                    self.run.flag("RationaleAmbiguous", f"{name}: different content in {seen[low][1]} and {station}; both loaded", name)
+                    self.rule("the same name with different content in two folders → both loaded, flagged", f"{station}/{name}")
+                    key = f"RationaleFile:{low}@{station.strip().lower()}"
+                else:
+                    seen[low] = (sha, station)
+                if self.run.already_loaded("document", "File", key, sha):
+                    continue
+                if self.run.existing_row("document", "File", key):
+                    self.run.flag("RationaleChanged", f"{name}: the bytes differ from the file loaded earlier; the earlier file stands", name); continue
+                (doc,) = self.run.exec("document.Document_Add", outputs=[("EntityId", "UNIQUEIDENTIFIER")], DocumentClassDefinitionEntityId=cls, Title=(name if "@" not in key else f"{name} ({station})")[:200],
+                                       Description=f"Legacy rationale document as filed (#217): {station}\\{name}" + (f"; {note}" if note else ""), ValidFrom=capture_at())
+                (drow,) = self.run.exec("document.Revision_Add", outputs=[("RowId", "UNIQUEIDENTIFIER")], DocumentEntityId=str(doc), RevisionLabel="1", Status="Issued",
+                                        IssuedAt=capture_at(), ChangeNote="as filed in the legacy document folder", ValidFrom=capture_at())
+                # the bytes: bound as varbinary(max) on the run's own cursor (Run.exec sizes nothing); a procedure call, as every write is
+                self.run.cur.setinputsizes([(pyodbc.SQL_WVARCHAR, 0, 0), (pyodbc.SQL_WVARCHAR, 0, 0), (pyodbc.SQL_WVARCHAR, 0, 0), (pyodbc.SQL_VARBINARY, 0, 0),
+                                            (pyodbc.SQL_BINARY, 32, 0), (pyodbc.SQL_WVARCHAR, 0, 0), (pyodbc.SQL_WVARCHAR, 0, 0), (pyodbc.SQL_WVARCHAR, 0, 0)])
+                frow, fent = self.run.cur.execute("""SET NOCOUNT ON; DECLARE @f UNIQUEIDENTIFIER, @e UNIQUEIDENTIFIER;
+                    EXEC document.File_Write @RevisionRowId=?, @FileName=?, @MimeType=?, @Content=?, @FileRole=N'Attachment', @Sha256=?, @ValidFrom=?, @ActorId=?, @MigrationRunId=?, @EntityId=@e OUTPUT, @RowId=@f OUTPUT;
+                    SELECT @f, @e""", str(drow), name, mime[ext], pyodbc.Binary(data), sha, capture_at(), self.run.actor_id, self.run.run_id).fetchone()
+                self.run.cur.setinputsizes(None); self.run.calls += 1
+                (lrow,) = self.run.exec("document.RevisionLink_Add", outputs=[("RowId", "UNIQUEIDENTIFIER")], RevisionRowId=str(drow), LinkKind="About",
+                                        SubjectKind="DocumentRevision", SubjectEntityId=str(rev), ValidFrom=capture_at())
+                self.run.provenance("document", "Document", key, sha, entity_id=str(doc), row_id=str(drow), notes=note)
+                self.run.provenance("document", "File", key, sha, entity_id=str(fent), row_id=str(frow))
+                self.run.provenance("document", "RevisionLink", "RationaleLink:" + key[len("RationaleFile:"):], sha, row_id=str(lrow))
+                loaded += 1
+        self.log(f"rationale documents loaded: {loaded}")
+
     # ------------------------------------------------------------------ 9b provenance for the engine-written rows
     def provenance_stage(self):
         """WriteConfigurationRevision and LandMigratedInstance write documents, files, blocks, steps, version pins and transitions
@@ -827,13 +926,13 @@ class Importer:
         return src_totals
 
 
-def load(database, limit=None, report=None, source_db=None):
+def load(database, limit=None, report=None, source_db=None, docs=None):
     """The rehearsal runner's entry (run_rehearsal.py): one run, the reconciliation written, the run's report returned."""
     if not database.startswith("PnCPlatform_V2_"):
         sys.exit("refusing: the target must be a PnCPlatform_V2_* database (#99)")
     with Run(SOURCE, CAPTURE_AT, notes=f"W7 legacy import (CUTOVER-STRATEGY §5); limit {limit}", target_db=database) as run:
-        imp = Importer(run, limit, source_db)
-        for stage in ("prepare", "persons_stage", "manufacturers_stage", "models_stage", "locations_stage", "devices_stage", "schemes_stage", "requests_stage", "revisions_stage", "landings_stage", "findings_stage", "provenance_stage", "dropped_counts"):
+        imp = Importer(run, limit, source_db, docs)
+        for stage in ("prepare", "persons_stage", "manufacturers_stage", "models_stage", "locations_stage", "devices_stage", "schemes_stage", "requests_stage", "revisions_stage", "rationale_stage", "landings_stage", "findings_stage", "provenance_stage", "dropped_counts"):
             imp.log(stage); getattr(imp, stage)()
         path = report or os.path.join(HERE, f"RECONCILIATION-{datetime.date.today().isoformat()}.md")
         totals = imp.report(path)
@@ -873,10 +972,11 @@ def main():
     ap.add_argument("--report", default=None)
     ap.add_argument("--close", action="store_true", help="close the landed requests whose runs the sweep has completed (card H); no load")
     ap.add_argument("--source-db", default=None, help="read the legacy tables from this database instead of dbRelayManagement_Legacy (the cutover rehearsal's second copy, W8)")
+    ap.add_argument("--docs", default=None, help="#217: the folder of legacy rationale documents (station folders of A9999 / M9999_CR / P9999_CR .doc); none = the stage loads nothing")
     a = ap.parse_args()
     if not a.database.startswith("PnCPlatform_V2_"):
         sys.exit("refusing: the target must be a PnCPlatform_V2_* database (#99)")
-    rep = close_landed(a.database) if a.close else load(a.database, a.limit, a.report, a.source_db)
+    rep = close_landed(a.database) if a.close else load(a.database, a.limit, a.report, a.source_db, a.docs)
     print(json.dumps(rep, indent=1, default=str))
 
 

@@ -1920,6 +1920,34 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
                     $"#216: the SEL-221F manual kept with its template is served inline as application/pdf ({k216_ba.LongLength} bytes, {k216_disp}); ReadOnly reads it ({(int)k216_gr.StatusCode}); the Node-scoped engineer reads it too ({(k216_gh is null ? "n/a" : ((int)k216_gh.StatusCode).ToString())}) — a manual is reference material, not a site's record");
             }
             else Skip("#216: no SEL-221F manual is loaded on this environment (tools/load_manual.py) — the inline serve and the scoped read are not checked");
+
+            // ======== #217 (2026-09-21): the legacy rationale documents, imported by a replayable rule — a Document of class Rationale
+            // whose revision holds the Word file as filed and links About the configuration-file revision it belongs to (SubjectKind
+            // DocumentRevision), never to the device; frozen at that revision. The owner: import them to get the system up reliably;
+            // from the next change the rationale is the structured one the application generates.
+            var (k217_cs, k217_cb) = await Get(admin, "api/v1/config/vDefinition?DefinitionKind=CharacteristicSchema.DocumentClass&DefinitionKey=Rationale&take=1");
+            var k217_cl = Id((k217_cb?["rows"] as JsonArray)?.FirstOrDefault());
+            var (k217_d1s, k217_d1b) = await Post(admin, "api/v1/document/Document_Add", new { DocumentClassDefinitionEntityId = k217_cl, Title = $"{tag} 217 rationale (no file)" });
+            var (k217_r1s, k217_r1b) = await Post(admin, "api/v1/document/Revision_Add", new { DocumentEntityId = Id(k217_d1b), RevisionLabel = "1", Status = "Issued" });
+            var (k217_l1s, k217_l1b) = await Post(admin, "api/v1/document/RevisionLink_Add", new { RevisionRowId = Id(k217_r1b, "RowId"), LinkKind = "About", SubjectKind = "DocumentRevision", SubjectEntityId = k215_rev });
+            var (k217_v1s, k217_v1b) = await Get(admin, $"api/v1/document/vRevisionLink?SubjectKind=DocumentRevision&SubjectEntityId={k215_rev}&LinkKind=About&take=5");
+            var (k217_l2s, _) = await Post(admin, "api/v1/document/RevisionLink_SoftDelete", new { EntityId = Id(k217_l1b) });
+            var (k217_r2s, _) = await Post(admin, "api/v1/document/Revision_SoftDelete", new { EntityId = Id(k217_r1b) });
+            var (k217_d2s, _) = await Post(admin, "api/v1/document/Document_SoftDelete", new { EntityId = Id(k217_d1b) });
+            Must(k217_cs == HttpStatusCode.OK && k217_cl is not null && k217_d1s == HttpStatusCode.OK && k217_r1s == HttpStatusCode.OK && k217_l1s == HttpStatusCode.OK
+                 && k217_v1s == HttpStatusCode.OK && ((k217_v1b?["rows"] as JsonArray)?.Count ?? 0) >= 1 && k217_l2s == HttpStatusCode.OK && k217_r2s == HttpStatusCode.OK && k217_d2s == HttpStatusCode.OK,
+                $"#217: a Rationale document links About a configuration-file revision ({(int)k217_l1s} {Code(k217_l1b)}) and the record's files read it back; retired again");
+            // a migrated rationale, when this environment has them (provenance RationaleFile:<name> → the file): a Word file served as a download
+            var (k217_ps, k217_pb) = await Get(admin, "api/v1/migration/vProvenance?TargetTable=File&SourceKey~=RationaleFile%3A&take=1");
+            var k217_prov = (k217_pb?["rows"] as JsonArray)?.FirstOrDefault();
+            if (k217_ps == HttpStatusCode.OK && k217_prov is not null)
+            {
+                var k217_g = await admin.GetAsync($"api/v1/files/{k217_prov["TargetRowId"]}"); var k217_bytes = await k217_g.Content.ReadAsByteArrayAsync();
+                var k217_mt = k217_g.Content.Headers.ContentType?.MediaType ?? "";
+                Must(k217_g.StatusCode == HttpStatusCode.OK && (k217_mt.Contains("msword") || k217_mt.Contains("wordprocessingml")) && k217_g.Content.Headers.ContentDisposition?.DispositionType == "attachment" && k217_bytes.Length > 0,
+                    $"#217: a migrated rationale ({k217_prov["SourceKey"]}) is served as a Word download ({k217_bytes.Length} bytes, {k217_mt}, {k217_g.Content.Headers.ContentDisposition?.DispositionType})");
+            }
+            else Skip($"#217: no legacy rationale documents are loaded on this environment, or the provenance view is not readable ({(int)k217_ps}) — the served file is not checked");
         }
 
         // ======== #168 increment 2 (2026-09-16): the settings edited in the platform, the file written by it — the owner's four-step

@@ -10,43 +10,54 @@ record is `LEGACY-FIELDS.md`. A rehearsal (`run_rehearsal.py`) proves the import
 
 | Rule | Function | Line |
 |---|---|---:|
-| Users: empty name, not migrated | `persons_stage` | 134 |
-| Users → personnel.Person | `persons_stage` | 139 |
-| Users → personnel.Person | `persons_stage` | 149 |
-| MANUFACTURER → ref.Manufacturer (existing) | `manufacturers_stage` | 163 |
-| MANUFACTURER → ref.Manufacturer (created) | `manufacturers_stage` | 179 |
-| DEVICE → ref.Model (existing) | `models_stage` | 213 |
-| DEVICE → ref.Model (created) | `models_stage` | 225 |
-| LOCATIONS row → its station's USERNAME groups | `locations_stage` | 247 |
-| station placed under the owner's marked division (card A) | `locations_stage` | 283 |
-| station created / confirmed | `locations_stage` | 308 |
-| (LOCATION, EQUIPMENT) → Panel | `locations_stage` | 314 |
-| duplicate station number → a finding on the station left without one (card C) | `station_number_finding` | 320 |
-| duplicate station number → a finding on the station left without one (card C) | `station_number_finding` | 327 |
-| row of a base with no LOCATION/EQUIPMENT panel: counted, not written | `devices_stage` | 362 |
-| FUNCTIONS with an ANSI code → ProtectionFunction + CommissionedFunction | `devices_stage` | 400 |
-| FUNCTIONS without an ANSI code → NodeFunction label | `devices_stage` | 410 |
-| base number → DevicePosition + Asset (+ Device, Installed) | `devices_stage` | 412 |
-| (LOCATION, EQUIPMENT) → Scheme (equipment group) | `schemes_stage` | 441 |
-| base number → member of its equipment group (asset + protection functions) | `schemes_stage` | 456 |
-| {tbl} row → a completion-track state on its request | `requests_stage` | 499 |
-| Setting Software Management non-NA row → a note on the request (#58) | `requests_stage` | 532 |
-| work request revised in place under a changed rule (card H) | `requests_stage` | 554 |
-| SAP Work Order Numer → SapWorkOrder key | `requests_stage` | 559 |
-| Change Request ID (of an A/M/P row) → work.WorkRequest | `requests_stage` | 561 |
-| Settings Management row → the request's type, requester, notes | `requests_stage` | 563 |
-| Settings Management row of a dropped chain (D / 2440): counted, not written | `requests_stage` | 568 |
-| Settings Management duplicate row (same CR): folded into its request | `requests_stage` | 570 |
-| CONTROL SWITCH row: asset only, no configuration file (mappings/asset_type.csv) | `revisions_stage` | 578 |
-| "A": "A row → the current revision, in service now", "P": "P row → a superseded revision with its in-service period", "M": "M row → a Draft revision (the open change)" | `revisions_stage` | 625 |
-| SET1 + SETTINGS2 → one settings text (#168) | `revisions_stage` | 641 |
-| legacy classification columns (CLASS, USE, RESPONSIBILITY, Bulk_Power_Element, Protection_Group, ELEMENT, LINE_TYPE, NUMBER OF RELAYS): dropped — untrusted (#194) | `revisions_stage` | 674 |
-| "A": "A row → the current revision, in service now", "P": "P row → a superseded revision with its in-service period", "M": "M row → a Draft revision (the open change)" | `revisions_stage` | 682 |
-| overflow columns (SETTINGS2, DESC, REMARKS, CT/PT) → the record's summary text | `revisions_stage` | 684 |
-| chain where an archived CR exceeds the active CR → a finding (#59) | `findings_stage` | 750 |
-| chain where an archived CR exceeds the active CR → a finding (#59) | `findings_stage` | 757 |
-| D row: dropped, counted (#31) | `dropped_counts` | 803 |
-| {tbl} row of a dropped or unknown chain: counted, not written | `dropped_counts` | 811 |
+| Users: empty name, not migrated | `persons_stage` | 136 |
+| Users → personnel.Person | `persons_stage` | 141 |
+| Users → personnel.Person | `persons_stage` | 151 |
+| MANUFACTURER → ref.Manufacturer (existing) | `manufacturers_stage` | 165 |
+| MANUFACTURER → ref.Manufacturer (created) | `manufacturers_stage` | 181 |
+| DEVICE → ref.Model (existing) | `models_stage` | 215 |
+| DEVICE → ref.Model (created) | `models_stage` | 227 |
+| LOCATIONS row → its station's USERNAME groups | `locations_stage` | 249 |
+| station placed under the owner's marked division (card A) | `locations_stage` | 285 |
+| station created / confirmed | `locations_stage` | 310 |
+| (LOCATION, EQUIPMENT) → Panel | `locations_stage` | 316 |
+| duplicate station number → a finding on the station left without one (card C) | `station_number_finding` | 322 |
+| duplicate station number → a finding on the station left without one (card C) | `station_number_finding` | 329 |
+| row of a base with no LOCATION/EQUIPMENT panel: counted, not written | `devices_stage` | 364 |
+| FUNCTIONS with an ANSI code → ProtectionFunction + CommissionedFunction | `devices_stage` | 402 |
+| FUNCTIONS without an ANSI code → NodeFunction label | `devices_stage` | 412 |
+| base number → DevicePosition + Asset (+ Device, Installed) | `devices_stage` | 414 |
+| (LOCATION, EQUIPMENT) → Scheme (equipment group) | `schemes_stage` | 443 |
+| base number → member of its equipment group (asset + protection functions) | `schemes_stage` | 458 |
+| {tbl} row → a completion-track state on its request | `requests_stage` | 501 |
+| Setting Software Management non-NA row → a note on the request (#58) | `requests_stage` | 534 |
+| work request revised in place under a changed rule (card H) | `requests_stage` | 556 |
+| SAP Work Order Numer → SapWorkOrder key | `requests_stage` | 561 |
+| Change Request ID (of an A/M/P row) → work.WorkRequest | `requests_stage` | 563 |
+| Settings Management row → the request's type, requester, notes | `requests_stage` | 565 |
+| Settings Management row of a dropped chain (D / 2440): counted, not written | `requests_stage` | 570 |
+| Settings Management duplicate row (same CR): folded into its request | `requests_stage` | 572 |
+| CONTROL SWITCH row: asset only, no configuration file (mappings/asset_type.csv) | `revisions_stage` | 580 |
+| "A": "A row → the current revision, in service now", "P": "P row → a superseded revision with its in-service period", "M": "M row → a Draft revision (the open change)" | `revisions_stage` | 627 |
+| SET1 + SETTINGS2 → one settings text (#168) | `revisions_stage` | 643 |
+| legacy classification columns (CLASS, USE, RESPONSIBILITY, Bulk_Power_Element, Protection_Group, ELEMENT, LINE_TYPE, NUMBER OF RELAYS): dropped — untrusted (#194) | `revisions_stage` | 676 |
+| "A": "A row → the current revision, in service now", "P": "P row → a superseded revision with its in-service period", "M": "M row → a Draft revision (the open change)" | `revisions_stage` | 684 |
+| overflow columns (SETTINGS2, DESC, REMARKS, CT/PT) → the record's summary text | `revisions_stage` | 686 |
+| chain where an archived CR exceeds the active CR → a finding (#59) | `findings_stage` | 752 |
+| chain where an archived CR exceeds the active CR → a finding (#59) | `findings_stage` | 759 |
+| a Word lock file or recovery copy → skipped | `rationale_stage` | 797 |
+| a Word file not named by the rotation → not loaded | `rationale_stage` | 800 |
+| a relay setting file beside the documents → skipped (not a document) | `rationale_stage` | 801 |
+| a document whose number has no legacy row → not loaded | `rationale_stage` | 805 |
+| a document whose change request belongs to a dropped D record → not loaded (R-06) | `rationale_stage` | 809 |
+| a document whose number and change request match no revision → not loaded | `rationale_stage` | 810 |
+| a rotation-named document → the rationale of the revision with its number and change request | `rationale_stage` | 814 |
+| an A document whose base has no A revision → not loaded | `rationale_stage` | 818 |
+| an A document → the rationale of the base's in-service revision | `rationale_stage` | 820 |
+| the same document in two station folders, identical → loaded once | `rationale_stage` | 826 |
+| the same name with different content in two folders → both loaded, flagged | `rationale_stage` | 831 |
+| D row: dropped, counted (#31) | `dropped_counts` | 902 |
+| {tbl} row of a dropped or unknown chain: counted, not written | `dropped_counts` | 910 |
 
 ## 2. Rules a PostDeploy seed applies to migrated data (replayed on every deploy)
 
