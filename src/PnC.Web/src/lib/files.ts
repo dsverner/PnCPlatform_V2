@@ -18,3 +18,19 @@ export async function openFileInTab(fileRowId: string): Promise<void> {
   window.open(url, '_blank', 'noopener')
   setTimeout(() => URL.revokeObjectURL(url), 60_000)
 }
+
+/** The file saved by the browser under its own name (a Word document, a settings file): a plain link cannot carry the
+ * identity and lands on 401 on DEV (#217 follow-up), so the bytes are fetched with it and handed to the browser's download. */
+export async function downloadFile(fileRowId: string, fileName: string): Promise<void> {
+  const blob = await fetchFileBlob(fileRowId)
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a'); a.href = url; a.download = fileName || 'file'; a.rel = 'noopener'
+  document.body.appendChild(a); a.click(); a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 60_000)
+}
+
+/** A PDF or a text opens in its own tab (the browser shows it); anything else is saved. */
+export function openOrDownload(fileRowId: string, fileName: string, mime: string): Promise<void> {
+  const inline = /^application\/pdf|^text\//i.test(mime || '')
+  return inline ? openFileInTab(fileRowId) : downloadFile(fileRowId, fileName)
+}
