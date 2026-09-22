@@ -12,7 +12,8 @@ import { useCan, useEntryState, useViewAll } from '@/lib/hooks'
 import { legacyFree, legacyDetail } from '@/lib/legacy'
 import { settingsText } from '@/lib/actions'
 import { type RecordParams, type Screen, splitView, screenPath } from '@/lib/screens'
-import { Panel, Pill, stateTone, Button, Facts, Status, Tabs } from '@/components/ui/ui'
+import { Panel, Pill, stateTone, Button, Facts, Status } from '@/components/ui/ui'
+import { PreferredTabs } from '@/components/PreferredTabs'
 import { openFile, downloadFile } from '@/lib/files'
 import { RaiseRequest, type RaiseOpts } from '@/components/actions/RaiseRequest'
 
@@ -68,7 +69,9 @@ export default function RecordScreen({ params: p, id }: { screen: Screen; params
       </header>
       {raise && <RaiseRequest o={raise} onClose={() => setRaise(null)} />}
       <Status>{legacyFree(r.DeviceName)} · rev {s(r.RevisionLabel) || '?'} · Revision {s(r.RevisionStatus)} · lifecycle {s(r.LifecycleState) || '—'} · {s(r.FileKind)} {s(r.ParseStatus)}</Status>
-      <Tabs value={section} onChange={setSection} tabs={[{ key: 'settings', label: 'Settings' }, ...(hasRationaleTab ? [{ key: 'rationale', label: 'Rationale' }] : []), { key: 'analog', label: 'Analog inputs' }, ...(r.TemplateDefinitionEntityId ? [{ key: 'jumpers', label: 'Jumper settings' }] : []), { key: 'record', label: 'Record' }, { key: 'history', label: 'History' }, { key: 'compliance', label: 'Compliance' }, { key: 'notes', label: 'Notes' }, { key: 'text', label: 'Settings file' }, { key: 'files', label: 'Files and records' }, { key: 'manual', label: 'Manual' }]} />
+      {/* #226 (the owner, 2026-09-22): which of these a person keeps is theirs — defaulted by the work they do, changed
+          by them, and never a way of blocking anything. The two conditional tabs keep their conditions on top of it. */}
+      <PreferredTabs screenKey="SETTINGS_RECORD" value={section} onChange={setSection} tabs={[{ key: 'settings', label: 'Settings' }, ...(hasRationaleTab ? [{ key: 'rationale', label: 'Rationale' }] : []), { key: 'analog', label: 'Analog inputs' }, ...(r.TemplateDefinitionEntityId ? [{ key: 'jumpers', label: 'Jumper settings' }] : []), { key: 'record', label: 'Record' }, { key: 'history', label: 'History' }, { key: 'compliance', label: 'Compliance' }, { key: 'notes', label: 'Notes' }, { key: 'text', label: 'Settings file' }, { key: 'files', label: 'Files and records' }, { key: 'manual', label: 'Manual' }]} />
       {section === 'settings' && (template
         /* #168: the template's view of the device — functions, inputs, settings by function — when the model has one */
         ? <>

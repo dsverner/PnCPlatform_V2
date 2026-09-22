@@ -15,6 +15,7 @@ import InstrumentTransformerScreen from '@/screens/InstrumentTransformerScreen'
 import LocationsScreen from '@/screens/LocationsScreen'
 import ReferenceDataScreen from '@/screens/ReferenceDataScreen'
 import ComplianceEvaluationScreen from '@/screens/ComplianceEvaluationScreen'
+import ViewPreferencesScreen from '@/screens/ViewPreferencesScreen'
 
 export default function ScreenPage() {
   const { key = '', id } = useParams()
@@ -31,6 +32,7 @@ function ScreenBody({ screen, id }: { screen: Screen; id?: string }) {
     case 'settingsBook': return <SettingsBookScreen screen={screen} params={screen.params as SettingsBookParams} />
     // #173: the locations index is plain code — the generic list cannot join a station to the buildings inside it
     case 'list': return screen.key === 'LOCATIONS' ? <LocationsScreen />
+      : screen.key === 'VIEW_PREFERENCES' ? <ViewPreferencesScreen screen={screen} />   // #226: what each person, and each group, sees
       : (screen.params as { view?: string }).view === 'ref.vVoltageClass' ? <ReferenceDataScreen screen={screen} params={screen.params as ListParams} id={id} />   // #210: the reference lists, kept from their own page
       : (screen.params as { view?: string }).view === 'compliance.vEvaluationQueue' ? <ComplianceEvaluationScreen screen={screen} />   // #214: how compliance keeps itself evaluated
       : <ListScreen screen={screen} params={screen.params as ListParams} />

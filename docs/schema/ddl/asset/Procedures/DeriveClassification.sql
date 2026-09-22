@@ -38,6 +38,11 @@ BEGIN
     DECLARE @value NVARCHAR(60) = NULLIF(LTRIM(RTRIM(@ClassificationValue)), N'');
     SET @DeterminedAt = ISNULL(@DeterminedAt, @now);
     DECLARE @currentBasis NVARCHAR(20), @currentValue NVARCHAR(60);
+    -- The API binds an OUTPUT parameter from the request body (SqlSession.ExecuteProcedureAsync), so a caller can name
+    -- a row here. Cleared first: without this, a person with rights on one subject could pass another subject's row id
+    -- and the lookup below would leave it standing, revising or deleting a row that is not theirs. Found 2026-09-22
+    -- while reviewing #226, and measured on DEV against config.SetViewItem, which had the same shape.
+    SET @EntityId = NULL;
     SELECT TOP (1) @EntityId = [EntityId], @currentBasis = [Basis], @currentValue = [ClassificationValue]
     FROM [asset].[Classification]
     WHERE [SubjectKind] = @SubjectKind AND [SubjectEntityId] = @SubjectEntityId AND [ClassificationKindCode] = @ClassificationKindCode

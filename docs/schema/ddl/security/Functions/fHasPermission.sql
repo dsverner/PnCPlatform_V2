@@ -40,6 +40,11 @@ BEGIN
     -- any role that carries Definition.Read, whatever the grant's scope: they have no place in the tree and every screen
     -- needs them (work types, models, procedures). Writes and approvals of definitions stay Global-only.
     IF @permissionCode = N'Definition.Read' AND (@subjectKind IS NULL OR @subjectKind IN (N'Definition', N'DefinitionVersion')) RETURN 1;
+    -- #226 (2026-09-22): what a person shows or hides on a screen is theirs wherever they work. The catalogue of screen
+    -- parts has no place in the tree, and config.SetViewItem writes only the calling person's own row, so a role that
+    -- carries these reads and sets them whatever its grant's scope. ViewItem.Administer, which changes what a role
+    -- starts everyone with, stays Global-only like every other Administer.
+    IF @permissionCode IN (N'ViewItem.Read', N'ViewItem.Modify') RETURN 1;
     -- #216 (2026-09-21): a REFERENCE document — one whose revision is linked About a Definition (a model's instruction manual on
     -- its asset template) — is read by any role that carries Document.Read, whatever the grant's scope: it is the manufacturer's
     -- book, not a site's record, and the field staff who work at one station need it as much as anyone. Every other document

@@ -59,13 +59,14 @@ export function Facts({ pairs, cols = 3 }: { pairs: [ReactNode, ReactNode][]; co
   )
 }
 
-export function Tabs<T extends string>({ tabs, value, onChange }: { tabs: { key: T; label: ReactNode }[]; value: T; onChange: (k: T) => void }) {
+export function Tabs<T extends string>({ tabs, value, onChange, extra }: { tabs: { key: T; label: ReactNode }[]; value: T; onChange: (k: T) => void; extra?: ReactNode }) {
   return (
-    <div role="tablist" className="flex flex-wrap gap-1 border-b border-slate-700">
+    <div role="tablist" className="flex flex-wrap items-center gap-1 border-b border-slate-700">
       {tabs.map((t) => (
         <button key={t.key} role="tab" type="button" aria-selected={t.key === value} onClick={() => onChange(t.key)}
           className={`-mb-px border-b-2 px-3 py-1.5 text-sm ${t.key === value ? 'border-sky-400 text-sky-300' : 'border-transparent text-slate-400 hover:text-slate-200'}`}>{t.label}</button>
       ))}
+      {extra && <div className="ml-auto pb-1 pl-2">{extra}</div>}
     </div>
   )
 }

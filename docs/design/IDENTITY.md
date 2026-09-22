@@ -70,7 +70,7 @@ row):
 account types; they stay active and unlisted.
 
 **The matrix** (`PostDeploy/Seed_security_RolePermission.sql`, extended; codes are
-`<SubjectClass>.<Verb>` over the twelve seeded classes):
+`<SubjectClass>.<Verb>` over the thirteen seeded classes):
 
 | Class | PCEngineer | PCApprover | PCTechnician | ReadOnly |
 |---|---|---|---|---|
@@ -82,8 +82,12 @@ account types; they stay active and unlisted.
 | Obligation | Read, Report | Read | Read | Read |
 | Definition | Read, **Modify, Approve** (W5 card F, #126; under a Global grant only — a definition has no node) | Read | Read | Read |
 | Grant | — | — | — | — |
+| ViewItem (#226: what a person shows or hides on a screen) | Read, Modify | Read, Modify | Read, Modify | Read |
 
-`Archive` and `Administer` stay the Administrator's everywhere. This is the proposition the W2 card
+`Archive` and `Administer` stay the Administrator's everywhere — `ViewItem.Administer`, which sets the
+shape a group starts with, included. `ViewItem.Read` is held by every active role and `ViewItem.Modify` by every one but
+ReadOnly, which only reads (decision 237); the pair is answered whatever a grant's scope: `config.SetViewItem` takes no user and writes only the caller's own row,
+so a person whose work is one division still keeps their own view (#226). This is the proposition the W2 card
 puts to the owner; the seed is idempotent, so an amendment is a row change and a redeploy.
 
 ---

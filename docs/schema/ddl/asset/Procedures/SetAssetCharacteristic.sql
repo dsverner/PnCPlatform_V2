@@ -69,6 +69,11 @@ BEGIN
     END
 
     -- what stands
+    -- The API binds an OUTPUT parameter from the request body (SqlSession.ExecuteProcedureAsync), so a caller can name
+    -- a row here. Cleared first: without this, a person with rights on one subject could pass another subject's row id
+    -- and the lookup below would leave it standing, revising or deleting a row that is not theirs. Found 2026-09-22
+    -- while reviewing #226, and measured on DEV against config.SetViewItem, which had the same shape.
+    SET @EntityId = NULL;
     DECLARE @from NVARCHAR(400);
     SELECT TOP (1) @EntityId = v.[EntityId],
            @from = COALESCE(v.[TextValue], CONVERT(NVARCHAR(40), v.[IntegerValue]), CONVERT(NVARCHAR(60), v.[DecimalValue]), CASE v.[BooleanValue] WHEN 1 THEN N'Y' WHEN 0 THEN N'N' END)

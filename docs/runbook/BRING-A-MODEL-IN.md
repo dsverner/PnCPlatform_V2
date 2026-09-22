@@ -102,6 +102,8 @@ Copy into the model's plan and tick off:
 8. If the relay has logic masks: `tools/relay_word_<model>.py`.
 9. `tools/load_manual.py` on each environment; the LOAD-MANUALS table.
 10. Screens: nothing per model unless a new kind of thing appears; if a screen is added, `seed_screens.py`, a `menu`, `PAGES`.
+    A screen with tabs also declares them in `tools/view_items.py` (#226), so a person can turn off the ones they do not
+    use; a tab left undeclared is simply always shown.
 11. Element map: `elements` and `groups` in `tools/relay_word_<model>.py` — every setting in exactly one owner; supervision from the manual's logic equations, quoted with the page. Rationale: `tools/rationale_<model>_<function>.py` — the sections, inputs, formulas and statements from the model's
     legacy rationale documents (Files and records of its records) and the manual; the plant facts it reads must exist on
     the assets (line impedance, ratios).

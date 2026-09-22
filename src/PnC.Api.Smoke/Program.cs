@@ -371,6 +371,112 @@ if (cs is not null && windows is null)
 }
 else Skip("AccessRefused in audit.vActionLog (needs a connection string and the DEV identities)");
 
+// 10c. #226: what a person sees is theirs. The catalogue of parts a screen offers, the shape each role starts with, and
+// each person's own choice on top — written only through config.SetViewItem, which takes no user and so can only ever
+// write the caller's own row. Hiding is a preference: nothing here refuses a read the person could otherwise make.
+if (windows is null && admin is not null && tech is not null && hydro is not null)
+{
+    const string SR = "SETTINGS_RECORD";
+    var (cats, catb) = await Get(admin, $"api/v1/config/vViewItem?ScreenKey={SR}&take=100");
+    var catalogue = (catb?["rows"] as JsonArray) ?? new JsonArray();
+    Check(cats == HttpStatusCode.OK && catalogue.Count == 11, $"#226: the settings record declares its eleven parts ({catalogue.Count})");
+    Check(catalogue.Any(r => r?["ItemKey"]?.ToString() == "settings" && r?["IsAlways"]?.GetValue<bool>() == true), "#226: Settings is the one part nobody hides");
+
+    async Task<(bool shown, string source)> Mine(HttpClient who, string item)
+    {
+        var (_, b) = await Get(who, $"api/v1/config/vMyViewItem?ScreenKey={SR}&ItemKey={item}");
+        var row = (b?["rows"] as JsonArray)?.FirstOrDefault();
+        return (row?["IsShown"]?.GetValue<bool>() ?? false, row?["Source"]?.ToString() ?? "");
+    }
+    var (ms, mb) = await Get(tech, $"api/v1/config/vMyViewItem?ScreenKey={SR}&take=100");
+    var mine = (mb?["rows"] as JsonArray) ?? new JsonArray();
+    var shownNow = mine.Count(r => r?["IsShown"]?.GetValue<bool>() == true);
+    Check(ms == HttpStatusCode.OK && mine.Count == 11 && shownNow == 8, $"#226: the technician's record screen resolves to 8 of 11 parts ({shownNow})");
+    var filesBefore = await Mine(tech, "files");
+    Check(!filesBefore.shown && filesBefore.source == "role", $"#226: Files and records is off for the technician, and the answer comes from the role ({filesBefore.source})");
+    var histBefore = await Mine(tech, "history");
+    var compBefore = await Mine(tech, "compliance");
+    Check(histBefore.shown && compBefore.shown, "#226: History and Compliance are there for the technician (the owner: engineering and technical staff the same)");
+
+    // the person's own choice, on top of the role
+    var (sv1, sv1b) = await Post(tech, "api/v1/config/SetViewItem", new { ScreenKey = SR, ItemKey = "files", IsShown = true });
+    var filesAfter = await Mine(tech, "files");
+    Check(sv1 == HttpStatusCode.OK && filesAfter.shown && filesAfter.source == "mine", $"#226: the technician turns Files and records on for themselves ({(int)sv1}, {filesAfter.source})");
+    // and nobody else's view moved with it
+    var hydroFiles = await Mine(hydro, "files");
+    Check(hydroFiles.source == "role", $"#226: the engineer's own view is untouched by what the technician chose ({hydroFiles.source})");
+    // back to the role's answer
+    var (sv2, _) = await Post(tech, "api/v1/config/SetViewItem", new { ScreenKey = SR, ItemKey = "files", IsShown = (bool?)null });
+    var filesBack = await Mine(tech, "files");
+    Check(sv2 == HttpStatusCode.OK && !filesBack.shown && filesBack.source == "role", $"#226: back to the usual puts the role's answer back ({filesBack.source})");
+
+    // what it refuses
+    var (sv3, sv3b) = await Post(tech, "api/v1/config/SetViewItem", new { ScreenKey = SR, ItemKey = "settings", IsShown = false });
+    Check(sv3 != HttpStatusCode.OK, $"#226: the part a screen exists for cannot be hidden [{(int)sv3} {Code(sv3b)}]");
+    var (sv4, sv4b) = await Post(tech, "api/v1/config/SetViewItem", new { ScreenKey = SR, ItemKey = "no-such-part", IsShown = true });
+    Check(sv4 != HttpStatusCode.OK, $"#226: a part the screen does not declare is refused [{(int)sv4} {Code(sv4b)}]");
+
+    // a person whose grant covers one division still sets their own view (the scope carve-out in security.fHasPermission)
+    var (sv5, sv5b) = await Post(hydro, "api/v1/config/SetViewItem", new { ScreenKey = SR, ItemKey = "text", IsShown = true });
+    var hydroText = await Mine(hydro, "text");
+    Check(sv5 == HttpStatusCode.OK && hydroText.source == "mine", $"#226: an engineer whose work is one division sets their own view [{(int)sv5} {Code(sv5b)}]");
+    await Post(hydro, "api/v1/config/SetViewItem", new { ScreenKey = SR, ItemKey = "text", IsShown = (bool?)null });
+
+    // the shape a role starts people with is an administrator's
+    var (rv1, rv1b) = await Post(tech, "api/v1/config/SetRoleViewItem", new { RoleCode = "PCTechnician", ScreenKey = SR, ItemKey = "text", IsShown = true });
+    Check(rv1 == HttpStatusCode.Forbidden, $"#226: a technician may not change what the group starts with [{(int)rv1} {Code(rv1b)}]");
+    var (rv2, rv2b) = await Post(admin, "api/v1/config/SetRoleViewItem", new { RoleCode = "PCTechnician", ScreenKey = SR, ItemKey = "text", IsShown = true });
+    var techText = await Mine(tech, "text");
+    Check(rv2 == HttpStatusCode.OK && techText.shown && techText.source == "role", $"#226: an administrator changes it and the technician sees it [{(int)rv2} {Code(rv2b)}, {techText.source}]");
+    await Post(admin, "api/v1/config/SetRoleViewItem", new { RoleCode = "PCTechnician", ScreenKey = SR, ItemKey = "text", IsShown = false });
+    var techTextBack = await Mine(tech, "text");
+    Check(!techTextBack.shown, "#226: the group's shape is put back where the smoke found it");
+
+    // A read-only account only reads (decision 237): it sees its group's shape and changes nothing, its own view included
+    if (readOnly is not null)
+    {
+        var (ro1, ro1b) = await Post(readOnly, "api/v1/config/SetViewItem", new { ScreenKey = SR, ItemKey = "files", IsShown = false });
+        var (ro2, _) = await Get(readOnly, $"api/v1/config/vMyViewItem?ScreenKey={SR}&take=100");
+        Check(ro1 == HttpStatusCode.Forbidden && ro2 == HttpStatusCode.OK, $"#226: a read-only account reads its view and cannot change it [{(int)ro1} {Code(ro1b)}, read {(int)ro2}]");
+    }
+
+    // A person's own choices are theirs to read as well as to set. The generated reads on the table are the
+    // Administrator's; everyone else reads their own answer, already resolved, through config.vMyViewItem.
+    var (uv1, uv1b) = await Get(tech, "api/v1/config/vUserViewItem?take=5");
+    var (uv2, uv2b) = await Get(tech, "api/v1/config/vUserViewItemHistory?take=5");
+    Check(uv1 == HttpStatusCode.Forbidden && uv2 == HttpStatusCode.Forbidden,
+        $"#226: nobody but an administrator reads the table of everyone's choices [{(int)uv1} {Code(uv1b)}, {(int)uv2} {Code(uv2b)}]");
+    var (uv3, _) = await Get(admin, "api/v1/config/vUserViewItem?take=5");
+    Check(uv3 == HttpStatusCode.OK, $"#226: an administrator still can, for an audit [{(int)uv3}]");
+
+    // Naming somebody else's row does not reach it. The API binds an OUTPUT parameter from the body, so EntityId is the
+    // caller's to send; the procedure clears it and finds its own. Measured on DEV, 2026-09-22, before that line existed:
+    // the engineer's call below returned Cleared and the technician's choice was gone.
+    var (h1, h1b) = await Post(tech, "api/v1/config/SetViewItem", new { ScreenKey = SR, ItemKey = "files", IsShown = true });
+    var victim = h1b?["EntityId"]?.ToString();
+    var (h2, h2b) = await Post(hydro, "api/v1/config/SetViewItem", new { ScreenKey = SR, ItemKey = "record", IsShown = (bool?)null, EntityId = victim });
+    var stillMine = await Mine(tech, "files");
+    Check(h1 == HttpStatusCode.OK && stillMine.shown && stillMine.source == "mine",
+        $"#226: one person naming another's row does not touch it [{(int)h2} {h2b?["Outcome"]}, the technician's answer is still {stillMine.source}]");
+    await Post(tech, "api/v1/config/SetViewItem", new { ScreenKey = SR, ItemKey = "files", IsShown = (bool?)null });
+
+    if (cs is not null)
+    {
+        await using var con = new SqlConnection(cs);
+        await con.OpenAsync();
+        await using var cmd = con.CreateCommand();
+        cmd.CommandText = """
+            SELECT COUNT(*) FROM audit.vActionLog
+            WHERE SubjectSchema = N'config' AND SubjectTable = N'UserViewItem'
+              AND JSON_VALUE(Detail, '$.screen') = N'SETTINGS_RECORD' AND JSON_VALUE(Detail, '$.item') = N'files'
+              AND OccurredAt > DATEADD(minute, -5, SYSDATETIMEOFFSET())
+            """;
+        var n = Convert.ToInt32(await cmd.ExecuteScalarAsync());
+        Check(n >= 2, $"#226: turning a part on and putting it back are both in the action log, named ({n})");
+    }
+}
+else Skip("#226 screen preferences (needs the DEV identities)");
+
 // 11. cleanup — soft deletes only, through the API as Administrator, children before parents
 if (admin is not null)
 {

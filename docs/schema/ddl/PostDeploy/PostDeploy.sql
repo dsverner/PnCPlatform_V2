@@ -1,4 +1,4 @@
-/*
+﻿/*
   Post-deployment script. Seeds reference rows the design states literally (SCHEMA-DESIGN
   step sections), idempotently (MERGE). Predecessor-derived lists (asset types, ANSI codes,
   models …) are migration content (§14.2), not seeds, and do not appear here.
@@ -50,6 +50,7 @@
 :r .\Seed_config_Workflow_InstrumentTransformerTests.sql
 :r .\Seed_config_SchemeType_Legacy.sql
 :r .\Seed_config_Screens.sql
+:r .\Seed_config_ViewItems.sql
 :r .\Seed_config_CharacteristicSchema_SettingsRecord.sql
 :r .\Seed_location_Divisions.sql
 :r .\Seed_location_StationCodes.sql

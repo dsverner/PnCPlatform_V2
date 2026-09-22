@@ -1,5 +1,5 @@
 {
-  "_": "docs/design/API.md §4. (schema, object) → <SubjectClass>.<Verb>. Subject classes are the twelve seeded by PostDeploy/Seed_security_Permission.sql. An explicit null is not callable over HTTP; a hand-written procedure absent from 'procedures' is not callable either. W1 defaults — the schema→class assignments marked (W2) are reviewed when roles and scopes are built.",
+  "_": "docs/design/API.md §4. (schema, object) → <SubjectClass>.<Verb>. Subject classes are the thirteen seeded by PostDeploy/Seed_security_Permission.sql. An explicit null is not callable over HTTP; a hand-written procedure absent from 'procedures' is not callable either. W1 defaults — the schema→class assignments marked (W2) are reviewed when roles and scopes are built.",
 
   "subjectClassBySchema": {
     "location":   "Node",
@@ -38,8 +38,17 @@
     "process.ProcedureStep":        "Definition",
     "process.ProcedureCall":        "Definition",
     "process.ProcedureFactUse":     "Definition",
-    "process.MigrationList":        "Definition"
+    "process.MigrationList":        "Definition",
+    "config.ViewItem":              "ViewItem",
+    "config.RoleViewItem":          "ViewItem",
+    "_userViewItem": "#226: one person's own screen choices are theirs. The generated reads on the table (vUserViewItem, vUserViewItemHistory) carry NO ViewItem code — every role holds ViewItem.Read, and neither view is row-scoped, so that would have let any signed-in person read everyone's. They are class Grant, the Administrator's alone; a person reads their own resolved answer through config.vMyViewItem, which is filtered to the session.",
+    "config.UserViewItem":          "Grant",
+    "config.MyViewItem":            "ViewItem",
+    "config.SetViewItem":           "ViewItem",
+    "config.SetRoleViewItem":       "ViewItem"
   },
+
+  "_226": "What a person shows or hides on a screen (#226). The catalogue and the role defaults are read by everyone and written only through the two guarded procedures: SetViewItem writes the caller's own row and nothing else, so every role holds ViewItem.Modify; SetRoleViewItem changes what a role starts people with, which is an Administrator's act. The generated writers are not callable over HTTP.",
 
   "_subjectKeys": "W2 (IDENTITY.md §5; API-W1-SECURITY.md #11): a body key that names the subject of a write and the ref.SubjectKind it implies. '*' = the object's class; '$SubjectKind' / '$MemberKind' = the body's own kind field. Order is preference.",
   "subjectKeys": [
@@ -83,6 +92,15 @@
     "compliance.SubjectEvaluation_Deactivate": null,
     "compliance.SubjectVerdict_Deactivate": null,
     "compliance.EvaluationRequest_Append": null,
+    "config.SetViewItem":                  "ViewItem.Modify",
+    "config.SetRoleViewItem":              "ViewItem.Administer",
+    "config.ViewItem_Upsert":              null,
+    "config.ViewItem_Deactivate":          null,
+    "config.RoleViewItem_Upsert":          null,
+    "config.RoleViewItem_Deactivate":      null,
+    "config.UserViewItem_Add":             null,
+    "config.UserViewItem_Revise":          null,
+    "config.UserViewItem_SoftDelete":      null,
     "config.AddCharacteristic":            "Definition.Modify",
     "config.AddDefinition":                "Definition.Modify",
     "config.AddDefinitionVersion":         "Definition.Modify",

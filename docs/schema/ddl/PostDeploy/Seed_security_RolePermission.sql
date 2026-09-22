@@ -1,4 +1,4 @@
--- PLATFORM-ARCHITECTURE decision 237; SCHEMA-DESIGN §11.3 (154). The only role → permission mappings the vision's
+﻿-- PLATFORM-ARCHITECTURE decision 237; SCHEMA-DESIGN §11.3 (154). The only role → permission mappings the vision's
 -- role descriptions imply: the Administrator "configures workflows, formulas, compliance rules, templates and
 -- reporting" and administers access (every permission); Read-only reads (every <Class>.Read). Every other role's
 -- permissions are the Administrator's to assign (owner, 2026-09-06: no other defaults seeded). Idempotent.
@@ -45,4 +45,27 @@ BEGIN
     FETCH NEXT FROM m INTO @r, @p;
 END
 CLOSE m; DEALLOCATE m;
+GO
+
+-- #226: what a person shows or hides on a screen is theirs. Every active role reads the catalogue of screen items, and
+-- every role but ReadOnly sets its own answers — config.SetViewItem writes only the calling person's row, so this gives
+-- nobody sight of another person's work. ReadOnly is left out of the Modify: decision 237 says it only reads, and the
+-- schema smoke holds the seed to that (a person's view row is still a write). ViewItem.Administer, which edits a role's
+-- starting shape, stays the Administrator's (seeded above).
+DECLARE @va UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000001';
+DECLARE @vr NVARCHAR(40), @vp NVARCHAR(80);
+DECLARE v CURSOR LOCAL FAST_FORWARD FOR
+    SELECT r.[RoleCode], p.[PermissionCode]
+    FROM [security].[Role] r
+    CROSS JOIN (VALUES (N'ViewItem.Read'), (N'ViewItem.Modify')) p ([PermissionCode])
+    WHERE r.[IsActive] = 1 AND NOT (r.[RoleCode] = N'ReadOnly' AND p.[PermissionCode] <> N'ViewItem.Read');
+OPEN v; FETCH NEXT FROM v INTO @vr, @vp;
+WHILE @@FETCH_STATUS = 0
+BEGIN
+    IF EXISTS (SELECT 1 FROM [security].[Permission] WHERE [PermissionCode] = @vp AND [IsActive] = 1)
+       AND NOT EXISTS (SELECT 1 FROM [security].[RolePermission] WHERE [RoleCode] = @vr AND [PermissionCode] = @vp)
+        EXEC [security].[RolePermission_Upsert] @RoleCode = @vr, @PermissionCode = @vp, @ActorId = @va;
+    FETCH NEXT FROM v INTO @vr, @vp;
+END
+CLOSE v; DEALLOCATE v;
 GO
