@@ -37,10 +37,13 @@ export default function RecordScreen({ params: p, id }: { screen: Screen; params
   const revisionsQ = useViewAll(schema, vw, { DeviceEntityId: s(r?.DeviceEntityId) }, '-CalculatedAt', !!r?.DeviceEntityId)
   const templateQ = useTemplate(s(r?.ModelId) || null); const template = templateQ.data ?? null
   const [raise, setRaise] = useState<RaiseOpts | null>(null)   // #220: a change is raised from the record itself, as from the settings book's menu
-  // #222 (the owner, 2026-09-22): on a legacy record with no rationale the tab showed an empty form of formulas and
-  // meant nothing. It is offered where it is filled in (an outstanding record) or where a rationale already stands.
-  const rationaleQ = useViewAll('document', 'vRevisionLink', { SubjectKind: 'DocumentRevision', SubjectEntityId: revision, LinkKind: 'About' }, undefined, !!revision)
-  const hasRationaleTab = s(r?.GridState) === 'Outstanding' || (rationaleQ.data ?? []).length > 0
+  // #223 (the owner, 2026-09-22): the Rationale tab is where the rationale is written and read for a change worked here.
+  // It showed an empty form of formulas on records brought in from the old system, which meant nothing — those changes
+  // were designed elsewhere, and the Word rationale they came with is on Files and records. So the tab follows the work:
+  // offered on a change raised in the platform, not on one the migration carried over.
+  const requestQ = useViewAll('work', 'vWorkRequest', { EntityId: s(r?.WorkRequestEntityId) }, undefined, !!r?.WorkRequestEntityId)
+  const fromTheOldSystem = !r?.WorkRequestEntityId || !!requestQ.data?.[0]?.MigrationRunId
+  const hasRationaleTab = !requestQ.isPending && !fromTheOldSystem
   // owner, 2026-09-16: the settings, the classification, the notes, the text as filed and the files are each a tab of their
   // own — nothing sits under the settings tabs whatever tab is chosen (it read as part of the settings and confused)
   const [section, setSection] = useEntryState('section', () => loc.hash === '#files' ? 'files' : 'settings')   // #189; #220: Compare is gone (the owner, 2026-09-22)
