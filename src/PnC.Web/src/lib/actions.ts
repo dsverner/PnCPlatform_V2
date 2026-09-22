@@ -12,9 +12,13 @@ export async function settingsText(revisionRowId: string): Promise<SettingsText 
   return { name: String(f.FileName), mime: String(f.MimeType), text: await getText('/api/v1/files/' + f.RowId) }
 }
 
-export interface WorkTypeOption { versionRowId: string; key: string; name: string; workflowKey?: string }
+export interface WorkTypeOption { versionRowId: string; key: string; name: string; description: string; workflowKey?: string }
 /** The effective work types a request may be raised under (Program.WorkType definitions with an Effective version), each
  * with the workflow its payload binds (#131) — the raise starts that workflow, so a new work type needs no screen change. */
+/** #222: a work type a smoke run left behind is not something a person chooses — its key is stamped with the run
+ * (W4_20260916…_SETTINGS_CHANGE) or its name says fixture. The list offers the work the group actually does. */
+const isFixture = (key: string, name: string) => /^W4_\d{8,}/.test(key) || /fixture|smoke/i.test(name)
+
 export async function workTypes(): Promise<WorkTypeOption[]> {
   const [types, versions] = await Promise.all([
     view('config', 'vDefinition', { DefinitionKind: 'Program.WorkType' }, { take: 500 }),
@@ -25,7 +29,9 @@ export async function workTypes(): Promise<WorkTypeOption[]> {
     const v = versions.rows.find((x) => String(x.DefinitionEntityId).toLowerCase() === String(t.EntityId).toLowerCase()); if (!v) continue
     let workflowKey: string | undefined
     try { workflowKey = JSON.parse(String(v.PayloadText || '{}')).workflow || undefined } catch { /* a work type with no payload binds no workflow */ }
-    out.push({ versionRowId: String(v.RowId), key: String(t.DefinitionKey), name: String(t.Name || ''), workflowKey })
+    const key = String(t.DefinitionKey), name = String(t.Name || '')
+    if (isFixture(key, name)) continue
+    out.push({ versionRowId: String(v.RowId), key, name, description: String(t.Description || ''), workflowKey })
   }
   return out
 }

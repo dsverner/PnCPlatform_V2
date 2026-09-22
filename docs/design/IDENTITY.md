@@ -126,8 +126,10 @@ records and work requests whose subject is one of those; WorkRequest and Ownersh
 likewise. Subject kinds with no node mapping (Document, Obligation, Grant) are readable under Global
 only, as `fHasPermission` already rules; **Definition (config, ref) reads are class-wide for any role that carries
 `Definition.Read`, whatever the grant's scope** (owner, W6 card H, 2026-09-12, decision #134 — a division-scoped
-engineer needs the work types, models and procedures to act at all); definition writes and approvals stay Global-only. The dispatcher adds one clause to a list read:
-`WHERE <subject column> IN (SELECT SubjectEntityId FROM security.fReadableSubjects(…))`. The rule is
+engineer needs the work types, models and procedures to act at all); definition writes and approvals stay Global-only. The dispatcher adds the readable set to a list read:
+it selects `SubjectEntityId FROM security.fReadableSubjects(…)` into a table variable in a statement of its own, then joins the
+view to that table on the subject column (#158 made it a join rather than an `IN`; #222 moved the set into its own statement, so
+the read's filters cannot reach inside the function and change its plan). The set, and therefore the rule, is
 the database's; the API knows only *which column of this view is the subject and of what kind*.
 
 **Which column, of what kind.** Derived from the catalogue and `ref.SubjectKind`, no per-view

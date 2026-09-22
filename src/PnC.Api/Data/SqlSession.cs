@@ -176,17 +176,42 @@ public sealed class SqlSession : IAsyncDisposable
         // IDENTITY.md §5: read scope is as strict as write scope. The set of readable subjects is the database's
         // (security.fReadableSubjects); the API contributes only the subject column and family.
         var scopeJoin = "";
+        var scopePrelude = "";
         if (scope is not null)
         {
             cmd.Parameters.Add("@su", SqlDbType.UniqueIdentifier).Value = scope.UserEntityId;
             cmd.Parameters.Add("@sp", SqlDbType.NVarChar, 80).Value = scope.PermissionCode;
             var families = scope.Family == "Any" ? new[] { "Node", "Asset", "Record", "WorkRequest", "Scheme" } : new[] { scope.Family };
             var sets = families.Select(f => $"SELECT [SubjectEntityId] FROM [security].[fReadableSubjects](@su, @sp, N'{f}', SYSDATETIMEOFFSET())");
+            // #222: the readable set is computed in a statement of its own, before the view is touched.
+            // security.fReadableSubjects is an inline function, so in one statement the optimizer is free to push the
+            // read's own filter into its body. It does, and the function's plan changes: a filter on the very column the
+            // scope joins on (asset/vPlacement?AssetEntityId=…, asset/vAsset?EntityId=…) propagated to asset.Placement
+            // inside the function's scope_assets, whose estimate fell to one row, and the estate's whole node tree was
+            // then expanded before the grant was applied — a Filter on the subtree LIKE ran 10 409 times over 108 million
+            // spooled location.Node rows, 87.3 s of an 87.5 s query (actual plan, DEV 2026-09-22). Measured on DEV,
+            // 7 909 placements: this statement 95.0 s → 0.30 s with the set materialised first (0.05–0.10 s once the
+            // INSERT's plan is cached), and over HTTP an "Execution Timeout Expired" 500 at 30.3 s → 200 in 0.08 s warm.
+            // What does not work, measured: OPTION (FORCE ORDER) 83.2 s, OPTION (OPTIMIZE FOR UNKNOWN) 87.0 s, OPTION
+            // (HASH JOIN) refused, and a covering location.Node ([Path]) INCLUDE ([EntityId]) filtered index 83.6 s — the
+            // damage is the join order inside the function, not a missing seek.
+            // A table variable with a primary key, and OPTION (RECOMPILE) kept on the read below: that recompile happens
+            // after the INSERT, so the set's true size is known. The set itself is unchanged, so read scope is exactly as strict.
+            // The INSERT deliberately carries NO hint. Almost all of this function's cost is compiling it, not running it:
+            // 387 ms compile against 7 ms execution for the administrator's 12 579 work requests (actual plan, DEV
+            // 2026-09-22). Under OPTION (RECOMPILE) the batch paid that compile twice and a screen read went 0.39 s → 0.68 s,
+            // failing the smoke's NFR-2 second; with the INSERT's plan cached it is 0.26 s — better than before. #147's
+            // warning (a plan cached for one grant's readable set serving another) is answered by the shape, not by a hint:
+            // the read is over @__scope and still recompiles, and the INSERT's plan is the function's own, which the same
+            // measurement ran across grants both ways (Global plan → subtree read 0.10 s, subtree plan → Global read 0.06 s).
+            scopePrelude = "SET NOCOUNT ON;\n"
+                         + "DECLARE @__scope TABLE ([__ScopeId] UNIQUEIDENTIFIER NOT NULL PRIMARY KEY);\n"
+                         + $"INSERT INTO @__scope ([__ScopeId]) SELECT DISTINCT [SubjectEntityId] FROM ({string.Join(" UNION ", sets)}) __s;\n";
             if (scope.Family == "Any")
             {
                 // W4 (decision #118): a subject of a kind outside the five scoped families (a settings-issue package, a
                 // procedure instance…) has no node to scope by; its rows are readable under a Global grant only (IDENTITY.md §5)
-                var inScope = $"{Q(scope.Column)} IN ({string.Join(" UNION ", sets)})";
+                var inScope = $"{Q(scope.Column)} IN (SELECT [__ScopeId] FROM @__scope)";
                 var outside = scope.KindColumn is null ? "1 = 1" : $"{Q(scope.KindColumn)} NOT IN (N'Node', N'Station', N'Panel', N'DevicePosition', N'ProtectionFunction', N'Asset', N'Device', N'Record', N'WorkRequest', N'Scheme')";
                 where.Add($"({inScope} OR ({outside} AND [security].[fHasPermission](@su, @sp, NULL, NULL, SYSDATETIMEOFFSET()) = 1))");
             }
@@ -196,8 +221,9 @@ public sealed class SqlSession : IAsyncDisposable
                 // On the fully loaded DEV estate the IN form took the whole settings book from 1.9 s to 100–170 s once the
                 // migration's landings filled the process tables (the optimizer pushed the set into the view's correlated
                 // lookups); the join form measured 1.9 s on the same data (2026-09-14, typed parameters). The derived
-                // table's one column is named so no view column can be ambiguous.
-                scopeJoin = $" JOIN (SELECT DISTINCT [SubjectEntityId] AS [__ScopeId] FROM ({string.Join(" UNION ", sets)}) __s) __scope ON __scope.[__ScopeId] = {Q(scope.Column)}";
+                // table's one column is named so no view column can be ambiguous. #222 keeps the join and moves the set
+                // it joins to into @__scope above.
+                scopeJoin = $" JOIN @__scope __scope ON __scope.[__ScopeId] = {Q(scope.Column)}";
             }
         }
         // W7: a scoped read is compiled for its own grant. A plan cached for one readable set (the whole registry under a
@@ -234,7 +260,7 @@ public sealed class SqlSession : IAsyncDisposable
         // plain, and ordered and paged here in memory — its whole set is what its screen wants anyway.
         if (MaterialiseBeforePaging.Contains(view.Key))
         {
-            cmd.CommandText = body + hint;
+            cmd.CommandText = scopePrelude + body + hint;
             var all = new List<JsonObject>();
             await using (var rr = await cmd.ExecuteReaderAsync(ct))
                 while (await rr.ReadAsync(ct)) { var row = RowToJson(rr); if (memFilters.All(f => MatchesFilter(row[f.Column], f.Value, f.SqlType, f.Contains))) all.Add(row); }
@@ -253,7 +279,7 @@ public sealed class SqlSession : IAsyncDisposable
             foreach (var row in all.Skip(skip).Take(take)) page.Add(row);
             return page;
         }
-        cmd.CommandText = body + paging + hint;
+        cmd.CommandText = scopePrelude + body + paging + hint;
 
         var rows = new JsonArray();
         await using var r = await cmd.ExecuteReaderAsync(ct);

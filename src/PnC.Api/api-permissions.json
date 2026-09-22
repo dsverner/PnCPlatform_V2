@@ -87,6 +87,7 @@
     "config.AddDefinition":                "Definition.Modify",
     "config.AddDefinitionVersion":         "Definition.Modify",
     "config.ApproveDefinitionVersion":     "Definition.Approve",
+    "config.Definition_SoftDelete":        "Definition.Archive",
     "config.ResolveDefinition":            null,
     "process.AddProcedureVersion":         "Definition.Modify",
     "process.AddWorkflowVersion":          "Definition.Modify",

@@ -271,18 +271,13 @@ if (hydro is not null && fixtureOk)
     Check(sst == HttpStatusCode.OK && stationRows.All(n => !n.Contains("Transmission")), $"as Hydro, no station row outside scope is visible ({stationRows.Count} stations)");
     var (ost, ob) = await Get(hydro, $"api/v1/asset/vAsset?EntityId={txAsset}");
     Check(ost == HttpStatusCode.Forbidden && Code(ob) == "forbidden", "as Hydro, a single read of the Transmission asset → 403 forbidden");
-    // #221: paged, not taken off the first page — the estate's placements passed 500 rows (7 880 on DEV) and the fixture fell off it,
-    // which said nothing about scope. Asking for the one asset instead (AssetEntityId=…) times out on the server for a Node-scoped
-    // reader: a finding raised on 2026-09-22, the read-scope plan of asset.vPlacement, not this check's business.
-    var pst = HttpStatusCode.OK; var placedAssets = new List<string>(); var seen = 0;
-    for (var skip = 0; skip < 12000; skip += 500)
-    {
-        var (st, b) = await Get(hydro, $"api/v1/asset/vPlacement?take=500&skip={skip}");
-        pst = st; var got = Ids(b, "AssetEntityId"); seen += got.Count; placedAssets.AddRange(got);
-        if (st != HttpStatusCode.OK || got.Count < 500 || placedAssets.Contains(hydroAsset.ToString()!.ToLowerInvariant())) break;
-    }
-    Check(pst == HttpStatusCode.OK && placedAssets.Contains(hydroAsset.ToString()!.ToLowerInvariant()) && !placedAssets.Contains(txAsset.ToString()!.ToLowerInvariant()),
-        $"as Hydro, asset/vPlacement (scoped by its AssetEntityId column) shows the Hydro placement and not the Transmission one ({seen} rows read)");
+    // #222: asked for the one asset again. Until the read-scope fix of #222 this timed out (the read's own filter was pushed
+    // into security.fReadableSubjects and its plan expanded the whole node tree); #221 paged around it. It answers in 0.1 s now.
+    var (pst, pb) = await Get(hydro, $"api/v1/asset/vPlacement?AssetEntityId={hydroAsset}");
+    var (pst2, pb2) = await Get(hydro, $"api/v1/asset/vPlacement?AssetEntityId={txAsset}");
+    var mine = (pb?["rows"] as JsonArray)?.Count ?? 0; var theirs = (pb2?["rows"] as JsonArray)?.Count ?? 0;
+    Check(pst == HttpStatusCode.OK && mine == 1 && (pst2 != HttpStatusCode.OK || theirs == 0),
+        $"as Hydro, asset/vPlacement (scoped by its AssetEntityId column) shows the Hydro placement ({mine}) and not the Transmission one ({(int)pst2} {theirs})");
 
     // writes: in scope allowed, outside scope refused
     var (w1s, w1b) = await Post(hydro, "api/v1/location/AddNode", new { NodeTypeCode = "Room", ParentEntityId = hydroBuilding, Name = "Smoke W2 Hydro room" });
@@ -379,6 +374,21 @@ else Skip("AccessRefused in audit.vActionLog (needs a connection string and the 
 // 11. cleanup — soft deletes only, through the API as Administrator, children before parents
 if (admin is not null)
 {
+    // #222 (the owner, 2026-09-22, looking at the Action type list on a change request: 207 of the 215 work types were
+    // this smoke's leavings): every definition a run of this smoke makes is withdrawn here, and anything an earlier run
+    // left behind goes with it — the key carries the run's stamp (W4_<yyyyMMddHHmmss>_…), so nothing of the group's is touched.
+    var (wds, wdb) = await Get(admin, "api/v1/config/vDefinition?take=1000");
+    var stale = ((wdb?["rows"] as JsonArray) ?? new JsonArray())
+        .Where(d => System.Text.RegularExpressions.Regex.IsMatch(d?["DefinitionKey"]?.ToString() ?? "", @"^W4_\d{8,}_"))
+        .Select(d => d?["EntityId"]?.ToString()).Where(x => x is not null).ToList();
+    var withdrawn = 0;
+    foreach (var id in stale)
+    {
+        var (ds, _) = await Post(admin, "api/v1/config/Definition_SoftDelete", new { EntityId = id });
+        if (ds == HttpStatusCode.OK) withdrawn++;
+    }
+    Check(wds == HttpStatusCode.OK && withdrawn == stale.Count, $"cleanup: the smoke's own definitions are withdrawn ({withdrawn} of {stale.Count}; the Action type list is the group's work, not the fixtures')");
+
     foreach (var (asset, panel) in new[] { (hydroAsset, hydroPanel), (txAsset, txPanel) })
         if (asset is Guid a)
         {
@@ -2318,7 +2328,8 @@ else Skip("W4 run (needs the Administrator, Approver, Hydro and Technician ident
             // counted without them — the legacy rows are the number the migration fixed, the fixtures are not
             var fixturesActive = await CountAll("api/v1/document/vSettingsRecord?GridState=Active&DeviceName~=W4_");
             Check(active - fixturesActive >= 5450 && active - fixturesActive < 5650, $"the grid's Active rows: {active - fixturesActive} legacy (the A rows that carry a settings file) plus {fixturesActive} of the smoke's fixtures");
-            Check(archived >= 5650 && archived < 5900, $"the grid's Archived rows: {archived} (the legacy P rows that carry a settings file, plus the fixtures')");
+            var fixturesArchived = await CountAll("api/v1/document/vSettingsRecord?GridState=Archived&DeviceName~=W4_");
+            Check(archived - fixturesArchived >= 5650 && archived - fixturesArchived < 5900, $"the grid's Archived rows: {archived - fixturesArchived} legacy (the P rows that carry a settings file) plus {fixturesArchived} of the smoke's fixtures");
             // #218 (2026-09-21): the Outstanding rows drift the same way (151 fixtures on DEV after the day's runs, 350 legacy) — counted without them
             var fixturesOutstanding = await CountAll("api/v1/document/vSettingsRecord?GridState=Outstanding&DeviceName~=W4_");
             Check(outstanding - fixturesOutstanding >= 340 && outstanding - fixturesOutstanding < 500, $"the grid's Outstanding rows: {outstanding - fixturesOutstanding} legacy (the M rows that carry a settings file) plus {fixturesOutstanding} of the smoke's fixtures");

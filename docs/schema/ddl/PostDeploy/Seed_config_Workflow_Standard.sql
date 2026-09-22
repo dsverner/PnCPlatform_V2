@@ -40,10 +40,19 @@ IF NOT EXISTS (SELECT 1 FROM [config].[Definition] WHERE [DefinitionKind] = N'Pr
 BEGIN
     DECLARE @wtEntity UNIQUEIDENTIFIER, @wtRowId UNIQUEIDENTIFIER, @wtNo INT;
     EXEC [config].[AddDefinition] @DefinitionKind = N'Program.WorkType', @DefinitionKey = N'Standard',
-         @Name = N'Standard work (runs the Standard workflow)', @ActorId = @author, @EntityId = @wtEntity OUTPUT;
+         @Name = N'Other work',
+         @Description = N'Work that is none of the others: an inspection, an investigation, anything the group does that has no settings change behind it. (#222: every action a person chooses says what it is for.)',
+         @ActorId = @author, @EntityId = @wtEntity OUTPUT;
     EXEC [config].[AddDefinitionVersion] @DefinitionKey = N'Standard', @DefinitionKind = N'Program.WorkType', @ChangeNote = N'seed',
          @PayloadText = N'{"workflow":"Standard","requiredRecordKinds":[],"defaultTestPlan":null}',
          @ActorId = @author, @VersionRowId = @wtRowId OUTPUT, @VersionNumber = @wtNo OUTPUT;
     EXEC [config].[ApproveDefinitionVersion] @VersionRowId = @wtRowId, @ActorId = @approver;
 END
+GO
+
+-- #222: the name and the description a person reads on the Action type list are kept current here (the guard above is the key's existence).
+UPDATE [config].[Definition] SET [Name] = N'Other work', [Description] = N'Work that is none of the others: an inspection, an investigation, anything the group does that has no settings change behind it.', [ModifiedAt] = SYSDATETIMEOFFSET()
+ WHERE [DefinitionKind] = N'Program.WorkType' AND [DefinitionKey] = N'Standard' AND [IsDeleted] = 0 AND (ISNULL([Description], N'') = N'' OR [Name] <> N'Other work');
+UPDATE [config].[Definition] SET [Description] = N'A settings change taken through the four steps: the change is designed, checked, issued to the field, and the date it was verified is recorded.', [ModifiedAt] = SYSDATETIMEOFFSET()
+ WHERE [DefinitionKind] = N'Program.WorkType' AND [DefinitionKey] = N'SETTINGS_CHANGE_SIMPLE' AND [IsDeleted] = 0 AND ISNULL([Description], N'') = N'';
 GO

@@ -15,6 +15,9 @@ import { type RecordParams, type Screen, splitView, screenPath } from '@/lib/scr
 import { Panel, Pill, stateTone, Button, Facts, Status, Tabs } from '@/components/ui/ui'
 import { openFile, downloadFile } from '@/lib/files'
 import { RaiseRequest, type RaiseOpts } from '@/components/actions/RaiseRequest'
+
+/** #222: what a person may raise from a relay's record — the settings actions, not the transformer tests. */
+const SETTINGS_ACTIONS = ['SETTINGS_CHANGE', 'SETTINGS_ADD', 'SETTINGS_DELETE', 'SETTINGS_VERIFY', 'SETTINGS_CHANGE_SIMPLE']
 import { RationalePanel } from '@/screens/RationalePanel'
 import { DataGrid, type Column } from '@/components/ui/data-grid'
 import DeviceSettings, { useTemplate, AnalogInputs, BasisPanel, RelayListingAndFile } from './DeviceSettings'
@@ -34,6 +37,10 @@ export default function RecordScreen({ params: p, id }: { screen: Screen; params
   const revisionsQ = useViewAll(schema, vw, { DeviceEntityId: s(r?.DeviceEntityId) }, '-CalculatedAt', !!r?.DeviceEntityId)
   const templateQ = useTemplate(s(r?.ModelId) || null); const template = templateQ.data ?? null
   const [raise, setRaise] = useState<RaiseOpts | null>(null)   // #220: a change is raised from the record itself, as from the settings book's menu
+  // #222 (the owner, 2026-09-22): on a legacy record with no rationale the tab showed an empty form of formulas and
+  // meant nothing. It is offered where it is filled in (an outstanding record) or where a rationale already stands.
+  const rationaleQ = useViewAll('document', 'vRevisionLink', { SubjectKind: 'DocumentRevision', SubjectEntityId: revision, LinkKind: 'About' }, undefined, !!revision)
+  const hasRationaleTab = s(r?.GridState) === 'Outstanding' || (rationaleQ.data ?? []).length > 0
   // owner, 2026-09-16: the settings, the classification, the notes, the text as filed and the files are each a tab of their
   // own — nothing sits under the settings tabs whatever tab is chosen (it read as part of the settings and confused)
   const [section, setSection] = useEntryState('section', () => loc.hash === '#files' ? 'files' : 'settings')   // #189; #220: Compare is gone (the owner, 2026-09-22)
@@ -50,7 +57,7 @@ export default function RecordScreen({ params: p, id }: { screen: Screen; params
         <div className="flex items-center gap-2"><h1 className="text-lg font-semibold text-slate-100">{s(r.SchemeName) || legacyFree(r.DeviceName)}</h1><Pill tone={stateTone(r.GridState)}>{s(r.GridState)}</Pill></div>
         <div className="flex flex-wrap gap-2">
           {/* #220 (the owner, 2026-09-22): the change is raised from the record; the device's changes are on the History tab; Compare is gone */}
-          {r.GridState === 'Active' && can('WorkRequest.Modify') && <Button onClick={() => setRaise({ heading: `Raise a change request — ${legacyFree(r.DeviceName)}`, title: `Settings change — ${legacyFree(r.DeviceName)}`, scopeKind: 'Asset', scopeEntityId: s(r.DeviceEntityId), defaultType: 'SETTINGS_CHANGE', workflowKey: 'SETTINGS_CHANGE_REQUEST' })}>Raise a change request</Button>}
+          {r.GridState === 'Active' && can('WorkRequest.Modify') && <Button onClick={() => setRaise({ heading: `Raise a change request — ${legacyFree(r.DeviceName)}`, title: `Settings change — ${legacyFree(r.DeviceName)}`, scopeKind: 'Asset', scopeEntityId: s(r.DeviceEntityId), defaultType: 'SETTINGS_CHANGE', workflowKey: 'SETTINGS_CHANGE_REQUEST', offer: SETTINGS_ACTIONS })}>Raise a change request</Button>}
           <Button onClick={() => setSection('history')}>History</Button>
           <Button onClick={() => setSection('files')}>Documentation</Button>
           <Button onClick={back}>Close</Button>
@@ -58,7 +65,7 @@ export default function RecordScreen({ params: p, id }: { screen: Screen; params
       </header>
       {raise && <RaiseRequest o={raise} onClose={() => setRaise(null)} />}
       <Status>{legacyFree(r.DeviceName)} · rev {s(r.RevisionLabel) || '?'} · Revision {s(r.RevisionStatus)} · lifecycle {s(r.LifecycleState) || '—'} · {s(r.FileKind)} {s(r.ParseStatus)}</Status>
-      <Tabs value={section} onChange={setSection} tabs={[{ key: 'settings', label: 'Settings' }, { key: 'rationale', label: 'Rationale' }, { key: 'analog', label: 'Analog inputs' }, ...(r.TemplateDefinitionEntityId ? [{ key: 'jumpers', label: 'Jumper settings' }] : []), { key: 'record', label: 'Record' }, { key: 'history', label: 'History' }, { key: 'compliance', label: 'Compliance' }, { key: 'notes', label: 'Notes' }, { key: 'text', label: 'Text as filed' }, { key: 'files', label: 'Files and records' }, { key: 'manual', label: 'Manual' }]} />
+      <Tabs value={section} onChange={setSection} tabs={[{ key: 'settings', label: 'Settings' }, ...(hasRationaleTab ? [{ key: 'rationale', label: 'Rationale' }] : []), { key: 'analog', label: 'Analog inputs' }, ...(r.TemplateDefinitionEntityId ? [{ key: 'jumpers', label: 'Jumper settings' }] : []), { key: 'record', label: 'Record' }, { key: 'history', label: 'History' }, { key: 'compliance', label: 'Compliance' }, { key: 'notes', label: 'Notes' }, { key: 'text', label: 'Text as filed' }, { key: 'files', label: 'Files and records' }, { key: 'manual', label: 'Manual' }]} />
       {section === 'settings' && (template
         /* #168: the template's view of the device — functions, inputs, settings by function — when the model has one */
         ? <>
@@ -122,7 +129,7 @@ export default function RecordScreen({ params: p, id }: { screen: Screen; params
           <FilesPanel r={r} revision={revision} />
         </>)}
       {section === 'manual' && <ManualPanel templateDefinitionEntityId={s(r.TemplateDefinitionEntityId) || null} modelName={s(r.ModelName)} />}   {/* #216 */}
-      {section === 'rationale' && <RationalePanel revision={id} editable={s(r.GridState) === 'Outstanding'} />}   {/* #219 */}
+      {section === 'rationale' && hasRationaleTab && <RationalePanel revision={id} editable={s(r.GridState) === 'Outstanding'} />}   {/* #219, #222 */}
     </div>
   )
 }

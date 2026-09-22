@@ -18,7 +18,7 @@ const LIST_CAP = 500
 export function raiseOptsFor(cmd: Command, r: Row): RaiseOpts | null {
   if (!cmd.scopeColumn || !cmd.scopeKind || !r[cmd.scopeColumn]) return null
   const subject = cmd.titleFrom ? legacyFree(r[cmd.titleFrom]) : ''
-  return { heading: `${cmd.label} — ${subject}`, title: `${cmd.label} — ${subject}`, scopeKind: cmd.scopeKind, scopeEntityId: s(r[cmd.scopeColumn]), defaultType: cmd.workType ?? 'SETTINGS_CHANGE', workflowKey: cmd.workflowKey }
+  return { heading: `${cmd.label} — ${subject}`, title: `${cmd.label} — ${subject}`, scopeKind: cmd.scopeKind, scopeEntityId: s(r[cmd.scopeColumn]), defaultType: cmd.workType ?? 'SETTINGS_CHANGE', offer: cmd.offer, workflowKey: cmd.workflowKey }
 }
 
 export default function ListScreen({ screen, params: p }: { screen: Screen; params: ListParams }) {

@@ -12,7 +12,7 @@ export type When = Record<string, string | boolean | number | null | string[]>
 export interface Command {
   label: string; action: 'openScreen' | 'raiseRequest' | 'transition' | 'openStep' | 'url'
   screen?: string; param?: string; query?: Record<string, string>
-  workflowKey?: string; workType?: string; scopeKind?: 'Asset' | 'Node'; scopeColumn?: string; titleFrom?: string
+  workflowKey?: string; workType?: string; scopeKind?: 'Asset' | 'Node'; scopeColumn?: string; titleFrom?: string; offer?: string[]
   transition?: string; requiresReason?: boolean; url?: string; when?: When; permission?: string
 }
 export interface SettingsBookParams {

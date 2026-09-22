@@ -198,6 +198,15 @@ are the database's `SYSDATETIMEOFFSET()`, read through `SqlSession.NowAsync` —
 scoped list read (joined to `security.fReadableSubjects`) carries `OPTION (RECOMPILE)` so a plan cached for one grant's
 readable set never serves another's (#147).
 
+**And one from the estate at 7 909 placements (#222).** The readable set is built in a statement of its own — inserted into a
+table variable keyed on its single column — and the view is joined to *that*, not to the function inline. `fReadableSubjects` is
+an inline function, so within one statement the read's own filter can be pushed into its body; when that filter names the very
+column the scope joins on (`asset/vPlacement?AssetEntityId=…`), it was, and the function's plan changed from seeking the grant's
+own subtree to expanding every node in the estate — 87.3 s of an 87.5 s query in one Filter, an "Execution Timeout Expired" 500
+over HTTP. The set is identical either way; only where it is evaluated changed. **That statement carries no hint**: almost all of
+`fReadableSubjects` is compile time (387 ms compiling, 7 ms running, measured), so an `OPTION (RECOMPILE)` on it would pay that
+compile a second time and cost every scoped read about 0.3 s. The read below it keeps its `RECOMPILE` (#147).
+
 ## 7. Fixed endpoints, headers, configuration
 
 | Endpoint | Identity | Returns |

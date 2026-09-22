@@ -10,7 +10,7 @@ import { useViewAll } from '@/lib/hooks'
 import { s } from '@/lib/api'
 import { Panel, Button, Field, inputClass, Status } from '@/components/ui/ui'
 
-export interface RaiseOpts { heading: string; title: string; scopeKind: 'Asset' | 'Node'; scopeEntityId: string; defaultType: string; workflowKey?: string; before?: [string, string][]; note?: string }
+export interface RaiseOpts { heading: string; title: string; scopeKind: 'Asset' | 'Node'; scopeEntityId: string; defaultType: string; workflowKey?: string; before?: [string, string][]; note?: string; offer?: string[] }
 
 const legacyName = (v: unknown) => s(v).replace(/\s*\[\d+\]\s*$/, '')   // the device's name without the legacy record number
 
@@ -18,7 +18,9 @@ export function RaiseRequest({ o, onClose }: { o: RaiseOpts; onClose: () => void
   const typesQ = useQuery({ queryKey: ['workTypes'], queryFn: workTypes, staleTime: 5 * 60_000 }); const navigate = useNavigate()
   const [title, setTitle] = useState(o.title); const [type, setType] = useState(''); const [busy, setBusy] = useState(false); const [err, setErr] = useState('')
   useEffect(() => { setTitle(o.title); setType(''); setSecond(false) }, [o])
-  const types = typesQ.data ?? []
+  // #222: the actions that suit what the person is standing on; everything else stays where it belongs
+  const all = typesQ.data ?? []
+  const types = o.offer?.length ? all.filter((x) => o.offer!.includes(x.key)) : all
   // #191: a device that already has an open change request. The owner, 2026-09-18: the person first looks at the existing
   // request and decides to join it, or starts a second that takes the first's current settings as its starting point and
   // can only complete after the first. Read from the settings book's own view; nothing is raised until one is chosen.
@@ -27,6 +29,7 @@ export function RaiseRequest({ o, onClose }: { o: RaiseOpts; onClose: () => void
   const [second, setSecond] = useState(false)
   const mustChoose = open.length > 0 && !second
   const chosen = type || types.find((t) => t.key === o.defaultType)?.versionRowId || types[0]?.versionRowId || ''
+  const chosenType = types.find((t) => t.versionRowId === chosen)
   const go = async () => {
     setBusy(true); setErr('')
     const wt = types.find((t) => t.versionRowId === chosen)
@@ -55,9 +58,12 @@ export function RaiseRequest({ o, onClose }: { o: RaiseOpts; onClose: () => void
         <Field label="Action type">
           <select className={inputClass} value={chosen} onChange={(e) => setType(e.target.value)}>
             {/* the workflow key beside the name is ours, not the engineer's */}
-            {types.map((t) => <option key={t.versionRowId} value={t.versionRowId}>{t.key} — {t.name}</option>)}
+            {types.map((t) => <option key={t.versionRowId} value={t.versionRowId}>{t.name}</option>)}
           </select>
         </Field>
+        {/* #222 (the owner, 2026-09-22): "there are many Action types … which have little explanation, how is the user
+            supposed to know which one to select" — the chosen one says what it is for, under the box */}
+        {chosenType?.description && <div className="max-w-xl text-xs text-slate-400">{chosenType.description}</div>}
         <Field label="Title"><input className={inputClass} size={50} value={title} onChange={(e) => setTitle(e.target.value)} /></Field>
         <Button kind="primary" disabled={busy || !chosen || !title.trim()} onClick={go}>Raise and start</Button>
       </div>
