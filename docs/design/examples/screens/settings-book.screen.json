@@ -103,7 +103,7 @@
       "FirmwareVersion": "Software version",
       "SerialNumber": "Serial number",
       "VoltageClassCode": "Voltage",
-      "WorkRequestTitle": "Change request",
+      "WorkRequestTitle": "Made by",
       "WorkTypeKey": "Action type",
       "CalculatedAt": "Calculated",
       "VerifiedAt": "Verified",
@@ -259,7 +259,8 @@
         "when": {
           "WorkRequestEntityId": [
             "*"
-          ]
+          ],
+          "GridState": "Outstanding"
         }
       },
       {
@@ -301,11 +302,6 @@
           ]
         },
         "permission": "WorkRequest.Modify"
-      },
-      {
-        "label": "Compare revisions",
-        "action": "url",
-        "url": "/app/s/SETTINGS_RECORD/{RevisionRowId}#compare"
       }
     ],
     "report": "/report.html?BuildingNodeEntityId={BuildingNodeEntityId}&GridState={GridState}",
