@@ -2,7 +2,7 @@
 // React with its constants, not a parameter grammar). The legacy flat window's content in the platform's names: the
 // device, where it is, the dates and state, the classification and instrument-transformer characteristics (editable
 // while the revision is a draft — the direct save with audit of #163), the notes, the parsed settings, the settings text
-// as filed, the files and records, and Compare with another revision of the same device. What the platform does not
+// as filed, the files and records, and the device's History (#220). What the platform does not
 // model is said so, never invented.
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
@@ -12,8 +12,9 @@ import { useCan, useEntryState, useViewAll } from '@/lib/hooks'
 import { legacyFree, legacyDetail } from '@/lib/legacy'
 import { settingsText } from '@/lib/actions'
 import { type RecordParams, type Screen, splitView, screenPath } from '@/lib/screens'
-import { Panel, Pill, stateTone, Button, Facts, Status, Field, Tabs, inputClass } from '@/components/ui/ui'
+import { Panel, Pill, stateTone, Button, Facts, Status, Tabs } from '@/components/ui/ui'
 import { openFile, downloadFile } from '@/lib/files'
+import { RaiseRequest, type RaiseOpts } from '@/components/actions/RaiseRequest'
 import { RationalePanel } from '@/screens/RationalePanel'
 import { DataGrid, type Column } from '@/components/ui/data-grid'
 import DeviceSettings, { useTemplate, AnalogInputs, BasisPanel, RelayListingAndFile } from './DeviceSettings'
@@ -31,13 +32,11 @@ export default function RecordScreen({ params: p, id }: { screen: Screen; params
   const parsedQ = useViewAll('document', 'vParsedSettingNamed', { ConfigurationFileRevisionRowId: revision }, 'SettingCode', !!r)
   const textQ = useQuery({ queryKey: ['settingsText', revision], queryFn: () => settingsText(revision), enabled: !!r, staleTime: 5 * 60_000 })
   const revisionsQ = useViewAll(schema, vw, { DeviceEntityId: s(r?.DeviceEntityId) }, '-CalculatedAt', !!r?.DeviceEntityId)
-  const others = useMemo(() => (revisionsQ.data ?? []).filter((x) => x.RevisionRowId !== revision), [revisionsQ.data, revision])
   const templateQ = useTemplate(s(r?.ModelId) || null); const template = templateQ.data ?? null
-  const [compareWith, setCompareWith] = useEntryState('compareWith', '')   // #189: kept per history entry
-  const compareId = compareWith || s(others[0]?.RevisionRowId)   // #compare in the address: the newest other revision until one is chosen
-  // owner, 2026-09-16: the settings, the classification, the notes, the text as filed, the files and Compare are each a tab of their
+  const [raise, setRaise] = useState<RaiseOpts | null>(null)   // #220: a change is raised from the record itself, as from the settings book's menu
+  // owner, 2026-09-16: the settings, the classification, the notes, the text as filed and the files are each a tab of their
   // own — nothing sits under the settings tabs whatever tab is chosen (it read as part of the settings and confused)
-  const [section, setSection] = useEntryState('section', () => loc.hash === '#compare' ? 'compare' : loc.hash === '#files' ? 'files' : 'settings')   // #189
+  const [section, setSection] = useEntryState('section', () => loc.hash === '#files' ? 'files' : 'settings')   // #189; #220: Compare is gone (the owner, 2026-09-22)
   if (!id) return <Status bad>No revision in the address.</Status>
   if (rowQ.isPending) return <Status>Loading the record…</Status>
   if (rowQ.isError) return <Status bad>Could not load: {(rowQ.error as Error).message}</Status>
@@ -50,14 +49,16 @@ export default function RecordScreen({ params: p, id }: { screen: Screen; params
         {/* #188: the owner, 2026-09-18: the title "should really be the name of the protection" — the scheme's name as recorded, the relay beneath */}
         <div className="flex items-center gap-2"><h1 className="text-lg font-semibold text-slate-100">{s(r.SchemeName) || legacyFree(r.DeviceName)}</h1><Pill tone={stateTone(r.GridState)}>{s(r.GridState)}</Pill></div>
         <div className="flex flex-wrap gap-2">
-          {!!r.WorkRequestEntityId && <Button onClick={() => navigate(screenPath('WORK_ITEM', s(r.WorkRequestEntityId)))}>Open its change request</Button>}
-          <Button disabled={!others.length} title={others.length ? undefined : 'This device has no other revision'} onClick={() => { setSection('compare'); if (!compareWith && others[0]) setCompareWith(s(others[0].RevisionRowId)) }}>Compare</Button>
+          {/* #220 (the owner, 2026-09-22): the change is raised from the record; the device's changes are on the History tab; Compare is gone */}
+          {r.GridState === 'Active' && can('WorkRequest.Modify') && <Button onClick={() => setRaise({ heading: `Raise a change request — ${legacyFree(r.DeviceName)}`, title: `Settings change — ${legacyFree(r.DeviceName)}`, scopeKind: 'Asset', scopeEntityId: s(r.DeviceEntityId), defaultType: 'SETTINGS_CHANGE', workflowKey: 'SETTINGS_CHANGE_REQUEST' })}>Raise a change request</Button>}
+          <Button onClick={() => setSection('history')}>History</Button>
           <Button onClick={() => setSection('files')}>Documentation</Button>
           <Button onClick={back}>Close</Button>
         </div>
       </header>
+      {raise && <RaiseRequest o={raise} onClose={() => setRaise(null)} />}
       <Status>{legacyFree(r.DeviceName)} · rev {s(r.RevisionLabel) || '?'} · Revision {s(r.RevisionStatus)} · lifecycle {s(r.LifecycleState) || '—'} · {s(r.FileKind)} {s(r.ParseStatus)}</Status>
-      <Tabs value={section} onChange={setSection} tabs={[{ key: 'settings', label: 'Settings' }, { key: 'rationale', label: 'Rationale' }, { key: 'analog', label: 'Analog inputs' }, ...(r.TemplateDefinitionEntityId ? [{ key: 'jumpers', label: 'Jumper settings' }] : []), { key: 'record', label: 'Record' }, { key: 'compliance', label: 'Compliance' }, { key: 'notes', label: 'Notes' }, { key: 'text', label: 'Text as filed' }, { key: 'files', label: 'Files and records' }, { key: 'manual', label: 'Manual' }, ...(others.length ? [{ key: 'compare', label: 'Compare' }] : [])]} />
+      <Tabs value={section} onChange={setSection} tabs={[{ key: 'settings', label: 'Settings' }, { key: 'rationale', label: 'Rationale' }, { key: 'analog', label: 'Analog inputs' }, ...(r.TemplateDefinitionEntityId ? [{ key: 'jumpers', label: 'Jumper settings' }] : []), { key: 'record', label: 'Record' }, { key: 'history', label: 'History' }, { key: 'compliance', label: 'Compliance' }, { key: 'notes', label: 'Notes' }, { key: 'text', label: 'Text as filed' }, { key: 'files', label: 'Files and records' }, { key: 'manual', label: 'Manual' }]} />
       {section === 'settings' && (template
         /* #168: the template's view of the device — functions, inputs, settings by function — when the model has one */
         ? <>
@@ -113,11 +114,7 @@ export default function RecordScreen({ params: p, id }: { screen: Screen; params
           <pre className="mt-1 max-h-[32rem] overflow-auto rounded border border-slate-800 bg-slate-950 p-2 text-xs whitespace-pre-wrap">{textQ.isPending ? 'loading…' : textQ.isError ? 'The settings text could not be read: ' + (textQ.error as Error).message : textQ.data ? textQ.data.text : 'No settings file is filed for this revision.'}</pre>
         </Panel>
       )}
-      {section === 'compare' && others.length > 0 && (
-        <Panel title="Compare" actions={<Field label="With"><select className={inputClass} value={compareId} onChange={(e) => setCompareWith(e.target.value)}>{others.map((x) => <option key={s(x.RevisionRowId)} value={s(x.RevisionRowId)}>rev {s(x.RevisionLabel) || '?'} · {s(x.GridState)} · calculated {fmtDate(x.CalculatedAt)}{x.WorkRequestTitle ? ' · ' + legacyFree(x.WorkRequestTitle) : ''}</option>)}</select></Field>}>
-          {compareId && <Compare mine={parsed} mineText={textQ.data?.text ?? ''} mineLabel={s(r.RevisionLabel)} other={others.find((x) => s(x.RevisionRowId) === compareId)!} />}
-        </Panel>
-      )}
+      {section === 'history' && <HistoryPanel r={r} revisions={revisionsQ.data ?? []} current={revision} />}   {/* #220 */}
       {section === 'files' && (
         <>
           {/* #216 follow-up (the owner, 2026-09-21): the relay's listing and the file the platform writes belong with the files */}
@@ -162,26 +159,49 @@ function Notes({ r, revision }: { r: Row; revision: string }) {
   return <Panel title="Notes"><Facts cols={1} pairs={pairs.length ? pairs : [['Notes', 'none recorded']]} /></Panel>
 }
 
-/** Compare (round 5 B4): two revisions' parsed settings side by side, or their texts line by line when nothing is parsed. */
-function Compare({ mine, mineText, mineLabel, other }: { mine: Row[]; mineText: string; mineLabel: string; other: Row }) {
-  const otherId = s(other.RevisionRowId)
-  const theirsQ = useViewAll('document', 'vParsedSettingNamed', { ConfigurationFileRevisionRowId: otherId }, 'SettingCode')
-  const textQ = useQuery({ queryKey: ['settingsText', otherId], queryFn: () => settingsText(otherId), staleTime: 5 * 60_000, enabled: mine.length === 0 })
-  if (theirsQ.isPending) return <Status>Comparing…</Status>
-  const theirs = theirsQ.data ?? []; const label = `rev ${s(other.RevisionLabel) || '?'}`
-  if (mine.length || theirs.length) {
-    const key = (x: Row) => s(x.SettingCode) + '|' + s(x.GroupNumber)
-    const m = new Map(mine.map((x) => [key(x), x])), t = new Map(theirs.map((x) => [key(x), x]))
-    const rows = [...new Set([...m.keys(), ...t.keys()])].sort().map((k) => { const a = m.get(k), b = t.get(k); const av = a ? s(a.DisplayValue) : null, bv = b ? s(b.DisplayValue) : null; return { k, code: s((a || b)!.SettingCode), name: s((a || b)!.SettingName), group: s((a || b)!.GroupNumber), mine: av, theirs: bv, diff: av !== bv } })
-    const n = rows.filter((x) => x.diff).length
-    return <><Status>{n} of {rows.length} setting(s) differ between rev {mineLabel || '?'} and {label} (differences highlighted).</Status>
-      <DataGrid rows={rows} rowKey={(x) => x.k} columns={[{ key: 'code', label: 'Setting' }, { key: 'name', label: 'Name' }, { key: 'group', label: 'Group' }, { key: 'mine', label: 'This revision', render: (x) => <span className={x.diff ? 'font-semibold text-amber-300' : ''}>{x.mine ?? '—'}</span> }, { key: 'theirs', label, render: (x) => <span className={x.diff ? 'font-semibold text-amber-300' : ''}>{x.theirs ?? '—'}</span> }]} /></>
-  }
-  if (textQ.isPending) return <Status>Comparing the texts…</Status>
-  const a = mineText.split(/\r?\n/), b = (textQ.data?.text ?? '').split(/\r?\n/); const sa = new Set(a), sb = new Set(b)
-  const rows = Array.from({ length: Math.max(a.length, b.length) }, (_, i) => ({ i: i + 1, mine: a[i], theirs: b[i], diff: (a[i] != null && !sb.has(a[i])) || (b[i] != null && !sa.has(b[i])) }))
-  return <><Status>{rows.filter((x) => x.diff).length} line(s) present in one text and not the other (no parsed settings on either; the texts are compared line by line).</Status>
-    <DataGrid rows={rows} rowKey={(x) => String(x.i)} columns={[{ key: 'i', label: 'Line' }, { key: 'mine', label: 'This revision', render: (x) => <span className={x.diff ? 'font-semibold text-amber-300' : ''}>{x.mine ?? ''}</span> }, { key: 'theirs', label, render: (x) => <span className={x.diff ? 'font-semibold text-amber-300' : ''}>{x.theirs ?? ''}</span> }]} /></>
+/** #220 (the owner, 2026-09-22): the device's whole history in one place — every revision with the change that made it, who asked for it and
+ * when, the dates it was calculated and verified, its time in service, and the rationale it holds. A change the migration brought in is
+ * marked legacy and shows the record's own dates, not the import's. Replaces Compare (a diff between revisions was ruled of no use). */
+function HistoryPanel({ r, revisions, current }: { r: Row; revisions: Row[]; current: string }) {
+  const navigate = useNavigate()
+  const ids = useMemo(() => [...new Set(revisions.map((x) => s(x.WorkRequestEntityId)).filter(Boolean))], [revisions])
+  const reqQ = useQuery({ queryKey: ['history', 'requests', ids.join(',')], enabled: ids.length > 0, staleTime: 60_000, queryFn: async () => {
+    const out: Record<string, Row> = {}
+    for (const id of ids) { const row = (await view('work', 'vChangeRequestStatus', { WorkRequestEntityId: id }, { take: 1 })).rows[0]; if (row) out[id] = row }
+    return out
+  } })
+  const ratQ = useQuery({ queryKey: ['history', 'rationale', revisions.map((x) => s(x.RevisionRowId)).join(',')], enabled: revisions.length > 0, staleTime: 60_000, queryFn: async () => {
+    const out: Record<string, Row> = {}
+    for (const x of revisions) {
+      const link = (await view('document', 'vRevisionLink', { SubjectKind: 'DocumentRevision', SubjectEntityId: s(x.RevisionRowId), LinkKind: 'About' }, { take: 5 })).rows[0]
+      if (!link) continue
+      const f = (await view('document', 'vFile', { RevisionRowId: s(link.RevisionRowId) }, { take: 10 })).rows.filter((y) => /\.docx?$/i.test(s(y.FileName))).pop()
+      if (f) out[s(x.RevisionRowId)] = f
+    }
+    return out
+  } })
+  const rows = [...revisions].sort((a, b) => Number(b.RevisionLabel) - Number(a.RevisionLabel))
+  const isLegacy = (x: Row) => /^CR \d+/.test(s(x.WorkRequestTitle))
+  return (
+    <Panel title={`History · ${legacyFree(r.DeviceName)} · ${rows.length} revision(s)`}>
+      <DataGrid rows={rows} rowKey={(x) => s(x.RevisionRowId)} columns={[
+        { key: 'RevisionLabel', label: 'Rev', render: (x) => <span>{s(x.RevisionLabel)}{s(x.RevisionRowId) === current ? ' (this one)' : ''}</span> },
+        { key: 'GridState', label: 'State', render: (x) => <Pill tone={stateTone(x.GridState)}>{s(x.GridState)}</Pill> },
+        { key: 'InServiceFrom', label: 'In service', render: (x) => <span>{x.InServiceFrom ? fmtDate(x.InServiceFrom) : '—'}{x.InServiceTo ? ` to ${fmtDate(x.InServiceTo)}` : x.InServiceFrom ? ' to now' : ''}</span> },
+        { key: 'WorkRequestTitle', label: 'Change request', render: (x) => (x.WorkRequestEntityId
+          ? <button type="button" className="text-sky-300 underline" onClick={() => navigate(screenPath('WORK_ITEM', s(x.WorkRequestEntityId)))}>{legacyFree(x.WorkRequestTitle)}{isLegacy(x) ? ' · legacy' : ''}</button>
+          : <span className="text-slate-500">—</span>) },
+        { key: 'RequestedBy', label: 'Requested by', render: (x) => { const q = reqQ.data?.[s(x.WorkRequestEntityId)]; return <span>{s(q?.RequestedByDisplayName) || (isLegacy(x) ? s(q?.Description).replace(/^Requested by /, '') : '') || '—'}</span> } },
+        { key: 'RequestedAt', label: 'Requested', render: (x) => { const q = reqQ.data?.[s(x.WorkRequestEntityId)]; return <span>{isLegacy(x) ? 'legacy record' : q?.RequestedAt ? fmtDate(q.RequestedAt) : '—'}</span> } },
+        { key: 'CalculatedAt', label: 'Calculated', render: (x) => <span>{x.CalculatedAt ? fmtDate(x.CalculatedAt) : '—'}</span> },
+        { key: 'VerifiedAt', label: 'Verified', render: (x) => <span>{x.VerifiedAt ? fmtDate(x.VerifiedAt) : '—'}</span> },
+        { key: 'rationale', label: 'Rationale', render: (x) => { const f = ratQ.data?.[s(x.RevisionRowId)]; return f
+          ? <button type="button" className="text-sky-300 underline" onClick={() => void openFile(s(f.RowId), s(f.FileName), s(f.MimeType))}>{s(f.FileName)}</button>
+          : <span className="text-slate-500">{ratQ.isPending ? '…' : 'none'}</span> } },
+      ]} emptyText="No revision of this relay is on record." />
+      <Status>Each row is one revision of this relay's settings: the change that made it, who asked for it, when it was calculated and verified, and its time in service. A change marked legacy came from the old program's records. The rationale opens in Word.</Status>
+    </Panel>
+  )
 }
 
 /** The files and records: this revision's files, then every record of the change with its evidence files (a name opens the file — every open is a logged read, #144). */
@@ -193,15 +213,16 @@ function FilesPanel({ r, revision }: { r: Row; revision: string }) {
       const rev = (await view('document', 'vRevision', { RowId: s(l.RevisionRowId) }, { take: 1 })).rows[0]
       const doc = rev ? (await view('document', 'vDocument', { EntityId: s(rev.DocumentEntityId) }, { take: 1 })).rows[0] : null
       const cls = doc ? (await view('config', 'vDefinition', { EntityId: s(doc.DocumentClassDefinitionEntityId) }, { take: 1 })).rows[0] : null
-      const what = s(cls?.DefinitionKey) === 'Rationale' ? (doc?.MigrationRunId ? 'Rationale (legacy, as filed)' : 'Rationale (generated, #219)') : s(cls?.Name) || 'document'
+      const what = s(cls?.DefinitionKey) === 'Rationale' ? (doc?.MigrationRunId ? 'Rationale (legacy, as filed)' : 'Rationale') : s(cls?.Name) || 'document'
       for (const f of (await view('document', 'vFile', { RevisionRowId: s(l.RevisionRowId) }, { take: 10 })).rows)
         rows.push({ what, kind: f.FileRole, name: f.FileName, mime: f.MimeType, size: f.SizeBytes, sha: f.Sha256, when: f.CreatedAt, fileRowId: f.RowId, note: s(doc?.Description) })
     }
-    for (const f of (await view('document', 'vFile', { RevisionRowId: revision }, { take: 100 })).rows) rows.push({ what: "this revision's file", kind: f.FileRole, name: f.FileName, mime: f.MimeType, size: f.SizeBytes, sha: f.Sha256, when: f.CreatedAt, fileRowId: f.RowId })
+    // #220: the revision's own settings file is on the Settings tab (the file the platform writes) and the Text as filed tab, not here
     if (r.WorkRequestEntityId) {
       for (const rec of (await view('record', 'vRecord', { WorkRequestEntityId: s(r.WorkRequestEntityId) }, { take: 200 })).rows) {
         const links = (await view('document', 'vRevisionLink', { SubjectKind: 'Record', SubjectEntityId: s(rec.EntityId) }, { take: 50 })).rows
-        if (!links.length) { rows.push({ what: rec.RecordKindCode, kind: rec.OverallResult ?? '', name: rec.RecordKindCode === 'ConfigurationFileRevision' ? "the migrated record's detail — shown in the groups above" : legacyFree(rec.Summary), when: rec.OccurredAt }); continue }
+        if (rec.RecordKindCode === 'ConfigurationFileRevision') continue   // #220: the migrated record's detail is on the Record tab
+        if (!links.length) { rows.push({ what: rec.RecordKindCode, kind: rec.OverallResult ?? '', name: legacyFree(rec.Summary), when: rec.OccurredAt }); continue }
         for (const l of links) {
           const fs = (await view('document', 'vFile', { RevisionRowId: s(l.RevisionRowId) }, { take: 50 })).rows
           if (!fs.length) rows.push({ what: rec.RecordKindCode, kind: l.LinkKind, name: `(revision ${s(l.RevisionRowId).slice(0, 8)})`, when: rec.OccurredAt })
@@ -220,13 +241,13 @@ function FilesPanel({ r, revision }: { r: Row; revision: string }) {
   const docTrack = s(trackQ.data?.[0]?.DocumentationStatus)
   return (
     <div id="files-panel"><Panel title={`Files and records · ${q.isPending ? '…' : rows.length}`}>
-      {!q.isPending && !hasRationale && docTrack === 'NA' && <Status>The legacy documentation track for this change reads NA — no rationale document was recorded for it.</Status>}
-      {!q.isPending && !hasRationale && docTrack && docTrack !== 'NA' && <Status>No rationale document is held for this revision (the legacy documentation track reads {docTrack}); the legacy document folder on hand covers stations E–W only.</Status>}
+      {!q.isPending && !hasRationale && docTrack === 'NA' && <Status>No rationale was written for this change in the old program (its documentation track reads NA).</Status>}
+      {!q.isPending && !hasRationale && docTrack && docTrack !== 'NA' && <Status>No rationale document is held for this revision. The old program's documentation track reads {docTrack}; the document folder we have covers stations E to W only.</Status>}
       <DataGrid rows={rows} rowKey={(x, ) => s(x.fileRowId) || s(x.what) + s(x.name) + s(x.when)} columns={[{ key: 'what', label: 'Record' }, { key: 'kind', label: 'Kind' },
         { key: 'name', label: 'File / summary', render: (x) => (<>{x.fileRowId ? <><button type="button" className="text-sky-300 underline" onClick={() => void openFile(s(x.fileRowId), s(x.name), s(x.mime)).catch((e) => setFileErr(e instanceof Error ? e.message : String(e)))}>{s(x.name)}</button>{/^application\/(msword|vnd\.openxmlformats)/i.test(s(x.mime)) && <button type="button" className="ml-2 text-xs text-slate-400 underline" title="Save the file instead of opening it in Word" onClick={() => void downloadFile(s(x.fileRowId), s(x.name)).catch((e) => setFileErr(e instanceof Error ? e.message : String(e)))}>save</button>}</> : s(x.name)}{noteOf(x.note) && <span className="ml-2 text-xs text-slate-400">{noteOf(x.note)}</span>}</>) },
         { key: 'mime', label: 'Type' }, { key: 'size', label: 'Bytes' }, { key: 'sha', label: 'SHA-256', render: (x) => (x.sha ? s(x.sha).slice(0, 12) + '…' : '') }, { key: 'when', label: 'When', render: (x) => fmtWhen(x.when) }]} emptyText={q.isPending ? 'Loading…' : 'No files.'} />
       {fileErr && <Status bad>{fileErr}</Status>}
-      <Status>A file name opens the file — a Word document in Word itself (the browser asks once whether to open Word; “save” keeps a copy instead), a PDF or a text in its own tab, anything else saved by the browser (every open is a logged read, #144). A legacy rationale is frozen at its revision (#217); from the next change on a device the rationale is generated by the platform.</Status>
+      <Status>Click a file name to open it. A Word document opens in Word (the browser asks once); “save” keeps a copy instead. A rationale from the old program stays as it was filed; a new change gets its rationale from the Rationale tab.</Status>
     </Panel></div>
   )
 }

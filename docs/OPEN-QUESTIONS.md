@@ -107,3 +107,11 @@ the text format, and the seed for the templates. → #61.
   substrate of §12.6, built but without a screen). The research side — what the standard's parts require, part by
   part — is content to be read and seeded from the standard, never written from memory. Phase 2 candidate; the
   substrate is here, the screen is not.
+- **Compare the relay's online settings with the in-service record** (the owner, 2026-09-22: a diff between two
+  revisions of a device "is not very useful. Users can review the rational of each"; "the one area when a comparison of
+  settings would be valuable would be to compare an 'online' version which would be downloaded from the device with what
+  is in the database as the in-service setting. Basically a confirmation of what is in service is what you think is in
+  service … a much later stage … that would require communications with field devices which hasn't even been planned
+  yet"). The schema already takes a captured file (`document.File_Write @IsCapturedFromDevice`, `ConfigurationFile.CaptureKind`)
+  and every filed text goes through the same reader, so the comparison is the in-service parsed settings against a
+  captured revision's. Later phase; field communications first. The Compare tab was removed in #220.
