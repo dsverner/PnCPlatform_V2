@@ -105,6 +105,11 @@ Carried forward from the predecessor, after a run of avoidable mistakes there.
   when modelling any P&C thing, ask what the physical object really is (windings, cores, taps, phases as units, terminals,
   cables, DC feeds) and whether the entity built now blocks that later — and raise it, with a recommendation, in the reply
   and the plan. Never add it silently.
+- **The application speaks as a P&C person speaks.** `docs/design/UI-WORDING.md` (owner, 2026-09-22: "I would like your
+  wording to be more in line with what a protection and control human would understand and write. This goes for the wording
+  in the entire application"). No decision number, owner quote, view, procedure, permission or tool name, and no sentence
+  explaining the platform's design, in anything a user reads; a manual's or a standard's own words stay verbatim with their
+  cite. `python tools/check_wording.py` must report zero before a commit that touches the interface.
 - **Bringing a model in follows the runbook.** `docs/runbook/BRING-A-MODEL-IN.md` holds every step, tool, ruling and trap
   of the SEL-221F (owner, 2026-09-21: "taking notes of all of these steps so that we can repeat them again for other relays
   without this back and forth"). An increment that adds a step, a tool or a ruling to that process adds it there in the

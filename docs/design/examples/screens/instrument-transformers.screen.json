@@ -3,7 +3,7 @@
   "kind": "screen",
   "key": "INSTRUMENT_TRANSFORMERS",
   "name": "Instrument transformers",
-  "description": "The instrument transformers as equipment in their own right (#201): CTs, VTs, auxiliaries, CVTs, metering units — where each is, its ratio in use and the schemes it feeds; a row opens the transformer.",
+  "description": "The CTs, VTs, auxiliaries, CVTs and metering units, with where each stands, the ratio in use and the schemes it feeds. Open a row for the transformer.",
   "menu": {
     "group": "Assets and schemes",
     "label": "Instrument transformers",

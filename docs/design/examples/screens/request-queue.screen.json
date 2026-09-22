@@ -1,6 +1,6 @@
 {
   "g": 1, "kind": "screen", "key": "REQUEST_QUEUE", "name": "Requests",
-  "description": "The change-request queue: every request the person may read, counted by state, filtered by state and location; a row opens the request (#158, #165).",
+  "description": "The change requests you may see, counted by state and filtered by state and location. Open a row for the request.",
   "menu": { "group": "Settings book", "label": "Requests", "order": 20 },
   "permission": "WorkRequest.Read",
   "screenKind": "list",
@@ -19,7 +19,7 @@
       { "key": "RequestedAt", "label": "Requested", "format": "date" },
       { "key": "DocumentationStatus", "label": "Documentation" },
       { "key": "DatabaseStatus", "label": "Database" },
-      { "key": "LifecycleState", "label": "Package" },
+      { "key": "LifecycleState", "label": "Settings package" },
       { "key": "RequestCompletedAt", "label": "Completed", "format": "date" }
     ],
     "textFilterColumns": ["Title", "ScopeName", "EquipmentName", "StationName", "RequestedByDisplayName", "WorkTypeKey", "Description"],

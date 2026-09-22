@@ -3,7 +3,7 @@
   "kind": "screen",
   "key": "STANDARDS",
   "name": "Standards and requirements",
-  "description": "Every requirement of every standard the platform holds, with its standard and version in force (#185). The owner, 2026-09-18: compliance is a function of its own, outside the device template - PRC-023 is compulsory whatever the relay - so the standards live here under Compliance, for every device type. NPCC Directory 4's 23 criteria and A-10 sit here. Reads compliance.vRequirementDetail.",
+  "description": "Every requirement of every standard held here, with the version in force. Requirements sit here, for every relay, not on a relay's template.",
   "menu": { "group": "Compliance", "label": "Standards", "order": 40 },
   "permission": "Obligation.Read",
   "screenKind": "list",

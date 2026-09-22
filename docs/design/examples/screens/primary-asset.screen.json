@@ -3,7 +3,7 @@
   "kind": "screen",
   "key": "PRIMARY_ASSET",
   "name": "Primary asset",
-  "description": "One primary asset \u2014 a line, transformer, bus, breaker, generator, capacitor, reactor or the system: where it is, the schemes that protect it, and its applicability classifications (CIP impact, BES status, NPCC BPS, A-10, PRC-023) recorded by a person with the list or study they came from (#170). Plain code; the definition names its data.",
+  "description": "One primary asset, a line, transformer, bus, breaker, generator, capacitor or reactor: where it is, its terminals, the schemes that protect it, its ratings, and the classifications recorded from the studies (CIP impact, BES, NPCC BPS, A-10, PRC-023). A line also carries its impedance and length.",
   "permission": "Asset.Read",
   "screenKind": "record",
   "params": {

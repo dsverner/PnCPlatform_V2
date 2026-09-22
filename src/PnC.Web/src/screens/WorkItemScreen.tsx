@@ -36,16 +36,16 @@ export default function WorkItemScreen({ screen, params: p, id }: { screen: Scre
     queryFn: async () => { const out: [string, string][] = []; for (const id of memberIds) { const r = (await readView('asset', 'vAsset', { EntityId: id }, { take: 1 })).rows[0]; if (r) out.push([id.toLowerCase(), legacyFree(r.Name)]) } return out } })
   const memberNames = useMemo(() => { const m = new Map<string, string>(namesQ.data ?? []); for (const r of itemsQ.data ?? []) if (r.DeviceEntityId) m.set(String(r.DeviceEntityId).toLowerCase(), legacyFree(r.DeviceName)); return m }, [itemsQ.data, namesQ.data])
 
-  if (!id) return <Status bad>No work item id in the address.</Status>
-  if (headQ.isPending) return <Status>Loading the work item…</Status>
+  if (!id) return <Status bad>The address names no change request.</Status>
+  if (headQ.isPending) return <Status>Loading the change request…</Status>
   if (headQ.isError) return <Status bad>Could not load: {(headQ.error as Error).message}</Status>
-  if (!head) return <Status bad>No work item with that id is readable by you.</Status>
+  if (!head) return <Status bad>You may not read that change request, or it does not exist.</Status>
 
   const current = s(head.RequestState) || null
   const doc = wfQ.data?.document
   const transitions = doc ? doc.transitions.filter((t) => t.from === current).filter((t, i, a) => a.findIndex((x) => x.name === t.name) === i) : []
   const fire = async (name: string, why?: string) => {
-    if (!wfId) { setMsg({ text: 'This work item has no workflow instance to transition.', bad: true }); return }
+    if (!wfId) { setMsg({ text: 'This change request has no stages, so it cannot be moved on.', bad: true }); return }
     try { const x = await transition(wfId, name, why); setMsg({ text: `${name} → ${x.toState}.` }); setReasonFor(null); setReason(''); reload() }
     catch (e) { setMsg({ text: `${name} refused: ${e instanceof ApiError ? e.status + ' ' : ''}${(e as Error).message}`, bad: true }) }
   }
@@ -64,12 +64,12 @@ export default function WorkItemScreen({ screen, params: p, id }: { screen: Scre
       </header>
       {reasonFor && (
         <form className="flex flex-wrap items-end gap-2 rounded border border-slate-700 bg-slate-950 p-2" onSubmit={(e) => { e.preventDefault(); if (reason.trim()) fire(reasonFor, reason.trim()) }}>
-          <Field label={`${reasonFor}: the reason (the workflow requires one)`}><input className={`${inputClass} w-96`} value={reason} onChange={(e) => setReason(e.target.value)} autoFocus /></Field>
+          <Field label={`${reasonFor} — the reason (one is required)`}><input className={`${inputClass} w-96`} value={reason} onChange={(e) => setReason(e.target.value)} autoFocus /></Field>
           <Button type="submit" kind="primary">{reasonFor}</Button><Button onClick={() => setReasonFor(null)}>Never mind</Button>
         </form>
       )}
-      <Status bad={msg?.bad}>{msg?.text ?? `Request ${current ?? 'not started'}${head.ProcedureState ? ` · procedure ${head.ProcedureState}${head.ProcedureOutcome ? ' / ' + head.ProcedureOutcome : ''}` : ''}${head.LifecycleState ? ` · package ${head.LifecycleState}` : ''}`}</Status>
-      {doc ? <StageBar stages={doc.states} current={current} /> : wfQ.isError ? <Status>The stage bar needs the workflow definition (Definition.Read).</Status> : null}
+      <Status bad={msg?.bad}>{msg?.text ?? `The request is ${current ?? 'not started'}.${head.ProcedureState ? ` The work is ${head.ProcedureState}${head.ProcedureOutcome ? ` — ${head.ProcedureOutcome}` : ''}.` : ''}${head.LifecycleState ? ` The settings package is ${head.LifecycleState}.` : ''}`}</Status>
+      {doc ? <StageBar stages={doc.states} current={current} /> : wfQ.isError ? <Status>You may not see the stages of this request.</Status> : null}
       {raise && <RaiseRequest o={raise} onClose={() => setRaise(null)} />}
       <div className="grid gap-3 lg:grid-cols-[2fr_1fr]">
         <Panel title="Request"><Facts cols={2} pairs={p.headerFacts.map((c) => [labelOf(c), cellText(c, head)])} /></Panel>
@@ -77,9 +77,9 @@ export default function WorkItemScreen({ screen, params: p, id }: { screen: Scre
       </div>
       {instId ? (instQ.isPending ? <Status>Loading the procedure…</Status> : instQ.isError ? <Status bad>The procedure could not be read: {(instQ.error as Error).message}</Status>
         : <Tracks inst={instQ.data} p={p} memberNames={memberNames} can={can} onChanged={reload} navigate={navigate} />)
-        : <Status>No procedure has been started for this work item{current === 'Raised' ? ' — Start it above' : ''}.</Status>}
+        : <Status>No procedure has been started for this request{current === 'Raised' ? ' — use Start, above' : ''}.</Status>}
       {p.produced && instQ.data && Object.keys(instQ.data.produced).length > 0 && (
-        <Panel title="Produced"><Facts cols={3} pairs={p.produced.filter((x) => instQ.data.produced[x.name]).map((x) => [x.label, x.screen ? <a className="text-sky-300 underline" href="#" onClick={(e) => { e.preventDefault(); navigate(screenPath(x.screen!, instQ.data.produced[x.name])) }}>{instQ.data.produced[x.name]}</a> : instQ.data.produced[x.name]])} /></Panel>
+        <Panel title="What this produced"><Facts cols={3} pairs={p.produced.filter((x) => instQ.data.produced[x.name]).map((x) => [x.label, x.screen ? <a className="text-sky-300 underline" href="#" onClick={(e) => { e.preventDefault(); navigate(screenPath(x.screen!, instQ.data.produced[x.name])) }}>{instQ.data.produced[x.name]}</a> : instQ.data.produced[x.name]])} /></Panel>
       )}
       {p.items && <Items p={p} rows={itemsQ.data ?? []} pending={itemsQ.isPending} ctx={ctx} can={can} />}
     </div>
@@ -91,7 +91,7 @@ function Tracks({ inst, p, memberNames, can, onChanged, navigate }: { inst: Proc
   const [msg, setMsg] = useState<string | null>(null); const [holdReason, setHoldReason] = useState<Record<string, string>>({})
   const byParent = useMemo(() => { const m = new Map<string | null, BlockNode[]>(); for (const b of inst.blocks) { if (!m.has(b.parent)) m.set(b.parent, []); m.get(b.parent)!.push(b) } return m }, [inst.blocks])
   const root = inst.blocks.find((b) => b.parent === null)
-  if (!root) return <Status>The procedure has no blocks yet.</Status>
+  if (!root) return <Status>This procedure has no steps yet.</Status>
   const top = byParent.get(root.blockInstanceEntityId) ?? []
   const parallel = p.tracks === 'branches' ? (p.tracksOf ? inst.blocks.find((b) => b.path === p.tracksOf && b.kind === 'parallel') : inst.blocks.find((b) => b.kind === 'parallel')) : undefined
   const branches = parallel ? byParent.get(parallel.blockInstanceEntityId) ?? [] : []
@@ -99,9 +99,9 @@ function Tracks({ inst, p, memberNames, can, onChanged, navigate }: { inst: Proc
   const shown = (steps: BlockNode[]) => (p.showSteps === 'open' ? steps.filter((x) => !['Committed', 'Skipped', 'Varied'].includes(x.step!.state)) : steps)
   const member = (b: BlockNode) => (b.memberSubjectEntityId ? memberNames.get(b.memberSubjectEntityId.toLowerCase()) ?? b.memberSubjectEntityId.slice(0, 8) : null)
   const trackStatus = (b: BlockNode) => (b.state === 'Completed' ? 'Complete' : b.state === 'Skipped' && b.outcome === 'NotApplicable' ? 'NA' : b.state === 'Running' || b.state === 'Held' ? 'In progress' : b.state === 'Cancelled' ? 'Cancelled' : 'Not started')
-  const release = async (b: BlockNode) => { const why = (holdReason[b.blockInstanceEntityId] ?? '').trim(); if (!why) { setMsg('A reason is required to release a hold by hand.'); return }
-    try { await releaseHold(b.blockInstanceEntityId, why); setMsg(`Hold ${b.title ?? b.path} released.`); onChanged() } catch (e) { setMsg(`Release refused: ${(e as Error).message}`) } }
-  const reevaluate = async () => { try { const r = await evaluate(inst.procedureInstanceEntityId); setMsg(`Evaluated: ${r.changes} change(s)${r.completed ? ', completed' : ''}${r.notes.length ? ' · ' + r.notes.join('; ') : ''}`); onChanged() } catch (e) { setMsg(`Evaluate refused: ${(e as Error).message}`) } }
+  const release = async (b: BlockNode) => { const why = (holdReason[b.blockInstanceEntityId] ?? '').trim(); if (!why) { setMsg('Give a reason before releasing this hold.'); return }
+    try { await releaseHold(b.blockInstanceEntityId, why); setMsg(`${b.title ?? 'The hold'} released.`); onChanged() } catch (e) { setMsg(`Could not release it: ${(e as Error).message}`) } }
+  const reevaluate = async () => { try { const r = await evaluate(inst.procedureInstanceEntityId); setMsg(`${r.changes} step(s) moved on${r.completed ? '; the procedure is complete' : ''}${r.notes.length ? ' · ' + r.notes.join('; ') : ''}`); onChanged() } catch (e) { setMsg(`Could not move it on: ${(e as Error).message}`) } }
   const StepRow = ({ b }: { b: BlockNode }) => (
     <li className="flex flex-wrap items-center justify-between gap-2 py-1 text-sm">
       <span><a className="text-sky-300 underline" href="#" onClick={(e) => { e.preventDefault(); navigate(screenPath('STEP', b.step!.stepInstanceEntityId)) }}>{b.title ?? b.step!.stepId}</a>{member(b) && <span className="ml-2 text-xs text-slate-400">{member(b)}</span>}</span>
@@ -117,14 +117,15 @@ function Tracks({ inst, p, memberNames, can, onChanged, navigate }: { inst: Proc
           <Pill tone={stateTone(trackStatus(b) === 'Complete' ? 'Complete' : trackStatus(b) === 'In progress' ? 'InProgress' : trackStatus(b))}>{trackStatus(b)}{b.completedAt ? ' · ' + fmtWhen(b.completedAt) : ''}</Pill>
         </div>
         {b.kind === 'hold' && b.state === 'Held' && (
-          <div className="mt-1 flex flex-wrap items-end gap-2"><Field label="Release the hold by hand — the reason"><input className={inputClass} value={holdReason[b.blockInstanceEntityId] ?? ''} onChange={(e) => setHoldReason({ ...holdReason, [b.blockInstanceEntityId]: e.target.value })} /></Field><Button kind="mini" disabled={!can('WorkRequest.Modify')} onClick={() => release(b)}>Release hold</Button></div>
+          <div className="mt-1 flex flex-wrap items-end gap-2"><Field label="Why release this hold?"><input className={inputClass} value={holdReason[b.blockInstanceEntityId] ?? ''} onChange={(e) => setHoldReason({ ...holdReason, [b.blockInstanceEntityId]: e.target.value })} /></Field><Button kind="mini" disabled={!can('WorkRequest.Modify')} onClick={() => release(b)}>Release hold</Button></div>
         )}
         {steps.length > 0 && <ul className="mt-1 divide-y divide-slate-800">{steps.map((x) => <StepRow key={x.blockInstanceEntityId} b={x} />)}</ul>}
       </div>
     )
   }
   return (
-    <Panel title={`Procedure ${inst.key} · ${inst.state}${inst.outcome ? ' / ' + inst.outcome : ''}`} actions={<Button kind="mini" disabled={!can('WorkRequest.Modify')} onClick={reevaluate} title="Ask the engine to advance what can advance">Evaluate</Button>}>
+    // #165: the procedure key is the definition's, not the user's — the state and outcome are what a person reads
+    <Panel title={`The procedure · ${inst.state}${inst.outcome ? ' — ' + inst.outcome : ''}`} actions={<Button kind="mini" disabled={!can('WorkRequest.Modify')} onClick={reevaluate} title="Starts any step whose turn it is now, and closes the procedure when the last step is done.">Move it on</Button>}>
       {msg && <Status>{msg}</Status>}
       {branches.length > 0 && (
         <div className="mb-3 grid gap-3" style={{ gridTemplateColumns: `repeat(${Math.min(branches.length, 4)}, minmax(0, 1fr))` }}>
@@ -157,7 +158,7 @@ function Items({ p, rows, pending, ctx, can }: { p: WorkItemParams; rows: Row[];
   const open = p.items!.rowOpen
   return (
     <Panel title={`Items · ${pending ? '…' : rows.length}`}>
-      <DataGrid rows={rows} columns={cols} rowKey={(r) => s(r[p.items!.key === 'WorkRequestEntityId' ? 'RevisionRowId' : p.items!.key])} onRowClick={open ? (r) => { if (commandEnabled(open, r, can)) runCommand(open, r, ctx) } : undefined} emptyText={pending ? 'Loading…' : 'No items yet.'} />
+      <DataGrid rows={rows} columns={cols} rowKey={(r) => s(r[p.items!.key === 'WorkRequestEntityId' ? 'RevisionRowId' : p.items!.key])} onRowClick={open ? (r) => { if (commandEnabled(open, r, can)) runCommand(open, r, ctx) } : undefined} emptyText={pending ? 'Loading…' : 'Nothing is listed on this request yet.'} />
     </Panel>
   )
 }

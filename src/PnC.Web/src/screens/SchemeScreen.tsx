@@ -70,9 +70,9 @@ export default function SchemeScreen({ params: p, id }: { screen: Screen; params
     try { await proc('scheme', 'SchemeProtects_SoftDelete', { EntityId: x.LinkEntityId }); setMsg({ text: `${s(x.Name)} no longer listed as protected by ${s(r?.Name)}.` }); refresh() }
     catch (e) { setMsg({ text: e instanceof ApiError ? e.message : String(e), bad: true }) }
   }
-  if (!id) return <Status bad>No scheme in the address.</Status>
+  if (!id) return <Status bad>No scheme was named. Pick one from Schemes.</Status>
   if (rowQ.isPending) return <Status>Loading the scheme…</Status>
-  if (!r) return <Status bad>No scheme with that id is readable by you.</Status>
+  if (!r) return <Status bad>You may not read this scheme.</Status>
   return (
     <div className="space-y-3">
       <header className="flex flex-wrap items-center justify-between gap-2">
@@ -108,7 +108,7 @@ export default function SchemeScreen({ params: p, id }: { screen: Screen; params
                 <Field label="Name"><input className={inputClass} value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="e.g. L0012" /></Field>
                 <Button kind="primary" disabled={!newName.trim() || !station?.StationNodeEntityId || busy} onClick={() => void create()}>Create and protect</Button>
               </div>
-              <div className="mt-1 text-xs text-slate-500">A name, a type and this station as its terminal 1 — the other end of a line is set on the asset's page. The power-system model (the TLM project) attaches later.</div>
+              <div className="mt-1 text-xs text-slate-500">A name, a type, and this station as terminal 1. The other end of a line is set on the asset's page.</div>
             </div>
           </div>
         )}
@@ -161,19 +161,20 @@ function MembersPanel({ schemeId, stationNodeEntityId, stationName }: { schemeId
     try { await proc('scheme', 'SchemeMember_SoftDelete', { EntityId: m.EntityId }); setMsg({ text: `${s(m.MemberName) || s(m.MemberKind)} is no longer a member.` }); setConfirmId(''); refresh() }
     catch (e) { setMsg({ text: e instanceof ApiError ? e.message : String(e), bad: true }) } finally { setBusy(false) }
   }
+  const ask = (m: Row) => { setMsg(null); setConfirmId(s(m.EntityId)) }
   const rows = membersQ.data ?? []
   return (
     <Panel title={`Members · ${membersQ.isPending ? '…' : rows.length}`}>
-      <DataGrid rows={rows} rowKey={(x) => s(x.EntityId)} emptyText="No members." columns={[
+      <DataGrid rows={rows} rowKey={(x) => s(x.EntityId)} emptyText="No member yet. Add the protection function this scheme runs on, below." columns={[
         { key: 'MemberName', label: 'Member' }, { key: 'MemberKind', label: 'Kind' }, { key: 'MemberRoleCode', label: 'Role' },
         { key: 'IsInService', label: 'In service', render: (x) => (x.IsInService ? 'yes' : 'no') },
         ...(canRemove ? [{ key: '_x', label: '', render: (x: Row) => (confirmId === s(x.EntityId)
           ? <span className="flex items-center gap-1 text-xs text-amber-300">remove?
               <Button kind="mini" disabled={busy} onClick={() => void remove(x)}>yes</Button>
               <Button kind="mini" disabled={busy} onClick={() => setConfirmId('')}>keep</Button></span>
-          : <Button kind="mini" disabled={busy} onClick={() => { setMsg(null); setConfirmId(s(x.EntityId)) }}>remove</Button>) }] : [])]} />
+          : <Button kind="mini" disabled={busy} onClick={() => ask(x)}>remove</Button>) }] : [])]} />
       {msg && <div className="mt-2"><Status bad={msg.bad}>{msg.text}</Status></div>}
-      <div className="mt-2"><Status>A member is a protection function, an asset or a channel — never a device, so that swapping a relay leaves the scheme intact.</Status></div>
+      <div className="mt-2"><Status>A member is a protection function, an asset or a channel. Never a device, so swapping a relay leaves the scheme intact.</Status></div>
       {canAdd && <AddMember schemeId={schemeId} stationNodeEntityId={stationNodeEntityId} stationName={stationName} onAdded={refresh} />}
     </Panel>
   )
@@ -261,7 +262,7 @@ function AddMember({ schemeId, stationNodeEntityId, stationName, onAdded }: { sc
                   <option value="">— which station? —</option>
                   {(stationsQ.data ?? []).map((x) => <option key={s(x.EntityId)} value={s(x.EntityId)}>{s(x.Code) ? `${s(x.Code)} · ` : ''}{s(x.Name)}</option>)}
                 </select></Field>
-              <Status>No member of this scheme is placed anywhere yet, so its station is not known — choose it once.</Status>
+              <Status>No member of this scheme is placed anywhere yet, so its station is not known. Choose it once.</Status>
             </div>)}
           {!!station && (
             <div className="flex flex-wrap items-end gap-2">
@@ -283,7 +284,7 @@ function AddMember({ schemeId, stationNodeEntityId, stationName, onAdded }: { sc
         </div>
       ) : (
         <AssetPicker value={asset} onChange={(a) => { setAsset(a); setMsg(null) }} disabled={busy} autoFocusKey={`member-${round}`}
-          label={kind === 'Channel' ? 'Channel (a channel is an asset, §7.2)' : 'Asset'} note="any part of the name; two of the same name are told apart by the model" />)}
+          label={kind === 'Channel' ? 'Channel' : 'Asset'} note="any part of the name; two of the same name are told apart by the model" />)}
       <label className="flex flex-col gap-1 text-xs text-slate-400">Notes (optional)
         <textarea className={`${inputClass} w-full`} rows={1} value={notes} disabled={busy} onChange={(e) => setNotes(e.target.value)} /></label>
       {msg && <Status bad={msg.bad}>{msg.text}</Status>}

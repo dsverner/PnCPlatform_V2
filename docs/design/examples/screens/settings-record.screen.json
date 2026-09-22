@@ -1,6 +1,6 @@
 {
   "g": 1, "kind": "screen", "key": "SETTINGS_RECORD", "name": "Settings record",
-  "description": "One settings revision: the device, where it is, the dates and state, the classification and instrument-transformer characteristics, the notes, the parsed settings, the settings text as filed, the files and records, Compare with another revision (#157, #165). The screen is plain code for the settings record; the definition only names its data.",
+  "description": "One settings record of a relay: its settings by function, the rationale, the analog inputs, the jumper settings, the record detail, compliance, notes, the settings text as filed, its documents and the relay's history.",
   "permission": "ConfigurationFile.Read",
   "screenKind": "record",
   "params": { "view": "document.vSettingsRecord", "key": "RevisionRowId" }

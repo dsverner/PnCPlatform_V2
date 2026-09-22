@@ -3,7 +3,7 @@
   "kind": "screen",
   "key": "DEVICE_TEMPLATES",
   "name": "Device templates",
-  "description": "The device templates, one row per template and the model it is bound to (#185). The owner, 2026-09-18, unable to reach SEL221F_Template from the main screen: functionality must always be reachable from the left navigation, and templates belong under a Templates entry. A row opens the model's template. Reads config.vAssetTemplate.",
+  "description": "The relay models with a template, one row per model. Open a row for that model's settings list, capabilities and manual.",
   "menu": { "group": "Templates", "label": "Device templates", "order": 30 },
   "permission": "Asset.Read",
   "screenKind": "list",

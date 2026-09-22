@@ -3,7 +3,7 @@
   "kind": "screen",
   "key": "COMPLIANCE_EVALUATION",
   "name": "Evaluation",
-  "description": "How the platform keeps compliance evaluated (#214): the requests left by writes that changed a fact the rules read, the passes that answered them (FactChanged within seconds, the hourly pass, a rule approved), the rules a pass could not evaluate, and the one hand-run — for after a rule changes. Reads compliance.vEvaluationQueue and compliance.vRuleEvaluationRun.",
+  "description": "How compliance is kept up to date: what has changed and is waiting to be checked, the checks already made, any rule that could not be worked out, and a button to check everything now. Compliance is normally checked on its own, within seconds of a change and every hour.",
   "menu": {
     "group": "Compliance",
     "label": "Evaluation",
@@ -17,11 +17,11 @@
     "rowKey": "RequestId",
     "columns": [
       { "key": "RequestedAt", "label": "Requested" },
-      { "key": "SubjectKind", "label": "About" },
+      { "key": "SubjectKind", "label": "What changed" },
       { "key": "SubjectName", "label": "Subject" },
-      { "key": "Reason", "label": "Changed by" },
-      { "key": "RequestedByName", "label": "Who" },
-      { "key": "IsPending", "label": "Pending" },
+      { "key": "Reason", "label": "Why" },
+      { "key": "RequestedByName", "label": "Raised by" },
+      { "key": "IsPending", "label": "Waiting" },
       { "key": "DevicesFound", "label": "Devices" }
     ],
     "textFilterColumns": ["SubjectName", "Reason"]

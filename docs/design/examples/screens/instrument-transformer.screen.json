@@ -3,7 +3,7 @@
   "kind": "screen",
   "key": "INSTRUMENT_TRANSFORMER",
   "name": "Instrument transformer",
-  "description": "One instrument transformer as equipment (#201): what it is, where it is, its nameplate (the CT_Template / VT_Template characteristics, editable), the schemes it feeds as CT or VT source, and its tests (#202). Plain code; the definition names its data.",
+  "description": "One CT or VT: what it is, where it stands, its nameplate, its windings and their ratios, the schemes it feeds, and its tests.",
   "permission": "Asset.Read",
   "screenKind": "record",
   "params": {

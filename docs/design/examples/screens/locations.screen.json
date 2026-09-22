@@ -3,7 +3,7 @@
   "kind": "screen",
   "key": "LOCATIONS",
   "name": "Locations",
-  "description": "The stations, each with the buildings inside it; a name opens the location, where its CIP-002 impact rating is recorded (#173). The definition names the data — the stations of location.vNode; the page adds each station's buildings, which no single view carries.",
+  "description": "The stations and the buildings in each. Open a station to see what is inside it and to record its CIP-002 impact rating.",
   "menu": {
     "group": "Assets and schemes",
     "label": "Locations",

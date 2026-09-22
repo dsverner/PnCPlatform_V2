@@ -12,19 +12,19 @@ export default function HomePage() {
   const isDev = healthQ.data?.environment === 'DEV'
   return (
     <div className="grid gap-4 md:grid-cols-2">
-      <Panel title="Platform">
-        {healthQ.data ? <Facts cols={1} pairs={[['Environment', healthQ.data.environment], ['Release', healthQ.data.release], ['Database', healthQ.data.database], ['Catalogue loaded', new Date(healthQ.data.catalogLoadedAt).toLocaleString()]]} />
-          : <Status bad={healthQ.isError}>{healthQ.isError ? 'The API did not answer.' : '…'}</Status>}
+      <Panel title="This application">
+        {healthQ.data ? <Facts cols={1} pairs={[['Environment', healthQ.data.environment], ['Release', healthQ.data.release], ['Database', healthQ.data.database], ['Loaded', new Date(healthQ.data.catalogLoadedAt).toLocaleString()]]} />
+          : <Status bad={healthQ.isError}>{healthQ.isError ? 'The server did not answer.' : '…'}</Status>}
       </Panel>
       <Panel title="You">
-        {meQ.data ? <Facts cols={1} pairs={[['Person', meQ.data.person.displayName], ['Account', meQ.data.user.userPrincipalName], ['Permissions', String(meQ.data.permissions.length)]]} />
-          : <Status bad={meQ.isError}>{meQ.isError ? 'Not signed in.' : '…'}</Status>}
+        {meQ.data ? <Facts cols={1} pairs={[['Name', meQ.data.person.displayName], ['Account', meQ.data.user.userPrincipalName], ['Permissions', String(meQ.data.permissions.length)]]} />
+          : <Status bad={meQ.isError}>{meQ.isError ? 'You are not signed in.' : '…'}</Status>}
         {isDev && (
           <form className="mt-3 flex flex-wrap items-end gap-2" onSubmit={(e) => { e.preventDefault(); setDevUser(upn.trim() || null); qc.invalidateQueries({ queryKey: ['me'] }); qc.invalidateQueries({ queryKey: ['view'] }) }}>
-            <label className="flex flex-col gap-1 text-xs text-slate-400">DEV sign-in (act as)
+            <label className="flex flex-col gap-1 text-xs text-slate-400">Sign in as someone else (development)
               <input className={inputClass} list="dev-upns" value={upn} onChange={(e) => setUpn(e.target.value)} placeholder="user@pnc.local" autoComplete="off" />
             </label>
-            <datalist id="dev-upns"><option value="smoke.admin@pnc.local">Administrator</option><option value="smoke.approver@pnc.local">Administrator (second)</option><option value="smoke.hydro@pnc.local">PCEngineer, Generation · Hydro</option><option value="smoke.readonly@pnc.local">ReadOnly</option></datalist>
+            <datalist id="dev-upns"><option value="smoke.admin@pnc.local">Administrator</option><option value="smoke.approver@pnc.local">Administrator (second)</option><option value="smoke.hydro@pnc.local">P&C engineer — Generation, Hydro</option><option value="smoke.readonly@pnc.local">Read only</option></datalist>
             <Button type="submit" kind="primary">Sign in</Button>
           </form>
         )}

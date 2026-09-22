@@ -38,9 +38,9 @@ export default function InstrumentTransformerScreen({ params: p, id }: { screen:
   const r = rowQ.data?.[0]
   const typeQ = useViewAll('ref', 'vAssetType', { AssetTypeCode: s(r?.AssetTypeCode) }, undefined, !!r)
   const [edit, setEdit] = useState(false)
-  if (!id) return <Status bad>No instrument transformer in the address.</Status>
+  if (!id) return <Status bad>No instrument transformer was named in the address.</Status>
   if (rowQ.isPending) return <Status>Loading the instrument transformer…</Status>
-  if (!r) return <Status bad>No instrument transformer with that id is readable by you.</Status>
+  if (!r) return <Status bad>There is no instrument transformer here, or you may not read it.</Status>
   const editable = can('Asset.Modify')
   const template = s(typeQ.data?.[0]?.DefaultTemplateDefinitionEntityId)
   const refresh = () => { qc.invalidateQueries({ queryKey: ['view', 'asset'] }); qc.invalidateQueries({ queryKey: ['view', 'scheme'] }); qc.invalidateQueries({ queryKey: ['view', 'location'] }) }
@@ -59,7 +59,8 @@ export default function InstrumentTransformerScreen({ params: p, id }: { screen:
               ['Serial number', s(r.SerialNumber) || '—'], ['Model', s(r.ModelCode) || '—'], ['Voltage class', s(r.VoltageClassCode) || '—'],
               ['Station', r.StationNodeEntityId ? <span><NodeLink id={s(r.StationNodeEntityId)} name={s(r.StationName)} />{r.StationSource === 'scheme' ? <span className="text-xs text-slate-500"> · by the scheme it feeds; not placed yet</span> : null}</span> : <span className="text-slate-500">unknown — it feeds no scheme and is not placed</span>],
               ['Commissioned', r.CommissionedAt ? fmtDate(r.CommissionedAt) : '—'], ['Retired', r.RetiredAt ? fmtDate(r.RetiredAt) : '—'], ['Notes', s(r.Notes) || '—']]} />}
-          {!!r.MigrationSource && <Status>Made by the migration rule (#206) from the legacy record: the scheme's devices declared this ratio, or their functions need this input. Correct it here if the yard says otherwise.</Status>}
+          {/* #206: the migration rule made this transformer from what the legacy record declared */}
+          {!!r.MigrationSource && <Status>Brought in from the legacy record: the scheme's relays declared this ratio, or their functions need this input. Correct it here if the yard says otherwise.</Status>}
         </Panel>
         <WhereItStands r={r} canPlace={editable} canMakeNode={can('Node.Modify')} onChanged={refresh} />
       </div>
@@ -108,6 +109,7 @@ function EditEquipment({ r, onDone }: { r: Row; onDone: () => void }) {
  * auxiliary at a Panel; and a node holds one installed asset (a second auxiliary on the same panel is refused by the database). */
 function WhereItStands({ r, canPlace, canMakeNode, onChanged }: { r: Row; canPlace: boolean; canMakeNode: boolean; onChanged: () => void }) {
   const station = s(r.StationNodeEntityId); const at = standsAt(s(r.AssetTypeCode))
+  const stationName = s(r.StationName); const placed = !!r.NodeEntityId; const migrated = !!r.MigrationSource
   const yardsQ = useViewAll('location', 'vNode', { ParentEntityId: station, NodeTypeCode: 'Yard' }, 'Name', !!station && at === 'Yard')
   const panelsQ = useQuery({ queryKey: ['stationPanels', station], enabled: !!station && at === 'Panel', staleTime: 60_000, queryFn: async () => {
     const buildings = await viewAll('location', 'vNode', { ParentEntityId: station, NodeTypeCode: 'Building' }, 'Name')
@@ -136,17 +138,17 @@ function WhereItStands({ r, canPlace, canMakeNode, onChanged }: { r: Row; canPla
     <Panel title="Where it stands">
       {r.NodeEntityId
         ? <Facts cols={1} pairs={[['Placed at', <span><NodeLink id={s(r.NodeEntityId)} name={s(r.NodeName)} /> <span className="text-xs text-slate-500">{s(r.NodeTypeCode)} · {s(r.PlacementKind)}</span></span>]]} />
-        : <Status>Not placed. {r.MigrationSource ? 'The migration rule knew the scheme, not the yard: ' : ''}{station ? `choose the ${at === 'Yard' ? 'yard' : 'panel'} at ${s(r.StationName)} below${at === 'Yard' ? ', or make the yard first' : ''}.` : 'nothing says which station it is at — name it as a scheme\'s source first, or place it from a yard\'s page.'}</Status>}
+        : <Status>Not placed. {migrated ? 'The legacy record gave the scheme, not the yard: ' : ''}{station ? `choose the ${at === 'Yard' ? 'yard' : 'panel'} at ${stationName} below${at === 'Yard' ? ', or make the yard first' : ''}.` : 'Nothing says which station it is at. Name it as a scheme\'s source first, or place it from a yard\'s page.'}</Status>}
       {canPlace && station && (
         <div className="mt-2 space-y-2 border-t border-slate-800 pt-2 text-sm">
           <div className="flex flex-wrap items-end gap-2">
-            <label className="flex flex-col gap-1 text-xs text-slate-400">{r.NodeEntityId ? 'Move to' : 'Place at'} — {at === 'Yard' ? 'a yard' : 'a panel'} of {s(r.StationName)}
+            <label className="flex flex-col gap-1 text-xs text-slate-400">{placed ? 'Move to' : 'Place at'} — {at === 'Yard' ? 'a yard' : 'a panel'} of {stationName}
               <select className={`${inputClass} w-72`} value={node} disabled={busy} onChange={(e) => setNode(e.target.value)}>
-                <option value="">{pending ? '…' : options.length ? `choose a ${at.toLowerCase()}` : `${s(r.StationName)} has no ${at.toLowerCase()} yet`}</option>
+                <option value="">{pending ? '…' : options.length ? `choose a ${at.toLowerCase()}` : `${stationName} has no ${at.toLowerCase()} yet`}</option>
                 {options.map((x) => <option key={s(x.EntityId)} value={s(x.EntityId)}>{s(x.Name)}{x.FlocCode ? ` (${s(x.FlocCode)})` : ''}</option>)}
               </select></label>
-            <Button kind="primary" disabled={busy || !node} onClick={() => void place(node)}>{r.NodeEntityId ? 'Move' : 'Place here'}</Button>
-            {at === 'Yard' && canMakeNode && <Button kind="mini" disabled={busy} onClick={() => setNewYard(!newYard)}>New yard at {s(r.StationName)}</Button>}
+            <Button kind="primary" disabled={busy || !node} onClick={() => void place(node)}>{placed ? 'Move' : 'Place here'}</Button>
+            {at === 'Yard' && canMakeNode && <Button kind="mini" disabled={busy} onClick={() => setNewYard(!newYard)}>New yard at {stationName}</Button>}
           </div>
           {newYard && (
             <div className="flex flex-wrap items-end gap-2">
@@ -154,7 +156,8 @@ function WhereItStands({ r, canPlace, canMakeNode, onChanged }: { r: Row; canPla
               <label className="flex flex-col gap-1 text-xs text-slate-400">FLOC code (optional)<input className={`${inputClass} w-28`} value={yardCode} disabled={busy} placeholder="Y230" onChange={(e) => setYardCode(e.target.value)} /></label>
               <Button kind="primary" disabled={busy || !yardName.trim()} onClick={() => void makeYardAndPlace()}>Make the yard and place here</Button>
             </div>)}
-          <Status>{at === 'Yard' ? 'On the transmission network an instrument transformer stands in a yard (#202).' : 'A panel-mounted auxiliary stands at a panel (#202); a panel holds one installed item, so a second auxiliary needs a position of its own.'}</Status>
+          {/* #202: a CT/VT stands in a yard, an auxiliary at a panel, and a node holds one installed asset */}
+          <Status>{at === 'Yard' ? 'On the transmission network an instrument transformer stands in a yard.' : 'A panel-mounted auxiliary stands at a panel. A panel holds one installed item, so a second auxiliary needs a position of its own.'}</Status>
         </div>)}
       {msg && <Status bad={msg.bad}>{msg.text}</Status>}
     </Panel>
@@ -179,13 +182,13 @@ function Feeds({ r, editable, canRemove, onChanged }: { r: Row; editable: boolea
     setBusy(true); setMsg(null)
     try {
       await proc('scheme', 'AddSchemeMember', { SchemeEntityId: scheme, MemberKind: 'Asset', MemberEntityId: asset, MemberRoleCode: role, IsInService: true, WindingEntityId: winding || null })
-      setMsg({ text: `${s(r.Name)} now feeds ${s((schemesQ.data ?? []).find((x) => s(x.SchemeEntityId) === scheme)?.SchemeName)} as ${sourceRoleLabel(role)} — on that scheme's first input of the kind, or a new one; the record's Analog inputs tab moves it if it belongs elsewhere.` })
+      setMsg({ text: `${s(r.Name)} now feeds ${s((schemesQ.data ?? []).find((x) => s(x.SchemeEntityId) === scheme)?.SchemeName)} as ${sourceRoleLabel(role)}. It lands on that scheme's first input of the kind, or on a new one. Move it from the record's Analog inputs tab if it belongs elsewhere.` })
       setScheme(''); onChanged()
     } catch (e) { setMsg({ text: e instanceof ApiError ? e.message : String(e), bad: true }) } finally { setBusy(false) }
   }
   return (
     <Panel title={`Feeds · ${feedsQ.isPending ? '…' : rows.length}`} actions={editable ? <Button kind={editing ? 'primary' : 'default'} onClick={() => setEditing(!editing)}>{editing ? 'Done' : 'Edit feeds'}</Button> : undefined}>
-      {!feedsQ.isPending && !rows.length && <Status>No scheme names this transformer as a source yet. A relay's CTR or PTR can only be checked once it does.{editable ? ' Edit feeds to name one.' : ''}</Status>}
+      {!feedsQ.isPending && !rows.length && <Status>No scheme names this transformer as a source yet. Until one does, no relay's CTR or PTR is checked against its ratio.{editable ? ' Edit feeds to name a scheme.' : ''}</Status>}
       {rows.length > 0 && (
         <table className="w-full text-sm">
           <thead><tr className="text-left text-xs uppercase tracking-wide text-slate-500"><th className="py-1 pr-2 font-normal">Scheme</th><th className="py-1 pr-2 font-normal">Role · input</th><th className="py-1 pr-2 font-normal">Status</th><th className="py-1 pr-2 font-normal">Note</th>{editing && <th className="py-1 font-normal">Actions</th>}</tr></thead>
@@ -193,7 +196,7 @@ function Feeds({ r, editable, canRemove, onChanged }: { r: Row; editable: boolea
             {rows.map((x) => (
               <tr key={s(x.MemberEntityId)} className="border-t border-slate-800 align-top">
                 <td className="py-1 pr-2"><SchemeName id={s(x.SchemeEntityId)} onOpen={() => navigate(screenPath('SCHEME', s(x.SchemeEntityId)))} /></td>
-                <td className="py-1 pr-2 text-slate-300">{sourceRoleLabel(x.MemberRoleCode)}{x.InputCode ? ` · ${s(x.InputCode)}` : ''}{x.WindingCode ? <span className="text-slate-200"> · winding {s(x.WindingCode)}</span> : <span className="text-xs text-amber-300"> · winding not said</span>}{x.RatioInUse ? <span className="text-xs text-slate-500"> · {s(x.RatioInUse)}{x.Ratio != null ? ` = ${s(x.Ratio)}` : ''}</span> : null}</td>
+                <td className="py-1 pr-2 text-slate-300">{sourceRoleLabel(x.MemberRoleCode)}{x.InputCode ? ` · ${s(x.InputCode)}` : ''}{x.WindingCode ? <span className="text-slate-200"> · winding {s(x.WindingCode)}</span> : <span className="text-xs text-amber-300"> · winding not recorded</span>}{x.RatioInUse ? <span className="text-xs text-slate-500"> · {s(x.RatioInUse)}{x.Ratio != null ? ` = ${s(x.Ratio)}` : ''}</span> : null}</td>
                 <td className="py-1 pr-2"><span className="flex flex-wrap gap-1">{x.IsInService === false ? <Pill tone="warn">not in service</Pill> : <Pill tone="good">in service</Pill>}{Number(x.ParallelCount ?? 0) >= 2 && <InputPartners inputId={s(x.AnalogInputEntityId)} self={s(r.Name)} />}</span></td>
                 <td className="py-1 pr-2 text-xs text-slate-300">{s(x.Notes) || <span className="text-slate-600">—</span>}</td>
                 {editing && <td className="py-1"><SchemeSourceActions x={x} canModify={editable} canRemove={canRemove} onChanged={onChanged} /></td>}
@@ -216,7 +219,7 @@ function Feeds({ r, editable, canRemove, onChanged }: { r: Row; editable: boolea
             </select></label>
           <Button kind="primary" disabled={busy || !scheme} onClick={() => void add()}>Add as {sourceRoleLabel(role)}</Button>
         </div>)}
-      {editing && editable && !r.StationNodeEntityId && <Status>Place the transformer first; the schemes offered are its station's.</Status>}
+      {editing && editable && !r.StationNodeEntityId && <Status>Place the transformer first. The schemes offered here are the ones at its station.</Status>}
       {msg && <Status bad={msg.bad}>{msg.text}</Status>}
     </Panel>
   )
@@ -245,12 +248,14 @@ function Windings({ r, editable, canRemove, onChanged }: { r: Row; editable: boo
   const create = () => { if (!add.Code.trim()) { setMsg({ text: 'A winding needs its code (S1, 1Y, X).', bad: true }); return }
     void run(async () => { await proc('asset', 'InstrumentWinding_Add', body({ ...add, WindingNo: nextNo })); setAdd({ ...blank }); setAdding(false) }, `${add.Code.trim()} added as winding ${nextNo}.`) }
   const remove = (w: Row) => void run(async () => { await proc('asset', 'InstrumentWinding_SoftDelete', { EntityId: w.WindingEntityId }) }, `${s(w.Code)} removed.`)
+  // the winding's values as the edit boxes start out
+  const editFrom = (w: Row) => ({ Code: w.Code, Purpose: w.Purpose ?? 'Protection', RatioTaps: w.RatioTaps ?? '', RatioInUse: w.RatioInUse ?? '', AccuracyClass: w.AccuracyClass ?? '', RatedBurden: w.RatedBurden ?? '', KneePointVoltageV: w.KneePointVoltageV ?? '', RatedSecondary: w.RatedSecondary ?? '', Connection: w.Connection ?? '', Notes: w.Notes ?? '' })
   const field = (_key: string, val: string, set: (v: string) => void, w = 'w-24', ph = '') => <input className={`${inputClass} ${w}`} value={val} disabled={busy} placeholder={ph} onChange={(e) => set(e.target.value)} />
   const purposeSel = (val: string, set: (v: string) => void) => <select className={`${inputClass} w-28`} value={val} disabled={busy} onChange={(e) => set(e.target.value)}>{['Protection', 'Metering', 'Sync', 'Spare', 'Other'].map((x) => <option key={x} value={x}>{x}</option>)}</select>
   const connSel = (val: string, set: (v: string) => void) => <select className={`${inputClass} w-28`} value={val} disabled={busy} onChange={(e) => set(e.target.value)}><option value="">—</option>{['Wye', 'Delta', 'OpenDelta', 'BrokenDelta', 'Single'].map((x) => <option key={x} value={x}>{x}</option>)}</select>
   return (
     <Panel title={`Secondary windings · ${q.isPending ? '…' : rows.length}`} actions={editable ? <Button kind={editing ? 'primary' : 'default'} onClick={() => { setEditing(!editing); setAdding(false) }}>{editing ? 'Done' : 'Edit windings'}</Button> : undefined}>
-      {!q.isPending && !rows.length && <Status>No secondary winding is recorded yet.{editable ? ' Edit windings to add the nameplate\'s windings.' : ''}</Status>}
+      {!q.isPending && !rows.length && <Status>No secondary winding is recorded for this transformer.{editable ? ' Edit windings to add the ones on the nameplate.' : ''}</Status>}
       {rows.length > 0 && (
         <table className="w-full table-fixed text-sm">
           <colgroup><col className="w-[9%]" /><col className="w-[10%]" /><col className="w-[14%]" /><col className="w-[11%]" /><col className="w-[9%]" /><col className="w-[9%]" />{isCurrent && <col className="w-[8%]" />}<col className="w-[8%]" /><col className="w-[9%]" /><col className={editing ? 'w-[6%]' : 'w-[13%]'} />{editing && <col className="w-[7%]" />}</colgroup>
@@ -273,7 +278,7 @@ function Windings({ r, editable, canRemove, onChanged }: { r: Row; editable: boo
                   <td className="py-1 pr-2 text-slate-300">{f ? connSel(g('Connection'), setF('Connection')) : (s(w.Connection) || '—')}</td>
                   <td className="py-1 pr-2 text-xs text-slate-300">{w.UsedBy ? s(w.UsedBy) : <span className="text-slate-500">free</span>}</td>
                   {editing && <td className="py-1"><span className="flex flex-wrap gap-1 text-xs">
-                    {!f && <Button kind="mini" disabled={busy} onClick={() => setEdit({ ...edit, [id]: { Code: w.Code, Purpose: w.Purpose ?? 'Protection', RatioTaps: w.RatioTaps ?? '', RatioInUse: w.RatioInUse ?? '', AccuracyClass: w.AccuracyClass ?? '', RatedBurden: w.RatedBurden ?? '', KneePointVoltageV: w.KneePointVoltageV ?? '', RatedSecondary: w.RatedSecondary ?? '', Connection: w.Connection ?? '', Notes: w.Notes ?? '' } })}>Edit</Button>}
+                    {!f && <Button kind="mini" disabled={busy} onClick={() => setEdit({ ...edit, [id]: editFrom(w) })}>Edit</Button>}
                     {f && <><Button kind="mini" disabled={busy} onClick={() => save(w)}>Save</Button><Button kind="mini" disabled={busy} onClick={() => setEdit((x) => { const n = { ...x }; delete n[id]; return n })}>Cancel</Button></>}
                     {!f && <Button kind="mini" disabled={busy} onClick={() => setTapsOpen({ ...tapsOpen, [id]: !tapsOpen[id] })}>{tapsOpen[id] ? 'Hide taps' : 'Taps'}</Button>}
                     {canRemove && !f && (Number(w.UseCount ?? 0) === 0 ? <Button kind="mini" disabled={busy} onClick={() => remove(w)}>Remove</Button> : <span className="text-slate-500" title={s(w.UsedBy)}>used — free it first</span>)}
@@ -301,7 +306,7 @@ function Windings({ r, editable, canRemove, onChanged }: { r: Row; editable: boo
           <Button disabled={busy} onClick={() => setAdding(false)}>Cancel</Button>
         </div>)}
       {msg && <Status bad={msg.bad}>{msg.text}</Status>}
-      <Status>Each secondary winding has its own ratio, class and burden and feeds its own circuit; a scheme names the winding it uses (Feeds, below), and the relay's ratio setting is checked against that winding. A winding's taps are its terminal pairs and their ratios; the ratio in use is the tap the wires are landed on — list the taps and land one, and the typed ratio gives way to it.</Status>
+      <Status>Each secondary winding has its own ratio, class and burden, and feeds its own circuit. A scheme names the winding it uses, under Feeds below, and the relay's ratio setting is checked against that winding. A winding's taps are its terminal pairs and their ratios. The ratio in use is the tap the wires are landed on: list the taps and land one, and the typed ratio gives way to it.</Status>
     </Panel>
   )
 }
@@ -338,7 +343,7 @@ function Taps({ winding, editing, canRemove, onChanged }: { winding: Row; editin
                 <td className="pr-3">{x.IsInUse === true ? <Pill tone="good">landed</Pill> : <span className="text-slate-600">—</span>}</td>
                 {editing && <td><span className="flex flex-wrap gap-1">
                   {!x.IsInUse && <Button kind="mini" disabled={busy} onClick={() => land(x)}>Land on this tap</Button>}
-                  {!!x.IsInUse && <Button kind="mini" disabled={busy} title="clear the tap; the ratio in use stays as it reads until typed over" onClick={() => land(null)}>Use the typed ratio</Button>}
+                  {!!x.IsInUse && <Button kind="mini" disabled={busy} title="clears the landed tap; the ratio in use stays as it reads until you type over it" onClick={() => land(null)}>Use the typed ratio</Button>}
                   {canRemove && !x.IsInUse && <Button kind="mini" disabled={busy} onClick={() => remove(x)}>Remove</Button>}
                 </span></td>}
               </tr>))}
@@ -386,9 +391,9 @@ function RetireOrDelete({ r, canModify, canDelete, onChanged }: { r: Row; canMod
           ? <span className="flex items-center gap-2"><span className="text-slate-300">Retire {s(r.Name)} as of today? It stays on record, retired.</span><Button kind="primary" disabled={busy} onClick={() => void retire()}>Yes, retire</Button><Button disabled={busy} onClick={() => setConfirm(null)}>No</Button></span>
           : <Button disabled={busy} onClick={() => setConfirm('retire')}>Retire</Button>)}
         {canDelete && (feeds > 0
-          ? <span className="text-xs text-slate-500">Delete is offered once no scheme names it as a source — remove it from its {feeds === 1 ? 'scheme' : `${feeds} schemes`} above first.</span>
+          ? <span className="text-xs text-slate-500">Delete is offered once no scheme names it as a source. Remove it from its {feeds === 1 ? 'scheme' : `${feeds} schemes`} above first.</span>
           : confirm === 'delete'
-            ? <span className="flex items-center gap-2"><span className="text-slate-300">Delete {s(r.Name)}? It leaves every list (soft delete; the audit keeps it).</span><Button kind="primary" disabled={busy} onClick={() => void del()}>Yes, delete</Button><Button disabled={busy} onClick={() => setConfirm(null)}>No</Button></span>
+            ? <span className="flex items-center gap-2"><span className="text-slate-300">Delete {s(r.Name)}? It leaves every list and stays in the history.</span><Button kind="primary" disabled={busy} onClick={() => void del()}>Yes, delete</Button><Button disabled={busy} onClick={() => setConfirm(null)}>No</Button></span>
             : <Button disabled={busy} onClick={() => setConfirm('delete')}>Delete</Button>)}
       </div>
       {msg && <Status bad={msg.bad}>{msg.text}</Status>}
@@ -422,7 +427,7 @@ function Tests({ r, canRaise }: { r: Row; canRaise: boolean }) {
   }
   return (
     <Panel title={`Tests · ${recQ.isPending ? '…' : sheets.length} sheet${sheets.length === 1 ? '' : 's'}`} actions={canRaise
-      ? <Button kind="primary" disabled={busy || !wt} title={wt ? `raises a ${wt.name} request on this transformer and opens it` : typesQ.isPending ? 'loading the work types' : `no Effective work type ${typeKey}`} onClick={() => void raise_()}>{busy ? 'Raising…' : 'Test this transformer'}</Button>
+      ? <Button kind="primary" disabled={busy || !wt} title={wt ? `raises a ${wt.name} request on this transformer and opens it` : typesQ.isPending ? 'loading the kinds of work' : `the ${typeKey} procedure is not available`} onClick={() => void raise_()}>{busy ? 'Raising…' : 'Test this transformer'}</Button>
       : undefined}>
       {msg && <Status bad={msg.bad}>{msg.text}</Status>}
       {requests.length > 0 && (
@@ -437,7 +442,7 @@ function Tests({ r, canRaise }: { r: Row; canRaise: boolean }) {
               </li>))}
           </ul>
         </div>)}
-      {!recQ.isPending && !sheets.length && <Status>No test sheet is recorded against this transformer yet. {canRaise ? 'Test this transformer raises the request; the technician records the ratio, the polarity and the excitation curve step by step, and the engineer reviews.' : ''}</Status>}
+      {!recQ.isPending && !sheets.length && <Status>No test sheet is recorded against this transformer yet. {canRaise ? 'Test this transformer raises the request. The technician records the ratio, the polarity and the excitation curve step by step, and the engineer reviews it.' : ''}</Status>}
       {sheets.length > 0 && (
         <table className="w-full text-sm">
           <thead><tr className="border-b border-slate-700 text-left text-xs uppercase tracking-wide text-slate-400">
@@ -452,7 +457,7 @@ function Tests({ r, canRaise }: { r: Row; canRaise: boolean }) {
               </tr>))}
           </tbody>
         </table>)}
-      <Status>A test is the CT_TEST or VT_TEST procedure run under a request on this transformer: each step's captures are its readings and each commit a sheet. No reading limit is enforced yet — a ratio-error acceptance depends on the accuracy class, a rule to come as data; the technician's outcome and the engineer's review are the verdict.</Status>
+      <Status>A test runs the CT or VT test procedure under a request on this transformer. What the technician captures at each step is a reading, and each step committed makes a test sheet. No limit is checked against the readings: the technician's outcome and the engineer's review are the verdict.</Status>
     </Panel>
   )
 }

@@ -20,9 +20,9 @@ export default function ScreenPage() {
   const { key = '', id } = useParams()
   const q = useScreens()
   if (q.isPending) return <Status>Loading the screen…</Status>
-  if (q.isError) return <Status bad>The screens could not be read: {(q.error as Error).message}</Status>
+  if (q.isError) return <Status bad>The screens could not be loaded: {(q.error as Error).message}</Status>
   const screen = q.data.find((x) => x.key === key)
-  if (!screen) return <Status bad>No screen named {key} is defined for you.</Status>
+  if (!screen) return <Status bad>There is no screen here, or you may not open it.</Status>
   return <ScreenBody screen={screen} id={id} />
 }
 
@@ -46,6 +46,7 @@ function ScreenBody({ screen, id }: { screen: Screen; id?: string }) {
       if (rp.view === 'asset.vInstrumentTransformer') return <InstrumentTransformerScreen screen={screen} params={rp} id={id} />  // #201: a CT, VT … as equipment
       return <RecordScreen screen={screen} params={rp} id={id} />
     }
-    default: return <Status bad>The screen kind “{screen.screenKind}” is not built yet (screen {screen.key}{id ? ', id ' + id : ''}).</Status>
+    // the screen kind, the key and the id are ours; the person is told what to do (#221)
+    default: return <Status bad>This screen cannot be shown here. Ask an administrator to check how it is set up.</Status>
   }
 }

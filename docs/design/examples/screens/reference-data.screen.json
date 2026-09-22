@@ -3,7 +3,7 @@
   "kind": "screen",
   "key": "REFERENCE_DATA",
   "name": "Reference data",
-  "description": "The reference lists the forms draw from (#210): the voltage classes first — added, corrected and retired here by the people who hold Definition.Modify and Definition.Archive; the list every voltage-class select reads.",
+  "description": "The lists the forms choose from, starting with the voltage classes. Add a class, correct its name, or retire one that should no longer be offered.",
   "menu": {
     "group": "Administration",
     "label": "Reference data",

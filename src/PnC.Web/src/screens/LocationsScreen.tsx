@@ -52,7 +52,7 @@ export default function LocationsScreen() {
             </li>))}
         </ul>
         {!stationsQ.isPending && !visible.length && <Status>No station matches that filter.</Status>}
-        <Status>A station's page carries its code and composed FLOC, its CIP-002 impact rating, what is inside it and the devices placed there; a building's page the same for the building. The legacy tree (Locations (legacy tree)) stays in the menu until this page covers everything it does.</Status>
+        <Status>Open a station for its code and FLOC, its CIP-002 impact rating, what is inside it and the devices placed there. A building's page shows the same for the building. Locations (legacy tree) in the menu still shows the whole tree.</Status>
       </Panel>
     </div>
   )

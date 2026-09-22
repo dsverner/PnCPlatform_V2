@@ -35,6 +35,8 @@ function VoltageClasses({ canModify, canRetire }: { canModify: boolean; canRetir
   const [add, setAdd] = useState({ code: '', kv: '', transmission: true, order: '' }); const [adding, setAdding] = useState(false)
   const [busy, setBusy] = useState(false); const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null)
   const refresh = () => qc.invalidateQueries({ queryKey: ['view', 'ref', 'vVoltageClass'] })
+  // the row's values as the edit boxes start out
+  const editFrom = (r: Row) => ({ NominalKv: s(r.NominalKv), IsTransmission: r.IsTransmission === true, DisplayOrder: s(r.DisplayOrder) })
   const upsert = async (code: string, kv: number, transmission: boolean, order: number, said: string) => {
     setBusy(true); setMsg(null)
     try { await proc('ref', 'VoltageClass_Upsert', { VoltageClassCode: code, NominalKv: kv, IsTransmission: transmission, DisplayOrder: order }); setMsg({ text: said }); refresh(); return true }
@@ -52,7 +54,7 @@ function VoltageClasses({ canModify, canRetire }: { canModify: boolean; canRetir
   }
   const retire = async (code: string) => {
     setBusy(true); setMsg(null)
-    try { await proc('ref', 'VoltageClass_Deactivate', { VoltageClassCode: code }); setMsg({ text: `${code} retired — it leaves every voltage-class list; an asset that carries it keeps it, shown as retired.` }); setConfirm(null); refresh() }
+    try { await proc('ref', 'VoltageClass_Deactivate', { VoltageClassCode: code }); setMsg({ text: `${code} retired. It leaves every voltage-class list. Equipment that carries it keeps it, shown as retired.` }); setConfirm(null); refresh() }
     catch (e) { setMsg({ text: e instanceof ApiError ? e.message : String(e), bad: true }) } finally { setBusy(false) }
   }
   const create = async () => {
@@ -88,9 +90,9 @@ function VoltageClasses({ canModify, canRetire }: { canModify: boolean; canRetir
                   <td className="py-1 pr-2">{e ? <input className={`${inputClass} w-16`} value={e.DisplayOrder} disabled={busy} onChange={(ev) => setEdit({ ...edit, [code]: { ...e, DisplayOrder: ev.target.value } })} /> : <span className="text-slate-400">{s(r.DisplayOrder)}</span>}</td>
                   <td className="py-1">
                     <span className="flex flex-wrap items-center gap-1 text-xs">
-                      {canModify && !e && <Button kind="mini" disabled={busy} onClick={() => setEdit({ ...edit, [code]: { NominalKv: s(r.NominalKv), IsTransmission: r.IsTransmission === true, DisplayOrder: s(r.DisplayOrder) } })}>Edit</Button>}
+                      {canModify && !e && <Button kind="mini" disabled={busy} onClick={() => setEdit({ ...edit, [code]: editFrom(r) })}>Edit</Button>}
                       {canModify && e && <><Button kind="mini" disabled={busy} onClick={() => void save(r)}>Save</Button><Button kind="mini" disabled={busy} onClick={() => setEdit((x) => { const n = { ...x }; delete n[code]; return n })}>Cancel</Button></>}
-                      {canRetire && confirm !== code && <Button kind="mini" disabled={busy} title="the class leaves every list; assets that carry it keep it" onClick={() => void startRetire(r)}>Retire</Button>}
+                      {canRetire && confirm !== code && <Button kind="mini" disabled={busy} title="the class leaves every list; equipment that carries it keeps it" onClick={() => void startRetire(r)}>Retire</Button>}
                       {canRetire && confirm === code && <span className="flex items-center gap-1"><span className="text-slate-400">retire {code}? {carrying === null ? '…' : carrying === 0 ? 'no asset carries it.' : `${carrying} asset${carrying === 1 ? '' : 's'} carry it and keep it.`}</span><Button kind="mini" disabled={busy} onClick={() => void retire(code)}>Yes, retire</Button><Button kind="mini" disabled={busy} onClick={() => setConfirm(null)}>No</Button></span>}
                     </span>
                   </td>
@@ -98,9 +100,10 @@ function VoltageClasses({ canModify, canRetire }: { canModify: boolean; canRetir
             })}
           </tbody>
         </table>)}
-      {!q.isPending && !rows.length && <Status>No voltage class is active.</Status>}
+      {!q.isPending && !rows.length && <Status>No voltage class is in the list. Add one, or the voltage-class boxes on the forms stay empty.</Status>}
       {msg && <Status bad={msg.bad}>{msg.text}</Status>}
-      <Status>This is the list every voltage-class select reads: a transformer's equipment, a primary asset's terminals. The code is the key and cannot be renamed — to rename, add the right one and retire the wrong one; assets keep a retired code until someone changes them. {canModify ? '' : 'Adding or correcting a class needs Definition.Modify; '}{canRetire ? '' : 'retiring one needs Definition.Archive (an Administrator).'}</Status>
+      {/* #210: the writes are ref.VoltageClass_Upsert (Definition.Modify) and ref.VoltageClass_Deactivate (Definition.Archive) */}
+      <Status>Every voltage box on the forms offers this list: a transformer's equipment, a primary asset's terminals. A code cannot be renamed. To change one, add the right code and retire the wrong one; equipment keeps a retired code until someone changes it. {canModify ? '' : 'You may not add or correct a voltage class here. '}{canRetire ? '' : 'You may not retire one.'}</Status>
     </Panel>
   )
 }

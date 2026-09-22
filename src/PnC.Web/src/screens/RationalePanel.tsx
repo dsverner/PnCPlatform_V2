@@ -63,29 +63,32 @@ export function RationalePanel({ revision, editable }: { revision: string; edita
   }
   if (q.isPending) return <Status>Loading the rationale…</Status>
   if (q.isError) return <Status bad>Could not load the rationale: {(q.error as Error).message}</Status>
-  if (!d?.template) return <Panel title="Rationale"><Status>This model has no rationale template yet — one is seeded per model by a tool such as <code>tools/rationale_sel221f.py</code> (the runbook, step 16).</Status></Panel>
+  if (!d?.template) return <Panel title="Rationale"><Status>No rationale template exists for this relay model yet. An administrator sets one up before settings can be worked out here.</Status></Panel>
   const apply = async () => {
     setBusy(true); setMsg(null)
     try {
       const body: Record<string, unknown> = { inputs: { ...inputs, FaultStudy: table.filter((r) => r.some((c) => c.trim())) } }
       if (line) body.lineAssetEntityId = line
       const r = await postJson<Result>(`/api/v1/rationale/${revision}/apply`, body)
-      setMsg({ text: `Applied: ${r.settingsWritten.length} settings written${r.unknown.length ? `; ${r.unknown.length} could not be computed` : ''}${Object.keys(r.rangeChecks).length ? `; range: ${Object.entries(r.rangeChecks).map(([k, v]) => `${k} ${v}`).join(', ')}` : ''}.` })
+      setMsg({ text: `Applied: ${r.settingsWritten.length} setting(s) written${r.unknown.length ? `; ${r.unknown.length} could not be worked out` : ''}${Object.keys(r.rangeChecks).length ? `; range: ${Object.entries(r.rangeChecks).map(([k, v]) => `${k} ${v}`).join(', ')}` : ''}.` })
       qc.invalidateQueries({ queryKey: ['rationale', revision] }); qc.invalidateQueries({ queryKey: ['view', 'document'] }); qc.invalidateQueries({ queryKey: ['rendered', revision] })
     } catch (e) { setMsg({ text: e instanceof Error ? e.message : String(e), bad: true }) } finally { setBusy(false) }
   }
   const docx = [...d.files].reverse().find((f) => /^rationale.*\.docx$/i.test(s(f.FileName)))   // the newest: the names are stamped
+  // the file's own id and name are ours; the buttons say what the engineer gets
+  const openDocx = () => { if (docx) void openFile(s(docx.RowId), s(docx.FileName), s(docx.MimeType)).catch((e) => setMsg({ text: String(e), bad: true })) }
+  const saveDocx = () => { if (docx) void downloadFile(s(docx.RowId), s(docx.FileName)).catch((e) => setMsg({ text: String(e), bad: true })) }
   const lineFacts = ['line.R1', 'line.X1', 'line.R0', 'line.X0', 'line.LengthMiles']   // the charging is optional (an input stands in)
   const missingLine = lineFacts.filter((f) => d.missing.includes(f))
   return (
     <div className="space-y-3">
       <Panel title={`Rationale · ${d.template.name}`} actions={<>
-        {docx && <Button onClick={() => void openFile(s(docx.RowId), s(docx.FileName), s(docx.MimeType)).catch((e) => setMsg({ text: String(e), bad: true }))}>Open in Word</Button>}
-        {docx && <Button onClick={() => void downloadFile(s(docx.RowId), s(docx.FileName)).catch((e) => setMsg({ text: String(e), bad: true }))}>Save</Button>}
+        {docx && <Button onClick={openDocx}>Open in Word</Button>}
+        {docx && <Button onClick={saveDocx}>Save the document</Button>}
         {editable && <Button onClick={() => void apply()} disabled={busy}>{busy ? 'Applying…' : last ? 'Apply again' : 'Apply'}</Button>}
       </>}>
         {msg && <Status bad={msg.bad}>{msg.text}</Status>}
-        {!editable && <Status>This revision is not outstanding: the rationale is frozen with it{last ? ` (applied ${s(last.appliedAt).slice(0, 16).replace('T', ' ')} by ${last.appliedBy})` : ' and none was applied'}.</Status>}
+        {!editable && <Status>This revision is no longer outstanding, so its rationale is fixed{last ? ` — applied ${s(last.appliedAt).slice(0, 16).replace('T', ' ')} by ${last.appliedBy}` : ', and none was applied'}.</Status>}
         {last && editable && <Status>Last applied {s(last.appliedAt).slice(0, 16).replace('T', ' ')} by {last.appliedBy}; the settings written are on the Settings tab. Change an input and apply again.</Status>}
         <div className="mt-2 grid gap-2 md:grid-cols-2">
           <div>
@@ -114,7 +117,7 @@ export function RationalePanel({ revision, editable }: { revision: string; edita
         const used = sec.kind !== 'element' || !ins.some((i) => i.key === 'Used_' + sec.key) || yes(inputs['Used_' + sec.key] ?? 'Y')
         return (
           <Panel key={sec.key} title={`${sec.kind === 'element' ? '' : sec.kind === 'shared' ? 'Shared · ' : ''}${sec.title}`}>
-            {el && <div className="text-xs text-slate-400">Capability {el.capability}{el.outputs.length ? ` · outputs ${el.outputs.join(', ')}` : ''} · owns {el.settings.join(', ') || 'no setting'}{d.commissioned.length ? (d.commissioned.includes(el.capability) ? ' · commissioned at this position' : ' · not among the position\'s commissioned functions') : ''}</div>}
+            {el && <div className="text-xs text-slate-400">Capability {el.capability}{el.outputs.length ? ` · outputs ${el.outputs.join(', ')}` : ''} · sets {el.settings.join(', ') || 'no setting'}{d.commissioned.length ? (d.commissioned.includes(el.capability) ? ' · commissioned at this position' : ' · not commissioned at this position') : ''}</div>}
             {el && supervisionLine(el) && <div className="text-xs text-slate-400">{supervisionLine(el)}</div>}
             <div className="mt-2 grid gap-2 md:grid-cols-3">
               {ins.map((i) => i.dataType === 'Table'
@@ -134,7 +137,7 @@ export function RationalePanel({ revision, editable }: { revision: string; edita
                   </label>)}
             </div>
             <div className="mt-2 text-sm text-slate-200">{used ? (lastSec && !editable ? lastSec.statement : preview(sec)) : 'Not in use at this position.'}</div>
-            {lastSec && lastSec.settings.length > 0 && <div className="mt-1 font-mono text-xs text-slate-400">{lastSec.settings.map((w) => `${w.code} = ${w.value ?? `? (${w.unknown ?? 'not computed'})`}`).join('    ')}</div>}
+            {lastSec && lastSec.settings.length > 0 && <div className="mt-1 font-mono text-xs text-slate-400">{lastSec.settings.map((w) => `${w.code} = ${w.value ?? `? (${w.unknown ?? 'not worked out'})`}`).join('    ')}</div>}
             {sec.settings.length > 0 && !lastSec && <div className="mt-1 text-xs text-slate-500">Writes {sec.settings.map((w) => w.code).join(', ')} on apply.</div>}
           </Panel>
         )
@@ -143,7 +146,7 @@ export function RationalePanel({ revision, editable }: { revision: string; edita
         <table className="text-sm"><thead><tr><th className="text-left text-xs text-slate-400 pr-3">Mask</th><th className="text-left text-xs text-slate-400 pr-3">Hex</th><th className="text-left text-xs text-slate-400 pr-3">Bits</th><th className="text-left text-xs text-slate-400">From</th></tr></thead>
           <tbody>{Object.entries(last.masks).map(([m, v]) => <tr key={m}><td className="pr-3 font-mono">{m}</td><td className="pr-3 font-mono">{v.value}</td><td className="pr-3">{v.bits.join(' ')}</td><td>{v.from}</td></tr>)}</tbody></table>
       </Panel>}
-      <Status>Sources: {d.template.sources.join(' · ')}. A default is a starting value from the legacy rationales named on each input; change any of them. The statements and the settings are written when you apply; the document is assembled from the sections in this order.</Status>
+      <Status>Sources: {d.template.sources.join(' · ')}. Each default is a starting value taken from the old rationales; change any of them. The statements and the settings are written when you apply. The document follows these sections in this order.</Status>
     </div>
   )
 }

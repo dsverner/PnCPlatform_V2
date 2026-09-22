@@ -83,9 +83,9 @@ export default function LocationScreen({ params: p, id }: { screen: Screen; para
   const placedId = s(placedQ.data?.[0]?.AssetEntityId)
   const bcaQ = useViewAll('asset', 'vClassification', { SubjectKind: 'Asset', SubjectEntityId: placedId, ClassificationKindCode: 'BesCyberAsset' }, undefined, !!placedId)
   const { byId: modelsById } = useModels()
-  if (!id) return <Status bad>No location in the address.</Status>
+  if (!id) return <Status bad>No location was named. Pick a station from Locations.</Status>
   if (rowQ.isPending) return <Status>Loading the location…</Status>
-  if (!r) return <Status bad>No node with that id is readable by you.</Status>
+  if (!r) return <Status bad>You may not read this location.</Status>
   const isStation = s(r.NodeTypeCode) === 'Station'
   const canEdit = can('Node.Modify'); const canArchive = can('Node.Archive')
   const ancestors = ancestorsQ.data ?? []
@@ -111,10 +111,11 @@ export default function LocationScreen({ params: p, id }: { screen: Screen; para
               : <Facts cols={1} pairs={[['Code', s(r.Code) || '—'], ['Name', s(r.Name)], ['Subtype', s(r.SubtypeCode) || '—'], ['Notes', s(r.Notes) || '—']]} />}
           </div>
         </Panel>
-        {/* #195 (owner, 2026-09-19): the CIP impact rating is the building's — offered on a Building page only; a station shows its buildings' ratings in the list below */}
+        {/* #195 (owner, 2026-09-19): the CIP impact rating is the building's — offered on a Building page only; a station shows its buildings' ratings in the list below.
+            #173, #177, #195: every BES Cyber Asset housed in the building inherits the building's rating. */}
         {s(r.NodeTypeCode) === 'Building'
           ? <ClassificationPanel title="Applicability classifications" subjectKind="Node" subjectEntityId={s(r.EntityId)} editable={can('Asset.Modify')} kinds={NODE_KINDS}
-              note="The CIP-002 impact rating of this building — every BES Cyber Asset housed in it inherits it (#173, #177, #195). Recorded by you from the entity's own CIP-002 evaluation in this phase; a value saves at once, audited." />
+              note="The CIP-002 impact rating of this building. Every BES Cyber Asset housed in it takes this rating. Record it from the entity's own CIP-002 evaluation." />
           : (() => {
               const rated = [...ancestors].reverse().map((a) => ({ a, c: (cipAllQ.data ?? []).find((c) => s(c.SubjectEntityId).toLowerCase() === s(a.EntityId).toLowerCase()) })).find((x) => x.c)
               return (
@@ -129,9 +130,9 @@ export default function LocationScreen({ params: p, id }: { screen: Screen; para
                       return <span>{s(x.AssetName)} <span className="text-slate-500">({tech || 'technology unknown'})</span> — {bca === 'BCA'
                         ? <span className="text-amber-200">BES Cyber Asset{rated ? `: ${s(rated.c!.ClassificationValue)} impact, from the building` : ''}</span>
                         : bca === 'Not BCA' ? <span className="text-slate-300">not a cyber asset; the building's rating does not apply to it</span>
-                        : <span className="text-slate-500">cyber status not derived yet — evaluate compliance on its settings record</span>}</span>
+                        : <span className="text-slate-500">cyber status not decided yet — run the compliance check on its settings record</span>}</span>
                     })()] as [string, ReactNode]] : [])]} />}
-                  <Status>The CIP-002 impact rating is recorded on a building — the BES Cyber Systems it houses take it. {s(r.NodeTypeCode) === 'Station' ? 'This station\'s buildings and their ratings are in the list below.' : 'Open the building to change it.'}</Status>
+                  <Status>The CIP-002 impact rating is recorded on the building. The BES Cyber Systems it houses take that rating. {isStation ? 'This station\'s buildings and their ratings are in the list below.' : 'Open the building to change it.'}</Status>
                 </Panel>)
             })()}
       </div>
@@ -165,7 +166,7 @@ function FlocTag({ floc }: { floc: string }) {
   }
   return (
     <span className="flex items-center gap-1">
-      <code title="The functional location — composed by the platform from the code at each level, never typed"
+      <code title="The functional location, built from the code at each level. It is never typed."
         className="select-all rounded border border-slate-700 bg-slate-950 px-2 py-0.5 font-mono text-sm tracking-wide text-sky-200">{floc}</code>
       {canCopy && <Button kind="mini" onClick={() => void copy()}>{copied ? 'copied' : 'copy'}</Button>}
     </span>
@@ -274,7 +275,7 @@ function NodeForm({ r }: { r: Row }) {
         <textarea className={`${inputClass} w-full`} rows={2} value={f.Notes} disabled={busy} onChange={(e) => setF({ ...f, Notes: e.target.value })} />
       </div>
       <Button kind="primary" disabled={!dirty || busy} onClick={() => void save()}>Save</Button>
-      <Status>The code is this level's one segment of the FLOC; the FLOC itself is composed from the codes above and is never typed. The name is the descriptive label and the notes the description.</Status>
+      <Status>The code is this level's part of the FLOC. The whole FLOC is built from the codes above it and is never typed. The name is what people call this place.</Status>
     </div>
   )
 }
@@ -304,10 +305,11 @@ function Inside({ node, canEdit, canArchive }: { node: Row; canEdit: boolean; ca
       setMsg({ text: `${s(n.Name)} withdrawn.` }); setConfirmId(''); refreshTree(qc)
     } catch (e) { setMsg({ text: e instanceof ApiError ? e.message : String(e), bad: true }) } finally { setBusy(false) }
   }
+  const ask = (n: Row) => { setMsg(null); setConfirmId(s(n.EntityId)) }
   return (
     <Panel title={`Inside here · ${q.isPending ? '…' : rows.length}`}>
       {q.isError && <Status bad>Could not read what is inside: {(q.error as Error).message}</Status>}
-      {!q.isPending && !rows.length && <Status>Nothing is recorded inside this {s(node.NodeTypeCode).toLowerCase()}.</Status>}
+      {!q.isPending && !rows.length && <Status>{canEdit ? 'Nothing is recorded inside here yet. Add one below.' : 'Nothing is recorded inside here yet.'}</Status>}
       <ul className="space-y-1 text-sm">
         {rows.map((n) => (
           <li key={s(n.EntityId)} className="flex flex-wrap items-center gap-2">
@@ -320,7 +322,7 @@ function Inside({ node, canEdit, canArchive }: { node: Row; canEdit: boolean; ca
               ? <span className="flex items-center gap-1 text-xs text-amber-300">withdraw {s(n.Name)}?
                   <Button kind="mini" disabled={busy} onClick={() => void remove(n)}>yes, withdraw</Button>
                   <Button kind="mini" disabled={busy} onClick={() => setConfirmId('')}>keep</Button></span>
-              : <Button kind="mini" disabled={busy} onClick={() => { setMsg(null); setConfirmId(s(n.EntityId)) }}>remove</Button>)}
+              : <Button kind="mini" disabled={busy} onClick={() => ask(n)}>remove</Button>)}
           </li>))}
       </ul>
       {msg && <div className="mt-2"><Status bad={msg.bad}>{msg.text}</Status></div>}
@@ -401,11 +403,11 @@ function DevicesHere({ node, station, isStation }: { node: Row; station: Row | u
   const rows = (q.data ?? []).filter((x) => x.InstalledAssetEntityId && (isStation || ancestorIds(x.Path).some((a) => a.toLowerCase() === me) || s(x.NodeEntityId).toLowerCase() === me))
   return (
     <Panel title={`Devices placed here · ${!stationId ? '—' : q.isPending ? '…' : rows.length}`}>
-      {!stationId && <Status>This node is above any station, so the devices are listed on the stations inside it.</Status>}
+      {!stationId && <Status>This location is above the stations. Open a station inside it to see the devices there.</Status>}
       {q.isError && <Status bad>Could not read the devices: {(q.error as Error).message}</Status>}
       {!!stationId && !q.isPending && !rows.length && <Status>No device is placed here.</Status>}
       {/* #176: a device is placed at a position, never at a panel or a building — asset.PlaceAsset refuses it (50215) */}
-      {!!stationId && <Status>A device is placed at a position, not at a {s(node.NodeTypeCode).toLowerCase()} — open the position in the last column to place, move or remove one.</Status>}
+      {!!stationId && <Status>A device is placed at a position, never at a panel or a building. Open the position in the last column to place, move or remove one.</Status>}
       {rows.length > 0 && (
         <table className="w-full text-sm">
           <thead><tr className="border-b border-slate-700 text-left text-xs uppercase tracking-wide text-slate-400">
@@ -583,7 +585,7 @@ function PlacedHere({ node, canPlace, canRetract, canRaise }: { node: Row; canPl
             <PlaceForm node={node} onDone={refresh} />
             {!rows.length && <NewRelayForm node={node} onDone={refresh} />}
           </>
-        : <div className="mt-3 border-t border-slate-800 pt-2"><Status>Placing a device needs Asset.Modify.</Status></div>}
+        : <div className="mt-3 border-t border-slate-800 pt-2"><Status>You may not place a device here.</Status></div>}
     </Panel>
   )
 }
@@ -618,6 +620,8 @@ function PlacedRow({ x, model, nodeName, canPlace, canRetract, onDone }: {
     try { await proc('asset', 'Placement_SoftDelete', { EntityId: x.EntityId }); setMsg({ text: `The record of ${s(x.AssetName)} at ${nodeName} is withdrawn.` }); setConfirm(false); onDone() }
     catch (e) { setMsg({ text: e instanceof ApiError ? e.message : String(e), bad: true }) } finally { setBusy(false) }
   }
+  const changeKind = () => run({ AssetEntityId: x.AssetEntityId, NodeEntityId: x.NodeEntityId, PlacementKind: kind }, `${s(x.AssetName)} is now ${kind.toLowerCase()} at ${nodeName}.`)
+  const sendToCustody = () => run({ AssetEntityId: x.AssetEntityId, CustodyLocationEntityId: custody, PlacementKind: 'Stored' }, `${s(x.AssetName)} is stored in custody; the position is free.`)
   return (
     <li className="rounded border border-slate-800 p-2">
       <div className="flex flex-wrap items-center gap-2">
@@ -636,9 +640,7 @@ function PlacedRow({ x, model, nodeName, canPlace, canRetract, onDone }: {
                 <select className={`${inputClass} w-36`} value={kind} disabled={busy} onChange={(e) => setKind(e.target.value)}>
                   {PLACEMENT_KINDS.map((k) => <option key={k} value={k}>{k}</option>)}
                 </select></label>
-              <Button kind="mini" disabled={busy || kind === s(x.PlacementKind)}
-                onClick={() => void run({ AssetEntityId: x.AssetEntityId, NodeEntityId: x.NodeEntityId, PlacementKind: kind },
-                  `${s(x.AssetName)} is now ${kind.toLowerCase()} at ${nodeName}.`)}>Change the kind</Button>
+              <Button kind="mini" disabled={busy || kind === s(x.PlacementKind)} onClick={() => void changeKind()}>Change the kind</Button>
             </div>)}
           {canPlace && (
             <div className="flex flex-wrap items-end gap-2">
@@ -647,10 +649,8 @@ function PlacedRow({ x, model, nodeName, canPlace, canRetract, onDone }: {
                   <option value="">— a custody location —</option>
                   {(custodyQ.data ?? []).map((c) => <option key={s(c.EntityId)} value={s(c.EntityId)}>{s(c.Name)}{c.CustodyKind ? ` · ${s(c.CustodyKind)}` : ''}</option>)}
                 </select></label>
-              <Button kind="mini" disabled={busy || !custody}
-                onClick={() => void run({ AssetEntityId: x.AssetEntityId, CustodyLocationEntityId: custody, PlacementKind: 'Stored' },
-                  `${s(x.AssetName)} is stored in custody; the position is free.`)}>Remove to custody</Button>
-              <Status>This is how a placement here ends — an asset is at a node or in a custody location, never nowhere.</Status>
+              <Button kind="mini" disabled={busy || !custody} onClick={() => void sendToCustody()}>Remove to custody</Button>
+              <Status>This is how a device leaves the position. It is always somewhere: at a position, or in a custody location.</Status>
             </div>)}
           {canRetract && (confirm
             ? <div className="flex flex-wrap items-center gap-2 text-xs text-amber-300">Withdraw the record that {s(x.AssetName)} is here — it was entered in error?
@@ -716,10 +716,10 @@ function PlaceForm({ node, onDone }: { node: Row; onDone: () => void }) {
         <Button kind="primary" disabled={!picked || busy} onClick={() => void place()}>Place</Button>
       </div>
       {picked && <PlacedNow assetEntityId={s(picked.EntityId)} hereNodeEntityId={s(node.EntityId)} />}
-      <label className="flex flex-col gap-1 text-xs text-slate-400">Notes (optional — they go on the lifecycle event)
+      <label className="flex flex-col gap-1 text-xs text-slate-400">Notes (optional)
         <textarea className={`${inputClass} w-full`} rows={1} value={notes} disabled={busy} onChange={(e) => setNotes(e.target.value)} /></label>
       {askReason && (
-        <label className="flex flex-col gap-1 text-xs text-amber-300">Override reason — the device's category and this position's subtype differ; the reason is logged with your name
+        <label className="flex flex-col gap-1 text-xs text-amber-300">Reason — this device is not the kind this position is meant for. Your reason is recorded with your name.
           <input className={`${inputClass} w-full`} value={reason} disabled={busy} placeholder="why this device goes in this position"
             onChange={(e) => setReason(e.target.value)} /></label>)}
       {msg && <Status bad={msg.bad}>{msg.text}</Status>}
@@ -742,9 +742,12 @@ function PlacedNow({ assetEntityId, hereNodeEntityId }: { assetEntityId: string;
   } })
   if (q.isPending || !q.data) return null
   const p = q.data
+  const kindNow = s(p.PlacementKind).toLowerCase()
+  const whereNow = s(p.WhereName) || 'a place you cannot read'
+  const flocNow = p.WhereFloc ? ` (${s(p.WhereFloc)})` : ''
   if (s(p.NodeEntityId).toLowerCase() === hereNodeEntityId.toLowerCase())
-    return <Status>It is already recorded here as {s(p.PlacementKind)}.</Status>
-  return <Status>It is recorded now as {s(p.PlacementKind)} at {s(p.WhereName) || 'a place you cannot read'}{p.WhereFloc ? ` (${s(p.WhereFloc)})` : ''} — placing it here moves it, and its removal from there is written in the same transaction.</Status>
+    return <Status>This device is already recorded here as {kindNow}.</Status>
+  return <Status>This device is {kindNow} now at {whereNow}{flocNow}. Placing it here moves it, and records that it left there.</Status>
 }
 
 /** The triggers step [1] of the settings-change procedure accepts (settings-change.procedure.json, capture `trigger`). */
@@ -790,8 +793,8 @@ function FirstSettings({ node, relay, canRaise }: { node: Row; relay: Row; canRa
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-slate-400">{s(relay.AssetName)} has no settings in the settings book yet.</span>
         {canRaise
-          ? <Button kind="primary" disabled={!wt || busy} title={wt ? undefined : 'the SETTINGS_ADD work type is not effective'} onClick={() => setOpen(!open)}>New setting</Button>
-          : <span className="text-xs text-slate-500">(raising a request needs WorkRequest.Modify)</span>}
+          ? <Button kind="primary" disabled={!wt || busy} title={wt ? undefined : 'New settings requests are not set up yet.'} onClick={() => setOpen(!open)}>New setting</Button>
+          : <span className="text-xs text-slate-500">(you may not raise a change request)</span>}
       </div>
       {open && (
         <div className="flex flex-wrap items-end gap-2">
@@ -802,7 +805,7 @@ function FirstSettings({ node, relay, canRaise }: { node: Row; relay: Row; canRa
           <label className="flex flex-col gap-1 text-xs text-slate-400">Reference (optional — the project, finding or advisory)
             <input className={`${inputClass} w-72`} value={reference} disabled={busy} onChange={(e) => setReference(e.target.value)} /></label>
           <Button kind="primary" disabled={busy || !wt} onClick={() => void go()}>Raise and start</Button>
-          <span className="text-xs text-slate-500">the request opens at step [2] with {s(relay.AssetName)} already in it; its commit drafts the settings from the model's template</span>
+          <span className="text-xs text-slate-500">the request opens at the scope step with this relay already in it; finishing that step drafts its settings from the model's template</span>
         </div>)}
       {err && <Status bad>{err}</Status>}
     </div>
@@ -829,7 +832,7 @@ function InstrumentTransformersHere({ node, canEdit }: { node: Row; canEdit: boo
               <span className="text-xs text-slate-500">{x.FeedsSchemes ? `feeds ${s(x.FeedsSchemes)}` : 'feeds no scheme yet'}</span>
             </li>))}
         </ul>)}
-      {canEdit ? <NewInstrumentTransformerForm node={node} onDone={refresh} /> : <Status>Making a transformer here needs Asset.Modify.</Status>}
+      {canEdit ? <NewInstrumentTransformerForm node={node} onDone={refresh} /> : <Status>You may not add a transformer here.</Status>}
     </Panel>
   )
 }
@@ -866,7 +869,7 @@ function NewInstrumentTransformerForm({ node, onDone }: { node: Row; onDone: () 
       const def = true
       const pdef = (defsQ.data ?? []).find((d) => s(d.CharacteristicKey) === 'Phases')
       if (phases && pdef) await saveAssetCharacteristic(assetId, pdef, phases)
-      setMsg({ text: `${name.trim()} (${s(chosen.Name)}${ratio.trim() ? ', ' + ratio.trim() : ''}${serial.trim() ? ', serial ' + serial.trim() : ''}) ${s(node.NodeTypeCode) === 'Panel' ? 'is mounted on' : 'stands in'} ${s(node.Name)}.${ratio.trim() && !def ? ' The ratio was not saved: the type names no nameplate template.' : ''}` })
+      setMsg({ text: `${name.trim()} (${s(chosen.Name)}${ratio.trim() ? ', ' + ratio.trim() : ''}${serial.trim() ? ', serial ' + serial.trim() : ''}) ${s(node.NodeTypeCode) === 'Panel' ? 'is mounted on' : 'stands in'} ${s(node.Name)}.${ratio.trim() && !def ? ' The ratio was not saved: this type has no nameplate sheet yet.' : ''}` })
       setName(''); setSerial(''); setRatio(''); setOpen(false); onDone()
     } catch (e) {
       const why = e instanceof ApiError ? e.message : String(e)
@@ -876,7 +879,7 @@ function NewInstrumentTransformerForm({ node, onDone }: { node: Row; onDone: () 
   return (
     <div className="mt-3 space-y-2 border-t border-slate-800 pt-2 text-sm">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-slate-400">A transformer not in the platform yet?</span>
+        <span className="text-slate-400">A transformer not recorded yet?</span>
         <Button kind="mini" disabled={busy} onClick={() => setOpen(!open)}>New instrument transformer</Button>
       </div>
       {open && (
@@ -939,7 +942,7 @@ function NewRelayForm({ node, onDone }: { node: Row; onDone: () => void }) {
   return (
     <div className="mt-3 space-y-2 border-t border-slate-800 pt-2 text-sm">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-slate-400">Not in the platform yet?</span>
+        <span className="text-slate-400">A relay not recorded yet?</span>
         <Button kind="mini" disabled={busy} onClick={() => setOpen(!open)}>New relay</Button>
       </div>
       {open && (

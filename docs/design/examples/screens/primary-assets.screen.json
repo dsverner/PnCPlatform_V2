@@ -3,7 +3,7 @@
   "kind": "screen",
   "key": "PRIMARY_ASSETS",
   "name": "Primary assets",
-  "description": "The primary assets \u2014 lines, transformers, busses, breakers, generators, capacitors, reactors, the system \u2014 with their station and applicability classifications; a row opens the primary asset (#170).",
+  "description": "The lines, transformers, busses, breakers, generators, capacitors and reactors, with their station and their classifications. Open a row for the asset.",
   "menu": {
     "group": "Assets and schemes",
     "label": "Primary assets",

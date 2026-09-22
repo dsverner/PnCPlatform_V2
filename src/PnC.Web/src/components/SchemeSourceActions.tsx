@@ -41,19 +41,22 @@ export function SchemeSourceActions({ x, canModify, canRemove, onChanged }: { x:
     try { await removeSource(x); setConfirm(false); onChanged() }
     catch (e) { setMsg({ text: e instanceof ApiError ? e.message : String(e), bad: true }) } finally { setBusy(false) }
   }
-  if (!canModify && !canRemove) return <span className="text-xs text-slate-500">no permission to change this</span>
+  // out of service keeps the transformer named on the scheme; the note says how it is wired (#206)
+  const off = x.IsInService === false
+  const noteText = s(x.Notes)
+  if (!canModify && !canRemove) return <span className="text-xs text-slate-500">You may not change this source.</span>
   return (
     <span className="flex flex-wrap items-center gap-1 text-xs">
       {canModify && <UseWinding x={x} busy={busy} onPick={(id) => void revise({ WindingEntityId: id })} />}
-      {canModify && <Button kind="mini" disabled={busy} title={x.IsInService === false ? 'this source is back in service' : 'the source stays named but is not in service'} onClick={() => void revise({ IsInService: x.IsInService === false })}>{x.IsInService === false ? 'Mark in service' : 'Mark not in service'}</Button>}
-      {canModify && note === null && <Button kind="mini" disabled={busy} title="how this transformer is connected: paralleled, which secondary winding, shared with which protection" onClick={() => setNote(s(x.Notes))}>{x.Notes ? 'Change the connection note' : 'Connection note'}</Button>}
+      {canModify && <Button kind="mini" disabled={busy} title={off ? 'Put this source back in service' : 'Keep it named on the scheme, but out of service'} onClick={() => void revise({ IsInService: off })}>{off ? 'Mark in service' : 'Mark not in service'}</Button>}
+      {canModify && note === null && <Button kind="mini" disabled={busy} title="How this transformer is wired: paralleled, which secondary winding, shared with which protection" onClick={() => setNote(noteText)}>{noteText ? 'Change the connection note' : 'Connection note'}</Button>}
       {canModify && note !== null && (
         <span className="flex items-center gap-1">
           <input className={`${inputClass} w-72`} value={note} disabled={busy} placeholder="e.g. two CTs paralleled; secondary winding S2" onChange={(e) => setNote(e.target.value)} />
           <Button kind="mini" disabled={busy} onClick={() => void revise({ Notes: note.trim() || null })}>Save note</Button>
           <Button kind="mini" disabled={busy} onClick={() => setNote(null)}>Cancel</Button>
         </span>)}
-      {canRemove && !confirm && <Button kind="mini" disabled={busy} title="the scheme no longer names this transformer as a source; the transformer itself stays" onClick={() => setConfirm(true)}>Remove from scheme</Button>}
+      {canRemove && !confirm && <Button kind="mini" disabled={busy} title="The scheme no longer names this transformer as a source. The transformer itself stays." onClick={() => setConfirm(true)}>Remove from scheme</Button>}
       {canRemove && confirm && <span className="flex items-center gap-1"><span className="text-slate-400">remove it as this scheme's source?{Number(x.ParallelCount ?? 0) <= 1 && x.InputCode ? ` ${s(x.InputCode)} goes with it.` : ''}</span><Button kind="mini" disabled={busy} onClick={() => void remove()}>Yes, remove</Button><Button kind="mini" disabled={busy} onClick={() => setConfirm(false)}>No</Button></span>}
       {msg && <Status bad={msg.bad}>{msg.text}</Status>}
     </span>
@@ -68,8 +71,8 @@ function UseWinding({ x, busy, onPick }: { x: Row; busy: boolean; onPick: (id: s
   if (rows.length < 2) return null
   return (
     <label className="flex items-center gap-1 text-slate-400">winding
-      <select className={`${inputClass} w-44`} value={s(x.WindingEntityId)} disabled={busy} title="the secondary winding this protection is wired to" onChange={(e) => onPick(e.target.value)}>
-        {!x.WindingEntityId && <option value="">— not said —</option>}
+      <select className={`${inputClass} w-44`} value={s(x.WindingEntityId)} disabled={busy} title="The secondary winding this protection is wired to" onChange={(e) => onPick(e.target.value)}>
+        {!x.WindingEntityId && <option value="">— not chosen —</option>}
         {rows.map((w) => <option key={s(w.WindingEntityId)} value={s(w.WindingEntityId)}>{s(w.Code)}{w.RatioInUse ? ` · ${s(w.RatioInUse)}` : ''}{w.Purpose ? ` · ${s(w.Purpose).toLowerCase()}` : ''}</option>)}
       </select></label>
   )

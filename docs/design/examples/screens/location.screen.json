@@ -3,7 +3,7 @@
   "kind": "screen",
   "key": "LOCATION",
   "name": "Location",
-  "description": "One node of the location tree — a region, a station, a building, a room, a panel or a position: where it sits, its CIP-002 impact rating (recorded here because a location carries it and every BES Cyber Asset in it inherits it — the owner, 2026-09-17), what is inside it and the devices placed there; a station also shows the primary assets with a terminal here and the schemes here (#173, the STATION screen generalised). Plain code; the definition names its data.",
+  "description": "One place in the plant — a region, station, building, room, panel or device position: where it sits, what is inside it, the relays placed there and, on a station or building, its CIP-002 impact rating.",
   "permission": "Asset.Read",
   "screenKind": "record",
   "params": {

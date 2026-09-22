@@ -99,7 +99,7 @@ SELECT g.[SchemeEntityId],
        CASE g.[Kind] WHEN N'CT' THEN N'CT' ELSE N'VT' END,
        CASE g.[Kind] WHEN N'CT' THEN N'CtSource' ELSE N'VtSource' END,
        g.[RatioText], g.[RatioNum], 3,
-       N'#206: from the legacy record — ' + g.[Sources],
+       N'From the legacy record: ' + g.[Sources],
        LOWER(CONVERT(NVARCHAR(36), g.[SchemeEntityId])) + N'/' + CASE g.[Kind] WHEN N'CT' THEN N'CtSource' ELSE N'VtSource' END + N'/' + g.[RatioText],
        g.[MigrationRunId], N'declared'
 FROM (SELECT d.[SchemeEntityId], MIN(d.[SchemeName]) AS [SchemeName], d.[Kind], d.[RatioNum], MIN(d.[Norm]) AS [RatioText], MIN(d.[MigrationRunId]) AS [MigrationRunId],
@@ -109,14 +109,14 @@ FROM (SELECT d.[SchemeEntityId], MIN(d.[SchemeName]) AS [SchemeName], d.[Kind], 
 -- 4b. the functions' floor: a set with the ratio unknown where a device needs the input and no string named one
 INSERT #make ([SchemeEntityId], [Name], [TypeCode], [Role], [RatioText], [RatioNum], [Phases], [Notes], [SourceKey], [MigrationRunId], [Step])
 SELECT n.[SchemeEntityId], sc.[SchemeName] + N' CTs (ratio unknown)', N'CT', N'CtSource', NULL, NULL, 3,
-       N'#206: a device of the scheme needs current by its functions and no legacy record names the CT ratio — the ratio is to be recorded',
+       N'A relay of this scheme needs current for its functions, and no legacy record names the CT ratio. Record the ratio here.',
        LOWER(CONVERT(NVARCHAR(36), n.[SchemeEntityId])) + N'/CtSource/unknown', sc.[MigrationRunId], N'floor'
 FROM #need n
 CROSS APPLY (SELECT TOP (1) x.[SchemeName], x.[MigrationRunId] FROM #rec x WHERE x.[SchemeEntityId] = n.[SchemeEntityId] ORDER BY x.[DeviceName]) sc
 WHERE n.[NeedsCurrent] = 1 AND NOT EXISTS (SELECT 1 FROM #make m WHERE m.[SchemeEntityId] = n.[SchemeEntityId] AND m.[Role] = N'CtSource');
 INSERT #make ([SchemeEntityId], [Name], [TypeCode], [Role], [RatioText], [RatioNum], [Phases], [Notes], [SourceKey], [MigrationRunId], [Step])
 SELECT n.[SchemeEntityId], sc.[SchemeName] + N' PTs (ratio unknown)', N'VT', N'VtSource', NULL, NULL, 3,
-       N'#206: a device of the scheme needs voltage by its functions and no legacy record names the PT ratio — the ratio is to be recorded',
+       N'A relay of this scheme needs voltage for its functions, and no legacy record names the PT ratio. Record the ratio here.',
        LOWER(CONVERT(NVARCHAR(36), n.[SchemeEntityId])) + N'/VtSource/unknown', sc.[MigrationRunId], N'floor'
 FROM #need n
 CROSS APPLY (SELECT TOP (1) x.[SchemeName], x.[MigrationRunId] FROM #rec x WHERE x.[SchemeEntityId] = n.[SchemeEntityId] ORDER BY x.[DeviceName]) sc
@@ -124,7 +124,7 @@ WHERE n.[NeedsVoltage] = 1 AND NOT EXISTS (SELECT 1 FROM #make m WHERE m.[Scheme
 -- 4c. the sync PT: single-phase, feeding the 25's sync input
 INSERT #make ([SchemeEntityId], [Name], [TypeCode], [Role], [RatioText], [RatioNum], [Phases], [Notes], [SourceKey], [MigrationRunId], [Step])
 SELECT n.[SchemeEntityId], sc.[SchemeName] + N' sync PT', N'VT', N'SyncVtSource', NULL, NULL, 1,
-       N'#206: a device of the scheme has a synchronism-check (25) element, which needs a single-phase voltage for its sync input — the ratio (the relay''s SPTR) is to be recorded; it may be a winding of a second PT set feeding an adjacent protection',
+       N'A relay of this scheme has a synchronism-check (25) element, which needs a single-phase voltage for its sync input — the ratio (the relay''s SPTR) is to be recorded; it may be a winding of a second PT set feeding an adjacent protection',
        LOWER(CONVERT(NVARCHAR(36), n.[SchemeEntityId])) + N'/SyncVtSource/sync', sc.[MigrationRunId], N'sync'
 FROM #need n
 CROSS APPLY (SELECT TOP (1) x.[SchemeName], x.[MigrationRunId] FROM #rec x WHERE x.[SchemeEntityId] = n.[SchemeEntityId] ORDER BY x.[DeviceName]) sc
@@ -136,7 +136,7 @@ SELECT d.[SchemeEntityId],
        CASE d.[Kind] WHEN N'CTAUX' THEN N'CT_AUX' ELSE N'VT_AUX' END,
        CASE d.[Kind] WHEN N'CTAUX' THEN N'CtSource' ELSE N'VtSource' END,
        CASE WHEN d.[RatioNum] IS NOT NULL THEN d.[Norm] END, d.[RatioNum], 3,
-       N'#206: from the legacy record — ' + d.[Key] + N' = ' + d.[Raw] + N' of ' + d.[DeviceName] + N' (auxiliary, at the device''s panel)',
+       N'From the legacy record: ' + d.[Key] + N' = ' + d.[Raw] + N' of ' + d.[DeviceName] + N' (auxiliary, at the device''s panel)',
        LOWER(CONVERT(NVARCHAR(36), d.[PositionNodeEntityId])) + N'/aux/' + d.[Key],
        d.[PanelNodeEntityId], d.[MigrationRunId], N'aux'
 FROM #decl d
@@ -174,7 +174,7 @@ BEGIN
         END
         SET @pdef = CASE WHEN @type IN (N'CT', N'CT_AUX') THEN @ctPhases ELSE @vtPhases END;
         EXEC [asset].[CharacteristicValue_Add] @HostEntityId = @asset, @CharacteristicDefinitionRowId = @pdef, @IntegerValue = @phases, @ActorId = @sys, @MigrationRunId = @run;
-        SET @mnotes = CASE WHEN @step = N'aux' THEN N'auxiliary (#206)' ELSE N'made by the migration rule (#206)' END;
+        SET @mnotes = CASE WHEN @step = N'aux' THEN N'auxiliary, brought in from the legacy record' ELSE N'brought in from the legacy record' END;
         EXEC [scheme].[AddSchemeMember] @SchemeEntityId = @scheme, @MemberKind = N'Asset', @MemberEntityId = @asset, @MemberRoleCode = @role, @IsInService = 1,
              @Notes = @mnotes, @ActorId = @sys, @MigrationRunId = @run;
         COMMIT TRANSACTION;
@@ -230,4 +230,20 @@ DECLARE @report NVARCHAR(1000) = N'#206: instrument transformers from the legacy
     + N', declared values that are not a ratio ' + CONVERT(NVARCHAR(10), @notRatio) + N'; failed ' + CONVERT(NVARCHAR(10), @failed) + N'; auxiliaries placed later ' + CONVERT(NVARCHAR(10), @placedLater);
 PRINT @report;
 DROP TABLE #rec; DROP TABLE #decl; DROP TABLE #need; DROP TABLE #make;
+GO
+-- migration-rule: #221 the notes these rows carry are read on the Analog inputs tab, so they are written in the words a P&C
+-- person would use (docs/design/UI-WORDING.md): no decision number on a screen. Rows made before this correction are brought
+-- into line here, by their text, so a re-run and the cutover both end in the same place.
+UPDATE m SET m.[Notes] = N'brought in from the legacy record', m.[ModifiedAt] = SYSDATETIMEOFFSET()
+  FROM [scheme].[SchemeMember] m WHERE m.[Notes] = N'made by the migration rule (#206)' AND m.[IsDeleted] = 0 AND m.[ValidTo] IS NULL;
+UPDATE m SET m.[Notes] = N'auxiliary, brought in from the legacy record', m.[ModifiedAt] = SYSDATETIMEOFFSET()
+  FROM [scheme].[SchemeMember] m WHERE m.[Notes] = N'auxiliary (#206)' AND m.[IsDeleted] = 0 AND m.[ValidTo] IS NULL;
+UPDATE a SET a.[Notes] = REPLACE(a.[Notes], N'#206: from the legacy record — ', N'From the legacy record: '), a.[ModifiedAt] = SYSDATETIMEOFFSET()
+  FROM [asset].[Asset] a WHERE a.[Notes] LIKE N'#206: from the legacy record — %' AND a.[IsDeleted] = 0 AND a.[ValidTo] IS NULL;
+UPDATE a SET a.[Notes] = N'A relay of this scheme needs current for its functions, and no legacy record names the CT ratio. Record the ratio here.', a.[ModifiedAt] = SYSDATETIMEOFFSET()
+  FROM [asset].[Asset] a WHERE a.[Notes] LIKE N'#206: a device of the scheme needs current%' AND a.[IsDeleted] = 0 AND a.[ValidTo] IS NULL;
+UPDATE a SET a.[Notes] = N'A relay of this scheme needs voltage for its functions, and no legacy record names the PT ratio. Record the ratio here.', a.[ModifiedAt] = SYSDATETIMEOFFSET()
+  FROM [asset].[Asset] a WHERE a.[Notes] LIKE N'#206: a device of the scheme needs voltage%' AND a.[IsDeleted] = 0 AND a.[ValidTo] IS NULL;
+UPDATE a SET a.[Notes] = REPLACE(a.[Notes], N'#206: a device of the scheme has a synchronism-check', N'A relay of this scheme has a synchronism-check'), a.[ModifiedAt] = SYSDATETIMEOFFSET()
+  FROM [asset].[Asset] a WHERE a.[Notes] LIKE N'#206: a device of the scheme has a synchronism-check%' AND a.[IsDeleted] = 0 AND a.[ValidTo] IS NULL;
 GO

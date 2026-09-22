@@ -3,7 +3,7 @@
   "kind": "screen",
   "key": "DEVICE_TEMPLATE",
   "name": "Device template",
-  "description": "One device type's template, named <MODEL>_Template (#184): everything true of the model itself, one level below a scheme - its settings list by the manual's own groups with none hidden (#183), what it can do (#181, #182), the PRC-023 loadability inputs its settings feed, and the NPCC Directory 4 criteria that attach when the protected bus is declared BPS by the A-10 study. Compliance here is calculated from study values recorded on the primary elements, never switched on per device (the owner, 2026-09-18). Plain code; the definition names its data.",
+  "description": "One relay model: its manual, its settings list in the manual's own groups, what the relay can do, its jumper settings, and the compliance inputs its settings feed. Everything here is true of every relay of this model.",
   "menu": null,
   "permission": "Asset.Read",
   "screenKind": "record",

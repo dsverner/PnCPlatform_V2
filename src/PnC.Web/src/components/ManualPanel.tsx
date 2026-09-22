@@ -42,12 +42,13 @@ export function ManualPanel({ templateDefinitionEntityId, modelName }: { templat
   const mb = m ? (m.sizeBytes / 1048576).toFixed(1) + ' MB' : ''
   return (
     <Panel title={m ? `Manual · ${m.title}` : 'Manual'} actions={m ? <Button onClick={() => void openFileInTab(m.fileRowId).catch((e) => setErr(String(e)))}>Open in its own tab</Button> : undefined}>
-      {!templateDefinitionEntityId && <Status>{modelName ? `${modelName} has no device template yet, so no manual is kept for it.` : 'No device template, so no manual.'}</Status>}
+      {!templateDefinitionEntityId && <Status>{modelName ? `${modelName} has no template yet, so no manual is kept with it.` : 'No template for this model, so no manual is kept with it.'}</Status>}
       {!!templateDefinitionEntityId && q.isPending && <Status>Looking for the manual…</Status>}
-      {!!templateDefinitionEntityId && !q.isPending && !m && <Status>No manual is loaded for this template on this environment. An administrator loads it from the manufacturer's PDF (tools/load_manual.py).</Status>}
-      {m && <div className="mb-2 text-xs text-slate-500">{m.name} · {mb} · every open is a logged read.</div>}
-      {err && <Status bad>The manual could not be fetched: {err}</Status>}
-      {m && busy && !url && <Status>Fetching {mb}…</Status>}
+      {/* #216: an administrator loads the manual against the template; the tool that does it is not the user's business */}
+      {!!templateDefinitionEntityId && !q.isPending && !m && <Status>No manual is loaded for this model yet. Ask an administrator to load the manufacturer's PDF.</Status>}
+      {m && <div className="mb-2 text-xs text-slate-500">{m.name} · {mb}</div>}
+      {err && <Status bad>The manual could not be opened: {err}</Status>}
+      {m && busy && !url && <Status>Loading the manual ({mb})…</Status>}
       {url && <iframe title={m?.title ?? 'Manual'} src={url} className="h-[78vh] w-full rounded border border-slate-800 bg-white" />}
     </Panel>
   )

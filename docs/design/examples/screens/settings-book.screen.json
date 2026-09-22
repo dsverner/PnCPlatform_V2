@@ -3,7 +3,7 @@
   "kind": "screen",
   "key": "SETTINGS_BOOK",
   "name": "Settings",
-  "description": "The settings book: a location, its settings records grouped by scheme, a row that unfolds to its card and filed settings text, the state toggle, the commands of the legacy main window (#157, #163, #165). #190 (2026-09-18): a record row opens on double-click (rowOpen) and its commands are the right-click menu; the card's hot links are gone — the owner: what has worked better is to double-click the description and right-click for the popup.",
+  "description": "The settings book: the relays at a location, grouped by scheme, with their in-service, outstanding and archived records. Click a record to unfold it, double-click to open it, right-click for what you can do with it.",
   "menu": {
     "group": "Settings book",
     "label": "Settings",

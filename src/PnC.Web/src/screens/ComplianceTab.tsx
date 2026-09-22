@@ -38,8 +38,8 @@ const statusTone = (v: unknown): Tone => {
   return 'neutral'
 }
 const resultTone = (v: string): Tone => (v === 'true' ? 'good' : v === 'false' ? 'neutral' : v === 'unknown' ? 'warn' : 'bad')
-/** The pass that last looked, in words (compliance.RuleEvaluationRun.Trigger). */
-const triggerWords = (t: unknown) => ({ Scheduled: 'the hourly pass', FactChanged: 'after a change', RuleApproved: 'after a rule was approved', Manual: 'run by hand' } as Record<string, string>)[s(t)] ?? s(t)
+/** Why the last check happened, in words (compliance.RuleEvaluationRun.Trigger). */
+const triggerWords = (t: unknown) => ({ Scheduled: 'in the hourly check', FactChanged: 'after a change', RuleApproved: 'after a rule changed', Manual: 'run by hand' } as Record<string, string>)[s(t)] ?? s(t)
 
 /** What the device's scheme protects, with each primary asset's applicability classifications and the bus at the end it
  * protects from. Lifted out of RecordScreen so the Where panel and this tab ask the same question once (#171). */
@@ -91,19 +91,19 @@ export function useLocationCip(positionNodeEntityId: string, deviceEntityId: str
  * derived row exists this says only that no pass has run and lists the inputs as facts; it never announces the verdict
  * itself. #214: the derivation's standing verdict (compliance.vDeviceVerdict, VerdictKind Derivation) carries its reason. */
 function besCyberAssetNote(r: Row, protectedAssets: Row[] | undefined, current: Row | undefined, derived: Row | undefined): DerivedNote {
-  if (derived?.Error) return { label: `could not be evaluated: ${s(derived.Error)}`, reason: s(derived.Error) }
+  if (derived?.Error) return { label: `could not be worked out: ${s(derived.Error)}`, reason: s(derived.Error) }
   if (current) return { reason: derived ? s(derived.Reason) : undefined }   // a derived row stands; its reason is the pass's
-  if (derived && !derived.Result) return { label: `undetermined — ${s(derived.Reason)}` }
-  return { label: `not yet evaluated — the platform evaluates within seconds of a change and every hour. The inputs: ${besCyberAssetInputs(r, protectedAssets)}.` }
+  if (derived && !derived.Result) return { label: `not decided — ${s(derived.Reason)}` }
+  return { label: `not decided yet. This is checked within seconds of a change, and every hour. What is known so far: ${besCyberAssetInputs(r, protectedAssets)}.` }
 }
 
 /** The facts the derivation reads, stated as facts and nothing more (the technology and each protected element's BES status). */
 function besCyberAssetInputs(r: Row, protectedAssets: Row[] | undefined): string {
   const tech = s(r.Technology)                                    // document.vSettingsRecord carries the model's Technology
   const parts = [tech ? `${tech.toLowerCase()}-based` : 'the technology is not recorded']
-  if (!r.SchemeEntityId) parts.push('the device is in no scheme, so nothing protected is known')
+  if (!r.SchemeEntityId) parts.push('this relay is in no scheme, so what it protects is not known')
   else if (!protectedAssets) parts.push('what it protects is still loading')
-  else if (!protectedAssets.length) parts.push('the scheme protects nothing that is recorded yet')
+  else if (!protectedAssets.length) parts.push('the scheme has nothing recorded that it protects')
   else parts.push(...protectedAssets.map((a) => `${s(a.Name)} is ${a.BesStatus ? s(a.BesStatus) : 'of no recorded BES status'}`))
   return parts.join('; ')
 }
@@ -120,9 +120,10 @@ export default function ComplianceTab({ r }: { r: Row }) {
   return (
     <div className="space-y-3">
       <div className="grid gap-3 lg:grid-cols-2">
+        {/* #173 (2026-09-17): the BES Cyber Asset line is derived, not chosen, so the panel offers no control for it */}
         <ClassificationPanel title="This device" subjectKind="Asset" subjectEntityId={device} editable={can('Asset.Modify')} kinds={DEVICE_KINDS}
           reasons={{ BesCyberAsset: besCyberAssetNote(r, protectsQ.data, bca, bcaDerived) }}
-          note="Whether the device is a BES Cyber Asset is derived, not judged (the owner, 2026-09-17): a microprocessor-based device protecting a BES element is one, so it is stated here with its basis and no control. External routable connectivity is recorded by hand until a network-analysis module can determine it. The impact rating is the location's, beside it." />
+          note="A microprocessor relay that protects a BES element is a BES Cyber Asset. That is worked out here, not chosen, so there is nothing to set. External routable connectivity is entered by hand. The impact rating comes from the building, shown beside this." />
         <Inherited r={r} bca={s(bca?.ClassificationValue)} />
       </div>
       <ElementsInService r={r} />
@@ -154,34 +155,35 @@ function Inherited({ r, bca }: { r: Row; bca: string }) {
             {/* #196 follow-up (owner, 2026-09-19): the rating is the device's only when the device is a BES Cyber Asset; the
                 MCGG22's page read "Medium" though it is electromechanical — the building's rating shown as if it were the relay's */}
             {cipQ.isPending ? <span className="text-slate-500">…</span>
-              : !cip ? <span className="text-slate-500">the device is not placed anywhere, so it inherits no rating</span>
-              : !cip.value ? <span className="text-slate-500">no building above this device's position carries a rating</span>
+              : !cip ? <span className="text-slate-500">this relay is not placed anywhere, so it takes no rating</span>
+              : !cip.value ? <span className="text-slate-500">no building above this position carries a rating</span>
               : bca === 'Not BCA' ? <span className="text-slate-300">Not applicable — not a cyber asset. <span className="text-slate-500">The building <NodeLink id={cip.nodeId} name={cip.nodeName} /> is rated {cip.value}; that applies to the cyber assets it houses, not to this relay.</span></span>
               : <><Pill tone={cip.value === 'High' ? 'bad' : cip.value === 'Medium' ? 'warn' : 'neutral'}>{cip.value}</Pill>
-                  <span className="ml-2">— {bca === 'BCA' ? 'a BES Cyber Asset in' : 'the rating of'} <NodeLink id={cip.nodeId} name={cip.nodeName} /> <span className="text-xs text-slate-500">{cip.nodeType}{cip.at ? ' · ' + fmtWhen(cip.at) : ''}{bca === 'BCA' ? '' : ' · cyber status not derived yet'}</span></span></>}
-            <div className="text-xs text-slate-600">CIP-002: the building's rating, taken by the BES Cyber Assets it houses (#173, #195); whether this device is one is derived above.</div>
+                  <span className="ml-2">— {bca === 'BCA' ? 'a BES Cyber Asset in' : 'the rating of'} <NodeLink id={cip.nodeId} name={cip.nodeName} /> <span className="text-xs text-slate-500">{cip.nodeType}{cip.at ? ' · ' + fmtWhen(cip.at) : ''}{bca === 'BCA' ? '' : ' · cyber status not decided yet'}</span></span></>}
+            <div className="text-xs text-slate-600">CIP-002: this is the building's rating. Every BES Cyber Asset in it takes that rating. Whether this relay is one is worked out above.</div>{/* #173, #195 */}
           </dd>
         </div>
         <div className="grid grid-cols-[13rem_1fr] items-start gap-2">
           <dt className="text-slate-400">Protected primary asset</dt>
           <dd className="min-w-0">
-            {!r.SchemeEntityId ? <span className="text-slate-500">the device is in no scheme, so nothing protected is known</span>
+            {!r.SchemeEntityId ? <span className="text-slate-500">this relay is in no scheme, so what it protects is not known</span>
               : protectsQ.isPending ? <span className="text-slate-500">…</span>
-              : !rows.length ? <span className="text-slate-500">the scheme protects nothing that is recorded yet</span>
+              : !rows.length ? <span className="text-slate-500">the scheme has nothing recorded that it protects</span>
               : <ul className="space-y-1">{rows.map((a) => (
                   <li key={s(a.EntityId)}>
                     {link('PRIMARY_ASSET', s(a.EntityId), s(a.Name))} <span className="text-xs text-slate-500">{s(a.AssetTypeName).toLowerCase()}{a.ZoneRole !== 'Primary' ? ' · ' + s(a.ZoneRole).toLowerCase() : ''}</span>
                     <div className="ml-3 text-xs text-slate-400">
                       {inherited(a).map(([code, label, value], i) => <span key={code}>{i > 0 ? ' · ' : ''}{label}: {value ? s(value) : <span className="text-slate-500">not recorded</span>}</span>)}
-                      {!inherited(a).length && <span className="text-slate-500">no applicability classification applies to a {s(a.AssetTypeName).toLowerCase()}</span>}
+                      {!inherited(a).length && <span className="text-slate-500">no BES or PRC-023 declaration applies to a {s(a.AssetTypeName).toLowerCase()}</span>}
                     </div>
                     <div className="ml-3 text-xs text-slate-400">
-                      {a.Npcc ? <span className="text-sky-300">NPCC {s(a.Npcc)} — declared on the {s(a.AssetTypeName).toLowerCase() || 'element'} (#196) · </span> : null}
-                      {a.HasTerminal ? <>from terminal {s(a.TerminalNo)} · {a.TerminalStationId ? link('LOCATION', s(a.TerminalStationId), s(a.TerminalStation)) : s(a.TerminalStation)} · {a.BusName ? <>bus {s(a.BusName)} — NPCC {s(a.BusNpcc) || 'not recorded'}{a.Npcc ? ' (the element\'s declaration rules)' : ''}</> : 'no bus linked at that end'}</>
-                        : <span className="text-slate-500">the protects link names no terminal end, so no bus NPCC is inherited</span>}
+                      {/* #196: the element's own A-10 declaration rules over the bus's */}
+                      {a.Npcc ? <span className="text-sky-300">NPCC {s(a.Npcc)} — declared on the {s(a.AssetTypeName).toLowerCase() || 'element'} · </span> : null}
+                      {a.HasTerminal ? <>from terminal {s(a.TerminalNo)} · {a.TerminalStationId ? link('LOCATION', s(a.TerminalStationId), s(a.TerminalStation)) : s(a.TerminalStation)} · {a.BusName ? <>bus {s(a.BusName)} — NPCC {s(a.BusNpcc) || 'not recorded'}{a.Npcc ? ' (the element\'s own declaration rules)' : ''}</> : 'no bus linked at that end'}</>
+                        : <span className="text-slate-500">no end is named for what this scheme protects, so no bus NPCC is taken</span>}
                     </div>
                   </li>))}</ul>}
-            <div className="text-xs text-slate-600">The applicability comes from the primary asset and its bus (the owner, 2026-09-16); the device inherits it.</div>
+            <div className="text-xs text-slate-600">What applies comes from the primary asset and its bus. The relay takes it from what it protects.</div>
           </dd>
         </div>
       </dl>
@@ -199,8 +201,8 @@ function ElementsInService({ r }: { r: Row }) {
   const rows = q.data ?? []
   return (
     <Panel title={`Elements in service · ${pos && q.isPending ? '…' : rows.length}`}>
-      {!pos && <Status>The record names no position, so its elements in service are not known.</Status>}
-      {pos && !q.isPending && !rows.length && <Status>No element is recorded in service at this position; PRC-023 cannot bind until one is.</Status>}
+      {!pos && <Status>This record names no position, so the elements in service are not known. Set the position on the record.</Status>}
+      {pos && !q.isPending && !rows.length && <Status>No element is in service at this position. PRC-023 cannot apply until one is recorded.</Status>}
       {rows.length > 0 && (
         <table className="w-full text-sm">
           <thead><tr className="border-b border-slate-700 text-left text-xs uppercase tracking-wide text-slate-400">
@@ -216,7 +218,7 @@ function ElementsInService({ r }: { r: Row }) {
                 </tr>) })}
           </tbody>
         </table>)}
-      <Status>PRC-023-6 binds “load-responsive phase protection systems as described in Attachment A” at the terminals of its circuits (4.1). The rule reads this list; an element nobody has ruled leaves the standard undetermined, never inapplicable.</Status>
+      <Status>PRC-023-6 applies to “load-responsive phase protection systems as described in Attachment A” at the terminals of its circuits (4.1). An element nobody has ruled on leaves the standard undecided here, never inapplicable.</Status>
     </Panel>
   )
 }
@@ -246,16 +248,16 @@ function Standards({ r, verdicts, pending }: { r: Row; verdicts: Row[]; pending:
   const count = binding.length + orphans.length
   return (
     <Panel title={`Standards · ${busy ? '…' : count}`}>
-      {obQ.isError && <Status bad>The obligations could not be read: {(obQ.error as Error).message}</Status>}
+      {obQ.isError && <Status bad>This list could not be read: {(obQ.error as Error).message}</Status>}
       {!busy && (ev
-        ? <Status>Evaluated {fmtWhen(ev.LastEvaluatedAt)} · {triggerWords(ev.LastTrigger)} · {s(ev.RulesEvaluated)} rule(s)</Status>
-        : <Status>Not yet evaluated — the platform evaluates a device within seconds of a change that a rule reads, and every hour. Nothing to press.</Status>)}
-      {!busy && !count && !!rules.length && <Status>No standard binds this device, and none is undetermined.</Status>}
+        ? <Status>{fmtWhen(ev.LastEvaluatedAt)} — last checked {triggerWords(ev.LastTrigger)} · {s(ev.RulesEvaluated)} rule(s).</Status>
+        : <Status>Not checked yet. A relay is checked within seconds of a change, and every hour. There is nothing to press.</Status>)}
+      {!busy && !count && !!rules.length && <Status>No standard applies to this relay, and none is undecided.</Status>}
       {count > 0 && (
         <table className="w-full text-sm">
           <thead><tr className="border-b border-slate-700 text-left text-xs uppercase tracking-wide text-slate-400">
             <th className="py-1 pr-2">Standard</th><th className="py-1 pr-2">Requirement</th><th className="py-1 pr-2">Rule</th>
-            <th className="py-1 pr-2">Status</th><th className="py-1 pr-2">Period</th><th className="py-1">Facts read</th></tr></thead>
+            <th className="py-1 pr-2">Status</th><th className="py-1 pr-2">Period</th><th className="py-1">What was read</th></tr></thead>
           <tbody>
             {binding.map((v) => { const key = s(v.RuleKey); const o = byRule.get(key); const result = s(v.Result); const id = o ? s(o.RowId) : 'v:' + key
               return (
@@ -268,8 +270,8 @@ function Standards({ r, verdicts, pending }: { r: Row; verdicts: Row[]; pending:
                     {!!v.EvidenceNote && <div className="text-xs text-slate-500">evidence: {s(v.EvidenceNote)}</div>}</td>
                   <td className="py-1 pr-2">
                     {o ? <Pill tone={statusTone(o.Status)}>{s(o.Status)}</Pill>
-                      : result === 'true' ? <Pill tone="warn" title="the rule applies but no obligation row stands yet — the next pass opens it">applies</Pill>
-                      : <Pill tone={resultTone(result)}>{result === 'unknown' ? 'undetermined' : 'error'}</Pill>}
+                      : result === 'true' ? <Pill tone="warn" title="This requirement applies to the relay. It joins the list at the next check.">applies</Pill>
+                      : <Pill tone={resultTone(result)}>{result === 'unknown' ? 'not decided' : 'error'}</Pill>}
                     <div className="text-xs text-slate-600">since {fmtWhen(v.SinceAt)}</div>
                   </td>
                   <td className="py-1 pr-2 text-xs text-slate-400">{o ? <>{fmtDate(o.PeriodStartAt)}{o.PeriodEndAt ? ' – ' + fmtDate(o.PeriodEndAt) : ' – open'}</> : '—'}</td>
@@ -293,7 +295,7 @@ function Standards({ r, verdicts, pending }: { r: Row; verdicts: Row[]; pending:
         </table>)}
       {!!notBinding.length && (
         <div className="mt-2 text-xs">
-          <span className="text-slate-500">{notBinding.length} standard{notBinding.length === 1 ? '' : 's'} do{notBinding.length === 1 ? 'es' : ''} not apply to this device</span>
+          <span className="text-slate-500">{notBinding.length} standard{notBinding.length === 1 ? '' : 's'} do{notBinding.length === 1 ? 'es' : ''} not apply to this relay</span>
           <Button kind="mini" className="ml-2" onClick={() => setShowWhy(!showWhy)}>{showWhy ? 'hide why' : 'show why'}</Button>
           {showWhy && (
             <ul className="mt-1 space-y-0.5">
@@ -309,7 +311,7 @@ const ruleTitle = (v: Row) => (v.StandardCode ? `${s(v.StandardCode)} ${s(v.Stan
 /** The reads the standing verdict was decided on (compliance.SubjectVerdict.ReadsJson) — shown when no obligation row carries them. */
 function VerdictReads({ v }: { v: Row }) {
   const reads = readsOf(v).filter((x) => !PRC023_READS.some(([n]) => n === x.name))
-  if (!reads.length) return <div className="mt-1 text-xs text-slate-500">No fact was read for this verdict.</div>
+  if (!reads.length) return <div className="mt-1 text-xs text-slate-500">Nothing was read for this rule.</div>
   return (
     <ul className="mt-1 space-y-0.5 text-xs">
       {reads.map((x, i) => <li key={x.name + i}><span className="text-slate-400">{x.name}{x.params ? ` [${x.params}]` : ''}</span> <span className="text-slate-100">{x.value}</span></li>)}
@@ -328,7 +330,7 @@ function Working({ v }: { v: Row }) {
       <ul className="mt-0.5 space-y-0.5 text-xs">
         {working.map(([name, label]) => <li key={name}><span className="text-slate-400">{label}</span> <span className="text-slate-100">{byName.get(name)!.value}</span></li>)}
       </ul>
-      <div className="mt-0.5 text-xs text-slate-600">The steady-state self-polarised circle; the memory-polarised expansion is not modelled. 50H is treated as a tripping element without decoding its MTU/MTO mask (#171).</div>
+      <div className="mt-0.5 text-xs text-slate-600">The steady-state self-polarised circle. The memory-polarised expansion is not modelled. 50H is taken as a tripping element; its MTU/MTO mask is not decoded.</div>{/* #171 */}
     </div>
   )
 }
@@ -338,7 +340,7 @@ function ObligationFacts({ instanceRowId }: { instanceRowId: string }) {
   const q = useViewAll('compliance', 'vObligationInstanceFact', { ObligationInstanceRowId: instanceRowId }, 'FactName')
   const rows = q.data ?? []
   if (q.isPending) return <div className="mt-1 text-xs text-slate-500">…</div>
-  if (!rows.length) return <div className="mt-1 text-xs text-slate-500">No fact was recorded on this obligation.</div>
+  if (!rows.length) return <div className="mt-1 text-xs text-slate-500">Nothing was recorded against this requirement.</div>
   return (
     <ul className="mt-1 space-y-0.5 text-xs">
       {rows.map((f) => <li key={s(f.ObligationInstanceFactId)}><span className="text-slate-400">{s(f.FactName)}</span> <span className="text-slate-200">{s(f.ValueAsRead)}</span></li>)}

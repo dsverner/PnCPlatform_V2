@@ -73,9 +73,9 @@ export function AssetCharacteristics({ assetEntityId, definitionEntityId, editab
     } catch (e) { setMsg({ text: `${s(d.Name)}: ${e instanceof ApiError ? e.message : String(e)}`, bad: true }) }
   }
   const fallback = title ?? 'Nameplate'
-  if (!definitionEntityId) return <Panel title={fallback}><Status>{emptyNote ?? 'This asset type names no characteristic template.'}</Status></Panel>
+  if (!definitionEntityId) return <Panel title={fallback}><Status>{emptyNote ?? 'This equipment type has no nameplate template yet, so there are no fields to fill in.'}</Status></Panel>
   if (defsQ.isPending) return <Panel title={fallback}><Status>Loading the template…</Status></Panel>
-  if (!defs.length) return <Panel title={fallback}><Status>{only ? `The template has no ${only.join(', ')} group.` : "The type's template has no Effective version."}</Status></Panel>
+  if (!defs.length) return <Panel title={fallback}><Status>{only ? `The template has no ${only.join(', ')} group.` : "The template for this type is not in use yet, so there are no fields to fill in."}</Status></Panel>
   return (
     <div className={`grid gap-3 ${groups.size > 1 ? 'lg:grid-cols-3' : ''}`}>
       {[...groups.entries()].map(([g, list]) => (
@@ -104,7 +104,7 @@ export function AssetCharacteristics({ assetEntityId, definitionEntityId, editab
           </dl>
         </Panel>))}
       {msg && <div className={groups.size > 1 ? 'lg:col-span-3' : ''}><Status bad={msg.bad}>{msg.text}</Status></div>}
-      {editable && <div className={groups.size > 1 ? 'lg:col-span-3' : ''}><Status>{note ?? 'A value saves when you leave the field (audited as your change). Hover a name for what the field means.'}</Status></div>}
+      {editable && <div className={groups.size > 1 ? 'lg:col-span-3' : ''}><Status>{note ?? 'A value saves when you leave the field. Hover a name to see what the field means.'}</Status></div>}
     </div>
   )
 }

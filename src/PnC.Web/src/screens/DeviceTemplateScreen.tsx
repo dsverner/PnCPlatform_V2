@@ -41,7 +41,7 @@ export default function DeviceTemplateScreen({ params: p, id }: { screen: Screen
   } })
 
   if (modelQ.isPending) return <Status>Loading…</Status>
-  if (!model) return <Status bad>No model with that id.</Status>
+  if (!model) return <Status bad>No relay model was found at this address.</Status>
   const nameOf = new Map((names.data ?? []).map((a) => [s(a.AnsiCode), s(a.Name)]))
   const isNum = new Map((names.data ?? []).map((a) => [s(a.AnsiCode), bit(a.IsDeviceNumber)]))
 
@@ -53,14 +53,14 @@ export default function DeviceTemplateScreen({ params: p, id }: { screen: Screen
         <span className="text-sm text-slate-400">{s(model.ModelName)}</span>
         <div className="ml-auto"><Button onClick={() => navigate(-1)}>Close</Button></div>
       </header>
-      <Status>One template per device type, one level below a scheme. What is shown here is true of every {code}. Which standards apply and why is under Compliance; which obligations bind a particular relay is on that relay's own record.</Status>
+      <Status>One template per device type, one level below a scheme. What is shown here is true of every {code}. Which standards apply is under Compliance. What binds one relay is on that relay's own record.</Status>
 
 
       {/* #186: the settings first — the owner: "the important, user facing stuff, at the top of the page and only show the
           documentation when the user needs them" */}
       <Panel title="Settings — by the manual's own groups, none hidden">
         {tmpl.isPending && <Status>…</Status>}
-        {!tmpl.isPending && !tmpl.data && <Status>No settings template is bound to this model.</Status>}
+        {!tmpl.isPending && !tmpl.data && <Status>No settings list is loaded for this model yet. An administrator builds it from the manufacturer's manual.</Status>}
         {tmpl.data && <SettingsByFunction template={tmpl.data} parsed={[]} parseStatus="template" parseError="" revision="" filedText={null} />}
       </Panel>
 
@@ -69,12 +69,12 @@ export default function DeviceTemplateScreen({ params: p, id }: { screen: Screen
 
       {/* #186: the documentation, closed until wanted */}
       <details className="rounded border border-slate-800">
-        <summary className="cursor-pointer select-none px-3 py-2 text-xs font-semibold uppercase tracking-wider text-slate-400 hover:text-slate-200">Template facts and what it can do — the documentation</summary>
+        <summary className="cursor-pointer select-none px-3 py-2 text-xs font-semibold uppercase tracking-wider text-slate-400 hover:text-slate-200">About this template — its facts and what the relay can do</summary>
         <div className="p-3">
         <div className="grid gap-3 lg:grid-cols-2">
           <Panel title="Template facts">
             {factsQ.isPending && <Status>…</Status>}
-            {!factsQ.isPending && !factsQ.data && <Status>No template definition is bound to this model yet. An administrator seeds one ({templateKey}) from the manufacturer's manual.</Status>}
+            {!factsQ.isPending && !factsQ.data && <Status>No facts are recorded for this model yet. An administrator builds them from the manufacturer's manual.</Status>}
             {factsQ.data && <Facts cols={1} pairs={factsQ.data.rows.map((r) => [s(r.Name), <span className="text-slate-300">{s(r.Description)}</span>] as [string, React.ReactNode])} />}
           </Panel>
           <Panel title={`What it can do · ${caps.isPending ? '…' : (caps.data ?? []).length}`}>
@@ -84,7 +84,8 @@ export default function DeviceTemplateScreen({ params: p, id }: { screen: Screen
                 <li key={k} className="text-slate-200">{isNum.get(k) ? <><span className="font-mono">{k}</span> {nameOf.get(k) ?? ''}</> : (nameOf.get(k) || k)}
                   <span className="ml-2 text-xs text-slate-500">{s(c.Source).toLowerCase()}</span></li>) })}
             </ul>
-            <div className="mt-2"><Status>Ten carry a C37.2 device number; the rest are named in the manual's own words (#182). Ticked per position when a relay is placed.</Status></div>
+            {/* #182: ten of the functions carry a C37.2 device number; the rest keep the manual's own names */}
+            <div className="mt-2"><Status>Ten carry a C37.2 device number. The rest are named in the manual's own words. Ticked per position when a relay is placed.</Status></div>
           </Panel>
         </div>
         </div>

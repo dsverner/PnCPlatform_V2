@@ -38,7 +38,7 @@ function BackButton() {
   const idx = (window.history.state as { idx?: number } | null)?.idx
   const canBack = idx == null ? window.history.length > 1 : idx > 0
   return (
-    <button type="button" disabled={!canBack} onClick={() => navigate(-1)} title={canBack ? 'the previous screen' : 'nothing to go back to'}
+    <button type="button" disabled={!canBack} onClick={() => navigate(-1)} title={canBack ? 'Back to the screen before this one' : 'There is no screen to go back to'}
       className="rounded border border-slate-700 px-2 py-0.5 text-xs text-slate-300 hover:border-slate-500 hover:text-slate-100 disabled:cursor-default disabled:opacity-40">‹ Back</button>
   )
 }
@@ -71,7 +71,7 @@ export default function AppLayout({ children }: { children?: ReactNode }) {
     for (const g of PAGES) byGroup.get(g.key)!.items.push(...g.items)
     return [...byGroup.values()].filter((g) => g.items.length)
   }, [screensQ.data])
-  const who = meQ.data ? (meQ.data.person.displayName || meQ.data.user.userPrincipalName) + (devUser() ? ' (DEV act-as)' : '') : meQ.isError ? 'not signed in' : '…'
+  const who = meQ.data ? 'signed in as ' + (meQ.data.person.displayName || meQ.data.user.userPrincipalName) + (devUser() ? ' (development)' : '') : meQ.isError ? 'not signed in' : '…'
   return (
     <div className="flex h-screen overflow-hidden">   {/* the owner, 2026-09-20: the nav and the header stay; only the content pane scrolls */}
       <aside className={`flex shrink-0 flex-col border-r border-slate-800 bg-slate-900 ${collapsed ? 'w-14' : 'w-56'}`}>
@@ -81,7 +81,7 @@ export default function AppLayout({ children }: { children?: ReactNode }) {
         </div>
         <nav className="flex-1 overflow-y-auto pb-4">
           {groups.map((g) => <NavGroup key={g.key} g={g} collapsed={collapsed} path={loc.pathname} />)}
-          {screensQ.isError && <p className="px-3 py-2 text-xs text-red-300">The screens could not be read.</p>}
+          {screensQ.isError && <p className="px-3 py-2 text-xs text-red-300">The menu could not be loaded. Refresh the page.</p>}
         </nav>
         <footer className="border-t border-slate-800 px-3 py-2 text-[11px] text-slate-500">
           {healthQ.data ? `${healthQ.data.environment} · ${healthQ.data.release}` : '…'}

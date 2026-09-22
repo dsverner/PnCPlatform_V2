@@ -35,7 +35,7 @@ export function RaiseRequest({ o, onClose }: { o: RaiseOpts; onClose: () => void
   }
   return (
     <Panel title={o.heading} actions={<Button kind="mini" onClick={onClose}>Close</Button>}>
-      <Status>{o.note || 'A new work request; starting it runs the settings-change procedure.'}</Status>
+      <Status>{o.note || 'A new change request. Starting it runs the settings-change procedure.'}</Status>
       {open.length > 0 && (
         <div className="mt-2 rounded border border-amber-700/60 bg-amber-950/30 p-2 text-sm">
           <div className="text-amber-200">{legacyName(open[0].DeviceName)} already has an open change request{open.length > 1 ? 's' : ''}:</div>
@@ -46,7 +46,7 @@ export function RaiseRequest({ o, onClose }: { o: RaiseOpts; onClose: () => void
             ? <div className="mt-2 flex flex-wrap items-center gap-2">
                 <Button kind="primary" onClick={() => navigate(screenPath('WORK_ITEM', s(open[0].WorkRequestEntityId)))}>Open it — join that request</Button>
                 <Button onClick={() => setSecond(true)}>Raise a second, based on it</Button>
-                <span className="text-xs text-slate-500">joining: your edits and steps there are under your own name · a second: its draft starts from that request's current settings and cannot go in service before it</span>
+                <span className="text-xs text-slate-500">Join it, and your edits and steps there are in your own name. A second request starts from that request's settings as they stand, and cannot go in service before it does.</span>
               </div>
             : <div className="mt-2 text-xs text-slate-400">A second request: its draft starts from “{s(open[0].WorkRequestTitle)}” as it stands now, and cannot go in service before that request does.</div>}
         </div>)}
@@ -54,7 +54,8 @@ export function RaiseRequest({ o, onClose }: { o: RaiseOpts; onClose: () => void
         {(o.before || []).map(([k, v]) => <Field key={k} label={k}><input className={inputClass} readOnly value={v} size={Math.max(12, Math.min(40, v.length + 2))} /></Field>)}
         <Field label="Action type">
           <select className={inputClass} value={chosen} onChange={(e) => setType(e.target.value)}>
-            {types.map((t) => <option key={t.versionRowId} value={t.versionRowId}>{t.key} — {t.name}{t.workflowKey ? ` (${t.workflowKey})` : ''}</option>)}
+            {/* the workflow key beside the name is ours, not the engineer's */}
+            {types.map((t) => <option key={t.versionRowId} value={t.versionRowId}>{t.key} — {t.name}</option>)}
           </select>
         </Field>
         <Field label="Title"><input className={inputClass} size={50} value={title} onChange={(e) => setTitle(e.target.value)} /></Field>

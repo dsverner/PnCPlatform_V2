@@ -76,14 +76,14 @@ export default function RecordScreen({ params: p, id }: { screen: Screen; params
           Analog inputs; recorded on the device, not this revision; changed under the change request; never in the settings file */}
       {section === 'jumpers' && !!r.TemplateDefinitionEntityId && <AssetCharacteristics assetEntityId={s(r.DeviceEntityId)} definitionEntityId={s(r.TemplateDefinitionEntityId)} groups={['Hardware']} title="Jumper settings"
         editable={r.GridState === 'Outstanding' && can('Asset.Modify')} workRequestEntityId={s(r.WorkRequestEntityId) || undefined}
-        note="The relay's own jumpers — the same on every record of this device, changed here under the change request (audited as your change), never part of the settings file. Hover a name for the manual's words." />}
+        note="The jumpers on this relay. They are the same on every record of it, are changed here under the change request, and are not part of the settings file. Hover a name for the manual's words." />}
       {section === 'analog' && <AnalogInputs r={r} revision={revision} canEditAssets={can('Asset.Modify')} canEditScheme={can('Scheme.Modify')} />}
       {/* #188: the relay, its placement and scheme, and the dates and state — a tab, not the top of every view. The owner,
           2026-09-18: the three panels "take up too much room and should really just be another tab"; "Where" renamed */}
       {section === 'record' && (
         <>
       <div className="grid gap-3 lg:grid-cols-3">
-        <Panel title="Relay"><Facts cols={1} pairs={[['Device', legacyFree(r.DeviceName)], ['Model', <span><a className="text-sky-300 underline" href={screenPath('DEVICE_TEMPLATE', s(r.ModelId))} onClick={(e) => { e.preventDefault(); navigate(screenPath('DEVICE_TEMPLATE', s(r.ModelId))) }} title="the device template for this model (#184)">{s(r.ModelCode)}</a>{r.ModelName ? ' — ' + s(r.ModelName) : ''}</span>], ['Manufacturer', s(r.ManufacturerName)], ['Technology', s(r.Technology)], ['Software version', s(r.FirmwareVersion)], ['Serial number', s(r.SerialNumber)], ['Voltage', s(r.VoltageClassCode)], ['Functions', s(r.Functions || r.PositionName)],
+        <Panel title="Relay"><Facts cols={1} pairs={[['Device', legacyFree(r.DeviceName)], ['Model', <span><a className="text-sky-300 underline" href={screenPath('DEVICE_TEMPLATE', s(r.ModelId))} onClick={(e) => { e.preventDefault(); navigate(screenPath('DEVICE_TEMPLATE', s(r.ModelId))) }} title="This model's template">{s(r.ModelCode)}</a>{r.ModelName ? ' — ' + s(r.ModelName) : ''}</span>], ['Manufacturer', s(r.ManufacturerName)], ['Technology', s(r.Technology)], ['Software version', s(r.FirmwareVersion)], ['Serial number', s(r.SerialNumber)], ['Voltage', s(r.VoltageClassCode)], ['Functions', s(r.Functions || r.PositionName)],
           /* #187: what the sheet is drawn from — the owner could not tell whether the relay "had a template applied" */
           ['Template', r.TemplateKey ? <span><a className="text-sky-300 underline" href={screenPath('DEVICE_TEMPLATE', s(r.ModelId))} onClick={(e) => { e.preventDefault(); navigate(screenPath('DEVICE_TEMPLATE', s(r.ModelId))) }}>{s(r.TemplateKey)} v{s(r.TemplateVersion)}</a> <span className="text-slate-500">through the model</span></span> : <span className="text-slate-500">no template for this model yet</span>]]} /></Panel>
         <Panel title="Placement and scheme"><Facts cols={1} pairs={[['Location', <NodeLink id={s(r.BuildingNodeEntityId)} name={s(r.BuildingName)} />],
@@ -118,7 +118,7 @@ export default function RecordScreen({ params: p, id }: { screen: Screen; params
       {section === 'files' && (
         <>
           {/* #216 follow-up (the owner, 2026-09-21): the relay's listing and the file the platform writes belong with the files */}
-          {template && <Panel title="Relay listing and the file the platform writes"><RelayListingAndFile template={template} parsed={parsed} revision={revision} filedText={textQ.data?.text ?? null} bare /></Panel>}
+          {template && <Panel title="Settings listing and the file for the relay">   {/* #216 */}<RelayListingAndFile template={template} parsed={parsed} revision={revision} filedText={textQ.data?.text ?? null} bare /></Panel>}
           <FilesPanel r={r} revision={revision} />
         </>)}
       {section === 'manual' && <ManualPanel templateDefinitionEntityId={s(r.TemplateDefinitionEntityId) || null} modelName={s(r.ModelName)} />}   {/* #216 */}

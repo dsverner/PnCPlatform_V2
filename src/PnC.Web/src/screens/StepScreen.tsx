@@ -50,15 +50,15 @@ export default function StepScreen({ params: p, id }: { screen: Screen; params: 
       const r = field
         ? await stepCall.checkin(st.stepInstanceEntityId, { outcome, capture, evidence, capturedBy: capturedBy.trim(), capturedAt: new Date(capturedAt).toISOString() })
         : await stepCall.commit(st.stepInstanceEntityId, { outcome, capture, evidence })
-      setResult(r); setMsg({ text: `Committed as ${r.outcome}${r.advanced ? ' · ' + r.advanced : ''}${r.branchOutcome ? ' · branch ' + r.branchOutcome : ''}${r.instance.completed ? ' · the procedure is complete' : ''}.` }); reload()
+      setResult(r); setMsg({ text: `Committed as ${r.outcome}${r.advanced ? ' · ' + r.advanced : ''}${r.branchOutcome ? ' · this track is ' + r.branchOutcome : ''}${r.instance.completed ? ' · the procedure is complete' : ''}.` }); reload()
     } catch (e) { setMsg({ text: `Commit refused: ${e instanceof ApiError ? e.status + ' ' : ''}${(e as Error).message}`, bad: true }) }
     setBusy(false)
   }
 
-  if (!id) return <Status bad>No step id in the address.</Status>
+  if (!id) return <Status bad>The address names no step.</Status>
   if (q.isPending) return <Status>Loading the step…</Status>
   if (q.isError) return <Status bad>Could not load: {(q.error as Error).message}</Status>
-  if (!st || !def) return <Status bad>No step with that id is readable by you.</Status>
+  if (!st || !def) return <Status bad>You may not read that step, or it does not exist.</Status>
   const evidenceKinds = def.evidence?.kinds ?? []
   const outcomes = def.outcomes?.length ? def.outcomes : ['Done']
   const back = st.workRequestEntityId ? screenPath('WORK_ITEM', st.workRequestEntityId) : null
@@ -67,33 +67,36 @@ export default function StepScreen({ params: p, id }: { screen: Screen; params: 
       <header className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="text-lg font-semibold text-slate-100">{def.title}</h1>
-          <p className="text-xs text-slate-400">{st.procedureKey} · {st.blockPath}{st.memberSubjectEntityId ? ` · ${st.memberSubjectKind} ${st.memberSubjectEntityId}` : ''}{back && <> · <a className="text-sky-300 underline" href="#" onClick={(e) => { e.preventDefault(); navigate(back) }}>the work item</a></>}</p>
+          {/* the procedure key, the block path and the member's id are ours, not the technician's — only the way back is shown */}
+          <p className="text-xs text-slate-400">{back && <a className="text-sky-300 underline" href="#" onClick={(e) => { e.preventDefault(); navigate(back) }}>back to the change request</a>}</p>
         </div>
         <Pill tone={stateTone(st.state === 'Committed' ? 'Complete' : st.state === 'Ready' || st.state === 'Active' ? 'InProgress' : st.state)}>{st.state}{st.outcome ? ' · ' + st.outcome : ''}</Pill>
       </header>
       {def.instruction && <p className="rounded border border-slate-800 bg-slate-900 p-3 text-sm text-slate-200">{def.instruction}</p>}
       <Facts cols={3} pairs={[['Role', `${def.roleCode ?? def.role}${st.assignedRoleCode && st.assignedRoleCode !== def.roleCode ? ' (' + st.assignedRoleCode + ')' : ''}`],
-        ['Claimed', st.claimedByDisplayName ? `${st.claimedByDisplayName}${st.isClaimant ? ' (you)' : ''} until ${fmtWhen(st.claimExpiresAt)}` : '—'],
+        ['Claimed by', st.claimedByDisplayName ? `${st.claimedByDisplayName}${st.isClaimant ? ' (you)' : ''} until ${fmtWhen(st.claimExpiresAt)}` : '—'],
         ['Sign-off', def.signoff ? `${def.signoff.action ?? ''}${def.signoff.witness ? ' · witnessed' : ''}` : '—'],
-        ['Witness', st.witnessedByDisplayName ?? (def.signoff?.witness ? 'not yet' : '—')], ['Record', def.record?.kind ?? '—'], ['Advances', def.advances ? `${def.advances.workflow} · ${def.advances.transition}` : '—'],
-        ['Due', st.dueAt ? fmtWhen(st.dueAt) : '—'], ['Committed', st.committedAt ? fmtWhen(st.committedAt) : '—'], ['Held', st.heldReason ?? '—']]} />
+        ['Witness', st.witnessedByDisplayName ?? (def.signoff?.witness ? 'not yet' : '—')], ['Record', def.record?.kind ?? '—'],
+        ['Moves the request on', def.advances ? def.advances.transition : '—'],   // the workflow key beside it is ours
+        ['Due', st.dueAt ? fmtWhen(st.dueAt) : '—'], ['Committed', st.committedAt ? fmtWhen(st.committedAt) : '—'], ['On hold', st.heldReason ?? '—']]} />
       {msg && <Status bad={msg.bad}>{msg.text}</Status>}
-      {result?.recordEntityId && <Status>Record {result.recordEntityId}{result.producedEntityId ? ` · produced ${result.producedEntityId}` : ''}</Status>}
+      {/* the record and produced ids are ours; the person sees them as records on the request */}
+      {result?.recordEntityId && <Status>The record for this step was created{result.producedEntityId ? ', and the settings package with it' : ''}.</Status>}
 
       {st.state !== 'Committed' && st.state !== 'Skipped' && (
         <div className="no-print flex flex-wrap items-end gap-2">
           {st.state === 'Ready' && <Button kind="primary" disabled={busy || !canAct} onClick={() => act('Claim', () => stepCall.claim(st.stepInstanceEntityId))}>Claim</Button>}
           {st.state === 'Active' && st.isClaimant && <Button disabled={busy} onClick={() => act('Release', () => stepCall.release(st.stepInstanceEntityId))}>Release</Button>}
           {st.state === 'Active' && !st.isClaimant && canAct && (
-            <><Field label="Take over — the reason"><input className={inputClass} value={takeoverReason} onChange={(e) => setTakeoverReason(e.target.value)} /></Field>
+            <><Field label="Why take it over?"><input className={inputClass} value={takeoverReason} onChange={(e) => setTakeoverReason(e.target.value)} /></Field>
               <Button disabled={busy || !takeoverReason.trim()} onClick={() => act('Take over', () => stepCall.takeover(st.stepInstanceEntityId, takeoverReason.trim()))}>Take over</Button></>
           )}
-          {st.state === 'Active' && def.signoff?.witness && !st.isClaimant && canAct && <Button disabled={busy} title="A second person, from their own session, attests to this step" onClick={() => act('Witness', () => stepCall.witness(st.stepInstanceEntityId))}>Witness</Button>}
+          {st.state === 'Active' && def.signoff?.witness && !st.isClaimant && canAct && <Button disabled={busy} title="A second person, signed in themselves, attests to this step" onClick={() => act('Witness', () => stepCall.witness(st.stepInstanceEntityId))}>Witness</Button>}
         </div>
       )}
 
       {def.capture && Object.keys(def.capture).length > 0 && (
-        <Panel title="Capture" actions={saved && <span className="text-xs text-slate-500">draft saved {saved}</span>}>
+        <Panel title="What to record" actions={saved && <span className="text-xs text-slate-500">draft saved {saved}</span>}>
           <div className="grid gap-3 md:grid-cols-2">
             {Object.entries(def.capture).map(([k, spec]) => <CaptureField key={k} name={k} spec={spec} value={values[k]} onChange={(v) => change(k, v)} disabled={!editable} help={p.help?.[k]} refView={spec.refKind ? p.refViews?.[spec.refKind] : undefined} subject={st.subjectEntityId} />)}
           </div>
@@ -107,15 +110,15 @@ export default function StepScreen({ params: p, id }: { screen: Screen; params: 
               <Field key={kind} label={kind}><input type="file" multiple disabled={!editable} className="text-sm text-slate-300" onChange={(e) => setFiles({ ...files, [kind]: Array.from(e.target.files ?? []) })} /></Field>
             ))}
           </div>
-          <Status>Files travel with the commit; the first file of a settings or readback step is the configuration file itself.</Status>
+          <Status>Files are attached when you commit. On a settings or readback step, the first file is the settings file itself.</Status>
         </Panel>
       )}
       {editable && (
         <Panel title="Commit">
-          <label className="mb-2 flex items-center gap-2 text-sm text-slate-300"><input type="checkbox" checked={field} onChange={(e) => { setField(e.target.checked); if (e.target.checked && !capturedBy) setCapturedBy(meQ.data?.user.userPrincipalName ?? '') }} />Captured in the field by someone else, checked in now (the act is theirs; the acceptance is yours)</label>
+          <label className="mb-2 flex items-center gap-2 text-sm text-slate-300"><input type="checkbox" checked={field} onChange={(e) => { setField(e.target.checked); if (e.target.checked && !capturedBy) setCapturedBy(meQ.data?.user.userPrincipalName ?? '') }} />Someone else did this in the field. You are entering it now, and the work stays in their name.</label>
           {field && <div className="mb-2 flex flex-wrap items-end gap-2"><Field label="Captured by (account)"><input className={inputClass} value={capturedBy} onChange={(e) => setCapturedBy(e.target.value)} /></Field><Field label="Captured at"><input type="datetime-local" className={inputClass} value={capturedAt} onChange={(e) => setCapturedAt(e.target.value)} /></Field></div>}
           <div className="flex flex-wrap gap-2">{outcomes.map((o) => <Button key={o} kind="primary" disabled={busy || (field && !capturedBy.trim())} onClick={() => commit(o)}>{outcomes.length === 1 && o === 'Done' ? (field ? 'Check in' : 'Commit') : `${field ? 'Check in' : 'Commit'} as ${o}`}</Button>)}</div>
-          {def.signoff?.witness && <Status>This step is witnessed: a second person must press Witness from their own session before the commit, within fifteen minutes.</Status>}
+          {def.signoff?.witness && <Status>This step is witnessed. A second person must press Witness from their own sign-in, within fifteen minutes before you commit.</Status>}
         </Panel>
       )}
       {st.state === 'Committed' && st.draft && Object.keys(st.draft).length > 0 && <Panel title="As committed"><Facts cols={2} pairs={Object.entries(st.draft).map(([k, v]) => [k, Array.isArray(v) ? v.join(', ') : s(v)])} /></Panel>}
@@ -159,11 +162,11 @@ function CaptureField({ name, spec, value, onChange, disabled, help, refView, su
         : <textarea className={`${inputClass} min-h-16`} value={s(value)} disabled={disabled} onChange={(e) => onChange(e.target.value)} />
       case 'ref': return refView
         ? <>{finder}<select className={inputClass} value={s(value)} disabled={disabled} onChange={(e) => onChange(e.target.value)}><option value="">—</option>{opts.map((r) => <option key={s(r.EntityId)} value={s(r.EntityId)}>{s(r[refView.label])}</option>)}</select></>
-        : <input className={inputClass} placeholder={`${spec.refKind ?? 'entity'} id`} value={s(value)} disabled={disabled} onChange={(e) => onChange(e.target.value)} />
+        : <input className={inputClass} placeholder={`the ${spec.refKind ? spec.refKind.toLowerCase() : 'record'} to use`} value={s(value)} disabled={disabled} onChange={(e) => onChange(e.target.value)} />
       case 'set': { const chosen = Array.isArray(value) ? (value as string[]).map((x) => x.toLowerCase()) : []
         return refView
           ? <>{finder}<select multiple className={`${inputClass} min-h-32`} disabled={disabled} value={chosen} onChange={(e) => onChange(Array.from(e.target.selectedOptions).map((o) => o.value))}>{opts.map((r) => <option key={s(r.EntityId)} value={s(r.EntityId).toLowerCase()}>{s(r[refView.label])}</option>)}</select><span className="text-xs text-slate-500">{chosen.length} chosen · Ctrl-click to add or remove</span></>
-          : <textarea className={`${inputClass} min-h-16`} placeholder="one id per line" value={Array.isArray(value) ? (value as string[]).join('\n') : s(value)} disabled={disabled} onChange={(e) => onChange(e.target.value)} /> }
+          : <textarea className={`${inputClass} min-h-16`} placeholder="one per line" value={Array.isArray(value) ? (value as string[]).join('\n') : s(value)} disabled={disabled} onChange={(e) => onChange(e.target.value)} /> }
       default: return <input className={inputClass} value={s(value)} disabled={disabled} onChange={(e) => onChange(e.target.value)} />
     }
   })()

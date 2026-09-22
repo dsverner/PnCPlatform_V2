@@ -3,7 +3,7 @@
   "kind": "screen",
   "key": "SCHEMES",
   "name": "Schemes",
-  "description": "The protection schemes; a row opens the scheme \u2014 its members and the primary assets it protects (#170).",
+  "description": "The protection schemes. Open a row for the scheme's members and what it protects.",
   "menu": {
     "group": "Assets and schemes",
     "label": "Schemes",

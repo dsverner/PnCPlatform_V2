@@ -96,15 +96,17 @@ export function AnalogInputs({ r, revision, canEditAssets = false, canEditScheme
     try { await proc('scheme', 'AnalogInput_SoftDelete', { EntityId: input.EntityId }); setMsg({ text: `${s(input.InputCode)} removed.` }); refresh() }
     catch (e) { setMsg({ text: e instanceof ApiError ? e.message : String(e), bad: true }) } finally { setBusy(false) }
   }
+  // the add form opens under the input it is for, and the same button closes it again
+  const toggleAdd = (input: Row) => setAddTo(addTo && s(addTo.EntityId) === s(input.EntityId) ? null : input)
   const orphans = sources.filter((x) => !x.AnalogInputEntityId)
   const unfed = capability ? (['Current', 'Voltage', 'SyncVoltage'] as const).flatMap((k) => capability[k].slice(inputs.filter((i) => s(i.InputKind) === k && Number(i.SourceCount ?? 0) > 0).length)) : []
   return (
     <Panel title={`Feeding this protection · ${sources.length ? `${sources.length} transformer${sources.length === 1 ? '' : 's'} on ${inputs.length} input${inputs.length === 1 ? '' : 's'}` : 'none named'}`}
       actions={hasScheme && canEdit ? <Button kind={editing ? 'primary' : 'default'} onClick={() => { setEditing(!editing); setAddTo(null) }}>{editing ? 'Done' : 'Edit inputs'}</Button> : undefined}>
-      {!hasScheme && <Status>This record is in no scheme, so nothing names the transformers that feed it.</Status>}
+      {!hasScheme && <Status>This relay is in no scheme. Nothing names the CTs and PTs that feed it.</Status>}
       {hasScheme && (sourcesQ.isPending || inputsQ.isPending) && <Status>Reading the scheme's inputs…</Status>}
-      {hasScheme && !sourcesQ.isPending && !inputsQ.isPending && !sources.length && !inputs.length && <Status>{schemeName} names no CT or VT source yet.{canEdit ? ' Edit inputs to add one.' : ''}</Status>}
-      {capability && <Status>{deviceName} takes {capability.Current.length} current input{capability.Current.length === 1 ? '' : 's'}{capability.Current.length ? ` (${capability.Current.map((x) => s(x.SettingCode)).join(', ')})` : ''}, {capability.Voltage.length} voltage{capability.Voltage.length ? ` (${capability.Voltage.map((x) => s(x.SettingCode)).join(', ')})` : ''} and {capability.SyncVoltage.length} sync voltage{capability.SyncVoltage.length ? ` (${capability.SyncVoltage.map((x) => s(x.SettingCode)).join(', ')})` : ''} — read from its settings template.</Status>}
+      {hasScheme && !sourcesQ.isPending && !inputsQ.isPending && !sources.length && !inputs.length && <Status>{schemeName} names no CT or PT feeding it yet.{canEdit ? ' Edit inputs to add one.' : ''}</Status>}
+      {capability && <Status>{deviceName} takes {capability.Current.length} current input{capability.Current.length === 1 ? '' : 's'}{capability.Current.length ? ` (${capability.Current.map((x) => s(x.SettingCode)).join(', ')})` : ''}, {capability.Voltage.length} voltage{capability.Voltage.length ? ` (${capability.Voltage.map((x) => s(x.SettingCode)).join(', ')})` : ''} and {capability.SyncVoltage.length} sync voltage{capability.SyncVoltage.length ? ` (${capability.SyncVoltage.map((x) => s(x.SettingCode)).join(', ')})` : ''}. Its template lists the ratio setting for each one.</Status>}
       {inputs.length > 0 && (
         <div className="space-y-3 text-sm">
           {inputs.map((input) => {
@@ -131,7 +133,7 @@ export function AnalogInputs({ r, revision, canEditAssets = false, canEditScheme
                         const ratio = src.Ratio == null ? NaN : Number(src.Ratio); const path = screenPath('INSTRUMENT_TRANSFORMER', s(src.AssetEntityId))
                         return (
                           <tr key={s(src.MemberEntityId)} className="border-t border-slate-800 align-top">
-                            <td className="py-1 pr-2"><a className="text-sky-300 underline" href={path} onClick={(e) => { e.preventDefault(); navigate(path) }}>{s(src.AssetName)}</a>{src.WindingCode ? <span className="text-slate-200"> · {s(src.WindingCode)}</span> : <span className="text-xs text-amber-300" title="which secondary winding feeds this input is not recorded"> · winding not said</span>} <span className="text-xs text-slate-500">{s(src.AssetTypeCode)}{src.Phases != null ? ` · ${s(src.Phases) === '1' ? 'single-phase' : `${s(src.Phases)}-phase`}` : ''}</span></td>
+                            <td className="py-1 pr-2"><a className="text-sky-300 underline" href={path} onClick={(e) => { e.preventDefault(); navigate(path) }}>{s(src.AssetName)}</a>{src.WindingCode ? <span className="text-slate-200"> · {s(src.WindingCode)}</span> : <span className="text-xs text-amber-300" title="which secondary winding feeds this input is not recorded"> · winding not recorded</span>} <span className="text-xs text-slate-500">{s(src.AssetTypeCode)}{src.Phases != null ? ` · ${s(src.Phases) === '1' ? 'single-phase' : `${s(src.Phases)}-phase`}` : ''}</span></td>
                             <td className="py-1 pr-2 text-slate-300">{s(src.RatioInUse) ? `${s(src.RatioInUse)}${Number.isFinite(ratio) ? ` = ${ratio}` : ' (not readable)'}` : 'not recorded'}</td>
                             <td className="py-1 pr-2"><span className="flex flex-wrap gap-1">{src.IsPlaced === false && <Pill tone="neutral" title="nothing says where it stands yet — place it from its page">not placed</Pill>}{src.IsInService === false ? <Pill tone="warn">not in service</Pill> : <Pill tone="good">in service</Pill>}</span></td>
                             <td className="py-1 pr-2 text-xs text-slate-300">{s(src.Notes) || <span className="text-slate-600">—</span>}</td>
@@ -143,15 +145,15 @@ export function AnalogInputs({ r, revision, canEditAssets = false, canEditScheme
                 {editing && (
                   <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-slate-800 pt-2 text-xs">
                     <span className="uppercase tracking-wide text-slate-500">Actions on {s(input.InputCode)}</span>
-                    {input.InputKind === 'Current' && !over && <Button kind="mini" disabled={busy} onClick={() => setAddTo(addTo && s(addTo.EntityId) === s(input.EntityId) ? null : input)}>{parallel ? 'Add another paralleled CT' : mine.length ? 'Add a paralleled CT' : 'Add a CT'}</Button>}
+                    {input.InputKind === 'Current' && !over && <Button kind="mini" disabled={busy} onClick={() => toggleAdd(input)}>{parallel ? 'Add another paralleled CT' : mine.length ? 'Add a paralleled CT' : 'Add a CT'}</Button>}
                     {!mine.length && <Button kind="mini" disabled={busy} onClick={() => void removeInput(input)}>Remove this input</Button>}
-                    {mine.length > 0 && over && <span className="text-slate-500">move its transformers off it (Remove from scheme) and it can be removed</span>}
+                    {mine.length > 0 && over && <span className="text-slate-500">Remove its transformers from the scheme first. Then this input can be removed.</span>}
                   </div>)}
                 {editing && addTo && s(addTo.EntityId) === s(input.EntityId) && <AddSourceForm schemeEntityId={schemeId} schemeName={schemeName} inputs={inputs} sources={sources} capability={capability} deviceName={deviceName} fixedInput={input} onDone={() => { setAddTo(null); refresh() }} />}
               </div>)
           })}
         </div>)}
-      {orphans.length > 0 && <Status bad>{orphans.length} source{orphans.length === 1 ? ' has' : 's have'} no analog input yet ({orphans.map((x) => s(x.AssetName)).join(', ')}) — the next deploy's catch-up gives them one.</Status>}
+      {orphans.length > 0 && <Status bad>{orphans.length} transformer{orphans.length === 1 ? ' is' : 's are'} on no analog input yet ({orphans.map((x) => s(x.AssetName)).join(', ')}). Nothing says which relay input {orphans.length === 1 ? 'it feeds' : 'they feed'}.</Status>}
       {hasScheme && !inputsQ.isPending && unfed.length > 0 && (
         <ul className="mt-2 space-y-1 border-t border-slate-800 pt-2 text-sm">
           {unfed.map((x) => <li key={s(x.SettingCode)} className="text-slate-500"><span className="text-slate-300">{s(x.SettingCode)}</span> — no {KIND_LABEL[inputKindOf(x)]} input with a transformer on it feeds this setting yet{canEdit ? (editing ? '; add one below' : '; Edit inputs to add one') : ''}.</li>)}
@@ -159,7 +161,7 @@ export function AnalogInputs({ r, revision, canEditAssets = false, canEditScheme
       {editing && <AddSourceForm schemeEntityId={schemeId} schemeName={schemeName} inputs={inputs} sources={sources} capability={capability} deviceName={deviceName} onDone={refresh} />}
       {msg && <Status bad={msg.bad}>{msg.text}</Status>}
       {tq.isPending && <Status>Reading the template…</Status>}
-      {!tq.isPending && !tq.data && <Status>No settings template for this model, so what {deviceName} can take is not known; the inputs are shown as the scheme has them.</Status>}
+      {!tq.isPending && !tq.data && <Status>No settings template for this model. How many inputs {deviceName} takes is not known, so the inputs are shown as the scheme has them.</Status>}
     </Panel>
   )
 }
@@ -219,11 +221,11 @@ function AddSourceForm({ schemeEntityId, schemeName, inputs, sources, capability
       const windingId = await addFirstWinding(assetId, ratio, role === 'SyncVtSource' ? 'Sync' : 'Protection')   // #212: the ratio is the winding's
       await proc('scheme', 'AddSchemeMember', { SchemeEntityId: schemeEntityId, MemberKind: 'Asset', MemberEntityId: assetId, MemberRoleCode: role, IsInService: true, Notes: note.trim() || null, AnalogInputEntityId: inputId, WindingEntityId: windingId })
       const where = inputs.find((i) => s(i.EntityId) === inputId)
-      setMsg({ text: `${name.trim() || suggested} now feeds ${schemeName} on ${where ? s(where.InputCode) : nextCode(inputs, kind)}; it is not placed yet — place it from its page.` })
+      setMsg({ text: `${name.trim() || suggested} now feeds ${schemeName} on ${where ? s(where.InputCode) : nextCode(inputs, kind)}. It is not placed yet — place it from its own page.` })
       setRatio(''); setName(''); setNote(''); setTarget(''); onDone()
     } catch (e) {
       const why = e instanceof ApiError ? e.message : String(e)
-      setMsg({ text: assetId ? `${name.trim() || suggested} was created but not finished: ${why} — open it from the Instrument transformers list.` : why, bad: true })
+      setMsg({ text: assetId ? `${name.trim() || suggested} was made but not finished: ${why}. Open it from the Instrument transformers list.` : why, bad: true })
     } finally { setBusy(false) }
   }
   return (
@@ -248,7 +250,7 @@ function AddSourceForm({ schemeEntityId, schemeName, inputs, sources, capability
       </div>
       {explain ? <div className="text-xs text-slate-300">{explain}</div> : (
         <div className="flex flex-col gap-1 text-xs text-slate-300">
-          <span className="text-slate-500">Where does it connect?{canTake !== null ? ` ${deviceName} has ${canTake} ${KIND_LABEL[kind]} input${canTake === 1 ? '' : 's'} (${capability![kind].map((x) => s(x.SettingCode)).join(', ')}); ${schemeName} uses ${existing.length}.` : ` What ${deviceName} can take is not known (no settings template).`}</span>
+          <span className="text-slate-500">Where does it land?{canTake !== null ? ` ${deviceName} has ${canTake} ${KIND_LABEL[kind]} input${canTake === 1 ? '' : 's'} (${capability![kind].map((x) => s(x.SettingCode)).join(', ')}). ${schemeName} uses ${existing.length}.` : ` How many ${KIND_LABEL[kind]} inputs ${deviceName} takes is not known: no settings template is loaded for it.`}</span>
           {existing.map((i) => <label key={s(i.EntityId)} className="flex items-center gap-2"><input type="radio" name="target" checked={effective === s(i.EntityId)} disabled={busy} onChange={() => setTarget(s(i.EntityId))} /> Paralleled into {s(i.InputCode)}{namesOn(i) ? ` with ${namesOn(i)}` : ''}</label>)}
           {separateAllowed && <label className="flex items-center gap-2"><input type="radio" name="target" checked={effective === 'new'} disabled={busy} onChange={() => setTarget('new')} /> A separate input — {nextCode(inputs, kind)}{nextSetting ? ` (${deviceName}'s ${s(nextSetting.SettingCode)})` : ''}</label>}
         </div>)}
@@ -299,7 +301,7 @@ function SettingsGrid({ rows: given, values, revision, editable = false, deviceI
   return (
     <>
       {msg && <Status bad={msg.bad}>{msg.text}</Status>}
-      {editable && !quiet && <Status>Outstanding revision: a value saves when you leave the field (audited as your change). The platform writes the settings file from these values when the settings step of the change commits.</Status>}
+      {editable && !quiet && <Status>This record is outstanding. A value saves when you leave the field. The settings file is written from these values when the settings step of the change commits.</Status>}
       <div className="mt-2"><DataGrid rows={rows} columns={cols} rowKey={(r) => s(r.SettingCode)} emptyText="No settings in this group."
         expandedKey={open} canExpand={isMask} onRowClick={(r) => { if (isMask(r)) setOpen(open === s(r.SettingCode) ? null : s(r.SettingCode)) }}
         detail={(r) => (open && s(r.SettingCode) === open && relayWord
@@ -337,7 +339,7 @@ function MaskBits({ relayWord, code, value, editing, onSave, onClose }: { relayW
   }
   return (
     <div className="space-y-2 p-2 text-sm">
-      {!readable && <Status bad>The filed value “{value}” is not {nRows} hex bytes; the bits below read it as far as they can. Saving replaces it.</Status>}
+      {!readable && <Status bad>The filed value “{value}” is not {nRows} hex bytes. The bits below read it as far as they can, and saving replaces it.</Status>}
       <div>
         <table className="w-auto text-xs">
           <tbody>
@@ -415,7 +417,7 @@ export function SettingsByFunction({ template, parsed, parseStatus, parseError, 
   const unmatched = parseError && /not in the template: ([^;]+)/.exec(parseError)?.[1]
   return (
     <Panel title={`Settings · ${template.name}`} actions={<>{parseStatus && <Pill tone={parseStatus === 'Parsed' ? 'good' : parseStatus === 'Partial' ? 'warn' : 'neutral'}>{parseStatus}</Pill>}
-      {parsed.length > 0 && <a className="text-xs text-sky-300 underline" href={`/api/v1/settings/${revision}/rendered`} target="_blank" rel="noopener">the settings file as the platform writes it</a>}</>}>
+      {parsed.length > 0 && <a className="text-xs text-sky-300 underline" href={`/api/v1/settings/${revision}/rendered`} target="_blank" rel="noopener">the settings file from these values</a>}</>}>
       {unmatched && <Status bad>Names in the filed text that the template does not know: {unmatched}</Status>}
       <Tabs tabs={[...categories.map((c) => ({ key: c, label: c.length > 42 ? c.slice(0, 40) + '…' : c })), ...extraTabs.map((x) => ({ key: x.key, label: x.label }))]} value={current} onChange={setTab} />
       {extraTabs.find((x) => x.key === current)
@@ -433,9 +435,9 @@ export function RelayListingAndFile({ template, parsed, revision, filedText, bar
   const renderedQ = useQuery({ queryKey: ['rendered', revision], queryFn: () => getText(`/api/v1/settings/${revision}/rendered`), staleTime: 60_000, enabled: !!revision && parsed.length > 0 })
   const body = (
       <div className="mt-2 grid gap-3 lg:grid-cols-2">
-        <div><h4 className="text-xs text-slate-500">Listing (the template's order, as the relay lists it)</h4><pre className="mt-1 overflow-auto rounded border border-slate-800 bg-slate-950 p-2 text-xs">{listing(template.rows, values)}</pre></div>
-        <div><h4 className="text-xs text-slate-500">The file the platform writes{renderedQ.data != null && filedText != null ? (renderedQ.data === filedText ? ' — identical to the file as filed' : ' — differs from the file as filed (order or spelling; the values are what was parsed)') : ''}</h4>
-          <pre className="mt-1 max-h-64 overflow-auto rounded border border-slate-800 bg-slate-950 p-2 text-xs whitespace-pre-wrap">{!revision || !parsed.length ? 'no revision' : renderedQ.isPending ? '…' : renderedQ.isError ? 'not available' : renderedQ.data}</pre></div>
+        <div><h4 className="text-xs text-slate-500">Listing — the template's order, as the relay lists it</h4><pre className="mt-1 overflow-auto rounded border border-slate-800 bg-slate-950 p-2 text-xs">{listing(template.rows, values)}</pre></div>
+        <div><h4 className="text-xs text-slate-500">The settings file from these values{renderedQ.data != null && filedText != null ? (renderedQ.data === filedText ? ' — the same as the file as filed' : ' — different from the file as filed: the order or the spelling differs, the values are the ones read from it') : ''}</h4>
+          <pre className="mt-1 max-h-64 overflow-auto rounded border border-slate-800 bg-slate-950 p-2 text-xs whitespace-pre-wrap">{!revision || !parsed.length ? 'no settings yet' : renderedQ.isPending ? '…' : renderedQ.isError ? 'not available' : renderedQ.data}</pre></div>
       </div>)
   if (bare) return body
   return (
@@ -485,40 +487,42 @@ export function BasisPanel({ r, revision, editable }: { r: Row; revision: string
   const drift = rows.filter((x) => ['take', 'agree', 'conflict'].includes(s(x.Outcome)))
   const conflicts = drift.filter((x) => s(x.Outcome) === 'conflict')
   const undecided = conflicts.filter((x) => !decisions[s(x.SettingCode)])
+  const undecidedCodes = undecided.map((x) => s(x.SettingCode)).join(', ')
   if (q.isPending) return null
-  if (q.isError) return <Status bad>Could not read the basis: {(q.error as Error).message}</Status>
+  if (q.isError) return <Status bad>Could not read what this draft started from: {(q.error as Error).message}</Status>
   const title = s(head?.BasisTitle) || 'the request it is based on'
-  if (!drift.length) return <Status>Based on {title} — unchanged since this draft was taken{head?.HasFrozenBasis ? '' : ' (no frozen basis yet; the first re-base takes one)'}.</Status>
+  // #192: with no frozen basis the first re-base is what records the starting point
+  if (!drift.length) return <Status>Based on {title}. Nothing there has changed since this draft was taken{head?.HasFrozenBasis ? '' : '; the first re-base records the starting point'}.</Status>
   const rebase = async () => {
     setBusy(true); setMsg(null)
     try {
       const out = await proc<Row>('process', 'RebaseDraft', { RevisionRowId: revision, DeviceEntityId: s(r.DeviceEntityId), Decisions: JSON.stringify(decisions) })
-      setMsg({ text: `Re-based: ${s(out.Applied)} value(s) taken from ${title}, ${s(out.Kept)} kept as yours.` }); setDecisions({})
+      setMsg({ text: `Re-based: ${s(out.Applied)} value(s) taken from ${title}, ${s(out.Kept)} kept as this draft's.` }); setDecisions({})
       qc.invalidateQueries({ queryKey: ['basisDrift', revision] }); qc.invalidateQueries({ queryKey: ['view', 'document'] }); qc.invalidateQueries({ queryKey: ['settingsText', revision] })
     } catch (e) { setMsg({ text: e instanceof ApiError ? e.message : String(e), bad: true }) } finally { setBusy(false) }
   }
   return (
     <Panel title={`${title} has changed since this draft was taken · ${drift.length} setting${drift.length === 1 ? '' : 's'}`} className="border-amber-700/60">
-      <Status>{head?.HasFrozenBasis ? 'Then is the basis as it stood when this draft was taken; theirs is the basis now; mine is this draft.' : 'This draft was taken before the basis was frozen, so every difference between the basis now and this draft is shown as a conflict to decide once; the re-base then freezes the basis.'} The check, the approval, the issue and the baseline refuse this draft until it is re-based.</Status>
+      <Status>{head?.HasFrozenBasis ? `Started from is the settings this draft began with. Changed to is what ${title} holds now. This draft is your own values. Re-basing copies in each value you pick from ${title} and leaves the rest of this draft alone.` : `This draft was taken before its starting point was recorded. Every setting where ${title} and this draft differ is shown as a conflict; decide each one once, and re-basing records the starting point.`} The check, the approval, the issue and the baseline refuse this draft until it is re-based.</Status>
       <table className="mt-2 w-full text-sm">
-        <thead><tr className="text-left text-xs uppercase tracking-wide text-slate-500"><th className="py-1">Setting</th><th>Then</th><th>Theirs now</th><th>Mine</th><th>Outcome</th></tr></thead>
+        <thead><tr className="text-left text-xs uppercase tracking-wide text-slate-500"><th className="py-1">Setting</th><th>Started from</th><th>Changed to</th><th>This draft</th><th>Outcome</th></tr></thead>
         <tbody>
           {drift.map((x) => { const code = s(x.SettingCode); const o = s(x.Outcome)
             return (
               <tr key={code + '|' + s(x.GroupNumber)} className="border-t border-slate-800">
                 <td className="py-1">{s(x.SettingName) || code} <span className="text-xs text-slate-500">{code}{x.GroupNumber && s(x.GroupNumber) !== '1' ? ` · group ${s(x.GroupNumber)}` : ''}</span></td>
                 <td className="font-mono text-slate-400">{s(x.ThenValue) || '—'}</td><td className="font-mono">{s(x.NowValue) || '—'}</td><td className="font-mono">{s(x.MineValue) || '—'}</td>
-                <td>{o === 'take' ? <span className="text-sky-300">theirs will apply</span> : o === 'agree' ? <span className="text-slate-400">both changed to the same value</span>
+                <td>{o === 'take' ? <span className="text-sky-300">the new value applies</span> : o === 'agree' ? <span className="text-slate-400">both changed to the same value</span>
                   : <span className="flex flex-wrap items-center gap-2 text-amber-200">conflict
-                      <label className="flex items-center gap-1 text-xs text-slate-300"><input type="radio" name={`d-${code}`} disabled={!editable || busy} checked={decisions[code] === 'theirs'} onChange={() => setDecisions({ ...decisions, [code]: 'theirs' })} /> theirs</label>
-                      <label className="flex items-center gap-1 text-xs text-slate-300"><input type="radio" name={`d-${code}`} disabled={!editable || busy} checked={decisions[code] === 'mine'} onChange={() => setDecisions({ ...decisions, [code]: 'mine' })} /> mine</label>
+                      <label className="flex items-center gap-1 text-xs text-slate-300"><input type="radio" name={`d-${code}`} disabled={!editable || busy} checked={decisions[code] === 'theirs'} onChange={() => setDecisions({ ...decisions, [code]: 'theirs' })} /> take the new value</label>
+                      <label className="flex items-center gap-1 text-xs text-slate-300"><input type="radio" name={`d-${code}`} disabled={!editable || busy} checked={decisions[code] === 'mine'} onChange={() => setDecisions({ ...decisions, [code]: 'mine' })} /> keep this draft's</label>
                     </span>}</td>
               </tr>) })}
         </tbody>
       </table>
       <div className="mt-2 flex flex-wrap items-center gap-2">
-        <Button kind="primary" disabled={!editable || busy || undecided.length > 0} title={undecided.length ? `decide ${undecided.map((x) => s(x.SettingCode)).join(', ')} first` : undefined} onClick={() => void rebase()}>Re-base — apply their changes</Button>
-        {!editable && <span className="text-xs text-slate-500">re-basing needs ConfigurationFile.Modify on an outstanding record</span>}
+        <Button kind="primary" disabled={!editable || busy || undecided.length > 0} title={undecided.length ? `decide ${undecidedCodes} first` : undefined} onClick={() => void rebase()}>Re-base — take the changes</Button>
+        {!editable && <span className="text-xs text-slate-500">You may not re-base this draft.</span>}
         {undecided.length > 0 && editable && <span className="text-xs text-slate-500">{undecided.length} conflict{undecided.length === 1 ? '' : 's'} to decide</span>}
       </div>
       {msg && <Status bad={msg.bad}>{msg.text}</Status>}

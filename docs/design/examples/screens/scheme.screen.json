@@ -3,7 +3,7 @@
   "kind": "screen",
   "key": "SCHEME",
   "name": "Protection scheme",
-  "description": "One protection scheme: its members, the primary assets it protects (with their applicability classifications) and the change requests on it (#170). Plain code for the scheme; the definition names its data.",
+  "description": "One protection scheme: the relays and equipment in it, what it protects, the CTs and VTs feeding it, and the change requests against it.",
   "permission": "Scheme.Read",
   "screenKind": "record",
   "params": {

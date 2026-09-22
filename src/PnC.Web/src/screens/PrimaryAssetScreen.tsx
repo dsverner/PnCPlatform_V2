@@ -27,8 +27,9 @@ export const CLASSIFICATION_KINDS: { code: string; label: string; values: string
   { code: 'CipImpactRating', label: 'CIP impact rating', values: ['High', 'Medium', 'Low', 'None'], help: 'CIP-002: the impact rating of this location — every BES Cyber Asset in it inherits it', subject: 'node' },
   { code: 'NpccBulkPowerSystem', label: 'NPCC bulk power system', values: ['BPS', 'Not BPS'], help: 'This bus declared BPS (or not) by the entity\'s A-10 study; the NPCC directories then apply to the protections at it', subject: 'asset' },
   { code: 'Prc023', label: 'PRC-023', values: ['Listed', 'Not listed'], help: 'On the entity\'s PRC-023 list of impactful lines: the relay loadability calculation applies', subject: 'asset' },
-  { code: 'BesCyberAsset', label: 'BES Cyber Asset', values: ['BCA', 'Not BCA'], help: 'CIP-002: a microprocessor-based device protecting a BES element is a BES Cyber Asset — the platform derives it; it is not recorded by hand', subject: 'device' },
-  { code: 'ExternalRoutableConnectivity', label: 'External routable connectivity', values: ['ERC', 'No ERC'], help: 'CIP-005: the device is reachable by a routable protocol from outside the electronic security perimeter — recorded by hand until a network-analysis module can determine it (the owner, 2026-09-17)', subject: 'device' },
+  { code: 'BesCyberAsset', label: 'BES Cyber Asset', values: ['BCA', 'Not BCA'], help: 'CIP-002: a microprocessor-based device protecting a BES element is a BES Cyber Asset. Worked out from the device and what it protects, not entered by hand', subject: 'device' },
+  // #171 (2026-09-17): ERC is recorded by hand until a network-analysis module can determine it
+  { code: 'ExternalRoutableConnectivity', label: 'External routable connectivity', values: ['ERC', 'No ERC'], help: 'CIP-005: the device is reachable by a routable protocol from outside the electronic security perimeter. Recorded by hand', subject: 'device' },
 ]
 /** The kinds each screen records: the primary asset's, the location node's, the device's (#171). */
 export const PRIMARY_ASSET_KINDS = ['BesStatus', 'NpccBulkPowerSystem', 'Prc023']
@@ -130,7 +131,7 @@ export function ClassificationPanel({ subjectKind, subjectEntityId, editable, as
                   <span>Terminal {s(t.TerminalNo)} · {s(t.StationName)}{t.BusAssetEntityId ? ` — ${s(t.BusName)}` : ' — no bus linked'}</span>
                   <span className="text-xs text-slate-500">{t.BusAssetEntityId ? (s(t.BusNpcc) ? `${s(t.BusNpcc)}, recorded on the bus` : 'not recorded on the bus') : ''}</span>
                 </label>)) : <span className="text-slate-500">no terminals yet</span>}
-              <div className="text-xs text-slate-600">Ticked: the bus at that end is declared BPS by the A-10 study; unticked after a tick: Not BPS. The declaration is the bus's and shows on every element connected to it.</div>
+              <div className="text-xs text-slate-600">Tick the box when the A-10 study declares that bus BPS; untick it for Not BPS. The declaration belongs to the bus and shows on every element connected to it.</div>
             </dd>
           </div>)}
         {assetTypeCode && assetTypeCode !== 'Bus' && (
@@ -143,11 +144,13 @@ export function ClassificationPanel({ subjectKind, subjectEntityId, editable, as
                   <span>Terminal {s(t.TerminalNo)} · <NodeLink id={s(t.StationNodeEntityId)} name={s(t.StationName)} /></span>
                   <span className="text-xs text-slate-500">{stationCipQ.isPending ? '…' : stationCip(t.StationNodeEntityId) || 'not recorded on the station'}</span>
                 </div>)) : <span className="text-slate-500">no terminals yet</span>}
-              <div className="text-xs text-slate-600">Recorded on the station (the owner, 2026-09-16): every BES Cyber Asset at it inherits it. Open the station to record it.</div>
+              {/* #171 (2026-09-16): the rating is the station's, recorded there */}
+              <div className="text-xs text-slate-600">The rating is recorded on the station. Every BES Cyber Asset at it takes that rating. Open the station to record it.</div>
             </dd>
           </div>)}
       </dl>
-      <Status>{note ?? (editable ? 'Recorded by you from the entity\'s own CIP-002 evaluation, A-10 study (the BPS declaration, on busses) and PRC-023 list (this phase); the platform derives them in a later phase and keeps both. A value saves at once, audited.' : 'Recorded values; the platform derives them in a later phase.')}</Status>
+      {/* #170, #173: recorded by hand now; derived later, and both are kept */}
+      <Status>{note ?? (editable ? 'Record each value from the entity\'s own CIP-002 evaluation, its A-10 study (the BPS declaration, on busses) and its PRC-023 list.' : 'The values recorded here. You may not change them.')}</Status>
     </Panel>
   )
 }
@@ -182,6 +185,11 @@ function Ratings({ r, editable }: { r: Row; editable: boolean }) {
   const revise = (x: Row, patch: Row, text: string) => run(() => proc('asset', 'AssetRating_Revise', {
     EntityId: x.RatingEntityId, AssetEntityId: r.EntityId, RatingKind: x.RatingKind, Season: x.Season,
     Amperes: x.Amperes, Source: x.Source ?? null, Notes: x.Notes ?? null, ...patch }), text)
+  const removeRating = (x: Row) => run(() => proc('asset', 'AssetRating_SoftDelete', { EntityId: x.RatingEntityId }), `${label(x.RatingKind)} ${s(x.Season)} removed.`)
+  const addRating = () => run(async () => {
+    await proc('asset', 'AssetRating_Add', { AssetEntityId: r.EntityId, RatingKind: add.RatingKind, Season: add.Season, Amperes: Number(add.Amperes) })
+    setAdd({ RatingKind: '', Season: 'Summer', Amperes: '' })
+  }, `${label(add.RatingKind)} ${add.Season}: ${add.Amperes} A added.`)
   return (
     <Panel title={`Ratings · ${q.isPending ? '…' : rows.length}`}>
       {msg && <Status bad={msg.bad}>{msg.text}</Status>}
@@ -195,22 +203,20 @@ function Ratings({ r, editable }: { r: Row; editable: boolean }) {
               <span className="text-xs text-slate-500">A</span>
               <input className={`${inputClass} w-64`} defaultValue={s(x.Source)} disabled={busy} placeholder="the document or system the value came from" onBlur={(e) => { if (e.target.value !== s(x.Source)) void revise(x, { Source: e.target.value || null }, `${label(x.RatingKind)} ${s(x.Season)}: source saved.`) }} />
               <span className="text-xs text-slate-500">{s(x.SourceSystem)}</span>
-              <Button kind="mini" disabled={busy} onClick={() => void run(() => proc('asset', 'AssetRating_SoftDelete', { EntityId: x.RatingEntityId }), `${label(x.RatingKind)} ${s(x.Season)} removed.`)}>remove</Button>
+              <Button kind="mini" disabled={busy} onClick={() => void removeRating(x)}>remove</Button>
             </> : <span>{label(x.RatingKind)} · {s(x.Season)} · {s(x.Amperes)} A{x.Source ? ` · ${s(x.Source)}` : ''} <span className="text-xs text-slate-500">{s(x.SourceSystem)}</span></span>}
           </div>))}
-        {!rows.length && !q.isPending && <div className="text-xs text-slate-500">No rating recorded. PRC-023 criteria 1, 2 and 13 are judged against the 4-hour, 15-minute and practical-limitation ratings; without them those criteria are skipped.</div>}
+        {!rows.length && !q.isPending && <div className="text-xs text-slate-500">No rating recorded. Add the 4-hour, 15-minute and practical-limitation ratings: PRC-023 criteria 1, 2 and 13 are judged against them, and are skipped without them.</div>}
         {editable && (
           <div className="flex flex-wrap items-center gap-2">
             <select className={`${inputClass} w-48`} value={add.RatingKind} disabled={busy} onChange={(e) => setAdd({ ...add, RatingKind: e.target.value })}><option value="">— a rating kind —</option>{RATING_KINDS.map(([c, l]) => <option key={c} value={c}>{l}</option>)}</select>
             <select className={`${inputClass} w-28`} value={add.Season} disabled={busy} onChange={(e) => setAdd({ ...add, Season: e.target.value })}>{SEASONS.map((v) => <option key={v}>{v}</option>)}</select>
             <input className={`${inputClass} w-28`} type="number" value={add.Amperes} disabled={busy} placeholder="amperes" onChange={(e) => setAdd({ ...add, Amperes: e.target.value })} />
-            <Button kind="mini" disabled={busy || !add.RatingKind || !add.Amperes} onClick={() => void run(async () => {
-              await proc('asset', 'AssetRating_Add', { AssetEntityId: r.EntityId, RatingKind: add.RatingKind, Season: add.Season, Amperes: Number(add.Amperes) })
-              setAdd({ RatingKind: '', Season: 'Summer', Amperes: '' })
-            }, `${label(add.RatingKind)} ${add.Season}: ${add.Amperes} A added.`)}>+ rating</Button>
+            <Button kind="mini" disabled={busy || !add.RatingKind || !add.Amperes} onClick={() => void addRating()}>+ rating</Button>
           </div>)}
       </div>
-      <Status>Entered by hand until the ratings connector exists (the values will then come from the ratings database).</Status>
+      {/* #171: hand-entered until the ratings connector exists, when the values come from the ratings database */}
+      <Status>Enter each rating by hand, with the document or system the value came from.</Status>
     </Panel>
   )
 }
@@ -265,6 +271,11 @@ function Terminals({ r, readOnly = false }: { r: Row; readOnly?: boolean }) {
   const voltageOptions = (voltagesQ.data ?? []).map((v) => <option key={s(v.VoltageClassCode)} value={s(v.VoltageClassCode)}>{v.NominalKv != null ? `${Number(v.NominalKv)} kV` : s(v.VoltageClassCode)}</option>)
   const bussesAt = (stationId: unknown) => (bussesQ.data ?? []).filter((b) => s(b.TerminalNodeIds).toLowerCase().includes(s(stationId).toLowerCase()) && s(b.EntityId) !== s(r.EntityId))
   const revise = (x: Row, patch: Row, text: string) => run(() => proc('asset', 'AssetTerminal_Revise', { EntityId: x.TerminalEntityId, AssetEntityId: r.EntityId, TerminalNo: x.TerminalNo, StationNodeEntityId: x.StationNodeEntityId, VoltageClassCode: x.VoltageClassCode ?? null, BusAssetEntityId: x.BusAssetEntityId ?? null, ...patch }), text)
+  const removeTerminal = (x: Row) => run(() => proc('asset', 'AssetTerminal_SoftDelete', { EntityId: x.TerminalEntityId }), `terminal ${s(x.TerminalNo)} removed.`)
+  const addTerminal = () => run(async () => {
+    await proc('asset', 'AssetTerminal_Add', { AssetEntityId: r.EntityId, TerminalNo: nextNo, StationNodeEntityId: adding, VoltageClassCode: addVolt || null })
+    setAdding(''); setAddVolt('')
+  }, `terminal ${nextNo}: ${name(adding)}${addVolt ? ' ' + addVolt : ''}.`)
   if (readOnly) return <span>{rows.length ? rows.map((x, i) => <span key={s(x.TerminalEntityId)}>{i > 0 ? ' – ' : ''}<NodeLink id={s(x.StationNodeEntityId)} name={s(x.StationName)} />{x.VoltageClassCode ? <span className="ml-1 text-xs text-slate-400">{s(x.VoltageClassCode)}</span> : null}</span>) : '—'}</span>
   return (
     <div className="space-y-1">
@@ -279,17 +290,17 @@ function Terminals({ r, readOnly = false }: { r: Row; readOnly?: boolean }) {
             <option value="">— bus at {s(x.StationName)} —</option>{bussesAt(x.StationNodeEntityId).map((b) => <option key={s(b.EntityId)} value={s(b.EntityId).toLowerCase()}>{s(b.Name)}{b.Classifications ? ` (${s(b.Classifications).replace('NpccBulkPowerSystem=', 'NPCC ')})` : ''}</option>)}
           </select>}
           <NodeLink id={s(x.StationNodeEntityId)} name="the station" />
-          <Button kind="mini" disabled={busy} onClick={() => void run(() => proc('asset', 'AssetTerminal_SoftDelete', { EntityId: x.TerminalEntityId }), `terminal ${s(x.TerminalNo)} removed.`)}>remove</Button>
+          <Button kind="mini" disabled={busy} onClick={() => void removeTerminal(x)}>remove</Button>
         </div>))}
       <div className="flex flex-wrap items-center gap-2">
         <span className="w-6 text-xs text-slate-500">{nextNo}</span>
         <select className={`${inputClass} w-64`} value={adding} disabled={busy} onChange={(e) => setAdding(e.target.value)}><option value="">— choose a station —</option>{(stationsQ.data ?? []).map((n) => <option key={s(n.EntityId)} value={s(n.EntityId).toLowerCase()}>{s(n.Name)}</option>)}</select>
         <select className={`${inputClass} w-28`} value={addVolt} disabled={busy} title="the voltage at this terminal" onChange={(e) => setAddVolt(e.target.value)}><option value="">— kV —</option>{voltageOptions}</select>
-        <Button kind="mini" disabled={!adding || busy} onClick={() => void run(async () => { await proc('asset', 'AssetTerminal_Add', { AssetEntityId: r.EntityId, TerminalNo: nextNo, StationNodeEntityId: adding, VoltageClassCode: addVolt || null }); setAdding(''); setAddVolt('') }, `terminal ${nextNo}: ${name(adding)}${addVolt ? ' ' + addVolt : ''}.`)}>+ terminal</Button>
+        <Button kind="mini" disabled={!adding || busy} onClick={() => void addTerminal()}>+ terminal</Button>
       </div>
       {msg && <div className="text-xs text-slate-400">{msg}</div>}
       {!rows.length && !q.isPending && <div className="text-xs text-slate-500">No terminal yet — a capacitor or reactor has one, a transformer two, a line two or more.</div>}
-      {r.AssetTypeCode !== 'Bus' && rows.length > 0 && !bussesQ.isPending && (bussesQ.data ?? []).length === 0 && <div className="text-xs text-slate-500">No bus is recorded yet: create the station's busses as primary assets of type Bus (Primary assets, or a scheme's page) and link each terminal to its bus for the NPCC declaration.</div>}
+      {r.AssetTypeCode !== 'Bus' && rows.length > 0 && !bussesQ.isPending && (bussesQ.data ?? []).length === 0 && <div className="text-xs text-slate-500">No bus is recorded yet. Create the station's busses as primary assets of type Bus, then link each terminal to its bus for the NPCC declaration.</div>}
     </div>
   )
 }
@@ -314,21 +325,23 @@ function ProtectedBy({ r, editable }: { r: Row; editable: boolean }) {
   const terminals = terminalsQ.data ?? []; const links = linksQ.data ?? []
   const refresh = () => { qc.invalidateQueries({ queryKey: ['protectedBy', s(r.EntityId)] }); qc.invalidateQueries({ queryKey: ['view', 'asset', 'vAssetTerminalDetail'] }); qc.invalidateQueries({ queryKey: ['view', 'asset', 'vPrimaryAsset'] }) }
   const run = async (what: () => Promise<unknown>, text: string) => { setBusy(true); try { await what(); setMsg({ text }); refresh() } catch (e) { setMsg({ text: e instanceof ApiError ? e.message : String(e), bad: true }) } finally { setBusy(false) } }
+  const tie = (l: Row, t: Row) => run(() => proc('scheme', 'SchemeProtects_Revise', { EntityId: l.EntityId, SchemeEntityId: l.SchemeEntityId, PrimaryAssetEntityId: r.EntityId, ZoneRole: l.ZoneRole, AssetTerminalEntityId: t.TerminalEntityId }), `${s(l.SchemeName)} tied to terminal ${s(t.TerminalNo)}.`)
+  const drop = (l: Row) => run(() => proc('scheme', 'SchemeProtects_SoftDelete', { EntityId: l.EntityId }), `${s(l.SchemeName)} no longer listed.`)
   const linksAt = (t: Row) => links.filter((l) => (l.AssetTerminalEntityId ? s(l.AssetTerminalEntityId).toLowerCase() === s(t.TerminalEntityId).toLowerCase() : (l.StationIds as string[]).includes(s(t.StationNodeEntityId).toLowerCase())))
   const untied = links.filter((l) => !terminals.some((t) => linksAt(t).includes(l)))
   const schemeLink = (l: Row) => <a className="text-sky-300 underline" href={screenPath('SCHEME', s(l.SchemeEntityId))} onClick={(e) => { e.preventDefault(); navigate(screenPath('SCHEME', s(l.SchemeEntityId))) }}>{s(l.SchemeName) || s(l.SchemeEntityId).slice(0, 8)}</a>
   return (
     <Panel title={`Protected by · ${linksQ.isPending ? '…' : links.length} scheme(s)`}>
       {msg && <Status bad={msg.bad}>{msg.text}</Status>}
-      {!terminals.length && <Status>Add the asset's terminals first; the protection at each end is assigned here.</Status>}
+      {!terminals.length && <Status>No terminal yet. Add the asset's terminals first, then assign the protection at each end here.</Status>}
       <ul className="space-y-2 text-sm">
         {terminals.map((t) => (
           <li key={s(t.TerminalEntityId)}>
             <div className="font-semibold text-slate-200">Terminal {s(t.TerminalNo)} · {s(t.StationName)}{t.VoltageClassCode ? ` · ${s(t.VoltageClassCode)}` : ''}{t.BusName ? <span className="ml-2 text-xs font-normal text-slate-400">bus {s(t.BusName)}{t.BusNpcc ? ` · NPCC ${s(t.BusNpcc)}` : ''}</span> : null}</div>
             <ul className="ml-4 mt-1 space-y-1">
               {linksAt(t).map((l) => <li key={s(l.EntityId)} className="flex items-center gap-2">└ {schemeLink(l)} <span className="text-xs text-slate-500">{s(l.ZoneRole) === 'BreakerFailure' ? 'breaker failure' : s(l.ZoneRole).toLowerCase()}{l.AssetTerminalEntityId ? '' : ' · by station'}</span>
-                {editable && !l.AssetTerminalEntityId && <Button kind="mini" disabled={busy} onClick={() => void run(() => proc('scheme', 'SchemeProtects_Revise', { EntityId: l.EntityId, SchemeEntityId: l.SchemeEntityId, PrimaryAssetEntityId: r.EntityId, ZoneRole: l.ZoneRole, AssetTerminalEntityId: t.TerminalEntityId }), `${s(l.SchemeName)} tied to terminal ${s(t.TerminalNo)}.`)}>tie to this end</Button>}
-                {editable && <Button kind="mini" disabled={busy} onClick={() => void run(() => proc('scheme', 'SchemeProtects_SoftDelete', { EntityId: l.EntityId }), `${s(l.SchemeName)} no longer listed.`)}>remove</Button>}</li>)}
+                {editable && !l.AssetTerminalEntityId && <Button kind="mini" disabled={busy} onClick={() => void tie(l, t)}>tie to this end</Button>}
+                {editable && <Button kind="mini" disabled={busy} onClick={() => void drop(l)}>remove</Button>}</li>)}
               {!linksAt(t).length && <li className="text-xs text-slate-500">└ no protection assigned at this end</li>}
               {editable && <li><AssignRow t={t} pick={pick[s(t.TerminalEntityId)] ?? ''} zone={zone[s(t.TerminalEntityId)] ?? 'Primary'} busy={busy} exclude={linksAt(t).map((l) => s(l.SchemeEntityId).toLowerCase())}
                 onPick={(v) => setPick({ ...pick, [s(t.TerminalEntityId)]: v })} onZone={(v) => setZone({ ...zone, [s(t.TerminalEntityId)]: v })}
@@ -338,8 +351,8 @@ function ProtectedBy({ r, editable }: { r: Row; editable: boolean }) {
         {untied.length > 0 && (
           <li><div className="font-semibold text-amber-300">Not tied to a terminal</div>
             <ul className="ml-4 mt-1 space-y-1">{untied.map((l) => <li key={s(l.EntityId)} className="flex items-center gap-2">└ {schemeLink(l)} <span className="text-xs text-slate-500">{s(l.ZoneRole).toLowerCase()} — the scheme's station is not one of the terminals</span>
-              {editable && terminals.length > 0 && <select className={`${inputClass} w-40`} disabled={busy} defaultValue="" onChange={(e) => { const t = terminals.find((x) => s(x.TerminalEntityId) === e.target.value); if (t) void run(() => proc('scheme', 'SchemeProtects_Revise', { EntityId: l.EntityId, SchemeEntityId: l.SchemeEntityId, PrimaryAssetEntityId: r.EntityId, ZoneRole: l.ZoneRole, AssetTerminalEntityId: t.TerminalEntityId }), `${s(l.SchemeName)} tied to terminal ${s(t.TerminalNo)}.`) }}><option value="">tie to terminal…</option>{terminals.map((t) => <option key={s(t.TerminalEntityId)} value={s(t.TerminalEntityId)}>{s(t.TerminalNo)} · {s(t.StationName)}</option>)}</select>}
-              {editable && <Button kind="mini" disabled={busy} onClick={() => void run(() => proc('scheme', 'SchemeProtects_SoftDelete', { EntityId: l.EntityId }), `${s(l.SchemeName)} no longer listed.`)}>remove</Button>}</li>)}</ul></li>)}
+              {editable && terminals.length > 0 && <select className={`${inputClass} w-40`} disabled={busy} defaultValue="" onChange={(e) => { const t = terminals.find((x) => s(x.TerminalEntityId) === e.target.value); if (t) void tie(l, t) }}><option value="">tie to terminal…</option>{terminals.map((t) => <option key={s(t.TerminalEntityId)} value={s(t.TerminalEntityId)}>{s(t.TerminalNo)} · {s(t.StationName)}</option>)}</select>}
+              {editable && <Button kind="mini" disabled={busy} onClick={() => void drop(l)}>remove</Button>}</li>)}</ul></li>)}
       </ul>
     </Panel>
   )
@@ -364,9 +377,9 @@ export default function PrimaryAssetScreen({ params: p, id }: { screen: Screen; 
   const rowQ = useViewAll('asset', 'vPrimaryAsset', { [p.key]: id ?? '' }, undefined, !!id)
   const typesQ = useAssetTypeRef()
   const r = rowQ.data?.[0]
-  if (!id) return <Status bad>No primary asset in the address.</Status>
+  if (!id) return <Status bad>No primary asset was named. Pick one from Primary assets.</Status>
   if (rowQ.isPending) return <Status>Loading the primary asset…</Status>
-  if (!r) return <Status bad>No primary asset with that id is readable by you.</Status>
+  if (!r) return <Status bad>You may not read this primary asset.</Status>
   const editable = can('Asset.Modify')
   return (
     <div className="space-y-3">
@@ -377,7 +390,8 @@ export default function PrimaryAssetScreen({ params: p, id }: { screen: Screen; 
       <div className="grid gap-3 lg:grid-cols-2">
         <Panel title="Primary asset">
           {editable ? <AssetForm r={r} /> : <Facts cols={1} pairs={[['Name', s(r.Name)], ['Type', s(r.AssetTypeName)], ['Terminals', <Terminals r={r} readOnly />], ['Status', s(r.Status)], ['Notes', s(r.Notes) || '—']]} />}
-          <Status>A thin record for this phase: a name, a type and its terminals — one station for a capacitor or reactor, two for a transformer, two or more for a line — each with its voltage and the bus it connects to. Connectivity, impedances and, for a line, its route and structures come from the power-system model (the TLM project) in a later phase.</Status></Panel>
+          {/* #170: connectivity, impedances and a line's route come from the power-system model (the TLM project) later */}
+          <Status>A name, a type and its terminals: one station for a capacitor or reactor, two for a transformer, two or more for a line. Each terminal carries its voltage and the bus it connects to.</Status></Panel>
         <ProtectedBy r={r} editable={can('Scheme.Modify')} />
       </div>
       {s(r.AssetTypeCode) === 'Line' && <LineImpedance r={r} editable={editable} />}   {/* #219 */}
@@ -394,7 +408,8 @@ export default function PrimaryAssetScreen({ params: p, id }: { screen: Screen; 
 function LineImpedance({ r, editable }: { r: Row; editable: boolean }) {
   const typeQ = useViewAll('ref', 'vAssetType', { AssetTypeCode: 'Line' }, undefined, true)
   const template = s(typeQ.data?.[0]?.DefaultTemplateDefinitionEntityId)
-  if (!template) return <Panel title="Impedance"><Status>{typeQ.isPending ? 'Loading the line template…' : 'The asset type Line names no template yet (LINE_Template is seeded by tools/template_line.py).'}</Status></Panel>
+  // the line template (LINE_Template, seeded by tools/template_line.py) has not reached this database yet
+  if (!template) return <Panel title="Impedance"><Status>{typeQ.isPending ? 'Loading the line template…' : 'No impedance sheet is set up for lines yet. An administrator sets it up before impedance can be recorded here.'}</Status></Panel>
   return <AssetCharacteristics assetEntityId={s(r.EntityId)} definitionEntityId={template} editable={editable} groups={['Impedance']} title="Impedance"
-    note="Recorded once on the line; every relay rationale on this line reads it (R1, X1, R0, X0 in ohms primary end to end, the length in miles). The legacy rationales wrote Z1 = R1 + jX1." />
+    note="Recorded once on the line. Every relay rationale on this line reads it: R1, X1, R0, X0 in ohms primary end to end, and the length in miles. The legacy rationales wrote Z1 = R1 + jX1." />
 }

@@ -1,6 +1,6 @@
 {
   "g": 1, "kind": "screen", "key": "STEP", "name": "Step",
-  "description": "One step of any procedure, drawn from its definition: instruction, capture fields, evidence, outcomes, sign-off; claim, draft, witness, commit, check in (#165). The pickers for reference fields name the view to choose from.",
+  "description": "One step of a procedure: what to do, what to record, the evidence to attach, and the sign-off — claim it, save a draft, have it witnessed, then check it in.",
   "permission": "WorkRequest.Read",
   "screenKind": "step",
   "params": {

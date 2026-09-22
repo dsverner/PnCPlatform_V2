@@ -1,6 +1,6 @@
 {
   "g": 1, "kind": "screen", "key": "WORK_ITEM", "name": "Change request",
-  "description": "One change request as the legacy change-request window showed it: the stage bar over the request workflow, the header, the notes, the completion tracks side by side (the parallel branches of the procedure's completion block), the settings records in the change, the transitions as buttons (#157, #165).",
+  "description": "One change request: where it stands, who asked for it and why, the work done so far, the settings records in the change, and what you can do next.",
   "permission": "WorkRequest.Read",
   "screenKind": "workItem",
   "params": {
@@ -21,7 +21,7 @@
       { "key": "ReturnToServiceAt", "label": "Return to service", "format": "when" },
       { "key": "RequestStartedAt", "label": "Started", "format": "when" },
       { "key": "RequestCompletedAt", "label": "Completed", "format": "when" },
-      { "key": "LifecycleState", "label": "Package", "format": "state" }
+      { "key": "LifecycleState", "label": "Settings package", "format": "state" }
     ],
     "notes": [ { "key": "Description", "label": "Description" }, { "key": "SpecialInstructions", "label": "Special instructions" }, { "key": "Notes", "label": "Notes" } ],
     "tracks": "branches",

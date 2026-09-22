@@ -271,10 +271,18 @@ if (hydro is not null && fixtureOk)
     Check(sst == HttpStatusCode.OK && stationRows.All(n => !n.Contains("Transmission")), $"as Hydro, no station row outside scope is visible ({stationRows.Count} stations)");
     var (ost, ob) = await Get(hydro, $"api/v1/asset/vAsset?EntityId={txAsset}");
     Check(ost == HttpStatusCode.Forbidden && Code(ob) == "forbidden", "as Hydro, a single read of the Transmission asset → 403 forbidden");
-    var (pst, pb) = await Get(hydro, "api/v1/asset/vPlacement?take=500");
-    var placedAssets = Ids(pb, "AssetEntityId");
+    // #221: paged, not taken off the first page — the estate's placements passed 500 rows (7 880 on DEV) and the fixture fell off it,
+    // which said nothing about scope. Asking for the one asset instead (AssetEntityId=…) times out on the server for a Node-scoped
+    // reader: a finding raised on 2026-09-22, the read-scope plan of asset.vPlacement, not this check's business.
+    var pst = HttpStatusCode.OK; var placedAssets = new List<string>(); var seen = 0;
+    for (var skip = 0; skip < 12000; skip += 500)
+    {
+        var (st, b) = await Get(hydro, $"api/v1/asset/vPlacement?take=500&skip={skip}");
+        pst = st; var got = Ids(b, "AssetEntityId"); seen += got.Count; placedAssets.AddRange(got);
+        if (st != HttpStatusCode.OK || got.Count < 500 || placedAssets.Contains(hydroAsset.ToString()!.ToLowerInvariant())) break;
+    }
     Check(pst == HttpStatusCode.OK && placedAssets.Contains(hydroAsset.ToString()!.ToLowerInvariant()) && !placedAssets.Contains(txAsset.ToString()!.ToLowerInvariant()),
-        $"as Hydro, asset/vPlacement (scoped by its AssetEntityId column) shows only the Hydro placement ({placedAssets.Count} rows)");
+        $"as Hydro, asset/vPlacement (scoped by its AssetEntityId column) shows the Hydro placement and not the Transmission one ({seen} rows read)");
 
     // writes: in scope allowed, outside scope refused
     var (w1s, w1b) = await Post(hydro, "api/v1/location/AddNode", new { NodeTypeCode = "Room", ParentEntityId = hydroBuilding, Name = "Smoke W2 Hydro room" });

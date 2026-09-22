@@ -12,7 +12,7 @@ import { useCan } from '@/lib/hooks'
 import { type Screen } from '@/lib/screens'
 import { Panel, Pill, Button, Status } from '@/components/ui/ui'
 
-const triggerWords = (t: unknown) => ({ Scheduled: 'hourly pass', FactChanged: 'after a change', RuleApproved: 'after a rule was approved', Manual: 'by hand' } as Record<string, string>)[s(t)] ?? s(t)
+const triggerWords = (t: unknown) => ({ Scheduled: 'the hourly check', FactChanged: 'after a change', RuleApproved: 'after a rule changed', Manual: 'by hand' } as Record<string, string>)[s(t)] ?? s(t)
 const seconds = (a: unknown, b: unknown) => (a && b ? `${Math.max(0, Math.round((new Date(s(b)).getTime() - new Date(s(a)).getTime()) / 1000))} s` : '—')
 
 export default function ComplianceEvaluationScreen({ screen }: { screen: Screen }) {
@@ -24,7 +24,7 @@ export default function ComplianceEvaluationScreen({ screen }: { screen: Screen 
       <RunNow />
       <Requests />
       <Passes />
-      <Status>A device's Compliance tab reads the platform's standing verdict (the last Effective pass over it, its reason and its reads) and shows when it was made. Writes made in SQL directly, and rulings in the fact catalogue itself, leave no request — the hourly pass covers those.</Status>
+      <Status>A relay's Compliance tab shows the last check on it: what was decided, why, and when. A change made outside the application is picked up by the hourly check.</Status>
     </div>
   )
 }
@@ -38,13 +38,13 @@ function RunNow() {
     setBusy(true); setMsg(null)
     try {
       const r = await postJson<{ rules: number; subjects: number; opened: number; closed: number; unchanged: number; unknown: number; errors: number; ruleErrors: string[]; runId: string }>('/api/v1/compliance/evaluate', { mode: 'Effective' })
-      setMsg({ text: `Done: ${r.rules} rule(s) over ${r.subjects} subject(s) — ${r.opened} opened, ${r.closed} closed, ${r.unchanged} unchanged, ${r.unknown} unknown, ${r.errors} error(s).${r.ruleErrors.length ? ' Rules that could not be evaluated: ' + r.ruleErrors.join('; ') : ''}` })
+      setMsg({ text: `Done: ${r.rules} rule(s) over ${r.subjects} device(s) — ${r.opened} opened, ${r.closed} closed, ${r.unchanged} unchanged, ${r.unknown} undecided, ${r.errors} error(s).${r.ruleErrors.length ? ' Rules that could not be checked: ' + r.ruleErrors.join('; ') : ''}` })
       qc.invalidateQueries({ queryKey: ['view', 'compliance'] })
     } catch (e) { setMsg({ text: e instanceof ApiError ? `${e.status} ${e.message}` : String(e), bad: true }) } finally { setBusy(false) }
   }
   return (
-    <Panel title="Run the pass now" actions={<Button kind="primary" disabled={busy || !can('Obligation.Modify')} title={can('Obligation.Modify') ? 'every effective rule over every candidate device, as the hourly pass does' : 'needs Obligation.Modify'} onClick={() => void run()}>{busy ? 'Running…' : 'Run the pass now'}</Button>}>
-      <Status>The platform evaluates on its own: within seconds of a change a rule reads, and every hour. Run it by hand only after a rule changed in a way the queue did not see.</Status>
+    <Panel title="Check everything now" actions={<Button kind="primary" disabled={busy || !can('Obligation.Modify')} title={can('Obligation.Modify') ? 'Checks every rule against every device, as the hourly check does' : 'You may not run the compliance check.'} onClick={() => void run()}>{busy ? 'Checking…' : 'Check everything now'}</Button>}>
+      <Status>Compliance is checked on its own: within seconds of a change, and every hour. Run it by hand only after a rule changed outside the application.</Status>
       {msg && <Status bad={msg.bad}>{msg.text}</Status>}
     </Panel>
   )
@@ -56,13 +56,13 @@ function Requests() {
   const rows = q.data ?? []
   const pending = rows.filter((r) => r.IsPending === true).length
   return (
-    <Panel title={`Requests · ${q.isPending ? '…' : `${pending} pending`}`}>
-      {q.isError && <Status bad>The requests could not be read: {(q.error as Error).message}</Status>}
-      {!q.isPending && !rows.length && <Status>No request yet — none of the facts the rules read has changed through the platform since this was built.</Status>}
+    <Panel title={`Changes to check · ${q.isPending ? '…' : `${pending} waiting`}`}>
+      {q.isError && <Status bad>This list could not be read: {(q.error as Error).message}</Status>}
+      {!q.isPending && !rows.length && <Status>Nothing is waiting. No change that a compliance rule reads has been made here yet.</Status>}
       {rows.length > 0 && (
         <table className="w-full text-sm">
           <thead><tr className="border-b border-slate-700 text-left text-xs uppercase tracking-wide text-slate-400">
-            <th className="py-1 pr-2">Requested</th><th className="py-1 pr-2">About</th><th className="py-1 pr-2">Changed by</th><th className="py-1 pr-2">Who</th><th className="py-1">Answered</th></tr></thead>
+            <th className="py-1 pr-2">Noticed</th><th className="py-1 pr-2">Relay or asset</th><th className="py-1 pr-2">What changed</th><th className="py-1 pr-2">Who</th><th className="py-1">Checked</th></tr></thead>
           <tbody>
             {rows.map((r) => (
               <tr key={s(r.RequestId)} className="border-b border-slate-800 align-top">
@@ -71,13 +71,13 @@ function Requests() {
                 <td className="py-1 pr-2 text-xs text-slate-300">{s(r.Reason)}</td>
                 <td className="py-1 pr-2 text-xs text-slate-400">{s(r.RequestedByName)}</td>
                 <td className="py-1 text-xs">
-                  {r.IsPending === true ? <Pill tone="warn">pending</Pill>
-                    : <><Pill tone="good">served</Pill> <span className="text-slate-400">{fmtWhen(r.ProcessedAt)} · {s(r.DevicesFound)} device(s){r.RunTrigger ? ` · ${triggerWords(r.RunTrigger)}` : ''}{r.InstancesOpened != null ? ` · ${s(r.InstancesOpened)} opened, ${s(r.InstancesClosed)} closed` : ''}</span></>}
+                  {r.IsPending === true ? <Pill tone="warn">waiting</Pill>
+                    : <><Pill tone="good">checked</Pill> <span className="text-slate-400">{fmtWhen(r.ProcessedAt)} · {s(r.DevicesFound)} device(s){r.RunTrigger ? ` · ${triggerWords(r.RunTrigger)}` : ''}{r.InstancesOpened != null ? ` · ${s(r.InstancesOpened)} opened, ${s(r.InstancesClosed)} closed` : ''}</span></>}
                 </td>
               </tr>))}
           </tbody>
         </table>)}
-      <Status>The last 100. A request names what changed and the procedure that changed it; the worker groups everything pending into one pass.</Status>
+      <Status>The last 100 changes. Each one names what changed and who changed it. Everything waiting is checked together, within seconds.</Status>
     </Panel>
   )
 }
@@ -86,12 +86,12 @@ function Passes() {
   const q = useQuery({ queryKey: ['view', 'compliance', 'vRuleEvaluationRun', 'last30'], queryFn: async () => (await view('compliance', 'vRuleEvaluationRun', { Mode: 'Effective' }, { orderBy: '-StartedAt', take: 30 })).rows, refetchInterval: 5000 })
   const rows = q.data ?? []
   return (
-    <Panel title="Passes">
-      {q.isError && <Status bad>The passes could not be read: {(q.error as Error).message}</Status>}
+    <Panel title="Checks run">
+      {q.isError && <Status bad>This list could not be read: {(q.error as Error).message}</Status>}
       {rows.length > 0 && (
         <table className="w-full text-sm">
           <thead><tr className="border-b border-slate-700 text-left text-xs uppercase tracking-wide text-slate-400">
-            <th className="py-1 pr-2">Started</th><th className="py-1 pr-2">Trigger</th><th className="py-1 pr-2">Took</th><th className="py-1 pr-2">Subjects</th><th className="py-1 pr-2">Opened · closed · unchanged</th><th className="py-1">Notes</th></tr></thead>
+            <th className="py-1 pr-2">Started</th><th className="py-1 pr-2">Why</th><th className="py-1 pr-2">Took</th><th className="py-1 pr-2">Checks</th><th className="py-1 pr-2">Opened · closed · unchanged</th><th className="py-1">Notes</th></tr></thead>
           <tbody>
             {rows.map((r) => (
               <tr key={s(r.RunId)} className="border-b border-slate-800 align-top">
@@ -104,7 +104,7 @@ function Passes() {
               </tr>))}
           </tbody>
         </table>)}
-      <Status>The last 30 Effective passes. "Subjects" counts rule × subject evaluations; a rule a pass could not evaluate is named in its notes, and it is the rule that is wrong, not any device.</Status>
+      <Status>The last 30 checks. "Checks" counts one rule against one device. A rule that could not be checked is named in the notes; the rule is wrong, not the device.</Status>
     </Panel>
   )
 }
