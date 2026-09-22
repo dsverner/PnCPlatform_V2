@@ -68,7 +68,7 @@ export default function RecordScreen({ params: p, id }: { screen: Screen; params
       </header>
       {raise && <RaiseRequest o={raise} onClose={() => setRaise(null)} />}
       <Status>{legacyFree(r.DeviceName)} · rev {s(r.RevisionLabel) || '?'} · Revision {s(r.RevisionStatus)} · lifecycle {s(r.LifecycleState) || '—'} · {s(r.FileKind)} {s(r.ParseStatus)}</Status>
-      <Tabs value={section} onChange={setSection} tabs={[{ key: 'settings', label: 'Settings' }, ...(hasRationaleTab ? [{ key: 'rationale', label: 'Rationale' }] : []), { key: 'analog', label: 'Analog inputs' }, ...(r.TemplateDefinitionEntityId ? [{ key: 'jumpers', label: 'Jumper settings' }] : []), { key: 'record', label: 'Record' }, { key: 'history', label: 'History' }, { key: 'compliance', label: 'Compliance' }, { key: 'notes', label: 'Notes' }, { key: 'text', label: 'Text as filed' }, { key: 'files', label: 'Files and records' }, { key: 'manual', label: 'Manual' }]} />
+      <Tabs value={section} onChange={setSection} tabs={[{ key: 'settings', label: 'Settings' }, ...(hasRationaleTab ? [{ key: 'rationale', label: 'Rationale' }] : []), { key: 'analog', label: 'Analog inputs' }, ...(r.TemplateDefinitionEntityId ? [{ key: 'jumpers', label: 'Jumper settings' }] : []), { key: 'record', label: 'Record' }, { key: 'history', label: 'History' }, { key: 'compliance', label: 'Compliance' }, { key: 'notes', label: 'Notes' }, { key: 'text', label: 'Settings file' }, { key: 'files', label: 'Files and records' }, { key: 'manual', label: 'Manual' }]} />
       {section === 'settings' && (template
         /* #168: the template's view of the device — functions, inputs, settings by function — when the model has one */
         ? <>
@@ -118,17 +118,22 @@ export default function RecordScreen({ params: p, id }: { screen: Screen; params
       {/* #171: what the device is, what it inherits from the station and the protected asset, its obligations and the evaluator's working */}
       {section === 'compliance' && <ComplianceTab r={r} />}
       {section === 'notes' && <Notes r={r} revision={revision} />}
+      {/* #225 (the owner, 2026-09-22): the three forms of the same settings sat on two tabs and read as duplicates —
+          "what is the significance between Text as filed and Files and records? It seems that they are showing the same
+          data in a slightly different way". They are together now: what came in, how the relay lists it, what we would write. */}
       {section === 'text' && (
-        <Panel title="Settings text as filed">
+        <>
+        {template && <RelayListingAndFile template={template} parsed={parsed} revision={revision} filedText={textQ.data?.text ?? null} bare />}
+        <Panel title="The file as filed">
           <h3 className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-400">{textQ.data ? textQ.data.name : 'file'}</h3>
           <pre className="mt-1 max-h-[32rem] overflow-auto rounded border border-slate-800 bg-slate-950 p-2 text-xs whitespace-pre-wrap">{textQ.isPending ? 'loading…' : textQ.isError ? 'The settings text could not be read: ' + (textQ.error as Error).message : textQ.data ? textQ.data.text : 'No settings file is filed for this revision.'}</pre>
         </Panel>
+        </>
       )}
       {section === 'history' && <HistoryPanel r={r} revisions={revisionsQ.data ?? []} current={revision} />}   {/* #220 */}
       {section === 'files' && (
         <>
-          {/* #216 follow-up (the owner, 2026-09-21): the relay's listing and the file the platform writes belong with the files */}
-          {template && <Panel title="Settings listing and the file for the relay">   {/* #216 */}<RelayListingAndFile template={template} parsed={parsed} revision={revision} filedText={textQ.data?.text ?? null} bare /></Panel>}
+          {/* #225: the settings file, in every form, is on the Settings file tab; this tab is the documents */}
           <FilesPanel r={r} revision={revision} />
         </>)}
       {section === 'manual' && <ManualPanel templateDefinitionEntityId={s(r.TemplateDefinitionEntityId) || null} modelName={s(r.ModelName)} />}   {/* #216 */}
