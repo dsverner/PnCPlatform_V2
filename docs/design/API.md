@@ -309,6 +309,13 @@ process and is skipped in Windows mode.
 
 The setting display (§9) links every file name to it; the record's Files and records (#218) opens a Word document in Word through the link, a PDF or a text in its own tab, and saves anything else.
 
+`src/PnC.Api/Endpoints/RationaleEndpoints.cs` (#219). The structured rationale, one section per protective element (`RationaleEngine`):
+
+| Route | Does | Permission |
+|---|---|---|
+| `GET /api/v1/rationale/{settingsRevisionRowId}[?line=<assetEntityId>]` | the model's Effective `Program.Rationale` template (its inputs by section with defaults, its sections), the element map of the relay's `Program.RelayWord` (elements, groups), the line (the scheme's, the stored pick, or `line=`) with the plant facts resolved from the line asset (`LINE_Template` characteristics, the remote terminal's station, the voltage) and the facts missing by name, the position's commissioned functions, the stored inputs, the rationale revision, its files and last result (`rationale.json`) | `ConfigurationFile.Read` on the device |
+| `POST /api/v1/rationale/{settingsRevisionRowId}/apply` `{ inputs: {key: value…, FaultStudy: [[…]]}, lineAssetEntityId? }` | an outstanding (Draft) revision only (409 `not_outstanding`): the sections evaluated in map order (grammar-1 formulas over `line.*`, `device.*`, `input.*`, `value.*`, `setting.*`), every owned setting written through `process.SetParsedSetting`, the inputs stored on the Draft rationale revision (`document.CreateRationale`, `document.SetRationaleValue`), MTU/MRI/MTO derived from the elements' marks in the Relay Word's bit order, `rationale.json` and `rationale.docx` (the platform's own WordprocessingML writer, `Documents/DocxWriter.cs`) filed on the rationale revision (the previous pair soft-deleted), `audit.LogAction` rationale-applied; answers the result (sections with statements and values, masks, settings written, range checks, unknowns) | `ConfigurationFile.Modify` on the device |
+
 ## 8d. Screens from definitions — W8 (2026-09-15, decisions #165, #167)
 
 - `GET /api/v1/screens` — the Effective `Program.Screen` definitions the person may open (each screen's `permission` is checked

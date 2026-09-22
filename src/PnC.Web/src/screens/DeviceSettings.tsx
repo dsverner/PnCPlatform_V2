@@ -13,7 +13,7 @@ import { useTemplateDefs, saveAssetCharacteristic, addFirstWinding } from '@/com
 import { SchemeSourceActions, sourceRoleLabel } from '@/components/SchemeSourceActions'
 import { Panel, Pill, Tabs, Status, Button, inputClass } from '@/components/ui/ui'
 import { DataGrid, type Column } from '@/components/ui/data-grid'
-import { useRelayWord, parseMask, formatMask, isMaskText, type RelayWord } from '@/lib/relayWord'
+import { useRelayWord, parseMask, formatMask, isMaskText, ownerOf, supervisionLine, type RelayWord, type RelayElement } from '@/lib/relayWord'
 import type { ReactNode } from 'react'
 
 export interface Template { definitionEntityId: string; versionRowId: string; key: string; name: string; rows: Row[]; ansi: Map<string, string> }
@@ -262,7 +262,7 @@ function AddSourceForm({ schemeEntityId, schemeName, inputs, sources, capability
  * revision is outstanding (#168 increment 2: process.SetParsedSetting reads it as the parser would — type, range, closed
  * list — closes the prior row in valid time and audits the change; the platform writes the settings file from these rows
  * at the settings step). */
-function SettingsGrid({ rows: given, values, revision, editable = false, deviceId = '', relayWord = null }: { rows: Row[]; values: Map<string, Row>; revision: string; editable?: boolean; deviceId?: string; relayWord?: RelayWord | null }) {
+function SettingsGrid({ rows: given, values, revision, editable = false, deviceId = '', relayWord = null, quiet = false }: { rows: Row[]; values: Map<string, Row>; revision: string; editable?: boolean; deviceId?: string; relayWord?: RelayWord | null; quiet?: boolean }) {
   const rows: (Row & { _v?: Row })[] = given.map((r) => ({ ...r, _v: values.get(s(r.SettingCode)) }))
   const qc = useQueryClient()
   const [edits, setEdits] = useState<Record<string, string>>({})
@@ -299,7 +299,7 @@ function SettingsGrid({ rows: given, values, revision, editable = false, deviceI
   return (
     <>
       {msg && <Status bad={msg.bad}>{msg.text}</Status>}
-      {editable && <Status>Outstanding revision: a value saves when you leave the field (audited as your change). The platform writes the settings file from these values when the settings step of the change commits.</Status>}
+      {editable && !quiet && <Status>Outstanding revision: a value saves when you leave the field (audited as your change). The platform writes the settings file from these values when the settings step of the change commits.</Status>}
       <div className="mt-2"><DataGrid rows={rows} columns={cols} rowKey={(r) => s(r.SettingCode)} emptyText="No settings in this group."
         expandedKey={open} canExpand={isMask} onRowClick={(r) => { if (isMask(r)) setOpen(open === s(r.SettingCode) ? null : s(r.SettingCode)) }}
         detail={(r) => (open && s(r.SettingCode) === open && relayWord
@@ -374,6 +374,33 @@ function MaskBits({ relayWord, code, value, editing, onSave, onClose }: { relayW
 /** The settings by function: a tab per category in the template's order, every template row of the category with the
  * revision's value or "not set". The ratio settings (CTR, PTR, SPTR) are a category like any other — #205 brought them back
  * from the Analog inputs tab, which now holds the transformers that feed them. */
+/** #219 (the owner, 2026-09-21): within a tab the settings are grouped by PROTECTIVE ELEMENT — "Zone 1, Zone 2 etc. with all
+ * appropriate settings"; overcurrent "broken up into phase, ground" — in the element map's order, each with its outputs and what
+ * supervises it (the manual's own logic). A relay whose Relay Word carries no map shows the tab as one grid, as before. Nothing hidden (#183). */
+function ElementGroups({ rows, values, revision, editable, deviceId, relayWord }: { rows: Row[]; values: Map<string, Row>; revision: string; editable: boolean; deviceId: string; relayWord: RelayWord | null }) {
+  const map = relayWord?.elements?.length ? relayWord : null
+  if (!map) return <SettingsGrid rows={rows} values={values} revision={revision} editable={editable} deviceId={deviceId} relayWord={relayWord} />
+  const order: { key: string; name: string; element: RelayElement | null }[] = [...(map.elements ?? []).map((e) => ({ key: e.key, name: e.name, element: e })), ...(map.groups ?? []).map((g) => ({ key: g.key, name: g.name, element: null as RelayElement | null }))]
+  const groups = order.map((o) => ({ ...o, rows: rows.filter((r) => ownerOf(map, s(r.SettingCode))?.key === o.key) })).filter((g) => g.rows.length > 0)
+  const placed = new Set(groups.flatMap((g) => g.rows.map((r) => s(r.SettingCode))))
+  const rest = rows.filter((r) => !placed.has(s(r.SettingCode)))
+  return (
+    <div className="space-y-3">
+      {groups.map((g, gi) => (
+        <div key={g.key}>
+          <div className="mt-2 flex flex-wrap items-baseline gap-2">
+            <span className="text-sm font-semibold text-slate-100">{g.name}</span>
+            {g.element && g.element.outputs.length > 0 && <span className="text-xs text-slate-400">outputs {g.element.outputs.join(', ')}</span>}
+          </div>
+          {g.element && supervisionLine(g.element) && <div className="text-xs text-slate-400">{supervisionLine(g.element)}</div>}
+          <SettingsGrid rows={g.rows} values={values} revision={revision} editable={editable} deviceId={deviceId} relayWord={relayWord} quiet={gi > 0} />
+        </div>
+      ))}
+      {rest.length > 0 && <div><div className="mt-2 text-sm font-semibold text-slate-100">Other</div><SettingsGrid rows={rest} values={values} revision={revision} editable={editable} deviceId={deviceId} relayWord={relayWord} quiet={groups.length > 0} /></div>}
+    </div>
+  )
+}
+
 /** A tab beside the template's categories that is not a settings category (#216 follow-up: the relay's Hardware). */
 export interface ExtraTab { key: string; label: string; render: () => ReactNode }
 
@@ -393,7 +420,7 @@ export function SettingsByFunction({ template, parsed, parseStatus, parseError, 
       <Tabs tabs={[...categories.map((c) => ({ key: c, label: c.length > 42 ? c.slice(0, 40) + '…' : c })), ...extraTabs.map((x) => ({ key: x.key, label: x.label }))]} value={current} onChange={setTab} />
       {extraTabs.find((x) => x.key === current)
         ? extraTabs.find((x) => x.key === current)!.render()   // the owner, 2026-09-21: "hardware should really be another tab in the settings section"
-        : <SettingsGrid rows={rows} values={values} revision={revision} editable={editable} deviceId={deviceId} relayWord={rwQ.data ?? null} />}
+        : <ElementGroups rows={rows} values={values} revision={revision} editable={editable} deviceId={deviceId} relayWord={rwQ.data ?? null} />}
       {showListing && <RelayListingAndFile template={template} parsed={parsed} revision={revision} filedText={filedText} />}
     </Panel>
   )

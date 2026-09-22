@@ -54,6 +54,39 @@ manual's, with its page. The Settings tab's mask editor reads the seeded definit
 | `MRI` | Mask for reclose initiate | If an element masked in the MRI mask is asserted when the TRIP output contacts close, reclosing is initiated unless a reclose cancel condition occurs. Reclose initiation is subordinate to reclose cancel. |  | 67N, Z1P, Z1G, Z2PT, Z2GT |  | `F0 80 00` | 5-37 |
 | `MRC` | Mask for reclose cancel | If an element masked in the MRC mask is asserted when the TRIP output contacts close, reclosing is cancelled even if a reclose initiate condition occurs. Reclose initiation is subordinate to reclose cancellation. |  | Z3T, 51NT |  | `04 20 00` | 5-37, 5-38 |
 
+## The element map (#219) — the sheet's sub-groups and the rationale's sections
+
+The owner, 2026-09-21: a rationale section per protective element being used; the settings sheet grouped the same way; the
+settings that supervise an element handled explicitly. Supervision is the manual's own logic (2-18, 2-24), quoted per row.
+
+| Element | Capability | Name | Outputs (Relay Word) | Owns | Supervised by | Page |
+|---|---|---|---|---|---|---|
+| `Z1` | `21` | Zone 1 distance (phase and ground, instantaneous) | Z1P, Z1G | `Z1%` | **50P** — the phase distance elements require the phase overcurrent 50AP/50BP/50CP (the 50P setting) on the faulted phases (2-18); **50NG** — the ground distance elements require 50AG/50BG/50CG and the residual 50N (the 50NG setting) (2-18); **3P21|32Q** — forward-direction supervision FDS = 3P21 + 32Q; "the negative-sequence directional elements always supervises the distance elements" (2-18; 2-24); **LOP** — blocked by loss of potential when LOPE = Y, 1, 2 or 3 (2-18) | 2-18; 5-13 |
+| `Z2` | `21` | Zone 2 distance (phase and ground, time delayed) | Z2PT, Z2GT | `Z2%`, `Z2DP`, `Z2DG` | **50P** — the phase distance elements require the phase overcurrent 50AP/50BP/50CP (the 50P setting) on the faulted phases (2-18); **50NG** — the ground distance elements require 50AG/50BG/50CG and the residual 50N (the 50NG setting) (2-18); **3P21|32Q** — forward-direction supervision FDS = 3P21 + 32Q; "the negative-sequence directional elements always supervises the distance elements" (2-18; 2-24); **LOP** — blocked by loss of potential when LOPE = Y, 1, 2 or 3 (2-18) | 2-18; 5-13 |
+| `Z3` | `21` | Zone 3 distance (phase or ground; instantaneous for permissive schemes, time delayed for tripping) | Z3, Z3T | `Z3%`, `Z3D` | **50P** — the phase distance elements require the phase overcurrent 50AP/50BP/50CP (the 50P setting) on the faulted phases (2-18); **50NG** — the ground distance elements require 50AG/50BG/50CG and the residual 50N (the 50NG setting) (2-18); **3P21|32Q** — forward-direction supervision FDS = 3P21 + 32Q; "the negative-sequence directional elements always supervises the distance elements" (2-18; 2-24); **LOP** — blocked by loss of potential when LOPE = Y, 1, 2 or 3 (2-18) | 2-18; 5-13 |
+| `50P` | `50` | Phase overcurrent, low set — supervises the phase distance elements | 50P | `50P` |  | 2-3; 2-18; 5-16 |
+| `50NG` | `50N` | Sensitive residual overcurrent — supervises the ground distance elements | 50NG | `50NG` |  | 2-3; 2-18; 5-16 |
+| `50H` | `50` | Phase overcurrent, high set (switch-onto-fault tripping) | 50H | `50H` | **52BT** — trips through the MTO mask while the 52BT element is asserted after the breaker closes (5-35) | 2-4; 5-16 |
+| `51N` | `51N` | Residual time-overcurrent | 51NP, 51NT | `51NP`, `51NC`, `51NTD`, `51NTC` | **32Q** — directionally supervised by 32Q when 51NTC = Y (and by loss of potential when LOPE is set): 51NP = 51N pickup · [32Q + (LOP·LOPE) + NOT(51NTC)] (2-18) | 2-3; 5-17 |
+| `67N` | `67N` | Residual instantaneous overcurrent, directional | 67N | `67NP`, `67NTC` | **32Q** — 67N = 67NP · [32Q + (LOP·LOPE) + NOT(67NTC)] (2-18) | 2-3; 5-17 |
+| `32Q` | `32Q` | Negative-sequence directional element | 32Q |  |  | 2-3; 2-24 |
+| `LOP` | `LOP` | Loss-of-potential detection | LOP | `LOPE` |  | 2-3; 2-17 (Table 2.3) |
+| `79` | `79` | Reclosing |  | `79OI`, `79RS` |  | 2-4; 5-14 |
+| `25` | `25` | Synchronism and voltage checking (25, 27, 59) | 27S, 27P, 59S, 59P, SSC, VSC | `PSVC`, `27VLO`, `59VHI`, `25DV`, `SYNCP`, `25T`, `VCT` |  | 2-4; 2-18; 5-14/5-15 |
+| `REJO` | `REJO` | Remote-end-just-opened protection | REJO | `REJOE` |  | 2-4; 5-18 |
+| `SOTF` | `SOTF` | Switch-onto-fault protection (52BT with the MTO mask) |  | `52BT` |  | 2-4; 5-18; 5-35 |
+| `FAULTLOC` | `FAULTLOC` | Fault locating (uses the line data R1, X1, R0, X0 and the line length) |  | `LL` |  | 1-1; 1-4/1-5; 5-13 |
+| `50BF` | `50BF` | Breaker failure (SEL-221F-3/121F-3 and SEL-221F-4 only) | BFT | `BFIN1`, `BFTD` |  | 1-2; 2-50/2-51 |
+
+| Group | Name | Settings |
+|---|---|---|
+| `ID` | Identifier | `ID` |
+| `LINE` | Line data (the distance characteristic: impedances and the maximum torque angle) | `R1`, `X1`, `R0`, `X0`, `MTA` |
+| `INPUTS` | Current and potential inputs | `CTR`, `PTR`, `SPTR` |
+| `TIMERS` | Miscellaneous timers | `A1TP`, `A1TD`, `TDUR` |
+| `COMMS` | Communications | `TIME1`, `TIME2`, `AUTO`, `RINGS` |
+| `MASKS` | Logic masks | `MTU`, `MPT`, `MTB`, `MTO`, `MA1`, `MA2`, `MA3`, `MA4`, `MRI`, `MRC` |
+
 ## What the platform cannot yet tell apart
 
 The -2 has TRIP at row 3 bit 2; the -3/-4 have BFT there (5-33 Note 2). The model rows in this platform carry no variation

@@ -14,6 +14,7 @@ import { settingsText } from '@/lib/actions'
 import { type RecordParams, type Screen, splitView, screenPath } from '@/lib/screens'
 import { Panel, Pill, stateTone, Button, Facts, Status, Field, Tabs, inputClass } from '@/components/ui/ui'
 import { openFile, downloadFile } from '@/lib/files'
+import { RationalePanel } from '@/screens/RationalePanel'
 import { DataGrid, type Column } from '@/components/ui/data-grid'
 import DeviceSettings, { useTemplate, AnalogInputs, BasisPanel, RelayListingAndFile } from './DeviceSettings'
 import ComplianceTab, { useProtectedAssets } from './ComplianceTab'
@@ -56,7 +57,7 @@ export default function RecordScreen({ params: p, id }: { screen: Screen; params
         </div>
       </header>
       <Status>{legacyFree(r.DeviceName)} · rev {s(r.RevisionLabel) || '?'} · Revision {s(r.RevisionStatus)} · lifecycle {s(r.LifecycleState) || '—'} · {s(r.FileKind)} {s(r.ParseStatus)}</Status>
-      <Tabs value={section} onChange={setSection} tabs={[{ key: 'settings', label: 'Settings' }, { key: 'analog', label: 'Analog inputs' }, ...(r.TemplateDefinitionEntityId ? [{ key: 'jumpers', label: 'Jumper settings' }] : []), { key: 'record', label: 'Record' }, { key: 'compliance', label: 'Compliance' }, { key: 'notes', label: 'Notes' }, { key: 'text', label: 'Text as filed' }, { key: 'files', label: 'Files and records' }, { key: 'manual', label: 'Manual' }, ...(others.length ? [{ key: 'compare', label: 'Compare' }] : [])]} />
+      <Tabs value={section} onChange={setSection} tabs={[{ key: 'settings', label: 'Settings' }, { key: 'rationale', label: 'Rationale' }, { key: 'analog', label: 'Analog inputs' }, ...(r.TemplateDefinitionEntityId ? [{ key: 'jumpers', label: 'Jumper settings' }] : []), { key: 'record', label: 'Record' }, { key: 'compliance', label: 'Compliance' }, { key: 'notes', label: 'Notes' }, { key: 'text', label: 'Text as filed' }, { key: 'files', label: 'Files and records' }, { key: 'manual', label: 'Manual' }, ...(others.length ? [{ key: 'compare', label: 'Compare' }] : [])]} />
       {section === 'settings' && (template
         /* #168: the template's view of the device — functions, inputs, settings by function — when the model has one */
         ? <>
@@ -124,6 +125,7 @@ export default function RecordScreen({ params: p, id }: { screen: Screen; params
           <FilesPanel r={r} revision={revision} />
         </>)}
       {section === 'manual' && <ManualPanel templateDefinitionEntityId={s(r.TemplateDefinitionEntityId) || null} modelName={s(r.ModelName)} />}   {/* #216 */}
+      {section === 'rationale' && <RationalePanel revision={id} editable={s(r.GridState) === 'Outstanding'} />}   {/* #219 */}
     </div>
   )
 }
@@ -191,7 +193,7 @@ function FilesPanel({ r, revision }: { r: Row; revision: string }) {
       const rev = (await view('document', 'vRevision', { RowId: s(l.RevisionRowId) }, { take: 1 })).rows[0]
       const doc = rev ? (await view('document', 'vDocument', { EntityId: s(rev.DocumentEntityId) }, { take: 1 })).rows[0] : null
       const cls = doc ? (await view('config', 'vDefinition', { EntityId: s(doc.DocumentClassDefinitionEntityId) }, { take: 1 })).rows[0] : null
-      const what = s(cls?.DefinitionKey) === 'Rationale' ? 'Rationale (legacy, as filed)' : s(cls?.Name) || 'document'
+      const what = s(cls?.DefinitionKey) === 'Rationale' ? (doc?.MigrationRunId ? 'Rationale (legacy, as filed)' : 'Rationale (generated, #219)') : s(cls?.Name) || 'document'
       for (const f of (await view('document', 'vFile', { RevisionRowId: s(l.RevisionRowId) }, { take: 10 })).rows)
         rows.push({ what, kind: f.FileRole, name: f.FileName, mime: f.MimeType, size: f.SizeBytes, sha: f.Sha256, when: f.CreatedAt, fileRowId: f.RowId, note: s(doc?.Description) })
     }

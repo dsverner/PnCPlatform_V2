@@ -8,12 +8,31 @@ import { s, view, viewAll } from '@/lib/api'
 
 export interface RelayWordBit { code: string; meaning: string; cite: string }
 export interface RelayWordMask { name: string; purpose: string; caution: string; typical: string[]; never: string[]; neverNote: string; example: string; cite: string }
+// #219: the element map — each protective element's capability, outputs (bits), owned settings and what supervises it (the manual's logic)
+export interface RelayElement { key: string; capability: string; name: string; outputs: string[]; settings: string[]; supervisedBy: { by: string; how: string; cite: string }[]; cite: string }
+export interface RelayGroup { key: string; name: string; settings: string[] }
 export interface RelayWord {
   key: string; name: string; settingsTemplate: string; source: string; bitOrder: string; footnote?: string
   rows: RelayWordBit[][]
   variants: { models: string; row: number; bit: number; code: string; note: string; cite: string }[]
   testing?: { bits: string[]; note: string; cite: string }
   masks: Record<string, RelayWordMask>
+  elements?: RelayElement[]
+  groups?: RelayGroup[]
+}
+
+/** The element or group that owns a setting code, in map order; null when the map does not place it. */
+export function ownerOf(rw: RelayWord | null | undefined, code: string): { key: string; name: string; element: RelayElement | null } | null {
+  if (!rw) return null
+  const c = code.toUpperCase()
+  for (const e of rw.elements ?? []) if (e.settings.some((x) => x.toUpperCase() === c)) return { key: e.key, name: e.name, element: e }
+  for (const g of rw.groups ?? []) if (g.settings.some((x) => x.toUpperCase() === c)) return { key: g.key, name: g.name, element: null }
+  return null
+}
+
+/** One line on what supervises an element, from the map (the manual's equations), for the sheet and the rationale. */
+export function supervisionLine(e: RelayElement): string {
+  return e.supervisedBy.length ? 'Supervised by ' + e.supervisedBy.map((x) => `${x.by.replace('|', ' or ')} — ${x.how} (${x.cite})`).join('; ') + '.' : ''
 }
 
 /** The filed text of a mask → one boolean per bit, row by row, left to right. Accepts "F0 A4 00", "F0A400", "F0-A4-00";

@@ -14,6 +14,7 @@ import { ApiError, fmtWhen, s, view, viewAll, proc, type Row } from '@/lib/api'
 import { useCan, useViewAll } from '@/lib/hooks'
 import { type RecordParams, type Screen, screenPath } from '@/lib/screens'
 import { Panel, Pill, Button, Facts, Status, inputClass } from '@/components/ui/ui'
+import { AssetCharacteristics } from '@/components/CharacteristicsPanel'
 
 /** The kinds and the values in the standards' own words. The **values** are still the client's; **which kinds apply** is
  * reference data (#173, the owner 2026-09-17: "a bus is not PRC-023 applicable and has no rating") —
@@ -379,10 +380,21 @@ export default function PrimaryAssetScreen({ params: p, id }: { screen: Screen; 
           <Status>A thin record for this phase: a name, a type and its terminals — one station for a capacitor or reactor, two for a transformer, two or more for a line — each with its voltage and the bus it connects to. Connectivity, impedances and, for a line, its route and structures come from the power-system model (the TLM project) in a later phase.</Status></Panel>
         <ProtectedBy r={r} editable={can('Scheme.Modify')} />
       </div>
+      {s(r.AssetTypeCode) === 'Line' && <LineImpedance r={r} editable={editable} />}   {/* #219 */}
       <ClassificationPanel subjectKind="Asset" subjectEntityId={s(r.EntityId)} editable={editable} assetTypeCode={s(r.AssetTypeCode)} kinds={PRIMARY_ASSET_KINDS} />
       {/* #173 (the owner, 2026-09-17): a bus has no rating — the Ratings panel belongs to the asset types that carry one
           (ref.AssetType.CarriesRating), because the rating exists to answer PRC-023 R1's criteria 1, 2 and 13. */}
       {!typesQ.isPending && carriesRating((typesQ.data ?? []).find((t) => s(t.AssetTypeCode) === s(r.AssetTypeCode))) && <Ratings r={r} editable={editable} />}
     </div>
   )
+}
+
+/** #219 (the owner, 2026-09-21): the line's impedance and length live on the line, not in a relay's settings — the type's default
+ * template (LINE_Template, tools/template_line.py) through the guarded save (asset.SetAssetCharacteristic, #216). */
+function LineImpedance({ r, editable }: { r: Row; editable: boolean }) {
+  const typeQ = useViewAll('ref', 'vAssetType', { AssetTypeCode: 'Line' }, undefined, true)
+  const template = s(typeQ.data?.[0]?.DefaultTemplateDefinitionEntityId)
+  if (!template) return <Panel title="Impedance"><Status>{typeQ.isPending ? 'Loading the line template…' : 'The asset type Line names no template yet (LINE_Template is seeded by tools/template_line.py).'}</Status></Panel>
+  return <AssetCharacteristics assetEntityId={s(r.EntityId)} definitionEntityId={template} editable={editable} groups={['Impedance']} title="Impedance"
+    note="Recorded once on the line; every relay rationale on this line reads it (R1, X1, R0, X0 in ohms primary end to end, the length in miles). The legacy rationales wrote Z1 = R1 + jX1." />
 }

@@ -33,6 +33,7 @@ USING (VALUES
     (N'Program.WorkType',                         N'Program',              N'Work type',                             1),
     (N'Program.SchemeType',                       N'Program',              N'Scheme type',                           1),
     (N'Program.RelayWord',                        N'Program',              N'Relay Word (a relay model''s logic bits and what each mask is for, from its manual; #215)', 1),
+    (N'Program.Rationale',                        N'Program',              N'Rationale template (one section per protective element: inputs as characteristic definitions, sections as the payload; #219)', 1),
     (N'Program.MaintenanceActivityType',          N'Program',              N'Maintenance activity type',             1),
     (N'Program.CleansingRules',                   N'Program',              N'Migration cleansing rules',             1),
     (N'Program.TestPlan',                         N'Program',              N'Test plan',                             1),

@@ -1976,6 +1976,63 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
                 Must(k218_rs == HttpStatusCode.OK && (k218_rb?["officeUrl"] is null || k218_rb["officeUrl"]!.ToString().StartsWith("ms-word:ofv|u|http")),
                     $"#218: ReadOnly (Document.Read) is issued a link too ({(int)k218_rs}); an Office document's link names its application ({k218_rb?["officeUrl"]?.ToString()?.Split('|')[0] ?? "not an Office document"})");
             }
+            // ======== #219 (2026-09-21): the structured rationale — one section per protective element. The line the #170 fixture made gets
+            // its impedance (LINE_Template, asset.SetAssetCharacteristic); the #187 relay's draft applies the SEL-221F template with that line
+            // picked: the settings are written on the draft (Z1% from the input, R1/X1 from the line, MTA computed, CTR from the ratio, MTU
+            // derived from the elements' marks), the rationale revision About the draft holds rationale.json and rationale.docx, a second
+            // apply updates, ReadOnly may not apply.
+            {
+                var k219_line = Id((await Get(admin, $"api/v1/asset/vPrimaryAsset?Name={Uri.EscapeDataString($"{tag} line 0001")}")).body?["rows"]?[0]);
+                var k219_ok = k219_line is not null;
+                foreach (var (key, val) in new[] { ("R1", "1.685"), ("X1", "6.7524"), ("R0", "6.635"), ("X0", "19.44"), ("LengthMiles", "8.49"), ("ChargingMvaPerMile", "0.128") })
+                {
+                    var (k219_cs, k219_cb) = await Post(admin, "api/v1/asset/SetAssetCharacteristic", new { AssetEntityId = k219_line, CharacteristicKey = key, Value = val });
+                    k219_ok &= k219_cs == HttpStatusCode.OK; if (k219_cs != HttpStatusCode.OK) Console.WriteLine($"    line {key}: {(int)k219_cs} {Code(k219_cb)}");
+                }
+                Must(k219_ok, $"#219: the line's impedance and length are recorded on the line asset (LINE_Template; R1 1.685, X1 6.7524, R0 6.635, X0 19.44, LL 8.49 — A4811's line)");
+                var (k219_t2s, _) = await Post(admin, "api/v1/asset/AssetTerminal_Add", new { AssetEntityId = k219_line, TerminalNo = 2, StationNodeEntityId = station });   // a far end, so the remote station resolves
+                var (k219_gs, k219_gb) = await Get(admin, $"api/v1/rationale/{k215_rev}?line={k219_line}");
+                var k219_remote = k219_gb?["line"]?["RemoteStation"]?.ToString() ?? "";
+                var k219_mta = Math.Round(Math.Atan2(6.7524, 1.685) * 180.0 / Math.PI, 2).ToString(System.Globalization.CultureInfo.InvariantCulture);
+                var k219_secs = (k219_gb?["template"]?["sections"] as JsonArray)?.Count ?? 0;
+                var k219_els = (k219_gb?["map"]?["elements"] as JsonArray)?.Count ?? 0;
+                Must(k219_gs == HttpStatusCode.OK && k219_secs >= 15 && k219_els >= 15 && k219_gb?["line"]?["Name"]?.ToString() == $"{tag} line 0001" && ((k219_gb?["missing"] as JsonArray) ?? new JsonArray()).All(m => m?.ToString() is "line.kV"),   // the fixture line has no voltage class
+                    $"#219: the draft's rationale template has {k219_secs} sections over the map's {k219_els} elements; the picked line resolves with every plant fact ({(int)k219_gs}; missing {(k219_gb?["missing"] as JsonArray)?.Count})");
+                var k219_inputs = new Dictionary<string, object?> { ["Zone1Pct"] = "85", ["Zone2Pct"] = "130", ["CtPrimary"] = "800", ["CtSecondary"] = "5", ["PtPrimary"] = "1200", ["Note_Z1"] = "smoke: zone 1 as A4811", ["FaultStudy"] = new[] { new[] { "St. Andre", "824", "779", "smoke" } } };
+                var (k219_as, k219_ab) = await Post(admin, $"api/v1/rationale/{k215_rev}/apply", new { inputs = k219_inputs, lineAssetEntityId = k219_line });
+                var k219_written = (k219_ab?["settingsWritten"] as JsonArray)?.ToDictionary(w => w!["code"]!.ToString(), w => w!["value"]!.ToString()) ?? new();
+                var (k219_ps, k219_pb) = await Get(admin, $"api/v1/document/vParsedSettingNamed?ConfigurationFileRevisionRowId={k215_rev}&take=200");
+                var k219_parsed = (k219_pb?["rows"] as JsonArray)?.ToDictionary(r => r!["SettingCode"]!.ToString(), r => r!["RawValue"]?.ToString() ?? r!["DisplayValue"]?.ToString()) ?? new();
+                Must(k219_as == HttpStatusCode.OK && k219_parsed.GetValueOrDefault("Z1%") == "85" && k219_parsed.GetValueOrDefault("Z2%") == "130" && k219_parsed.GetValueOrDefault("CTR") == "160" && k219_parsed.GetValueOrDefault("PTR") == "1200"
+                     && k219_parsed.GetValueOrDefault("R1") == "1.685" && k219_parsed.GetValueOrDefault("X1") == "6.7524" && k219_parsed.GetValueOrDefault("MTA") == k219_mta && k219_written.ContainsKey("MTU") && k219_parsed.GetValueOrDefault("MTU") == k219_written["MTU"],
+                    $"#219: apply writes the settings on the draft — Z1% {k219_parsed.GetValueOrDefault("Z1%")}, Z2% {k219_parsed.GetValueOrDefault("Z2%")}, CTR {k219_parsed.GetValueOrDefault("CTR")}, R1 {k219_parsed.GetValueOrDefault("R1")}, MTA {k219_parsed.GetValueOrDefault("MTA")} (atan2 of the line), MTU {k219_parsed.GetValueOrDefault("MTU")} from the elements' marks ({(int)k219_as} {Code(k219_ab)}; {k219_written.Count} written)");
+                var k219_z1 = (k219_ab?["sections"] as JsonArray)?.FirstOrDefault(x => x?["key"]?.ToString() == "Z1");
+                Must(k219_remote.Length > 0 && k219_z1?["statement"]?.ToString().Contains("85% of the distance to " + k219_remote) == true && k219_z1?["supervision"]?.ToString().Contains("50P") == true,
+                    $"#219: the zone 1 statement names the remote station and its supervision line the map's supervisors — \"{k219_z1?["statement"]?.ToString()?[..Math.Min(110, k219_z1?["statement"]?.ToString()?.Length ?? 0)]}…\"");
+                var k219_rr = k219_ab?["rationaleRevisionRowId"]?.ToString();
+                var (k219_fs, k219_fb) = await Get(admin, $"api/v1/document/vFile?RevisionRowId={k219_rr}&take=10");
+                var k219_docx = (k219_fb?["rows"] as JsonArray)?.FirstOrDefault(f => f?["FileName"]?.ToString().StartsWith("rationale") == true && f?["FileName"]?.ToString().EndsWith(".docx") == true);
+                var k219_json = (k219_fb?["rows"] as JsonArray)?.FirstOrDefault(f => f?["FileName"]?.ToString().StartsWith("rationale") == true && f?["FileName"]?.ToString().EndsWith(".json") == true);
+                var k219_dl = k219_docx is null ? null : await admin.GetAsync($"api/v1/files/{k219_docx["RowId"]}");
+                var k219_bytes = k219_dl is null ? Array.Empty<byte>() : await k219_dl.Content.ReadAsByteArrayAsync();
+                var k219_text = "";
+                if (k219_bytes.Length > 4 && k219_bytes[0] == 0x50 && k219_bytes[1] == 0x4B)
+                {
+                    using var k219_zip = new System.IO.Compression.ZipArchive(new MemoryStream(k219_bytes), System.IO.Compression.ZipArchiveMode.Read);
+                    using var k219_rd = new StreamReader(k219_zip.GetEntry("word/document.xml")!.Open());
+                    k219_text = System.Net.WebUtility.HtmlDecode(System.Text.RegularExpressions.Regex.Replace(await k219_rd.ReadToEndAsync(), "<[^>]+>", " "));
+                }
+                Must(k219_docx is not null && k219_json is not null && k219_bytes.Length > 1000 && k219_text.Contains("Zone 1") && k219_text.Contains("Settings Summary") && k219_text.Contains("Z1% = 85"),
+                    $"#219: the rationale revision About the draft holds rationale.json and rationale.docx ({k219_bytes.Length} bytes; a Word package whose text carries Zone 1 and the summary)");
+                if (k219_bytes.Length > 0) { try { System.IO.File.WriteAllBytes(Path.Combine(Path.GetTempPath(), "pnc_smoke_rationale.docx"), k219_bytes); } catch (IOException) { } }
+                var (k219_bs, k219_bb) = await Post(admin, $"api/v1/rationale/{k215_rev}/apply", new { inputs = new { Zone1Pct = "80" }, lineAssetEntityId = k219_line });
+                var (k219_p2s, k219_p2b) = await Get(admin, $"api/v1/document/vParsedSettingNamed?ConfigurationFileRevisionRowId={k215_rev}&SettingCode=Z1%25&take=1");
+                var (k219_f2s, k219_f2b) = await Get(admin, $"api/v1/document/vFile?RevisionRowId={k219_rr}&take=10");
+                Must(k219_bs == HttpStatusCode.OK && (k219_p2b?["rows"] as JsonArray)?.FirstOrDefault()?["RawValue"]?.ToString() == "80" && ((k219_f2b?["rows"] as JsonArray)?.Count ?? 0) == 2,
+                    $"#219: a second apply with zone 1 at 80 % updates Z1% ({(k219_p2b?["rows"] as JsonArray)?.FirstOrDefault()?["RawValue"]}) and refiles the two files ({(k219_f2b?["rows"] as JsonArray)?.Count} on the rationale revision)");
+                var (k219_rs, k219_rb) = await Post(readOnly!, $"api/v1/rationale/{k215_rev}/apply", new { inputs = new { Zone1Pct = "70" } });
+                Must(k219_rs == HttpStatusCode.Forbidden, $"#219: ReadOnly may not apply a rationale ({(int)k219_rs} {Code(k219_rb)})");
+            }
         }
 
         // ======== #168 increment 2 (2026-09-16): the settings edited in the platform, the file written by it — the owner's four-step

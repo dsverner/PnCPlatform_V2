@@ -16,7 +16,9 @@ BEGIN
       AND f.[FactName] <> ISNULL(JSON_VALUE(@PayloadText, '$.publishes.fact'), N'')   -- #171: a formula's own published name (FORMULA-GRAMMAR §7 "publishes") is not a reference
       -- PROCEDURE-ENGINE §7 (W3): procedure.<name> and input.<name> are declared by the procedure document itself;
       -- process.ValidateProcedureDocument checks them against its produces and inputs
-      AND NOT (@DefinitionKind = N'Program.Procedure' AND (f.[FactName] LIKE N'procedure.%' OR f.[FactName] LIKE N'input.%'));
+      AND NOT (@DefinitionKind = N'Program.Procedure' AND (f.[FactName] LIKE N'procedure.%' OR f.[FactName] LIKE N'input.%'))
+      -- #219: a rationale template's formulas read the plant facts and inputs the template itself declares (RationaleEngine resolves them)
+      AND NOT (@DefinitionKind = N'Program.Rationale' AND (f.[FactName] LIKE N'line.%' OR f.[FactName] LIKE N'ct.%' OR f.[FactName] LIKE N'input.%' OR f.[FactName] LIKE N'setting.%' OR f.[FactName] LIKE N'value.%' OR f.[FactName] LIKE N'device.%'));
     IF @missing IS NOT NULL
     BEGIN
         DECLARE @msg NVARCHAR(MAX) = N'Program references facts not in the catalogue: ' + @missing;

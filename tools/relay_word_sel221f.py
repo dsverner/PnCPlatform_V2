@@ -118,6 +118,54 @@ MASKS = [
 ]
 
 
+# #219 (2026-09-21): the ELEMENT MAP — the owner: "a rational 'section' for each of the protective elements being used" and the
+# settings sheet grouped the same way ("Zone 1, Zone 2 etc. with all appropriate settings"; overcurrent "broken up into phase,
+# ground"); the settings that SUPERVISE an element handled explicitly. The grain agreed: the fifteen capabilities
+# (sel-221f.capabilities.md, #181/#182) with the Relay Word bits beneath them as the element outputs. Each element: its
+# capability, its outputs (bits above), the settings it OWNS (decided in its section), and what SUPERVISES it — from the
+# manual's own logic equations (2-18 "Distance Relay Logic", 2-24 "Negative-Sequence Directional Element"), never from memory:
+#   Z1P = (21AB1·50AP·50BP + 21BC1·50BP·50CP + 21CA1·50CP·50AP) · FDS · NOT(LOP·LOPE=Y,1,2,3)      FDS = 3P21 + 32Q
+#   Z1G = (21AG1·50AG + 21BG1·50BG + 21CG1·50CG) · 50N · FDS · NOT(LOP·LOPE)                     (Z2, Z3 alike)
+#   67N = 67NP · [32Q + (LOP·LOPE) + NOT(67NTC)]      51NP = 51N pickup · [32Q + (LOP·LOPE) + NOT(51NTC)]
+# (key, capability, name, outputs, owned settings, supervised-by [(by, how, cite)], cite)
+SUP_DIST = [
+    ("50P",  "the phase distance elements require the phase overcurrent 50AP/50BP/50CP (the 50P setting) on the faulted phases", "2-18"),
+    ("50NG", "the ground distance elements require 50AG/50BG/50CG and the residual 50N (the 50NG setting)", "2-18"),
+    ("3P21|32Q", "forward-direction supervision FDS = 3P21 + 32Q; \"the negative-sequence directional elements always supervises the distance elements\"", "2-18; 2-24"),
+    ("LOP",  "blocked by loss of potential when LOPE = Y, 1, 2 or 3", "2-18"),
+]
+ELEMENTS = [
+    ("Z1",  "21",  "Zone 1 distance (phase and ground, instantaneous)", ["Z1P", "Z1G"], ["Z1%"], SUP_DIST, "2-18; 5-13"),
+    ("Z2",  "21",  "Zone 2 distance (phase and ground, time delayed)", ["Z2PT", "Z2GT"], ["Z2%", "Z2DP", "Z2DG"], SUP_DIST, "2-18; 5-13"),
+    ("Z3",  "21",  "Zone 3 distance (phase or ground; instantaneous for permissive schemes, time delayed for tripping)", ["Z3", "Z3T"], ["Z3%", "Z3D"], SUP_DIST, "2-18; 5-13"),
+    ("50P", "50",  "Phase overcurrent, low set — supervises the phase distance elements", ["50P"], ["50P"], [], "2-3; 2-18; 5-16"),
+    ("50NG","50N", "Sensitive residual overcurrent — supervises the ground distance elements", ["50NG"], ["50NG"], [], "2-3; 2-18; 5-16"),
+    ("50H", "50",  "Phase overcurrent, high set (switch-onto-fault tripping)", ["50H"], ["50H"],
+            [("52BT", "trips through the MTO mask while the 52BT element is asserted after the breaker closes", "5-35")], "2-4; 5-16"),
+    ("51N", "51N", "Residual time-overcurrent", ["51NP", "51NT"], ["51NP", "51NC", "51NTD", "51NTC"],
+            [("32Q", "directionally supervised by 32Q when 51NTC = Y (and by loss of potential when LOPE is set): 51NP = 51N pickup · [32Q + (LOP·LOPE) + NOT(51NTC)]", "2-18")], "2-3; 5-17"),
+    ("67N", "67N", "Residual instantaneous overcurrent, directional", ["67N"], ["67NP", "67NTC"],
+            [("32Q", "67N = 67NP · [32Q + (LOP·LOPE) + NOT(67NTC)]", "2-18")], "2-3; 5-17"),
+    ("32Q", "32Q", "Negative-sequence directional element", ["32Q"], [], [], "2-3; 2-24"),
+    ("LOP", "LOP", "Loss-of-potential detection", ["LOP"], ["LOPE"], [], "2-3; 2-17 (Table 2.3)"),
+    ("79",  "79",  "Reclosing", [], ["79OI", "79RS"], [], "2-4; 5-14"),
+    ("25",  "25",  "Synchronism and voltage checking (25, 27, 59)", ["27S", "27P", "59S", "59P", "SSC", "VSC"], ["PSVC", "27VLO", "59VHI", "25DV", "SYNCP", "25T", "VCT"], [], "2-4; 2-18; 5-14/5-15"),
+    ("REJO","REJO","Remote-end-just-opened protection", ["REJO"], ["REJOE"], [], "2-4; 5-18"),
+    ("SOTF","SOTF","Switch-onto-fault protection (52BT with the MTO mask)", [], ["52BT"], [], "2-4; 5-18; 5-35"),
+    ("FAULTLOC", "FAULTLOC", "Fault locating (uses the line data R1, X1, R0, X0 and the line length)", [], ["LL"], [], "1-1; 1-4/1-5; 5-13"),
+    ("50BF","50BF","Breaker failure (SEL-221F-3/121F-3 and SEL-221F-4 only)", ["BFT"], ["BFIN1", "BFTD"], [], "1-2; 2-50/2-51"),
+]
+# the settings that are no element's, in plain groups (the sheet and the rationale show them as such)
+GROUPS = [
+    ("ID",     "Identifier", ["ID"]),
+    ("LINE",   "Line data (the distance characteristic: impedances and the maximum torque angle)", ["R1", "X1", "R0", "X0", "MTA"]),
+    ("INPUTS", "Current and potential inputs", ["CTR", "PTR", "SPTR"]),
+    ("TIMERS", "Miscellaneous timers", ["A1TP", "A1TD", "TDUR"]),
+    ("COMMS",  "Communications", ["TIME1", "TIME2", "AUTO", "RINGS"]),
+    ("MASKS",  "Logic masks", ["MTU", "MPT", "MTB", "MTO", "MA1", "MA2", "MA3", "MA4", "MRI", "MRC"]),
+]
+
+
 def document():
     return {
         "g": 1, "kind": "relayWord", "key": KEY, "name": "SEL-221F Relay Word",
@@ -130,6 +178,11 @@ def document():
         "masks": {code: {"name": name, "purpose": purpose, "caution": caution, "typical": typical, "never": never,
                          "neverNote": NEVER_TRIP.format(m=code) if "TRIP" in never else "", "example": example, "cite": cite}
                   for (code, name, purpose, caution, typical, never, example, cite) in MASKS},
+        # #219: the element map — the sheet's sub-groups and the rationale's sections, in this order
+        "elements": [{"key": k, "capability": cap, "name": name, "outputs": outs, "settings": sets,
+                      "supervisedBy": [{"by": by, "how": how, "cite": c} for (by, how, c) in sup], "cite": cite}
+                     for (k, cap, name, outs, sets, sup, cite) in ELEMENTS],
+        "groups": [{"key": k, "name": name, "settings": sets} for (k, name, sets) in GROUPS],
     }
 
 
@@ -192,6 +245,17 @@ def md(doc):
     for (code, name, purpose, caution, typical, never, example, cite) in MASKS:
         L.append("| `" + code + "` | " + name + " | " + purpose + " | " + (caution or "") + " | " + ", ".join(typical) + " | "
                  + ", ".join(never) + (" - \"" + NEVER_TRIP.format(m=code) + "\"" if never else "") + " | `" + example + "` | " + cite + " |")
+    L += ["", "## The element map (#219) — the sheet's sub-groups and the rationale's sections", "",
+          "The owner, 2026-09-21: a rationale section per protective element being used; the settings sheet grouped the same way; the",
+          "settings that supervise an element handled explicitly. Supervision is the manual's own logic (2-18, 2-24), quoted per row.", "",
+          "| Element | Capability | Name | Outputs (Relay Word) | Owns | Supervised by | Page |",
+          "|---|---|---|---|---|---|---|"]
+    for (k, cap, name, outs, sets, sup, cite) in ELEMENTS:
+        L.append("| `" + k + "` | `" + cap + "` | " + name + " | " + ", ".join(outs) + " | " + ", ".join("`" + s + "`" for s in sets) + " | "
+                 + "; ".join("**" + by + "** — " + how + " (" + c + ")" for (by, how, c) in sup) + " | " + cite + " |")
+    L += ["", "| Group | Name | Settings |", "|---|---|---|"]
+    for (k, name, sets) in GROUPS:
+        L.append("| `" + k + "` | " + name + " | " + ", ".join("`" + s + "`" for s in sets) + " |")
     L += ["", "## What the platform cannot yet tell apart", "",
           "The -2 has TRIP at row 3 bit 2; the -3/-4 have BFT there (5-33 Note 2). The model rows in this platform carry no variation",
           "suffix (`sel-221f.capabilities.md`), so the editor names the bit \"TRIP (BFT on the -3/-4)\" and a person must know which",

@@ -57,6 +57,8 @@
 :r .\Seed_scheme_FunctionCapability_SEL221F.sql
 :r .\Seed_config_AssetTemplate_SEL221F.sql
 :r .\Seed_scheme_RepointCommissionedFunctions.sql
+:r .\Seed_config_AssetTemplate_Line.sql   -- #219: the line's impedance and length as characteristics of the line asset
+:r .\Seed_config_Rationale_SEL221F.sql   -- #219: the SEL-221F line-distance rationale template, one section per element
 :r .\Seed_asset_PlacementOccupancy.sql
 :r .\Seed_asset_InstrumentTransformersFromLegacy.sql
 :r .\Seed_scheme_AnalogInputs.sql

@@ -113,6 +113,8 @@
     "process.WriteEvidence":               null,
     "process.ParseSettingsText":           null,
     "process.SetParsedSetting":            "ConfigurationFile.Modify",
+    "document.CreateRationale":            "ConfigurationFile.Modify",
+    "document.SetRationaleValue":          "ConfigurationFile.Modify",
     "process.BasisDrift":               "ConfigurationFile.Read",
     "process.RebaseDraft":              "ConfigurationFile.Modify",
     "process.WriteBasisSnapshot":          null,

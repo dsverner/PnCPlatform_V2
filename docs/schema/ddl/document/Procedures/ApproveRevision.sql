@@ -54,6 +54,15 @@ BEGIN
      WHERE [RowId] = @RevisionRowId AND [IsDeleted] = 0 AND [ValidTo] IS NULL;
     IF @@ROWCOUNT = 0 THROW 50240, N'document.ApproveRevision: the revision is not a current revision.', 1;
 
+    -- #219: the platform-generated rationale of a configuration-file revision is issued with it and never edited after
+    IF @isConfig = 1
+        UPDATE r SET r.[Status] = N'Issued', r.[IssuedAt] = @ApprovedAt, r.[ModifiedBy] = @ActorId, r.[ModifiedAt] = @now
+          FROM [document].[Revision] r
+          JOIN [document].[Rationale] ra ON ra.[RevisionRowId] = r.[RowId] AND ra.[IsDeleted] = 0
+          JOIN [document].[RevisionLink] l ON l.[RevisionRowId] = r.[RowId] AND l.[LinkKind] = N'About' AND l.[SubjectKind] = N'DocumentRevision'
+                                            AND l.[SubjectEntityId] = @RevisionRowId AND l.[ValidTo] IS NULL AND l.[IsDeleted] = 0
+         WHERE r.[Status] = N'Draft' AND r.[IsDeleted] = 0 AND r.[ValidTo] IS NULL;
+
     DECLARE @detail NVARCHAR(MAX) = CASE WHEN @PackageRevisionRowId IS NULL THEN NULL
                                          ELSE (SELECT @PackageRevisionRowId AS [authorityPackageRevisionRowId] FOR JSON PATH, WITHOUT_ARRAY_WRAPPER) END;
     EXEC [audit].[LogAction] @ActionKindCode = N'Approval', @SubjectSchema = N'document', @SubjectTable = N'Revision',

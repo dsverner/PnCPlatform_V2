@@ -75,6 +75,7 @@ FileEndpoints.Map(app, authz);                                           // W7: 
 var fileLinks = app.Services.GetRequiredService<PnC.Api.Security.FileLinkTokens>();
 app.Logger.LogInformation("File links: {Seconds} s, key {Source}", fileLinks.LifetimeSeconds, fileLinks.KeyFromConfig ? "from Files:LinkKey" : "drawn at startup (links outlive neither the process nor their lifetime)");
 SettingsEndpoints.Map(app, authz);                                       // #168: the rendered settings text
+RationaleEndpoints.Map(app, authz);                                      // #219: the structured rationale (one section per element)
 ComplianceEndpoints.Map(app, catalog, authz);                            // #171: the obligation-rule evaluator (preview / effective)
 ProcessEndpoints.Map(app, catalog, map, authz, connectionString);   // W4: the procedure engine   // W3: fixed routes before the generic {schema}/{procedure}
 ApiEndpoints.Map(app, catalog, map, authz, app.Environment.EnvironmentName, connectionString);
