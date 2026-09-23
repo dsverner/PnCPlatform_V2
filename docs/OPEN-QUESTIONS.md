@@ -151,9 +151,14 @@ the text format, and the seed for the templates. → #61.
   (#158). The owner: a panel "should have values such as PNL12A, PNL34 etc."; the platform's panel nodes carry "2101 A-PROT"
   and the like. So a relay's physical place is known only down to the equipment group; the real panels — what cabling, DC feeds
   and panel drawings hang off in later phases — are not held. The owner's ruling: leave the book's two groupings as they are
-  (removing Equipment would need remembering to restore it). Open: where the real panel identifiers come from (not found in the
-  legacy database — unverified whether drawings or site records hold them); when they are loaded, the Equipment grouping shows
-  them with no screen change.
+  (removing Equipment would need remembering to restore it).
+  **Resolved the same day** — the owner, shown that a panel is a location node with its own name, description and code:
+  "I did not realize that panels were a first class citizen with name, description, code etc. That being the case, I don't see
+  an issue at all! The way the client sets up their protections is on a panel level anyway. So, ultimately PNL34A could very well
+  be L2103 A-PROT and at the present time the code field can be blank". So a panel's **Name** is the protection panel as the
+  client names it (e.g. L2103 A-PROT — what the migration put there, correctly), and its **Code** is the physical panel
+  identifier (e.g. PNL34A), blank until known; setting the code completes the FLOC beneath it (RenameNode rewrites the
+  descendants). No change made. Still open, and not blocking: where the physical panel codes come from.
 - **The engine stamps "now" from the machine it runs on, not from the database** (measured 2026-09-23 on VGS-PC02). The
   first schema smoke on PC02 was 268 PASS / 1 FAIL: "the engine moves the open exception to the new rule version and
   recomputes its clock (#23: 1, [])" (`docs/schema/ddl/tools/smoke.py:686`) — one exception moved, none visible. It is clock
