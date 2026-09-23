@@ -39,6 +39,7 @@ export default function SettingsBookScreen({ screen, params: p }: { screen: Scre
   const [chosen, setChosen] = useChosenColumns(store_('columns'), p.defaultColumns)
   const [showColumns, setShowColumns] = useState(false); const [showFilter, setShowFilter] = useEntryState('showFilter', false)
   const [raise, setRaise] = useState<RaiseOpts | null>(null)
+  const [toolsOpen, setToolsOpen] = useEntryState('toolsOpen', false)   // 2026-09-23: the tools fold away, closed by default
 
   // ---- the location list (legacy: the active location; round 4: a list first, the estate only by an explicit choice)
   // #179: WHICH node type is the definition's, because after #178 the unit a person picks is the BUILDING, not the
@@ -108,6 +109,8 @@ export default function SettingsBookScreen({ screen, params: p }: { screen: Scre
   }, [g, station, scopeDevice, chosen, stateDef, badged]) // eslint-disable-line react-hooks/exhaustive-deps
   const groupBy = g.key === 'none' ? null : (r: Row) => s(r[g.key]) || g.empty || '(none)'
   const groupCount = useMemo(() => (groupBy ? new Set(visible.map(groupBy)).size : 1), [visible, groupBy])
+  // what the closed tool bar says is in effect: only what hides rows, so a filter left on is never out of sight
+  const inEffect = [filter.trim() ? `rows filtered by “${filter.trim()}”` : '', filters.length ? `${filters.length} field filter${filters.length === 1 ? '' : 's'}` : ''].filter(Boolean)
   const toggleGroup = (gk: string) => setOpen((o) => { const n = new Set(o); if (n.has(gk)) n.delete(gk); else n.add(gk); return n })
 
   // ---- the commands (round 4 §3: the legacy right-click menu), from the definition
@@ -148,27 +151,37 @@ export default function SettingsBookScreen({ screen, params: p }: { screen: Scre
         <div className="no-print border-b border-slate-800">
           <Tabs tabs={p.states.map((x) => ({ key: x.value, label: x.label }))} value={gridState} onChange={chooseState} />
         </div>
-        <div className="no-print flex flex-wrap items-end gap-x-6 gap-y-2 rounded border border-slate-800 bg-slate-900/40 px-3 py-2">
-          <ToolGroup label="Find">
-            <input className={`${inputClass} w-56`} placeholder="filter the rows…" value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="filter the rows" />
-            <Button kind="mini" onClick={() => setShowFilter(!showFilter)}>By field…</Button>
-          </ToolGroup>
-          <ToolGroup label="Arrange">
-            {groupings.length > 1 && <label className="flex items-center gap-1 text-xs text-slate-400">Group by<select className={inputClass} value={grouping} onChange={(e) => { setGrouping(e.target.value); setOpen(new Set()); store(store_('grouping'), e.target.value) }}>
-              {groupings.map((x) => <option key={x.key} value={x.key}>{x.label}</option>)}</select></label>}
-            <Button kind="mini" onClick={() => setShowColumns(!showColumns)}>Columns…</Button>
-          </ToolGroup>
-          <ToolGroup label="Output" className="ml-auto">
-            <Button kind="mini" onClick={csv}>Export CSV</Button>
-            {p.report && <Button kind="mini" onClick={report}>Location report</Button>}
-            <Button kind="mini" onClick={reload} title="read the records again">Refresh</Button>
-          </ToolGroup>
+        {/* the owner, 2026-09-23: the tools fold away, closed by default, to give the records the screen; closed, the bar still
+            says what is in effect, so rows are never hidden without a visible reason */}
+        <div className="no-print rounded border border-slate-800 bg-slate-900/40">
+          <button type="button" onClick={() => setToolsOpen(!toolsOpen)} aria-expanded={toolsOpen} className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-slate-300 hover:bg-slate-800/60">
+            <span className="w-3 text-slate-500">{toolsOpen ? '▾' : '▸'}</span><span className="font-semibold">Filter, arrange, export</span>
+            {!toolsOpen && inEffect.length > 0 && <span className="truncate text-xs text-amber-300">· {inEffect.join(' · ')}</span>}
+          </button>
+          {toolsOpen && (<>
+          <div className="flex flex-wrap items-end gap-x-6 gap-y-2 border-t border-slate-800 px-3 py-2">
+            <ToolGroup label="Find">
+              <input className={`${inputClass} w-56`} placeholder="filter the rows…" value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="filter the rows" />
+              <Button kind="mini" onClick={() => setShowFilter(!showFilter)}>By field…</Button>
+            </ToolGroup>
+            <ToolGroup label="Arrange">
+              {groupings.length > 1 && <label className="flex items-center gap-1 text-xs text-slate-400">Group by<select className={inputClass} value={grouping} onChange={(e) => { setGrouping(e.target.value); setOpen(new Set()); store(store_('grouping'), e.target.value) }}>
+                {groupings.map((x) => <option key={x.key} value={x.key}>{x.label}</option>)}</select></label>}
+              <Button kind="mini" onClick={() => setShowColumns(!showColumns)}>Columns…</Button>
+            </ToolGroup>
+            <ToolGroup label="Output" className="ml-auto">
+              <Button kind="mini" onClick={csv}>Export CSV</Button>
+              {p.report && <Button kind="mini" onClick={report}>Location report</Button>}
+              <Button kind="mini" onClick={reload} title="read the records again">Refresh</Button>
+            </ToolGroup>
+          </div>
+          {showFilter && <div className="border-t border-slate-800 px-3 py-2"><AddFilter keys={lead.concat(context, chosen)} labelOf={(k) => labelOf(col(k))} onAdd={(f) => { setFilters([...filters, f]); setShowFilter(false) }} /></div>}
+          {showColumns && <div className="border-t border-slate-800 px-3 py-2"><ColumnChooser all={allColumns} labels={p.labels ?? {}} chosen={chosen} onChange={setChosen} defaults={p.defaultColumns} /></div>}
+          </>)}
         </div>
-        {showFilter && <AddFilter keys={lead.concat(context, chosen)} labelOf={(k) => labelOf(col(k))} onAdd={(f) => { setFilters([...filters, f]); setShowFilter(false) }} />}
         {filters.length > 0 && (
           <div className="flex flex-wrap gap-1">{filters.map((x, i) => <Pill key={i} tone="accent">{labelOf(col(x.key))} contains “{x.value}” <button type="button" className="ml-1" title="remove" onClick={() => setFilters(filters.filter((_, j) => j !== i))}>×</button></Pill>)}</div>
         )}
-        {showColumns && <ColumnChooser all={allColumns} labels={p.labels ?? {}} chosen={chosen} onChange={setChosen} defaults={p.defaultColumns} />}
         {raise && <RaiseRequest o={raise} onClose={() => setRaise(null)} />}
         {status}
         <DataGrid rows={visible} columns={columns} rowKey={(r) => s(r[rowKey])} groupBy={groupBy} openGroups={open} onToggleGroup={toggleGroup}
