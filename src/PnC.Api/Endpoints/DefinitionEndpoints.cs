@@ -153,7 +153,7 @@ public static class DefinitionEndpoints
             var code = map.ForProcedure(schema, procName) ?? throw new ApiException(404, "not_callable", $"{schema}.{procName} is not callable over the API.");
             await authz.RequireAsync(s, u, code, "DefinitionVersion", versionRowId, $"POST {schema}.{procName}", http.Connection.RemoteIpAddress?.ToString() ?? "", ct);
             var args = new JsonObject { ["VersionRowId"] = versionRowId.ToString() };
-            foreach (var k in new[] { "EffectiveFrom", "OverrideReason", "OverrideApprovedByActorId" })
+            foreach (var k in new[] { "EffectiveFrom", "OverrideReason" })   // #232: an override's approver approves from their own session (security.ApproveOverride), never named here
                 if (body[k] is not null) args[k] = body[k]!.DeepClone();
             await s.ExecuteProcedureAsync(proc, args, ct);
             var steps = kind == "Program.Procedure"

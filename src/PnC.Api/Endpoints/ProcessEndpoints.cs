@@ -69,12 +69,54 @@ public static class ProcessEndpoints
             var r = await Exec(http, "Transition", new JsonObject
             {
                 ["WorkflowInstanceEntityId"] = id.ToString(), ["TransitionName"] = name, ["Reason"] = body["reason"]?.DeepClone(), ["GuardEvaluation"] = guards,
-                ["OverrideReason"] = body["overrideReason"]?.DeepClone(), ["OverrideApprovedByActorId"] = body["overrideApprovedByActorId"]?.DeepClone(),
+                ["OverrideReason"] = body["overrideReason"]?.DeepClone(),
             }, ct);
             var interp = Interp(http);
             foreach (var pi in await StartedRuns(http.Session(), id, ct)) await interp.AdvanceAsync(pi, await http.Session().NowAsync(ct), ct);
             await ComplianceTriggers.RequestForWorkAsync(http.Session(), catalog, wf.SubjectKind, wf.Subject, wf.WorkRequest, $"process.Transition {name}", log, ct);   // #214
             return Results.Json(new { workflowInstanceEntityId = id, transition = name, toState = r["ToState"], transitionId = r["TransitionId"] });
+        });
+
+        // ---- #232: a segregation override approved by the approver, from their own session. security.ApproveOverride decides who
+        // may (the owner, 2026-09-23: someone who could do the act themselves) — the act's permission and role in the database; a
+        // step role's competency is an expression, so it is evaluated here, as the commit's is, and passed as a verdict (the
+        // procedure is not callable through the generic endpoint, so the verdict cannot come from a caller)
+        static IEnumerable<DocBlock> Steps(DocBlock b) => (b.Kind == "step" ? new[] { b } : Array.Empty<DocBlock>()).Concat(b.Children.SelectMany(Steps));
+        app.MapPost("/api/v1/process/override-approvals", async (HttpContext http, CancellationToken ct) =>
+        {
+            var body = await ReadObject(http, ct);
+            var u = http.User(); var s = http.Session();
+            var kind = body["subjectKind"]?.GetValue<string>() ?? throw new ApiException(400, "bad_request", "subjectKind is required.");
+            var subject = Guid.TryParse(body["subjectEntityId"]?.ToString(), out var sg) ? sg : throw new ApiException(400, "bad_request", "subjectEntityId is required.");
+            var action = body["action"]?.GetValue<string>() ?? throw new ApiException(400, "bad_request", "action is required.");
+            var forPerson = Guid.TryParse(body["forPersonEntityId"]?.ToString(), out var fp) ? fp : throw new ApiException(400, "bad_request", "forPersonEntityId is required.");
+            var competencyOk = false;
+            if (kind == "ProcedureInstance")
+            {
+                var inst = await Interp(http).LoadAsync(subject, ct);
+                var now = await s.NowAsync(ct);
+                var reader = new DbFactReader(s.Connection, null);
+                foreach (var step in Steps(inst.Root).Where(b => b.Node["signoff"]?["action"]?.GetValue<string>() == action))
+                {
+                    var alias = step.Node["role"]?.GetValue<string>();
+                    if (alias is null) continue;
+                    if (inst.Document["roles"]?[alias]?["requires"] is not JsonObject req
+                        || Evaluator.Evaluate(req, reader, new Ref(u.PersonEntityId.ToString(), "Person"), now).Value is true) { competencyOk = true; break; }
+                }
+            }
+            var p = catalog.Procedure("security", "ApproveOverride") ?? throw new ApiException(500, "internal", "security.ApproveOverride is not in the catalogue.");
+            var r = await s.ExecuteProcedureAsync(p, new JsonObject
+            {
+                ["SubjectKind"] = kind, ["SubjectEntityId"] = subject.ToString(), ["Action"] = action, ["ForPersonEntityId"] = forPerson.ToString(),
+                ["Reason"] = body["reason"]?.DeepClone(), ["CompetencyOk"] = competencyOk,
+            }, ct);
+            return Results.Json(new { overrideApprovalId = r["OverrideApprovalId"]?.DeepClone(), expiresAt = r["ExpiresAt"]?.DeepClone() });
+        });
+        app.MapPost("/api/v1/process/override-approvals/{id:long}/withdraw", async (long id, HttpContext http, CancellationToken ct) =>
+        {
+            var p = catalog.Procedure("security", "WithdrawOverrideApproval") ?? throw new ApiException(500, "internal", "security.WithdrawOverrideApproval is not in the catalogue.");
+            await http.Session().ExecuteProcedureAsync(p, new JsonObject { ["OverrideApprovalId"] = id }, ct);
+            return Results.Json(new { overrideApprovalId = id, withdrawn = true });
         });
 
         // ---- procedure instances
@@ -144,7 +186,7 @@ public static class ProcessEndpoints
             var live = (await s.RowsAsync("""
                 SELECT st.State, st.Outcome, st.AssignedRoleCode, st.ClaimedByActorId, st.ClaimedAt, st.ClaimExpiresAt, st.Draft, st.DraftModifiedAt,
                        st.CapturedAt, st.CapturedByActorId, st.CaptureSource, st.CommittedRecordEntityId, st.CommittedByActorId, st.WitnessedByActorId, st.CommittedAt, st.HeldReason,
-                       cp.DisplayName AS ClaimedByDisplayName, wp.DisplayName AS WitnessedByDisplayName
+                       cp.DisplayName AS ClaimedByDisplayName, wp.DisplayName AS WitnessedByDisplayName, ca.PersonEntityId AS ClaimedByPersonEntityId
                 FROM process.vStepInstance st
                 LEFT JOIN personnel.vActor ca ON ca.ActorId = st.ClaimedByActorId LEFT JOIN personnel.vPerson cp ON cp.EntityId = ca.PersonEntityId
                 LEFT JOIN personnel.vActor wa ON wa.ActorId = st.WitnessedByActorId LEFT JOIN personnel.vPerson wp ON wp.EntityId = wa.PersonEntityId
@@ -159,8 +201,18 @@ public static class ProcessEndpoints
             var alias = node["role"]?.GetValue<string>();
             var roleNode = alias is null ? null : inst.Document["roles"]?[alias] as JsonObject;
             var draftText = live["Draft"]?.GetValue<string>();
+            // #232: an override another person has approved for the claimant's sign-off on this run, still unused
+            var signoffAction = node["signoff"]?["action"]?.GetValue<string>();
+            JsonObject? liveOverride = null;
+            if (signoffAction is not null && G(live["ClaimedByPersonEntityId"]) is Guid claimPerson)
+                liveOverride = (await s.RowsAsync("""
+                    SELECT o.OverrideApprovalId, o.ExpiresAt, p.DisplayName AS ApprovedByDisplayName
+                    FROM security.fLiveOverrideApproval(N'ProcedureInstance', @i, @a, @p, SYSDATETIMEOFFSET()) o
+                    LEFT JOIN personnel.vActor ac ON ac.ActorId = o.ApprovedByActorId LEFT JOIN personnel.vPerson p ON p.EntityId = ac.PersonEntityId
+                    """, new Dictionary<string, object?> { ["@i"] = instanceId, ["@a"] = signoffAction, ["@p"] = claimPerson }, ct)).FirstOrDefault() as JsonObject;
             return Results.Json(new
             {
+                claimedByPersonEntityId = live["ClaimedByPersonEntityId"]?.DeepClone(), overrideApproval = liveOverride?.DeepClone(),
                 stepInstanceEntityId = id, procedureInstanceEntityId = instanceId, procedureKey = inst.Document["key"]?.DeepClone(), procedureVersionRowId = inst.VersionRowId,
                 workRequestEntityId = wr, workflowInstanceEntityId = inst.WorkflowInstanceEntityId, subjectKind = inst.SubjectKind, subjectEntityId = inst.SubjectEntityId,
                 blockPath = row.Path, stepId = row.StepId, state = live["State"]?.DeepClone(), outcome = live["Outcome"]?.DeepClone(), heldReason = live["HeldReason"]?.DeepClone(),
@@ -268,7 +320,7 @@ public static class ProcessEndpoints
             {
                 ["StepInstanceEntityId"] = id.ToString(), ["Outcome"] = body["outcome"]?.DeepClone(), ["Capture"] = capture?.DeepClone(), ["Evidence"] = body["evidence"]?.DeepClone(),
                 ["ValidationOk"] = validationOk, ["ValidationUnknowns"] = unknowns.Count == 0 ? null : string.Join("; ", unknowns), ["CompetencyOk"] = competencyOk,
-                ["OverrideReason"] = body["overrideReason"]?.DeepClone(), ["OverrideApprovedByActorId"] = body["overrideApprovedByActorId"]?.DeepClone(),
+                ["OverrideReason"] = body["overrideReason"]?.DeepClone(),
                 ["CapturedByActorId"] = capturedBy?.ToString(), ["CapturedAt"] = capturedAt, ["CaptureTimeQuality"] = deferred ? 2 : null, ["At"] = now,
             }, ct);
 
@@ -283,7 +335,7 @@ public static class ProcessEndpoints
                 var tname = result["AdvancesTransition"]!.GetValue<string>();
                 var guards = GuardVerdicts(s, wf, tname, now);
                 var tr = await Exec(http, "Transition", new JsonObject { ["WorkflowInstanceEntityId"] = wf.EntityId.ToString(), ["TransitionName"] = tname, ["GuardEvaluation"] = guards, ["FiredByStepInstanceEntityId"] = id.ToString(), ["At"] = now,
-                    ["OverrideReason"] = body["overrideReason"]?.DeepClone(), ["OverrideApprovedByActorId"] = body["overrideApprovedByActorId"]?.DeepClone() }, ct);
+                    ["OverrideReason"] = body["overrideReason"]?.DeepClone() }, ct);
                 advanced = $"{wfKey}.{tname} → {tr["ToState"]}";
             }
             // 11 branch outcome: the enclosing member or branch ends with it

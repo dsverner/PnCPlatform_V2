@@ -2288,6 +2288,77 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
         }
         else Skip("#227 requests from the old program (needs the DEV identities and a connection string)");
 
+        // ======== #232 (2026-09-23): a Block-mode segregation override is approved by the approver, from their own session — never a
+        // name the person acting types. The owner: the approver must be someone who could do the act themselves. A Block rule is made
+        // for this run only (an author may not approve their own definition version) and withdrawn at once after.
+        if (cs is not null && windows is null)
+        {
+            await using var con232 = new SqlConnection(cs);
+            await con232.OpenAsync();
+            async Task<object?> Sql232(string text, params (string name, object? value)[] ps)
+            {
+                await using var cmd = con232.CreateCommand(); cmd.CommandText = text;
+                foreach (var (n, v) in ps) cmd.Parameters.AddWithValue(n, v ?? DBNull.Value);
+                return await cmd.ExecuteScalarAsync();
+            }
+            var k232_adminPerson = await Sql232("SELECT TOP (1) PersonEntityId FROM security.vUser WHERE UserPrincipalName = @u", ("@u", adminUpn));
+            var k232_approverActor = await Sql232("SELECT TOP (1) a.ActorId FROM security.vUser u JOIN personnel.vActor a ON a.PersonEntityId = u.PersonEntityId WHERE u.UserPrincipalName = @u ORDER BY a.ActorId", ("@u", approverUpn));
+            var k232_rule = await Definition("Program.SegregationRule", $"{tag}_SEG_BLOCK", "#232 smoke: Block rule, withdrawn at once",
+                new { rules = new[] { new { actionA = "Author", actionB = "Approve", subjectKind = "DefinitionVersion", mode = "Block" } } });
+            var k232_ruleDef = k232_rule is null ? null : await Sql232("SELECT DefinitionEntityId FROM config.DefinitionVersion WHERE RowId = @r", ("@r", k232_rule));
+            try
+            {
+                // the admin authors a version and wants to approve it themselves
+                var k232_key = $"{tag}_SEG_SUBJECT";
+                await Post(admin, "api/v1/config/AddDefinition", new { DefinitionKind = "Program.SchemeType", DefinitionKey = k232_key, Name = "#232 smoke subject" });
+                async Task<Guid?> NewVersion() { var (_, vb) = await Post(admin, "api/v1/config/AddDefinitionVersion", new { DefinitionKey = k232_key, DefinitionKind = "Program.SchemeType", ChangeNote = "#232", PayloadText = JsonSerializer.Serialize(new { g = 1, name = "#232 " + Guid.NewGuid().ToString("N")[..6] }) }); return Id(vb, "VersionRowId"); }
+                var k232_v1 = await NewVersion();
+                // (a) naming an approver is not an approval
+                var (k232_a1s, k232_a1b) = await Post(admin, "api/v1/config/ApproveDefinitionVersion", new { VersionRowId = k232_v1, OverrideReason = "smoke #232", OverrideApprovedByActorId = k232_approverActor });
+                // a request that names an approver is refused before it reaches the database (the name is never accepted from a client);
+                // without one, the Block rule refuses the author and says another person must approve first
+                var (k232_a2s, k232_a2b) = await Post(admin, "api/v1/config/ApproveDefinitionVersion", new { VersionRowId = k232_v1, OverrideReason = "smoke #232" });
+                Must(k232_rule is not null && k232_v1 is not null && k232_a1s == HttpStatusCode.BadRequest && (k232_a1b?["detail"]?.ToString() ?? "").Contains("never accepted")
+                     && k232_a2s == HttpStatusCode.Conflict && (k232_a2b?["detail"]?.ToString() ?? "").Contains("unless another person"),
+                    $"#232: under a Block rule the author cannot approve their own version by naming an approver [{(int)k232_a1s}: {k232_a1b?["detail"]}], nor with a reason alone [{(int)k232_a2s}: {k232_a2b?["detail"]}]");
+                object Ask(Guid? v) => new { subjectKind = "DefinitionVersion", subjectEntityId = v, action = "Approve", forPersonEntityId = k232_adminPerson, reason = "smoke #232: the author's own fixture" };
+                // (b) not for oneself; (c) not by someone who could not approve it themselves; (d) by someone who could
+                var (k232_b1s, k232_b1b) = await Post(admin, "api/v1/process/override-approvals", Ask(k232_v1));
+                var (k232_c1s, k232_c1b) = await Post(tech!, "api/v1/process/override-approvals", Ask(k232_v1));
+                var (k232_d1s, k232_d1b) = await Post(approver, "api/v1/process/override-approvals", Ask(k232_v1));
+                Must(k232_b1s == HttpStatusCode.Conflict && (k232_b1b?["detail"]?.ToString() ?? "").Contains("for yourself")
+                     && k232_c1s == HttpStatusCode.Conflict && (k232_c1b?["detail"]?.ToString() ?? "").Contains("could do this")
+                     && k232_d1s == HttpStatusCode.OK && k232_d1b?["overrideApprovalId"] is not null,
+                    $"#232: an override is not approved for oneself [{(int)k232_b1s}], nor by a person who could not approve it [{(int)k232_c1s}: {k232_c1b?["detail"]}], and is by one who could [{(int)k232_d1s} {Code(k232_d1b)} {k232_d1b?["detail"]}]");
+                // (e) the author now approves, once, and the override names the approver who approved it
+                var (k232_e1s, k232_e1b) = await Post(admin, "api/v1/config/ApproveDefinitionVersion", new { VersionRowId = k232_v1, OverrideReason = "smoke #232" });
+                var k232_named = await Sql232("SELECT COUNT(*) FROM security.SegregationOverride WHERE SubjectEntityId = @v AND ApprovedByActorId = @a", ("@v", k232_v1), ("@a", k232_approverActor));
+                var k232_used = await Sql232("SELECT COUNT(*) FROM security.OverrideApproval WHERE EventKind = N'Used' AND SubjectEntityId = @v", ("@v", k232_v1));
+                Must(k232_e1s == HttpStatusCode.OK && Convert.ToInt32(k232_named) == 1 && Convert.ToInt32(k232_used) == 1,
+                    $"#232: with the approval the author's approval goes through, the override records who approved it ({k232_named}) and the approval is used ({k232_used}) [{(int)k232_e1s} {k232_e1b?["detail"]}]");
+                // (f) single use: the next version needs its own approval
+                var k232_v2 = await NewVersion();
+                var (k232_f1s, _) = await Post(admin, "api/v1/config/ApproveDefinitionVersion", new { VersionRowId = k232_v2, OverrideReason = "smoke #232" });
+                // (g) an approval taken back before use: only by its approver, and then it no longer counts
+                var (k232_g1s, k232_g1b) = await Post(approver, "api/v1/process/override-approvals", Ask(k232_v2));
+                var k232_gid = k232_g1b?["overrideApprovalId"]?.ToString();
+                var (k232_g2s, _) = await Post(tech!, $"api/v1/process/override-approvals/{k232_gid}/withdraw", new { });
+                var (k232_g3s, _) = await Post(approver, $"api/v1/process/override-approvals/{k232_gid}/withdraw", new { });
+                var (k232_g4s, _) = await Post(admin, "api/v1/config/ApproveDefinitionVersion", new { VersionRowId = k232_v2, OverrideReason = "smoke #232" });
+                Must(k232_f1s == HttpStatusCode.Conflict && k232_g1s == HttpStatusCode.OK && k232_g2s == HttpStatusCode.Conflict && k232_g3s == HttpStatusCode.OK && k232_g4s == HttpStatusCode.Conflict,
+                    $"#232: an approval is used once [{(int)k232_f1s}]; taken back only by its approver [{(int)k232_g2s} / {(int)k232_g3s}], after which the author is refused again [{(int)k232_g4s}]");
+                var (k232_h1s, _) = await Post(admin, "api/v1/security/ApproveOverride", new { SubjectKind = "DefinitionVersion", SubjectEntityId = k232_v2, Action = "Approve", ForPersonEntityId = k232_adminPerson, Reason = "x", CompetencyOk = true });
+                Must(k232_h1s is HttpStatusCode.NotFound or HttpStatusCode.Forbidden, $"#232: the approval procedure is not callable through the generic endpoint [{(int)k232_h1s}]");
+            }
+            finally
+            {
+                if (k232_ruleDef is not null) await Post(admin, "api/v1/config/Definition_SoftDelete", new { EntityId = k232_ruleDef });
+            }
+            var k232_left = await Sql232("SELECT COUNT(*) FROM config.vDefinition WHERE DefinitionKey = @k", ("@k", $"{tag}_SEG_BLOCK"));
+            Must(Convert.ToInt32(k232_left) == 0, $"#232: the run's Block rule is withdrawn ({k232_left} left)");
+        }
+        else Skip("#232 override approvals (needs the DEV identities and a connection string)");
+
         // ======== #168 increment 2 (2026-09-16): the settings edited in the platform, the file written by it — the owner's four-step
         // procedure on the BDD15B that the run above left in service. REQUEST copies the in-service revision as the change's outstanding
         // revision (the legacy M from the A); a value is edited through SetParsedSetting; the settings step commits with no file and

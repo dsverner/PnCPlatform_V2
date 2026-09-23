@@ -958,9 +958,11 @@ def main():
     cur.execute("EXEC config.ApproveDefinitionVersion @VersionRowId=?, @ActorId=?", qrv, a1)
     check(expect_error(cur, "EXEC work.AssignPerson @WorkRequestEntityId=?, @PersonEntityId=?, @ActorId=?", wr, per4, SYSTEM_ACTOR, contains="lacks the qualification"), "AssignPerson refuses an unqualified person under a Block requirement (§11.6)")
     check(expect_error(cur, "EXEC work.AssignPerson @WorkRequestEntityId=?, @PersonEntityId=?, @RoleCode=N'ReadOnly', @ActorId=?", wr, per4, SYSTEM_ACTOR, contains="not an assignment role"), "AssignPerson refuses a role that is not an assignment role")
-    ga = q("DECLARE @e UNIQUEIDENTIFIER; EXEC work.AssignPerson @WorkRequestEntityId=?, @PersonEntityId=?, @OverrideReason=N'smoke: supervised', @OverrideApprovedByActorId=?, @ActorId=?, @GrantEntityId=@e OUTPUT; SELECT @e", wr, per4, a1, SYSTEM_ACTOR)[0][0]
-    check(q("SELECT COUNT(*) FROM security.vGrant WHERE EntityId = ? AND ScopeKind = N'WorkRequest' AND RoleCode = N'Assignee'", ga)[0][0] == 1
-          and q("SELECT COUNT(*) FROM security.vSegregationOverride WHERE SubjectKind = N'WorkRequest' AND SubjectEntityId = ?", wr)[0][0] == 1, "AssignPerson with an approved override grants the assignment role scoped to the request and records the override (§9.7, §11.7)")
+    # #232: an approver NAMED by the caller is no longer an approval — the approver approves from their own session
+    # (security.ApproveOverride; exercised with real identities in the API smoke). A named approver changes nothing:
+    check(expect_error(cur, "EXEC work.AssignPerson @WorkRequestEntityId=?, @PersonEntityId=?, @OverrideReason=N'smoke: supervised', @OverrideApprovedByActorId=?, @ActorId=?", wr, per4, a1, SYSTEM_ACTOR, contains="lacks the qualification")
+          and q("SELECT COUNT(*) FROM security.vSegregationOverride WHERE SubjectKind = N'WorkRequest' AND SubjectEntityId = ?", wr)[0][0] == 0,
+          "AssignPerson ignores an approver named by the caller: still refused, no override recorded (#232)")
     cur.execute("DECLARE @t DATETIMEOFFSET(7) = SYSDATETIMEOFFSET(); EXEC personnel.PersonQualification_Add @PersonEntityId=?, @QualificationTypeCode=?, @GrantedAt=@t, @GrantedByActorId=?, @ActorId=?", per4, QT, SYSTEM_ACTOR, SYSTEM_ACTOR)
     ga2 = q("DECLARE @e UNIQUEIDENTIFIER; EXEC work.AssignPerson @WorkRequestEntityId=?, @PersonEntityId=?, @ActorId=?, @GrantEntityId=@e OUTPUT; SELECT @e", wr, per4, SYSTEM_ACTOR)[0][0]
     # ---- PROCEDURES.md #35: the remaining catalogue facts

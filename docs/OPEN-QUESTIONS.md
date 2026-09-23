@@ -134,6 +134,11 @@ the text format, and the seed for the templates. → #61.
   Block rule when the caller names a different person as `OverrideApprovedByActorId`; nothing shows that person approved.
   Every seeded rule is WarnAndLog, so it is latent. Recommendation: the approval becomes the approver's own act (recorded in
   their own session) before any rule is switched to Block. Not built.
+  **Built 2026-09-23 as #232** (the owner: the approver must be "someone who could do the action themselves", option A): the
+  approver records the approval from their own session (`security.ApproveOverride`, `POST /api/v1/process/override-approvals`),
+  single use, 24 h, withdrawable; a name in a request is refused. **Raised, not built:** the approve control exists on the step
+  screen only; approving an override for a definition approval, a record acceptance or a work assignment is API-only until
+  those screens get it.
 - **The simple settings lifecycle lets an applied package be withdrawn** (#228): `SETTINGS_LIFECYCLE_SIMPLE` has
   `Withdraw` from Applied ("applied to the relay"), so a request under the four-step procedure can be cancelled after its
   settings are on the relay, and the record then says the old settings are in service. The full lifecycle has no such

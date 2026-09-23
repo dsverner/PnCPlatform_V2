@@ -56,14 +56,20 @@ BEGIN
     DECLARE @blocked NVARCHAR(400) = (SELECT STRING_AGG([QualificationTypeCode], N', ') FROM @missing WHERE [Mode] = N'Block');
     DECLARE @warned  NVARCHAR(400) = (SELECT STRING_AGG([QualificationTypeCode], N', ') FROM @missing WHERE [Mode] <> N'Block');
     DECLARE @overrode BIT = 0;
+    -- #232 (2026-09-23): the override's approval is the approver's own act (security.ApproveOverride on this work request, action
+    -- 'Assign', for the person assigning), never a name passed in: @OverrideApprovedByActorId is ignored; the approval is used once
+    SET @OverrideApprovedByActorId = NULL;
+    DECLARE @assigner UNIQUEIDENTIFIER = (SELECT [PersonEntityId] FROM [personnel].[Actor] WHERE [ActorId] = @ActorId), @approvalId BIGINT, @approvalReason NVARCHAR(400);
     IF @blocked IS NOT NULL
     BEGIN
-        IF @OverrideReason IS NULL OR @OverrideApprovedByActorId IS NULL
+        SELECT @approvalId = [OverrideApprovalId], @OverrideApprovedByActorId = [ApprovedByActorId], @approvalReason = [Reason]
+        FROM [security].[fLiveOverrideApproval](N'WorkRequest', @WorkRequestEntityId, N'Assign', @assigner, @OccurredAt);
+        SET @OverrideReason = ISNULL(NULLIF(LTRIM(RTRIM(@OverrideReason)), N''), @approvalReason);
+        IF @approvalId IS NULL
         BEGIN
-            DECLARE @m1 NVARCHAR(400) = CONCAT(N'work.AssignPerson: the person lacks the qualification required for this work (Block): ', @blocked, N'; an override needs a reason and another person''s approval (§11.6, §11.7).');
+            DECLARE @m1 NVARCHAR(400) = CONCAT(N'work.AssignPerson: the person lacks the qualification required for this work (Block): ', @blocked, N'; an override needs another person, who could make this assignment, to approve it first from their own session (§11.6, §11.7).');
             THROW 50303, @m1, 1;
         END;
-        IF @OverrideApprovedByActorId = @ActorId THROW 50304, N'work.AssignPerson: the override must be approved by a different actor (§11.7).', 1;
         SET @overrode = 1;
     END;
 
@@ -76,9 +82,14 @@ BEGIN
         EXEC [audit].[LogAction] @ActionKindCode = N'Override', @SubjectSchema = N'work', @SubjectTable = N'WorkRequest', @SubjectEntityId = @WorkRequestEntityId,
                                  @DefinitionVersionRowId = @ruleVersion, @Detail = @detail, @ActorId = @ActorId, @OccurredAt = @OccurredAt, @ActionLogId = @logId OUTPUT;
         IF @overrode = 1
+        BEGIN
+            DECLARE @ovId BIGINT;
             EXEC [security].[SegregationOverride_Append] @RuleDefinitionVersionRowId = @ruleVersion, @SubjectKind = N'WorkRequest', @SubjectEntityId = @WorkRequestEntityId,
                  @ActionTaken = N'Assign without required qualification', @ActorId = @ActorId, @Reason = @OverrideReason, @ApprovedByActorId = @OverrideApprovedByActorId,
-                 @OccurredAt = @OccurredAt, @ActionLogId = @logId;
+                 @OccurredAt = @OccurredAt, @ActionLogId = @logId, @OverrideId = @ovId OUTPUT;
+            INSERT [security].[OverrideApproval] ([EventKind], [RefersToOverrideApprovalId], [SubjectKind], [SubjectEntityId], [Action], [ForPersonEntityId], [ActorId], [OccurredAt], [SegregationOverrideId], [ActionLogId])
+            VALUES (N'Used', @approvalId, N'WorkRequest', @WorkRequestEntityId, N'Assign', @assigner, @ActorId, @OccurredAt, @ovId, @logId);
+        END;
     END;
     EXEC [security].[Grant_Add] @GranteeKind = N'User', @GranteeEntityId = @user, @RoleCode = @RoleCode, @ScopeKind = N'WorkRequest', @ScopeWorkRequestEntityId = @WorkRequestEntityId,
          @GrantedByActorId = @ActorId, @ValidFrom = @OccurredAt, @ActorId = @ActorId, @MigrationRunId = @MigrationRunId, @EntityId = @GrantEntityId OUTPUT, @RowId = @RowId OUTPUT;

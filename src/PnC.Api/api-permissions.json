@@ -53,6 +53,7 @@
   "_227": "A change request brought over from the old program (#227): its two tracks are set by hand and it is finished or withdrawn as the old program did. The three procedures take WorkRequest.Modify on the request named in the body, so a scoped grant covers only its own requests; the workflow's Close and Cancel role rules still apply inside them. document.SetOutOfService is called only by work.CompleteLegacyRequest.",
 
   "_228": "#228 (2026-09-22): the engine procedures that a dedicated endpoint wraps are not callable through the generic endpoint. Called directly they took the engine's own inputs from the caller: process.Transition skipped its role check for any existing step named in FiredByStepInstanceEntityId (measured on DEV: a technician cancelled a request that needs the engineer role), and process.CommitStep took ValidationOk, CompetencyOk and CapturedByActorId as given. The dedicated endpoints (src/PnC.Api/Endpoints/ProcessEndpoints.cs) compute those; their permission codes are here.",
+  "_232": "#232: a segregation override's approval is the approver's own act, through POST /api/v1/process/override-approvals (which evaluates a step role's competency and passes the verdict; security.ApproveOverride decides who may). The procedures and the generated writers of the approval and override logs are not callable through the generic endpoint — an Administrator's Grant.Modify would otherwise write an approval, or an override, in someone else's name.",
   "endpoints": {
       "process.Transition": "WorkRequest.Modify",
       "process.StartWorkflow": "WorkRequest.Modify",
@@ -183,6 +184,10 @@
     "scheme.AddSchemeMember":              "Scheme.Modify",
     "scheme.RaiseProtectionOperation":     "Record.Modify",
     "security.CheckSegregation":           null,
+    "security.ApproveOverride":            null,
+    "security.WithdrawOverrideApproval":   null,
+    "security.OverrideApproval_Append":    null,
+    "security.SegregationOverride_Append": null,
     "security.Delegate":                   "Grant.Modify",
     "work.AssignPerson":                   "WorkRequest.Modify"
   }

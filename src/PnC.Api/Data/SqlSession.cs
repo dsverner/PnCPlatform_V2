@@ -51,7 +51,9 @@ public sealed class SqlSession : IAsyncDisposable
 
     // DeferFileWrite (#230): process.SetParsedSetting's switch for callers that write the settings file once after many edits;
     // taken from a body it would let a caller leave an outstanding record's file behind its settings
-    private static readonly HashSet<string> NeverBound = new(StringComparer.OrdinalIgnoreCase) { "ActorId", "MigrationRunId", "DeferFileWrite" };
+    // OverrideApprovedByActorId (#232): a segregation override's approver approves from their own session (security.ApproveOverride);
+    // a name in a body was taken as the approval, with nothing to show that person approved
+    private static readonly HashSet<string> NeverBound = new(StringComparer.OrdinalIgnoreCase) { "ActorId", "MigrationRunId", "DeferFileWrite", "OverrideApprovedByActorId" };
     /// <summary>Views materialised whole before ordering and paging (W7; Api:MaterialiseBeforePaging).</summary>
     public static HashSet<string> MaterialiseBeforePaging { get; } = new(StringComparer.OrdinalIgnoreCase);
 

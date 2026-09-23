@@ -32,7 +32,14 @@ export interface StepInstance {
   witnessedByActorId: string | null; witnessedByDisplayName: string | null; committedAt: string | null; committedByActorId: string | null; committedRecordEntityId: string | null
   capturedAt: string | null; captureSource: string | null; draftModifiedAt: string | null; draft: Record<string, unknown> | null; dueAt: string | null; dueBasis: string
   definition: StepDefinition
+  /** #232: the claimant's person, and an override another person has approved for their sign-off on this run (unused, unexpired) */
+  claimedByPersonEntityId: string | null
+  overrideApproval: { OverrideApprovalId: number; ExpiresAt: string; ApprovedByDisplayName: string | null } | null
 }
+/** #232: a segregation override approved by the approver, from their own session — never a name typed by the person acting */
+export const approveOverride = (body: { subjectKind: string; subjectEntityId: string; action: string; forPersonEntityId: string; reason: string }) =>
+  postJson<{ overrideApprovalId: number; expiresAt: string }>('/api/v1/process/override-approvals', body)
+export const withdrawOverride = (id: number) => postJson(`/api/v1/process/override-approvals/${id}/withdraw`, {})
 export const stepInstance = (id: string) => getJson<StepInstance>(`/api/v1/process/step-instances/${id}`)
 export interface Evidence { name: string; mimeType: string; kind: string; contentBase64: string }
 export interface CommitResult { stepInstanceEntityId: string; outcome: string; recordEntityId: string | null; producedEntityId: string | null; branchOutcome: string | null; advanced: string | null; deferred: boolean; instance: { changes: number; completed: boolean; notes: string[] } }

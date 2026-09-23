@@ -5,8 +5,9 @@
 -- (or '*') applies:
 --   WarnAndLog (the design's default) — proceeds only with a stated @OverrideReason; the override
 --     is logged (audit.ActionLog kind Override) and appended to security.SegregationOverride.
---   Block — refuses unless a different person approves the override (@OverrideApprovedByActorId,
---     recorded in SegregationOverride.ApprovedByActorId) with a reason.
+--   Block — refuses unless a different person who could do the act has approved the override from their own session
+--     (security.ApproveOverride, #232); the approval is used once and its approver recorded in SegregationOverride.ApprovedByActorId.
+--     @OverrideApprovedByActorId is kept for the callers' signatures and ignored.
 -- No effective rule naming the pair → no constraint. Payload shape (implementation choice, STEPS.md
 -- step 11): {"rules":[{"actionA":"Prepare","actionB":"Approve","subjectKind":"ConfigurationFileRevision","mode":"WarnAndLog"}]}
 CREATE PROCEDURE [security].[CheckSegregation]
@@ -48,16 +49,22 @@ BEGIN
     IF @mode IS NULL RETURN;
 
     DECLARE @pair NVARCHAR(200) = CONCAT(@ActionA, N' and ', @ActionB, N' of ', @SubjectKind);
+    -- #232 (2026-09-23): the approval is the approver's own act (security.ApproveOverride, from their own session, by someone
+    -- who could do this themselves), never a name the caller passes: @OverrideApprovedByActorId is ignored. The live approval
+    -- for this item, this action and this person is taken, and used once.
+    SET @OverrideApprovedByActorId = NULL;
+    DECLARE @personB UNIQUEIDENTIFIER = (SELECT [PersonEntityId] FROM [personnel].[Actor] WHERE [ActorId] = @ActorB);
+    DECLARE @approvalId BIGINT, @approvalReason NVARCHAR(400);
+    SELECT @approvalId = [OverrideApprovalId], @OverrideApprovedByActorId = [ApprovedByActorId], @approvalReason = [Reason]
+    FROM [security].[fLiveOverrideApproval](@SubjectKind, @SubjectEntityId, @ActionB, @personB, @OccurredAt);
+    SET @OverrideReason = ISNULL(NULLIF(LTRIM(RTRIM(@OverrideReason)), N''), @approvalReason);
     IF @mode = N'Block'
     BEGIN
-        IF @OverrideApprovedByActorId IS NULL OR @OverrideReason IS NULL
+        IF @approvalId IS NULL
         BEGIN
-            DECLARE @m1 NVARCHAR(400) = CONCAT(N'security.CheckSegregation: segregation of duties (Block) — the same person may not perform ', @pair, N'; an override needs a reason and approval by another person (§11.7).');
+            DECLARE @m1 NVARCHAR(400) = CONCAT(N'security.CheckSegregation: the same person may not perform ', @pair, N' unless another person who could do this approves an override first, from their own session.');
             THROW 50250, @m1, 1;
         END;
-        IF @OverrideApprovedByActorId = @ActorB OR EXISTS (SELECT 1 FROM [personnel].[Actor] a JOIN [personnel].[Actor] b ON b.[PersonEntityId] = a.[PersonEntityId]
-                                                          WHERE a.[ActorId] = @OverrideApprovedByActorId AND b.[ActorId] = @ActorB AND a.[PersonEntityId] IS NOT NULL)
-            THROW 50251, N'security.CheckSegregation: the override must be approved by a different person (§11.7).', 1;
     END
     ELSE IF @OverrideReason IS NULL
     BEGIN
@@ -73,5 +80,8 @@ BEGIN
     EXEC [security].[SegregationOverride_Append] @RuleDefinitionVersionRowId = @ruleVersion, @SubjectKind = @SubjectKind, @SubjectEntityId = @SubjectEntityId,
          @ActionTaken = @taken, @ActorId = @ActorB, @Reason = @OverrideReason, @ApprovedByActorId = @OverrideApprovedByActorId,
          @OccurredAt = @OccurredAt, @ActionLogId = @logId, @OverrideId = @OverrideId OUTPUT;
+    IF @approvalId IS NOT NULL   -- #232: single use
+        INSERT [security].[OverrideApproval] ([EventKind], [RefersToOverrideApprovalId], [SubjectKind], [SubjectEntityId], [Action], [ForPersonEntityId], [ActorId], [OccurredAt], [SegregationOverrideId], [ActionLogId])
+        VALUES (N'Used', @approvalId, @SubjectKind, @SubjectEntityId, @ActionB, @personB, @ActorB, @OccurredAt, @OverrideId, @logId);
 END;
 GO

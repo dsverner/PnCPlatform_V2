@@ -5,10 +5,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router'
-import { ApiError, fmtWhen, s, type Row } from '@/lib/api'
+import { fmtWhen, s, plainRefusal, type Row } from '@/lib/api'
 import { useCan, useMe, useViewAll } from '@/lib/hooks'
 import { type StepParams, type Screen, splitView, screenPath } from '@/lib/screens'
-import { stepInstance, stepCall, fileToEvidence, type CaptureSpec, type Evidence, type CommitResult } from '@/lib/process'
+import { stepInstance, stepCall, fileToEvidence, approveOverride, type CaptureSpec, type Evidence, type CommitResult } from '@/lib/process'
 import { Panel, Pill, stateTone, Button, Facts, Status, Field, inputClass } from '@/components/ui/ui'
 
 type Values = Record<string, unknown>
@@ -20,7 +20,7 @@ export default function StepScreen({ params: p, id }: { screen: Screen; params: 
   const [values, setValues] = useState<Values>({}); const [loadedFor, setLoadedFor] = useState<string | null>(null)
   const [files, setFiles] = useState<Record<string, File[]>>({}); const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null)
   const [busy, setBusy] = useState(false); const [result, setResult] = useState<CommitResult | null>(null)
-  const [takeoverReason, setTakeoverReason] = useState(''); const [field, setField] = useState(false)
+  const [takeoverReason, setTakeoverReason] = useState(''); const [field, setField] = useState(false); const [overrideReason, setOverrideReason] = useState('')
   const [capturedBy, setCapturedBy] = useState(''); const [capturedAt, setCapturedAt] = useState(() => new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 16))
   const saveTimer = useRef<number | null>(null); const [saved, setSaved] = useState<string | null>(null)
   useEffect(() => { if (st && loadedFor !== st.stepInstanceEntityId + (st.draftModifiedAt ?? '')) { setValues(st.draft ?? {}); setLoadedFor(st.stepInstanceEntityId + (st.draftModifiedAt ?? '')) } }, [st, loadedFor])
@@ -37,7 +37,7 @@ export default function StepScreen({ params: p, id }: { screen: Screen; params: 
   }
   const act = async (what: string, fn: () => Promise<unknown>) => {
     setBusy(true); setMsg(null)
-    try { await fn(); setMsg({ text: `${what} — done.` }); reload() } catch (e) { setMsg({ text: `${what} refused: ${e instanceof ApiError ? e.status + ' ' : ''}${(e as Error).message}`, bad: true }) }
+    try { await fn(); setMsg({ text: `${what} — done.` }); reload() } catch (e) { setMsg({ text: `${what} refused: ${plainRefusal((e as Error).message)}`, bad: true }) }
     setBusy(false)
   }
   const commit = async (outcome: string) => {
@@ -51,7 +51,7 @@ export default function StepScreen({ params: p, id }: { screen: Screen; params: 
         ? await stepCall.checkin(st.stepInstanceEntityId, { outcome, capture, evidence, capturedBy: capturedBy.trim(), capturedAt: new Date(capturedAt).toISOString() })
         : await stepCall.commit(st.stepInstanceEntityId, { outcome, capture, evidence })
       setResult(r); setMsg({ text: `Committed as ${r.outcome}${r.advanced ? ' · ' + r.advanced : ''}${r.branchOutcome ? ' · this track is ' + r.branchOutcome : ''}${r.instance.completed ? ' · the procedure is complete' : ''}.` }); reload()
-    } catch (e) { setMsg({ text: `Commit refused: ${e instanceof ApiError ? e.status + ' ' : ''}${(e as Error).message}`, bad: true }) }
+    } catch (e) { setMsg({ text: `Commit refused: ${plainRefusal((e as Error).message)}`, bad: true }) }
     setBusy(false)
   }
 
@@ -93,6 +93,19 @@ export default function StepScreen({ params: p, id }: { screen: Screen; params: 
           )}
           {st.state === 'Active' && def.signoff?.witness && !st.isClaimant && canAct && <Button disabled={busy} title="A second person, signed in themselves, attests to this step" onClick={() => act('Witness', () => stepCall.witness(st.stepInstanceEntityId))}>Witness</Button>}
         </div>
+      )}
+      {/* #232 (the owner, 2026-09-23): where the same person may not do both parts of the work, another person who could do this
+          step approves the exception from their own sign-in; the person doing the work never names who approved */}
+      {st.overrideApproval && st.state === 'Active' && <Status>Another person has approved an exception for {st.claimedByDisplayName ?? 'the person doing this step'}: {st.overrideApproval.ApprovedByDisplayName ?? 'someone'}, until {fmtWhen(st.overrideApproval.ExpiresAt)}. It is used when the step is committed.</Status>}
+      {st.state === 'Active' && !st.isClaimant && canAct && def.signoff?.action && st.claimedByPersonEntityId && !st.overrideApproval && (
+        <details className="no-print rounded border border-slate-800 bg-slate-900 p-2">
+          <summary className="cursor-pointer text-sm text-slate-300">Approve an exception for {st.claimedByDisplayName ?? 'the person doing this step'}</summary>
+          <p className="mt-2 text-xs text-slate-400">Use this only when {st.claimedByDisplayName ?? 'they'} must do this step although they did an earlier part of the same work that it checks, and you could do this step yourself. It lets one commit of this step through, within 24 hours.</p>
+          <div className="mt-2 flex flex-wrap items-end gap-2">
+            <Field label="Why is this acceptable?"><input className={inputClass} value={overrideReason} onChange={(e) => setOverrideReason(e.target.value)} /></Field>
+            <Button disabled={busy || !overrideReason.trim()} onClick={() => act('Exception approved', () => approveOverride({ subjectKind: 'ProcedureInstance', subjectEntityId: st.procedureInstanceEntityId, action: def.signoff!.action!, forPersonEntityId: st.claimedByPersonEntityId!, reason: overrideReason.trim() }))}>Approve the exception</Button>
+          </div>
+        </details>
       )}
 
       {def.capture && Object.keys(def.capture).length > 0 && (
