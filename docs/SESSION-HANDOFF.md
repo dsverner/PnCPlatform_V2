@@ -73,8 +73,8 @@ Written 2026-09-23, at the end of the session that built #217–#228. Read this 
   failure of that one check on PC02 is this; any other failure is not. The API smoke on PC02: 407 PASS.
 - PC02 was on Wi-Fi by the owner's choice. It is an ASUS ROG Flow X13 laptop: its battery bridges short cuts; whether its
   firmware can power on after an outage is unconfirmed (F2 at start, Advanced Mode).
-- **Z: credentials on PC02** were not confirmed saved: if `git push` from PC02 fails, open the Z: share once in the desktop
-  session and save them.
+- **Z: credentials on PC02 saved 2026-09-23** (cmdkey `10.10.40.10`, Z: mapped persistently); `origin` pushes work. The copied
+  repo's `origin` URL had lost a backslash — fixed. GitHub sign-in stored for the predecessor repo's `github` remote.
 
 ## Raised, not built — the next candidates, most important first
 

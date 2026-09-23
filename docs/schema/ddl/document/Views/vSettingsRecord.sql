@@ -33,6 +33,7 @@ SELECT r.[RowSeq],
        lc.[EntityId]                AS [LifecycleWorkflowInstanceEntityId],
        ISNULL(lk.[Locked], CAST(0 AS BIT)) AS [SettingsLocked],   -- #231: the package is in a state that fixes its settings (on the relay)
        r.[RevisionLabel],
+       TRY_CONVERT(INT, r.[RevisionLabel]) AS [RevisionNumber],   -- 2026-09-23: the label as a number, so revision 10 sorts after 2 (the book's order)
        r.[Status]                   AS [RevisionStatus],
        r.[DocumentEntityId],
        cf.[FileKind], cf.[CaptureKind], cf.[ParseStatus], cf.[ParseError], cf.[SettingsGroupCount],   -- ParseError: the names the template did not know (#168)

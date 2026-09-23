@@ -35,7 +35,7 @@
     ],
     "deviceColumn": "DeviceEntityId",
     "rowKey": "RevisionRowId",
-    "orderBy": "-CalculatedAt",
+    "orderBy": "DeviceName,DeviceEntityId,-RevisionNumber",
     "groupings": [
       {
         "key": "SchemeName",

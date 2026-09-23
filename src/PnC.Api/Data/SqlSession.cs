@@ -241,13 +241,15 @@ public sealed class SqlSession : IAsyncDisposable
 
         // Stable ordering: RowSeq is always the tiebreaker, so paging never repeats or skips a row.
         var order = new List<string>();
-        if (!string.IsNullOrEmpty(orderBy))
+        // several keys, comma-separated, each "-" for descending (2026-09-23: the settings book keeps one relay's revisions
+        // together, newest first — "DeviceName,DeviceEntityId,-RevisionNumber"); every name is checked against the catalogue
+        foreach (var key in (orderBy ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
-            var desc = orderBy.StartsWith('-');
-            var name = desc ? orderBy[1..] : orderBy;
+            var desc = key.StartsWith('-');
+            var name = desc ? key[1..] : key;
             var col = view.Columns.FirstOrDefault(c => c.Name.Equals(name, StringComparison.OrdinalIgnoreCase))
                       ?? throw new ApiException(400, "unknown_column", $"'{name}' is not a column of {view.Key}.");
-            order.Add($"{Q(col.Name)} {(desc ? "DESC" : "ASC")}");
+            if (!order.Any(o => o.StartsWith(Q(col.Name) + " "))) order.Add($"{Q(col.Name)} {(desc ? "DESC" : "ASC")}");
         }
         if (view.HasRowSeq) { if (!order.Any(o => o.StartsWith("[RowSeq]"))) order.Add("[RowSeq] ASC"); }
         else if (order.Count == 0) order.Add($"{Q(view.Columns[0].Name)} ASC");
