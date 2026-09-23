@@ -21,7 +21,7 @@ CREATE TABLE [process].[HoldInstance] (
     [HeldByActorId] UNIQUEIDENTIFIER  NULL     CONSTRAINT [FK_HoldInstance_HeldByActor] REFERENCES [personnel].[Actor] ([ActorId]),
     [ReleasedAt]        DATETIMEOFFSET(7) NULL,
     [ReleasedByActorId] UNIQUEIDENTIFIER  NULL     CONSTRAINT [FK_HoldInstance_ReleasedByActor] REFERENCES [personnel].[Actor] ([ActorId]),
-    [ReleaseBasis]      NVARCHAR(20)      NULL     CONSTRAINT [CK_HoldInstance_ReleaseBasis] CHECK ([ReleaseBasis] IS NULL OR [ReleaseBasis] IN (N'Condition', N'Manual', N'Expired')),
+    [ReleaseBasis]      NVARCHAR(20)      NULL     CONSTRAINT [CK_HoldInstance_ReleaseBasis] CHECK ([ReleaseBasis] IS NULL OR [ReleaseBasis] IN (N'Condition', N'Manual', N'Expired', N'Cancelled')),
     CONSTRAINT [PK_HoldInstance] PRIMARY KEY CLUSTERED ([RowSeq]),
     CONSTRAINT [UQ_HoldInstance_RowId] UNIQUE NONCLUSTERED ([RowId])
 ) WITH (SYSTEM_VERSIONING = ON (HISTORY_TABLE = [process].[HoldInstance_History]));

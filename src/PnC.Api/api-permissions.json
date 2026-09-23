@@ -52,6 +52,17 @@
 
   "_227": "A change request brought over from the old program (#227): its two tracks are set by hand and it is finished or withdrawn as the old program did. The three procedures take WorkRequest.Modify on the request named in the body, so a scoped grant covers only its own requests; the workflow's Close and Cancel role rules still apply inside them. document.SetOutOfService is called only by work.CompleteLegacyRequest.",
 
+  "_228": "#228 (2026-09-22): the engine procedures that a dedicated endpoint wraps are not callable through the generic endpoint. Called directly they took the engine's own inputs from the caller: process.Transition skipped its role check for any existing step named in FiredByStepInstanceEntityId (measured on DEV: a technician cancelled a request that needs the engineer role), and process.CommitStep took ValidationOk, CompetencyOk and CapturedByActorId as given. The dedicated endpoints (src/PnC.Api/Endpoints/ProcessEndpoints.cs) compute those; their permission codes are here.",
+  "endpoints": {
+      "process.Transition": "WorkRequest.Modify",
+      "process.StartWorkflow": "WorkRequest.Modify",
+      "process.CommitStep": "Record.Modify",
+      "process.ClaimStep": "Record.Modify",
+      "process.SaveDraft": "Record.Modify",
+      "process.ReleaseHold": "WorkRequest.Modify",
+      "process.SetBlockState": "WorkRequest.Modify"
+  },
+
   "_subjectKeys": "W2 (IDENTITY.md §5; API-W1-SECURITY.md #11): a body key that names the subject of a write and the ref.SubjectKind it implies. '*' = the object's class; '$SubjectKind' / '$MemberKind' = the body's own kind field. Order is preference.",
   "subjectKeys": [
     { "key": "EntityId",            "kind": "*" },
@@ -122,16 +133,16 @@
     "process.ProjectProcedureVersion":     "Definition.Approve",
     "process.ValidateProcedureDocument":   null,
     "process.ValidateWorkflowDocument":    null,
-    "process.StartWorkflow":               "WorkRequest.Modify",
-    "process.Transition":                  "WorkRequest.Modify",
-    "process.ReleaseHold":                 "WorkRequest.Modify",
-    "process.ClaimStep":                   "Record.Modify",
+    "process.StartWorkflow":               null,
+    "process.Transition":                  null,
+    "process.ReleaseHold":                 null,
+    "process.ClaimStep":                   null,
     "process.ReleaseStep":                 "Record.Modify",
     "process.TakeOverStep":                "Record.Modify",
-    "process.SaveDraft":                   "Record.Modify",
+    "process.SaveDraft":                   null,
     "process.WitnessStep":                 "Record.Modify",
-    "process.CommitStep":                  "Record.Modify",
-    "process.SetBlockState":               "WorkRequest.Modify",
+    "process.CommitStep":                  null,
+    "process.SetBlockState":               null,
     "process.StartProcedure":              null,
     "process.MaterialiseBlock":            null,
     "process.SetStepState":                null,

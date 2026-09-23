@@ -22,6 +22,8 @@ SELECT r.[RowSeq],
            -- #227: withdrawn settings that never went in service (a change request withdrawn, or the draft of a finished Delete
            -- Order) are in no list — they were never the device's settings; the device's History still shows them
            WHEN r.[Status] = N'Withdrawn' AND cf.[InServiceFrom] IS NULL THEN N'Withdrawn'
+           -- #228: the draft of a cancelled request — its package's lifecycle was withdrawn with it — is in no list either
+           WHEN lc.[CurrentState] = N'Withdrawn' AND cf.[InServiceFrom] IS NULL THEN N'Withdrawn'
            WHEN r.[Status] IN (N'Superseded', N'Withdrawn') OR lc.[CurrentState] IN (N'Superseded', N'Withdrawn') THEN N'Archived'   -- the letters first (W7: a retired device's last revision keeps an open period)
            WHEN cf.[InServiceFrom] IS NOT NULL AND cf.[InServiceTo] IS NULL THEN N'Active'
            WHEN cf.[InServiceTo] IS NOT NULL THEN N'Archived'
@@ -42,6 +44,8 @@ SELECT r.[RowSeq],
        bow.[EntityId]               AS [BasedOnWorkRequestEntityId],
        bow.[Title]                  AS [BasedOnWorkRequestTitle],
        CASE WHEN bo.[BasisRevisionRowId] IS NULL THEN NULL
+            -- #228: a basis that never went in service and whose request was withdrawn or cancelled is gone, not outstanding
+            WHEN bo.[BasisInServiceFrom] IS NULL AND (bo.[BasisStatus] = N'Withdrawn' OR bowf.[CurrentState] = N'Cancelled') THEN N'Withdrawn'
             WHEN bo.[BasisStatus] IN (N'Superseded', N'Withdrawn') OR bo.[BasisInServiceTo] IS NOT NULL THEN N'Archived'
             WHEN bo.[BasisInServiceFrom] IS NOT NULL THEN N'Active'
             ELSE N'Outstanding' END AS [BasedOnGridState],
@@ -119,6 +123,8 @@ OUTER APPLY (SELECT TOP (1) x.[WorkRequestEntityId] FROM [document].[SettingsIss
              ORDER BY x.[OccurredAt]) boprec
 OUTER APPLY (SELECT TOP (1) bw.[EntityId], bw.[Title] FROM [work].[WorkRequest] bw
              WHERE bw.[ValidTo] IS NULL AND bw.[IsDeleted] = 0 AND bw.[EntityId] = COALESCE(borec.[WorkRequestEntityId], boprec.[WorkRequestEntityId]) ORDER BY bw.[RowSeq] DESC) bow
+OUTER APPLY (SELECT TOP (1) bwi.[CurrentState] FROM [process].[WorkflowInstance] bwi
+             WHERE bwi.[IsDeleted] = 0 AND bwi.[SubjectKind] = N'WorkRequest' AND bwi.[SubjectEntityId] = bow.[EntityId] ORDER BY bwi.[RowSeq] DESC) bowf
 LEFT JOIN [config].[vDefinitionVersion] wtv ON wtv.[RowId] = w.[WorkTypeDefinitionVersionRowId]
 LEFT JOIN [config].[vDefinition] wt ON wt.[EntityId] = wtv.[DefinitionEntityId]
 OUTER APPLY (SELECT TOP (1) p.[EntityId], p.[State] FROM [process].[ProcedureInstance] p

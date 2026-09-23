@@ -198,9 +198,11 @@ BEGIN
             SELECT @dN = COUNT(*), @dCodes = STRING_AGG([SettingCode], N', ') WITHIN GROUP (ORDER BY [SettingCode]) FROM [process].[fBasisDrift](@dRev) WHERE [Outcome] IN (N'take', N'agree', N'conflict');
             IF @dN > 0
             BEGIN
-                SELECT TOP (1) @dTitle = sr.[BasedOnWorkRequestTitle] FROM [document].[vSettingsRecord] sr WHERE sr.[RevisionRowId] = @dRev;
+                DECLARE @dGone BIT = 0;
+                SELECT TOP (1) @dTitle = sr.[BasedOnWorkRequestTitle], @dGone = CASE WHEN sr.[BasedOnGridState] = N'Withdrawn' THEN 1 ELSE 0 END
+                  FROM [document].[vSettingsRecord] sr WHERE sr.[RevisionRowId] = @dRev;
                 SELECT @dName = [Name] FROM [asset].[vAsset] WHERE [EntityId] = @dDev;
-                SET @dMsg = CONCAT(N'process.CommitStep: ', ISNULL(@dName, N'the device'), N' is based on "', ISNULL(@dTitle, N'another request'), N'", which has changed since this draft was taken (', @dN, N' setting', CASE WHEN @dN = 1 THEN N'' ELSE N's' END, N': ', LEFT(@dCodes, 300), N'); re-base it first.');
+                SET @dMsg = CONCAT(N'process.CommitStep: ', ISNULL(@dName, N'the device'), N' is based on "', ISNULL(@dTitle, N'another request'), N'", ', CASE WHEN @dGone = 1 THEN N'which was withdrawn, so it is measured against the settings in service, which differ (' ELSE N'which has changed since this draft was taken (' END, N'', @dN, N' setting', CASE WHEN @dN = 1 THEN N'' ELSE N's' END, N': ', LEFT(@dCodes, 300), N'); re-base it first.');
                 CLOSE dcx; DEALLOCATE dcx;
                 THROW 50251, @dMsg, 1;
             END
@@ -281,7 +283,9 @@ BEGIN
         WHILE @@FETCH_STATUS = 0
         BEGIN
             SET @basisEnt = (SELECT TOP (1) l.[SubjectEntityId] FROM [document].[RevisionLink] l WHERE l.[RevisionRowId] = @itRev AND l.[LinkKind] = N'BasedOn' AND l.[ValidTo] IS NULL AND l.[IsDeleted] = 0 ORDER BY l.[RowSeq] DESC);
-            SET @basisRow = CASE WHEN @basisEnt IS NULL THEN NULL ELSE (SELECT TOP (1) br.[RowId] FROM [document].[Revision] br WHERE br.[RowId] = @basisEnt AND br.[IsDeleted] = 0 AND br.[Status] NOT IN (N'Superseded', N'Withdrawn')) END;   -- the subject is the basis revision's RowId
+            -- #228: the basis as process.fBasisRevision reads it — a basis withdrawn, or whose request was cancelled, gives way to
+            -- what is in service, so a second change is no longer held back by a first that will never go in service
+            SET @basisRow = CASE WHEN @basisEnt IS NULL THEN NULL ELSE [process].[fBasisRevision](@itRev) END;
             IF @basisRow IS NOT NULL AND EXISTS (SELECT 1 FROM [document].[ConfigurationFile] bcf WHERE bcf.[RevisionRowId] = @basisRow AND bcf.[IsDeleted] = 0 AND bcf.[InServiceFrom] IS NULL)
             BEGIN
                 SELECT TOP (1) @basisTitle = sr.[WorkRequestTitle] FROM [document].[vSettingsRecord] sr WHERE sr.[RevisionRowId] = @basisRow;

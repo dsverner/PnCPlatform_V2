@@ -17,6 +17,8 @@ public sealed class PermissionMap
         [JsonPropertyName("subjectClassByPrefix")] public Dictionary<string, string> ByPrefix { get; set; } = new();
         [JsonPropertyName("procedures")] public Dictionary<string, string?> Procedures { get; set; } = new();
         [JsonPropertyName("subjectKeys")] public List<SubjectKey> SubjectKeys { get; set; } = new();
+        /// <summary>#228: the permission code of each dedicated endpoint that wraps an engine procedure the generic endpoint does not call.</summary>
+        [JsonPropertyName("endpoints")] public Dictionary<string, string> Endpoints { get; set; } = new();
     }
 
     /// <summary>A body key that names a write's subject, and the subject kind it implies ("*" = the object's class; "$SubjectKind" / "$MemberKind" = the body's own kind field).</summary>
@@ -69,6 +71,10 @@ public sealed class PermissionMap
 
     private static readonly string[] ModifySuffixes = ["_Add", "_Revise", "_Update", "_Append", "_Upsert"];
     private static readonly string[] ArchiveSuffixes = ["_SoftDelete", "_Deactivate"];
+
+    /// <summary>#228: the permission code a dedicated endpoint checks for the engine procedure it wraps ("process.CommitStep"), or null.
+    /// Kept apart from the procedures map so the generic endpoint can refuse the procedure while its own endpoint still guards it.</summary>
+    public string? ForEndpoint(string schema, string name) => _f.Endpoints.TryGetValue($"{schema}.{name}", out var c) ? c : null;
 
     /// <summary>Permission code for a procedure, or null when it is not callable over HTTP.</summary>
     public string? ForProcedure(string schema, string name)

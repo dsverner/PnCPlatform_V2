@@ -115,3 +115,19 @@ the text format, and the seed for the templates. → #61.
   yet"). The schema already takes a captured file (`document.File_Write @IsCapturedFromDevice`, `ConfigurationFile.CaptureKind`)
   and every filed text goes through the same reader, so the comparison is the in-service parsed settings against a
   captured revision's. Later phase; field communications first. The Compare tab was removed in #220.
+- **A settings record goes in service with a file that no longer matches its settings** (found in #228, measured on DEV
+  2026-09-22): an outstanding record whose settings are edited after its settings step wrote the file — a direct edit, or a
+  re-base (#192) — goes in service with the old file. The smoke's `W4_20260923005330 B` reads SLOPE 39 % in its settings and
+  `SLOPE=35 %` in its filed `settings.txt`; the next change on the relay, copied from the file, started from 35 %. The file is
+  what is loaded to the relay (feedback-native-settings-round-trip), so this is the one that matters. Recommendation: the file
+  is rewritten from the settings whenever they change after the settings step (or the edit reopens that step), and a new
+  change copies the in-service settings rather than the file, as it already does for an outstanding basis. Not built.
+- **A Block-mode segregation override is approved by being named** (found in #228): `security.CheckSegregation` lifts a
+  Block rule when the caller names a different person as `OverrideApprovedByActorId`; nothing shows that person approved.
+  Every seeded rule is WarnAndLog, so it is latent. Recommendation: the approval becomes the approver's own act (recorded in
+  their own session) before any rule is switched to Block. Not built.
+- **The simple settings lifecycle lets an applied package be withdrawn** (#228): `SETTINGS_LIFECYCLE_SIMPLE` has
+  `Withdraw` from Applied ("applied to the relay"), so a request under the four-step procedure can be cancelled after its
+  settings are on the relay, and the record then says the old settings are in service. The full lifecycle has no such
+  transition and the cancel is refused. A ruling for the owner: keep it (the technician puts the old settings back, unrecorded)
+  or remove it from the definition (recommended), so the change must be finished or reversed by a new one.

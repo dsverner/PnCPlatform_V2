@@ -28,7 +28,8 @@ public static class ProcessEndpoints
 
         async Task Require(HttpContext http, string schema, string proc, string? subjectKind, Guid? subject, CancellationToken ct)
         {
-            var code = map.ForProcedure(schema, proc) ?? throw new ApiException(404, "not_callable", $"{schema}.{proc} is not callable over the API.");
+            // #228: the engine procedures are refused by the generic endpoint; this endpoint's own code is under "endpoints"
+            var code = map.ForEndpoint(schema, proc) ?? map.ForProcedure(schema, proc) ?? throw new ApiException(404, "not_callable", $"{schema}.{proc} is not callable over the API.");
             await authz.RequireAsync(http.Session(), http.User(), code, subjectKind, subject, $"POST {schema}.{proc}", http.Connection.RemoteIpAddress?.ToString() ?? "", ct);
         }
         async Task<JsonObject> Exec(HttpContext http, string proc, JsonObject args, CancellationToken ct)
@@ -362,7 +363,8 @@ public static class ProcessEndpoints
     }
 
     private static async Task<List<Guid>> StartedRuns(SqlSession s, Guid workflowInstance, CancellationToken ct)
-        => (await s.RowsAsync("SELECT EntityId FROM process.vProcedureInstance WHERE WorkflowInstanceEntityId = @w AND ParentInstanceEntityId IS NULL AND State IN (N'Running', N'Held')", new Dictionary<string, object?> { ["@w"] = workflowInstance }, ct))
+        // #228: a run whose workflow has ended is not advanced (a cancelled request cancels its runs; this is the belt to that brace)
+        => (await s.RowsAsync("SELECT p.EntityId FROM process.vProcedureInstance p JOIN process.WorkflowInstance w ON w.EntityId = p.WorkflowInstanceEntityId AND w.IsDeleted = 0 AND w.CompletedAt IS NULL WHERE p.WorkflowInstanceEntityId = @w AND p.ParentInstanceEntityId IS NULL AND p.State IN (N'Running', N'Held')", new Dictionary<string, object?> { ["@w"] = workflowInstance }, ct))
             .Select(r => Guid.Parse(r!["EntityId"]!.GetValue<string>())).ToList();
 
     private static DocBlock? FindDoc(DocBlock b, string path, string kind)

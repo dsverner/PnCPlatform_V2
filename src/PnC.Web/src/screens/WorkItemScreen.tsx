@@ -6,7 +6,7 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router'
-import { ApiError, fmtWhen, s, view as readView, type Row } from '@/lib/api'
+import { fmtWhen, s, view as readView, type Row } from '@/lib/api'
 import { useCan, useViewAll } from '@/lib/hooks'
 import { type WorkItemParams, type Screen, type Command, splitView, cellText, labelOf, runCommand, commandEnabled, screenPath } from '@/lib/screens'
 import { procedureInstance, evaluate, releaseHold, workflowDocumentOf, transition, type BlockNode, type ProcedureInstance } from '@/lib/process'
@@ -21,6 +21,8 @@ import { LegacyRequest } from '@/components/LegacyRequest'
 const REQUEST_WORDS: Record<string, string> = { Raised: 'raised', InProgress: 'in progress', Closed: 'finished', Cancelled: 'withdrawn' }
 const WORK_WORDS: Record<string, string> = { Running: 'under way', Held: 'on hold', Completed: 'done', Cancelled: 'stopped', Pending: 'not started' }
 // #227: a request from the old program has none of these — no package, no outage window, no raised date
+// #228: a refusal from the database starts with the procedure's name — ours, not the reader's
+const plain = (m: string) => m.replace(/^[a-z]+\.[A-Za-z]+: /, '')
 const NOT_IN_THE_OLD_PROGRAM = new Set(['PriorityCode', 'OutageWindowStartAt', 'OutageWindowEndAt', 'ReturnToServiceAt', 'LifecycleState', 'DeviceCount', 'RequestStartedAt'])
 
 export default function WorkItemScreen({ screen, params: p, id }: { screen: Screen; params: WorkItemParams; id?: string }) {
@@ -55,7 +57,7 @@ export default function WorkItemScreen({ screen, params: p, id }: { screen: Scre
   const fire = async (name: string, why?: string) => {
     if (!wfId) { setMsg({ text: 'This change request has no stages, so it cannot be moved on.', bad: true }); return }
     try { const x = await transition(wfId, name, why); setMsg({ text: `${name} → ${x.toState}.` }); setReasonFor(null); setReason(''); reload() }
-    catch (e) { setMsg({ text: `${name} refused: ${e instanceof ApiError ? e.status + ' ' : ''}${(e as Error).message}`, bad: true }) }
+    catch (e) { setMsg({ text: `${name} refused: ${plain((e as Error).message)}`, bad: true }) }
   }
   const ctx = { navigate, can, raise: ({ command, row }: { command: Command; row: Row }) => setRaise(raiseOptsFor(command, row)), transition: (name: string, requiresReason?: boolean) => (requiresReason ? setReasonFor(name) : fire(name)) }
   const title = p.title ? cellText({ key: p.title, format: 'legacyFree' }, head) : legacyFree(head.Title)
@@ -74,6 +76,10 @@ export default function WorkItemScreen({ screen, params: p, id }: { screen: Scre
         <form className="flex flex-wrap items-end gap-2 rounded border border-slate-700 bg-slate-950 p-2" onSubmit={(e) => { e.preventDefault(); if (reason.trim()) fire(reasonFor, reason.trim()) }}>
           <Field label={`${reasonFor} — the reason (one is required)`}><input className={`${inputClass} w-96`} value={reason} onChange={(e) => setReason(e.target.value)} autoFocus /></Field>
           <Button type="submit" kind="primary">{reasonFor}</Button><Button onClick={() => setReasonFor(null)}>Never mind</Button>
+          {/* #228: what a cancellation takes with it, said before it is done */}
+          {doc?.states.some((st) => st.cancellation && doc.transitions.some((tr) => tr.name === reasonFor && tr.from === current && tr.to === st.code)) && (
+            <span className="w-full text-xs text-slate-400">The work on this request stops and its outstanding settings are set aside. The settings in service are not changed.</span>
+          )}
         </form>
       )}
       <Status bad={msg?.bad}>{msg?.text ?? (legacy

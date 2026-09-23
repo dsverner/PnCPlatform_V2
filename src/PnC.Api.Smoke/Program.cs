@@ -904,6 +904,13 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
         await RunStep(tech, "APPLY", new { outcome = "Done", capture = new { appliedAt = DateTimeOffset.Now } }, devBdd);
         await RunStep(admin, "APPLY", new { outcome = "Done", capture = new { appliedAt = DateTimeOffset.Now.AddHours(-2) }, capturedBy = techUpn, capturedAt = DateTimeOffset.Now.AddHours(-2) }, devCyl, null, true);
         Must((await LifecycleState()) == "Applied", "APPLY advanced the lifecycle to Applied (once per device; the repeats were no-ops)");
+        // #228: with the settings applied on the relays, the request cannot be cancelled — SETTINGS_LIFECYCLE has no way from
+        // Applied to Withdrawn, so the platform would otherwise say the old settings are in service while the relays hold the new
+        var (k228_ca, k228_cab) = await Post(admin, $"api/v1/process/workflow-instances/{wfReq}/transitions", new { name = "Cancel", reason = "smoke #228: too late" });
+        var (_, k228_rib) = await Get(admin, $"api/v1/process/vProcedureInstance?EntityId={inst}");
+        Must(k228_ca == HttpStatusCode.Conflict && (k228_cab?["detail"]?.ToString() ?? "").Contains("cannot be cancelled now")
+             && (k228_rib?["rows"] as JsonArray)?.FirstOrDefault()?["State"]?.ToString() == "Running" && (await LifecycleState()) == "Applied",
+            $"#228: with its settings applied on the relays the request cannot be cancelled, and the refusal changes nothing [{(int)k228_ca}: {k228_cab?["detail"]}]");
         await RunStep(tech, "READBACK", new { outcome = "Done", capture = new { differenceCount = 0 }, evidence = new[] { File("sel421-readback.rdb", "application/octet-stream", "readback", "ReadbackFile") } }, devSel);
         await RunStep(tech, "READBACK", new { outcome = "Done", capture = new { differenceCount = 0 }, evidence = new[] { File("bdd15b-readback.txt", "text/plain", "WDG1=2.9, WDG2=4.2, SLOPE=25 %, HARMONIC RESTRAINT = 20%", "ReadbackFile") } }, devBdd);
         await RunStep(tech, "READBACK", new { outcome = "Done", capture = new { differenceCount = 1 }, evidence = new[] { File("cyl-readback.txt", "text/plain", "COMPENSATOR=1.4 OHMS, INST=10 AMPS", "ReadbackFile") } }, devCyl);
@@ -2446,6 +2453,64 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
                     Must(kas == HttpStatusCode.OK && activeAfterA == draftA && rbs2 == HttpStatusCode.OK && activeAfterB == draftB && aArchived,
                         $"#191: A in service first ({(int)kas}), then B ({(int)rbs2} {Code(rbb2)} {rbb2?["detail"]}) — B is the Active record, A archived");
                     await Post(admin, $"api/v1/process/workflow-instances/{wfA}/transitions", new { name = "Close" }); await Post(admin, $"api/v1/process/workflow-instances/{wfB}/transitions", new { name = "Close" });
+
+                    // ======== #228 (2026-09-22): cancelling a request stops its work and sets its draft aside. Until now a cancel moved
+                    // only the request: its run stayed Running, its package's lifecycle where it was, its draft Outstanding, and a
+                    // second change based on it could not go in service. C is raised and cancelled; D, based on C, then goes in
+                    // service without a re-base; and D, once its settings are on the relay, cannot be cancelled.
+                    var (k228_wrC, k228_wfC, k228_instC) = await Raise($"{tag} C: to be cancelled (#228)");
+                    inst = k228_instC;
+                    var (k228_c1s, _) = await RunStep(admin, "REQUEST", new { outcome = "Done", capture = new { reason = "#228 C", devices = new[] { devBdd } } });
+                    var k228_draftC = Id((await Get(admin, $"api/v1/document/vSettingsRecord?DeviceEntityId={devBdd}&GridState=Outstanding")).body?["rows"] is JsonArray k228_oc
+                        ? k228_oc.FirstOrDefault(r => string.Equals(r?["WorkRequestEntityId"]?.ToString(), k228_wrC?.ToString(), StringComparison.OrdinalIgnoreCase)) : null, "RevisionRowId");
+                    var (k228_wrD, k228_wfD, k228_instD) = await Raise($"{tag} D: based on C (#228)");
+                    inst = k228_instD;
+                    var (k228_d1s, _) = await RunStep(admin, "REQUEST", new { outcome = "Done", capture = new { reason = "#228 D", devices = new[] { devBdd } } });
+                    var k228_activeBefore = Id(await Record(devBdd, "Active"), "RevisionRowId");
+                    Must(k228_c1s == HttpStatusCode.OK && k228_d1s == HttpStatusCode.OK && k228_draftC is not null, $"#228: C and D raised on the relay, D based on C (draft C {k228_draftC})");
+
+                    var (k228_x1s, k228_x1b) = await Post(admin, $"api/v1/process/workflow-instances/{k228_wfC}/transitions", new { name = "Cancel", reason = "smoke #228: raised in error" });
+                    var (_, k228_ciB) = await Get(admin, $"api/v1/process/vProcedureInstance?EntityId={k228_instC}");
+                    var k228_cState = (k228_ciB?["rows"] as JsonArray)?.FirstOrDefault()?["State"]?.ToString();
+                    var (_, k228_crB) = await Get(admin, $"api/v1/document/vSettingsRecord?RevisionRowId={k228_draftC}&take=1");
+                    var k228_cRow = (k228_crB?["rows"] as JsonArray)?.FirstOrDefault();
+                    Must(k228_x1s == HttpStatusCode.OK && k228_cState == "Cancelled" && k228_cRow?["GridState"]?.ToString() == "Withdrawn" && k228_cRow?["LifecycleState"]?.ToString() == "Withdrawn"
+                         && Id(await Record(devBdd, "Active"), "RevisionRowId") == k228_activeBefore,
+                        $"#228: C cancelled — its run {k228_cState}, its package {k228_cRow?["LifecycleState"]}, its draft {k228_cRow?["GridState"]} (in no list), the settings in service unchanged [{(int)k228_x1s} {Code(k228_x1b)}]");
+                    var (_, k228_drB) = await Get(admin, $"api/v1/document/vSettingsRecord?DeviceEntityId={devBdd}&GridState=Outstanding");
+                    var k228_dRow = (k228_drB?["rows"] as JsonArray)?.FirstOrDefault(r => string.Equals(r?["WorkRequestEntityId"]?.ToString(), k228_wrD?.ToString(), StringComparison.OrdinalIgnoreCase));
+                    Must(k228_dRow?["BasedOnGridState"]?.ToString() == "Withdrawn", $"#228: D reads its basis as withdrawn, not outstanding ({k228_dRow?["BasedOnGridState"]})");
+
+                    // D runs to service; the cancelled C, its basis, no longer holds it back. (The simple lifecycle lets an applied
+                    // package be withdrawn, so the refusal is checked on the full lifecycle in the main run, not here.)
+                    inst = k228_instD;
+                    await RunStep(admin, "WRITE_RATIONALE", new { outcome = "Done", evidence = new[] { File("rationale.txt", "text/plain", "#228 D", "Rationale") } });
+                    await RunStep(admin, "RECORD_SETTINGS", new { outcome = "Done" }, devBdd);
+                    await Post(admin, $"api/v1/process/procedure-instances/{k228_instD}/evaluate", new { }); await Post(admin, $"api/v1/process/procedure-instances/{k228_instD}/evaluate", new { });
+                    await RunStep(tech, "INSTALL", new { outcome = "Done", capture = new { installedAt = DateTime.UtcNow.ToString("o"), commissioningNote = "#228 D" } }, devBdd);
+                    // with C cancelled, D is measured against what is in service: the ordering rule ("that request completes first")
+                    // no longer stands between them; any difference from the in-service settings is re-based as #192 does it
+                    var k228_stepD = await ReadyStep("COMPLETE", null, 2);
+                    await Post(admin, $"api/v1/process/step-instances/{k228_stepD}/claim", new { });
+                    var (k228_k1s, k228_k1b) = await Post(admin, $"api/v1/process/step-instances/{k228_stepD}/commit", new { outcome = "Done" });
+                    var k228_k1 = k228_k1b?["detail"]?.ToString() ?? "";
+                    Must(!k228_k1.Contains("that request completes first"), $"#228: the cancelled C does not hold D back by order [{(int)k228_k1s}: {k228_k1}]");
+                    if (k228_k1s != HttpStatusCode.OK)
+                    {
+                        var k228_draftD = Id(k228_dRow, "RevisionRowId");
+                        var (k228_rbs, k228_rbb) = await Post(admin, "api/v1/process/RebaseDraft", new { RevisionRowId = k228_draftD, DeviceEntityId = devBdd });
+                        var (k228_k2s, k228_k2b) = await Post(admin, $"api/v1/process/step-instances/{k228_stepD}/commit", new { outcome = "Done" });
+                        Must(k228_rbs == HttpStatusCode.OK && k228_k2s == HttpStatusCode.OK,
+                            $"#228: re-based onto what is in service, D goes in [{(int)k228_rbs} {Code(k228_rbb)} {k228_rbb?["detail"]}; {(int)k228_k2s} {Code(k228_k2b)} {k228_k2b?["detail"]}]");
+                    }
+                    Must(Id(await Record(devBdd, "Active"), "RevisionRowId") != k228_activeBefore, "#228: D is the settings in service now");
+                    await Post(admin, $"api/v1/process/workflow-instances/{k228_wfD}/transitions", new { name = "Close" });
+
+                    // the engine's own procedures are reached only through their endpoints, which compute what they are given
+                    var (k228_g1s, k228_g1b) = await Post(tech, "api/v1/process/Transition", new { WorkflowInstanceEntityId = k228_wfD, TransitionName = "Cancel", Reason = "x" });
+                    var (k228_g2s, k228_g2b) = await Post(tech, "api/v1/process/CommitStep", new { StepInstanceEntityId = Guid.NewGuid(), Outcome = "Done", ValidationOk = true, CompetencyOk = true });
+                    Must(k228_g1s == HttpStatusCode.NotFound && k228_g2s == HttpStatusCode.NotFound,
+                        $"#228: a transition or a step commit is not taken from the caller's own verdicts [{(int)k228_g1s} {Code(k228_g1b)}, {(int)k228_g2s} {Code(k228_g2b)}]");
                 }
             }
         }

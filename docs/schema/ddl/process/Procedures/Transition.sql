@@ -17,6 +17,7 @@ CREATE PROCEDURE [process].[Transition]
     @At DATETIMEOFFSET(7) = NULL,
     @ActorId UNIQUEIDENTIFIER = NULL,
     @MigrationRunId UNIQUEIDENTIFIER = NULL,   -- W7 (#141): the importer's transition — no person's role to check; the run stamped on the transition row
+    @CascadeFromTransitionId BIGINT = NULL,    -- #228: fired because another workflow was cancelled; the role was checked there. Not callable over HTTP.
     @ToState NVARCHAR(40) = NULL OUTPUT,
     @TransitionId BIGINT = NULL OUTPUT
 AS
@@ -53,7 +54,7 @@ BEGIN
     IF JSON_VALUE(@t, '$.requiresReason') = 'true' AND NULLIF(LTRIM(RTRIM(@Reason)), N'') IS NULL THROW 50155, N'process.Transition: this transition requires a reason.', 1;
 
     -- roles (a person's transition): the transition's roles, else the from-state's; none listed → anyone signed in
-    IF @FiredByStepInstanceEntityId IS NULL AND @MigrationRunId IS NULL
+    IF @FiredByStepInstanceEntityId IS NULL AND @MigrationRunId IS NULL AND @CascadeFromTransitionId IS NULL
     BEGIN
         DECLARE @roles NVARCHAR(MAX) = ISNULL(JSON_QUERY(@t, '$.roles'), JSON_QUERY(@fromJson, '$.roles'));
         IF @roles IS NOT NULL AND (SELECT COUNT(*) FROM OPENJSON(@roles)) > 0
@@ -118,9 +119,50 @@ BEGIN
         CLOSE sc; DEALLOCATE sc;
     END
 
+    -- #228: entering a cancellation state cancels what this workflow started: its procedure runs (children first) and the
+    -- workflows those runs started on what they produced, each taken to its own cancellation state by its own transition.
+    -- Refused here, before anything is written, when one of those has no way to its cancellation state from where it stands
+    -- (the settings package already applied on the relay): cancelling then would leave the record saying one thing and the
+    -- plant another. Nothing below names a procedure or a workflow; it reads the definitions' own `cancellation` flags.
+    DECLARE @cancelling BIT = CASE WHEN JSON_VALUE(@toJson, '$.cancellation') = 'true' THEN 1 ELSE 0 END;
+    DECLARE @runs TABLE ([EntityId] UNIQUEIDENTIFIER PRIMARY KEY, [Depth] INT, [Produced] NVARCHAR(MAX), [IsOpen] BIT);
+    DECLARE @downstream TABLE ([WorkflowInstanceEntityId] UNIQUEIDENTIFIER PRIMARY KEY, [TransitionName] NVARCHAR(100), [State] NVARCHAR(40), [WorkflowKey] NVARCHAR(100));
+    IF @cancelling = 1
+    BEGIN
+        ;WITH tree AS (
+            SELECT p.[EntityId], 0 AS [Depth] FROM [process].[ProcedureInstance] p
+             WHERE p.[WorkflowInstanceEntityId] = @WorkflowInstanceEntityId AND p.[ParentInstanceEntityId] IS NULL AND p.[IsDeleted] = 0
+            UNION ALL
+            SELECT c.[EntityId], tree.[Depth] + 1 FROM [process].[ProcedureInstance] c JOIN tree ON c.[ParentInstanceEntityId] = tree.[EntityId] WHERE c.[IsDeleted] = 0)
+        INSERT @runs ([EntityId], [Depth], [Produced], [IsOpen])
+        SELECT tree.[EntityId], tree.[Depth], p.[Produced], CASE WHEN p.[State] IN (N'Completed', N'Cancelled') THEN 0 ELSE 1 END
+          FROM tree JOIN [process].[ProcedureInstance] p ON p.[EntityId] = tree.[EntityId];
+        -- what the runs produced that has a workflow of its own still open, and that workflow's way to its cancellation state
+        INSERT @downstream ([WorkflowInstanceEntityId], [TransitionName], [State], [WorkflowKey])
+        SELECT DISTINCT w.[EntityId],
+               (SELECT TOP (1) JSON_VALUE(tr.[value], '$.name') FROM OPENJSON(dv.[PayloadText], '$.transitions') tr
+                  JOIN OPENJSON(dv.[PayloadText], '$.states') st ON JSON_VALUE(st.[value], '$.code') = JSON_VALUE(tr.[value], '$.to')
+                 WHERE JSON_VALUE(tr.[value], '$.from') = w.[CurrentState] AND JSON_VALUE(st.[value], '$.cancellation') = 'true'),
+               w.[CurrentState], d.[DefinitionKey]
+          FROM @runs r CROSS APPLY OPENJSON(r.[Produced]) pr
+          JOIN [process].[WorkflowInstance] w ON w.[SubjectEntityId] = TRY_CONVERT(UNIQUEIDENTIFIER, pr.[value]) AND w.[IsDeleted] = 0 AND w.[CompletedAt] IS NULL
+                                              AND w.[EntityId] <> @WorkflowInstanceEntityId
+          JOIN [config].[DefinitionVersion] dv ON dv.[RowId] = w.[WorkflowDefinitionVersionRowId]
+          JOIN [config].[Definition] d ON d.[EntityId] = dv.[DefinitionEntityId]
+         WHERE r.[Produced] IS NOT NULL AND ISJSON(r.[Produced]) = 1 AND TRY_CONVERT(UNIQUEIDENTIFIER, pr.[value]) IS NOT NULL;
+        IF EXISTS (SELECT 1 FROM @downstream WHERE [TransitionName] IS NULL)
+        BEGIN
+            DECLARE @stuck NVARCHAR(200) = (SELECT TOP (1) [State] FROM @downstream WHERE [TransitionName] IS NULL);
+            DECLARE @m5 NVARCHAR(400) = N'process.Transition: this cannot be cancelled now: what it produced is already ' + @stuck
+                + N', which cannot be withdrawn from there. Finish it, or raise a new change to put things back.';
+            THROW 50178, @m5, 1;
+        END
+    END
+
     BEGIN TRANSACTION;
     DECLARE @logId BIGINT;
-    DECLARE @detail NVARCHAR(MAX) = CONCAT(N'{"action":"transition","workflow":"', STRING_ESCAPE(@key, 'json'), N'","name":"', STRING_ESCAPE(@TransitionName, 'json'), N'","from":"', @from, N'","to":"', @ToState, N'"}');
+    DECLARE @detail NVARCHAR(MAX) = CONCAT(N'{"action":"transition","workflow":"', STRING_ESCAPE(@key, 'json'), N'","name":"', STRING_ESCAPE(@TransitionName, 'json'), N'","from":"', @from, N'","to":"', @ToState, N'"',
+        CASE WHEN @CascadeFromTransitionId IS NULL THEN N'' ELSE CONCAT(N',"following":', @CascadeFromTransitionId) END, N'}');
     EXEC [audit].[LogAction] @ActionKindCode = N'Administrative', @SubjectSchema = N'process', @SubjectTable = N'WorkflowInstance', @SubjectEntityId = @WorkflowInstanceEntityId,
          @DefinitionVersionRowId = @version, @ActorId = @ActorId, @Detail = @detail, @OccurredAt = @now, @ActionLogId = @logId OUTPUT;
     EXEC [process].[WorkflowTransition_Append] @WorkflowInstanceEntityId = @WorkflowInstanceEntityId, @OccurredAt = @now, @FromState = @from, @ToState = @ToState,
@@ -141,6 +183,33 @@ BEGIN
         FETCH NEXT FROM ef INTO @proc;
     END
     CLOSE ef; DEALLOCATE ef;
+
+    -- #228: the cascade — the runs first, deepest child first, then what they produced
+    IF @cancelling = 1
+    BEGIN
+        DECLARE @cancelWhy NVARCHAR(400) = ISNULL(NULLIF(LTRIM(RTRIM(@Reason)), N''), N'the ' + @key + N' it belonged to was cancelled');
+        DECLARE @run UNIQUEIDENTIFIER;
+        DECLARE rc CURSOR LOCAL FAST_FORWARD FOR SELECT [EntityId] FROM @runs WHERE [IsOpen] = 1 ORDER BY [Depth] DESC;
+        OPEN rc; FETCH NEXT FROM rc INTO @run;
+        WHILE @@FETCH_STATUS = 0
+        BEGIN
+            -- a child's cancellation may already have been carried up; only a run still open is cancelled
+            IF EXISTS (SELECT 1 FROM [process].[ProcedureInstance] WHERE [EntityId] = @run AND [IsDeleted] = 0 AND [State] NOT IN (N'Completed', N'Cancelled'))
+                EXEC [process].[CompleteInstance] @ProcedureInstanceEntityId = @run, @State = N'Cancelled', @Reason = @cancelWhy, @At = @now, @ActorId = @ActorId;
+            FETCH NEXT FROM rc INTO @run;
+        END
+        CLOSE rc; DEALLOCATE rc;
+        DECLARE @dw UNIQUEIDENTIFIER, @dname NVARCHAR(100), @dto NVARCHAR(40), @did BIGINT;
+        DECLARE dc CURSOR LOCAL FAST_FORWARD FOR SELECT [WorkflowInstanceEntityId], [TransitionName] FROM @downstream;
+        OPEN dc; FETCH NEXT FROM dc INTO @dw, @dname;
+        WHILE @@FETCH_STATUS = 0
+        BEGIN
+            EXEC [process].[Transition] @WorkflowInstanceEntityId = @dw, @TransitionName = @dname, @Reason = @cancelWhy, @At = @now, @ActorId = @ActorId,
+                 @MigrationRunId = @MigrationRunId, @CascadeFromTransitionId = @TransitionId, @ToState = @dto OUTPUT, @TransitionId = @did OUTPUT;
+            FETCH NEXT FROM dc INTO @dw, @dname;
+        END
+        CLOSE dc; DEALLOCATE dc;
+    END
     COMMIT TRANSACTION;
 END;
 GO

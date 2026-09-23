@@ -60,6 +60,18 @@
       "what": "#227 browser proof: one fixture relay (W4_20260922234302 227 browser proof) and a change request landed on it the way the importer lands one (migration run 'smoke-227'), then its two tracks set and the request finished in Chrome as the engineer smoke user; its new settings are in service and the old archived. No real legacy request was changed",
       "why": "the Save and Finish buttons proven at the user's layer without touching a real legacy request",
       "rule": false
+    },
+    {
+      "date": "2026-09-22",
+      "what": "#228 security probe: a fixture change request (W4_… 228 bypass probe) raised on a smoke relay and, before the fix, cancelled by the technician smoke user through process.Transition by naming an unrelated step",
+      "why": "measured the role bypass before closing it",
+      "rule": false
+    },
+    {
+      "date": "2026-09-22",
+      "what": "#228 browser proof: a change request (W4_20260916125248 228 browser proof: to be cancelled) raised on the smoke fixture relay W4_20260916125248 BDD15B and cancelled from its screen by the engineer smoke user; its run cancelled with it",
+      "why": "the Cancel form and the cascade proven at the user's layer on a fixture",
+      "rule": false
     }
   ]
 }

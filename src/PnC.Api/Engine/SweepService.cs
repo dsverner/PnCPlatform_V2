@@ -31,10 +31,11 @@ public sealed class SweepService(IConfiguration config, Catalog catalog, ILogger
     {
         await using var s = await SqlSession.OpenAsync(connectionString, null, ct);
         var now = await s.NowAsync(ct);
-        var ids = (await s.RowsAsync("SELECT EntityId FROM process.vProcedureInstance WHERE State IN (N'Running', N'Held') AND ParentInstanceEntityId IS NULL ORDER BY StartedAt", new Dictionary<string, object?>(), ct))
+        // #228: a run whose governing workflow has ended (a cancelled request) is never advanced
+        var ids = (await s.RowsAsync("SELECT p.EntityId FROM process.vProcedureInstance p LEFT JOIN process.WorkflowInstance w ON w.EntityId = p.WorkflowInstanceEntityId AND w.IsDeleted = 0 WHERE p.State IN (N'Running', N'Held') AND p.ParentInstanceEntityId IS NULL AND w.CompletedAt IS NULL ORDER BY p.StartedAt", new Dictionary<string, object?>(), ct))
             .Select(r => Guid.Parse(r!["EntityId"]!.GetValue<string>())).ToList();
         // children first would double the work: a child's completion advances its parent through the parent's next pass
-        var children = (await s.RowsAsync("SELECT EntityId FROM process.vProcedureInstance WHERE State IN (N'Running', N'Held') AND ParentInstanceEntityId IS NOT NULL ORDER BY StartedAt", new Dictionary<string, object?>(), ct))
+        var children = (await s.RowsAsync("SELECT p.EntityId FROM process.vProcedureInstance p LEFT JOIN process.WorkflowInstance w ON w.EntityId = p.WorkflowInstanceEntityId AND w.IsDeleted = 0 WHERE p.State IN (N'Running', N'Held') AND p.ParentInstanceEntityId IS NOT NULL AND w.CompletedAt IS NULL ORDER BY p.StartedAt", new Dictionary<string, object?>(), ct))
             .Select(r => Guid.Parse(r!["EntityId"]!.GetValue<string>())).ToList();
         var interp = new Interpreter(s, catalog, log);
         int changes = 0; var detail = new List<object>();

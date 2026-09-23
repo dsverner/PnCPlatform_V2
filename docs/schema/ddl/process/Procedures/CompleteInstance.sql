@@ -32,6 +32,13 @@ BEGIN
         UPDATE s SET s.[State] = N'Skipped', s.[Outcome] = N'Cancelled', s.[ModifiedBy] = @ActorId, s.[ModifiedAt] = SYSDATETIMEOFFSET()
         FROM [process].[StepInstance] s JOIN [process].[BlockInstance] b ON b.[EntityId] = s.[BlockInstanceEntityId]
         WHERE b.[ProcedureInstanceEntityId] = @ProcedureInstanceEntityId AND s.[IsDeleted] = 0 AND s.[State] NOT IN (N'Committed', N'Skipped', N'Varied');
+        -- #228: a cancelled run leaves no step claimed (who claimed it stays on the row and in its history) and no hold standing
+        UPDATE s SET s.[ClaimExpiresAt] = NULL, s.[ModifiedBy] = @ActorId, s.[ModifiedAt] = SYSDATETIMEOFFSET()
+        FROM [process].[StepInstance] s JOIN [process].[BlockInstance] b ON b.[EntityId] = s.[BlockInstanceEntityId]
+        WHERE b.[ProcedureInstanceEntityId] = @ProcedureInstanceEntityId AND s.[IsDeleted] = 0 AND s.[ClaimExpiresAt] IS NOT NULL;
+        UPDATE h SET h.[ReleasedAt] = @now, h.[ReleasedByActorId] = @ActorId, h.[ReleaseBasis] = N'Cancelled', h.[ModifiedBy] = @ActorId, h.[ModifiedAt] = SYSDATETIMEOFFSET()
+        FROM [process].[HoldInstance] h JOIN [process].[BlockInstance] b ON b.[EntityId] = h.[BlockInstanceEntityId]
+        WHERE b.[ProcedureInstanceEntityId] = @ProcedureInstanceEntityId AND h.[IsDeleted] = 0 AND h.[ReleasedAt] IS NULL;
     END
     DECLARE @detail NVARCHAR(MAX) = CONCAT(N'{"action":"procedure-', LOWER(@State), N'","outcome":"', STRING_ESCAPE(@Outcome, 'json'), N'","reason":', CASE WHEN @Reason IS NULL THEN N'null' ELSE CONCAT(N'"', STRING_ESCAPE(@Reason, 'json'), N'"') END, N'}');
     EXEC [audit].[LogAction] @ActionKindCode = N'Administrative', @SubjectSchema = N'process', @SubjectTable = N'ProcedureInstance', @SubjectEntityId = @ProcedureInstanceEntityId,

@@ -51,6 +51,7 @@
 :r .\Seed_config_SchemeType_Legacy.sql
 :r .\Seed_config_Screens.sql
 :r .\Seed_config_ViewItems.sql
+:r .\Seed_process_RepairCancelledRuns.sql
 :r .\Seed_config_CharacteristicSchema_SettingsRecord.sql
 :r .\Seed_location_Divisions.sql
 :r .\Seed_location_StationCodes.sql
