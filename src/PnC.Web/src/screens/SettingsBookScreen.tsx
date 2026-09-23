@@ -73,13 +73,10 @@ export default function SettingsBookScreen({ screen, params: p }: { screen: Scre
   const scopeFilters: Record<string, string | null> = scopeDevice ? { [deviceCol]: scopeDevice } : scopeRequest ? { WorkRequestEntityId: scopeRequest } : station && station !== '*' ? { [p.stationColumn]: station } : {}
   const ready = scoped || !!station
   const stateDef = p.states.find((x) => x.value === gridState) ?? p.states[0]
-  const t0 = useMemo(() => performance.now(), [gridState, station, scopeDevice, scopeRequest]) // eslint-disable-line react-hooks/exhaustive-deps
   const rowsQ = useViewAll(schema, view, { [p.stateColumn]: gridState, ...scopeFilters }, p.orderBy, ready)
   const badgeQ = useViewAll(schema, view, { [p.stateColumn]: stateDef.badgeFrom ?? '', ...scopeFilters }, undefined, ready && !!stateDef.badgeFrom)
   const rows = rowsQ.data ?? []
   const badged = useMemo(() => new Set((badgeQ.data ?? []).map((r) => String(r[deviceCol]).toLowerCase())), [badgeQ.data, deviceCol])
-  const [ms, setMs] = useState<number | null>(null)
-  useEffect(() => { if (rowsQ.isSuccess) setMs(Math.round(performance.now() - t0)) }, [rowsQ.isSuccess, rowsQ.dataUpdatedAt, t0])
   const reload = () => qc.invalidateQueries({ queryKey: ['view', schema, view] })
 
   // ---- the view's columns for the chooser
@@ -120,7 +117,11 @@ export default function SettingsBookScreen({ screen, params: p }: { screen: Scre
   const status: ReactNode = rowsQ.isError ? <Status bad>Could not load: {(rowsQ.error as Error).message}</Status>
     : !ready ? <Status>Choose a location on the left — or the whole estate at the foot of the list.</Status>
     : rowsQ.isPending ? <Status>Loading {stateDef.label} settings…</Status>
-    : <Status>{rows.length} {stateDef.label.toLowerCase()} settings record(s){ms != null ? ` · ${ms} ms` : ''}{scopeDevice ? ' · one device' : scopeRequest ? ' · one change request' : station === '*' ? ' · every location' : ` · ${stationName ?? 'one location'}`}</Status>
+    // the owner, 2026-09-23, asked what the count line was worth: the count is in the footer, the location in the heading and
+    // the load time was for us — so once loaded it says only what the heading does not: that the book is one relay, one change
+    // request or the whole estate
+    : scopeDevice ? <Status>One relay's settings records.</Status> : scopeRequest ? <Status>The settings records of one change request.</Status>
+    : station === '*' ? <Status>Every location.</Status> : null
 
   const csv = () => downloadCsv(`${screen.key.toLowerCase()}-${gridState.toLowerCase()}-${new Date().toISOString().slice(0, 10)}.csv`, visible,
     context.map((k) => ({ key: k, label: labelOf(col(k)) })).concat(columns))
