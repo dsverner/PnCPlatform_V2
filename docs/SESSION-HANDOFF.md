@@ -9,7 +9,7 @@ Written 2026-09-23, at the end of the session that built #217–#228. Read this 
 | | |
 |---|---|
 | Branch | `foundation/documentary-record`, clean, last commit `46a8421` (#228) |
-| Remote | **none** — the repository exists only on this laptop (see "Before travelling") |
+| Remote | `origin` = `Z:\Repos\PnCPlatform_V2.git` (pushed 2026-09-23); no GitHub remote (the owner's call) |
 | DEV database | `PnCPlatform_V2_DEV` on VM01 `10.10.70.25`, deployed with everything to #228 |
 | DEV API | `http://127.0.0.1:5210`, React app at `/app/` (run recipe in memory `project-dev-api-run-recipe`) |
 | Last results | API smoke 407 PASS / 0 FAIL; schema smoke 269 PASS; wording check 0 |
@@ -86,9 +86,37 @@ Written 2026-09-23, at the end of the session that built #217–#228. Read this 
 - Never change a real legacy request or record on DEV to demonstrate something; build a `W4_…` fixture and record it in
   `docs/schema/migration/DEV-ONLY-MUTATIONS.json`.
 
+## The development workstation for the trip (set up 2026-09-23)
+
+The laptop reaches every `10.10.x` host through Tailscale (`vgs-ct05`), so away from home the database would sit an internet
+round trip from the API and the tools (the import alone makes ~47,000 calls; 3 ms each at home, measured). The owner chose to
+develop on a machine next to the database and use the laptop only as a Remote Desktop screen.
+
+| | |
+|---|---|
+| Workstation | **VGS-PC02** `10.10.40.69` (`vgs-pc02.home.arpa`), Windows 11 Pro 25H2, Ryzen 9 5980HS / 16 threads, 31 GB, 846 GB free, **on Wi-Fi** |
+| Access from the laptop | SSH `vgs-pc02` (key `vernersys01_ed25519`, user `daren`, an administrator); Remote Desktop on with NLA, firewall limited to `10.10.40.0/24` and Tailscale `100.64.0.0/10` |
+| Installed | Git 2.55, .NET SDK 10.0.401 + sqlpackage, Node 24.19, Python 3.14.7 (`pyodbc`, `pycdlib`), ODBC Driver 17, Chrome, Tailscale 1.102.4, Claude Code 2.1.280 |
+| Repositories | `C:\Projects\PnCPlatform_V2` (this one; `origin` = `\\10.10.40.10\vernersys-share\Repos\PnCPlatform_V2.git`) and `C:\Projects\PnCPlatform` (the predecessor: its engine and `dev.local`), with their ignored settings and credential files copied |
+| Claude Code | global `CLAUDE.md`, `settings.json` (standing permissions, hooks), status line, skills, `C:\ss\stage-clip.ps1`, and this project's 29 memory files copied |
+| Verified | the API, the smoke tool, the engine, the web app and the database project build (70 s) |
+| Spare | **VGS-DEV01**, Proxmox VM 102 on the Business VLAN, Windows 11 Pro 25H2, no tools; stopped and off at boot; admin in the predecessor's `dev.local` (`DEV01_ADMIN_*`) |
+
+**Still needed from the owner, before leaving:**
+1. **Tailscale sign-in on PC02** with the same route to `10.10.0.0/16` the laptop uses — PC02 cannot reach SQL Server without it (the
+   `Business -> OT (MSSQL)` rule names `vgs-ct05` only; measured: `10.10.70.25:1433` does not answer from PC02).
+2. **Claude Code sign-in** on PC02 and the **Claude extension** in Chrome there.
+3. **The Z: credentials** saved once in an interactive session on PC02, so `git push` to `origin` works.
+4. **A network cable** for PC02 if it can take one — a Wi-Fi drop at home cuts the remote session until someone is there.
+5. **Power**: set it to come back on after a power cut (BIOS "restore on AC power loss"); sleep is already off on AC.
+6. Windows activation on the spare VM, whenever it is used.
+
+**After the Tailscale sign-in (the session does these):** the DEV API on PC02, the API smoke, the schema smoke, and a timed
+database round trip from PC02.
+
 ## Before travelling (from the 2026-09-23 discussion)
 
-- **Back the repository up off this laptop before leaving.** 160 commits, 32 MB of history, no remote anywhere.
+- **Done 2026-09-23**: the repository has an `origin` on Z: (`Z:\Repos\PnCPlatform_V2.git`), all branches and tags pushed.
 - Every `10.10.x` host is reached through Tailscale already (subnet router `vgs-ct05`); away from home the same tunnel
   crosses the internet. Measured at home: 3 ms per database round trip. The chatty links are the API↔database and the
   tools↔database (the import makes ~47,000 calls; the smokes and deploys thousands), so the plan for working remotely is
