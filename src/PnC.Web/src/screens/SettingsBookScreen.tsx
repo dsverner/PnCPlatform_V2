@@ -142,16 +142,27 @@ export default function SettingsBookScreen({ screen, params: p }: { screen: Scre
         </aside>
       )}
       <div className="min-w-0 flex-1 space-y-3">
-        <div className="no-print flex flex-wrap items-center gap-2">
+        {/* the owner, 2026-09-23: the location chosen, named above its settings; then what is being looked at (the state), then
+            the tools in three groups — finding rows, arranging them, taking them out — instead of one line of equal-weight controls */}
+        {!scopeDevice && !scopeRequest && station && station !== '*' && stationName ? <h2 className="text-center text-lg font-semibold text-slate-100">{String(stationName)}</h2> : null}
+        <div className="no-print border-b border-slate-800">
           <Tabs tabs={p.states.map((x) => ({ key: x.value, label: x.label }))} value={gridState} onChange={chooseState} />
-          {groupings.length > 1 && <Field label="Group by" className="ml-2"><select className={inputClass} value={grouping} onChange={(e) => { setGrouping(e.target.value); setOpen(new Set()); store(store_('grouping'), e.target.value) }}>
-            {groupings.map((x) => <option key={x.key} value={x.key}>{x.label}</option>)}</select></Field>}
-          <input className={`${inputClass} w-56`} placeholder="filter the rows…" value={filter} onChange={(e) => setFilter(e.target.value)} />
-          <Button kind="mini" onClick={() => setShowFilter(!showFilter)}>Filter by field</Button>
-          <Button kind="mini" onClick={() => setShowColumns(!showColumns)}>Columns</Button>
-          <Button kind="mini" onClick={csv}>Export CSV</Button>
-          {p.report && <Button kind="mini" onClick={report}>Location report</Button>}
-          <Button kind="mini" onClick={reload}>Refresh</Button>
+        </div>
+        <div className="no-print flex flex-wrap items-end gap-x-6 gap-y-2 rounded border border-slate-800 bg-slate-900/40 px-3 py-2">
+          <ToolGroup label="Find">
+            <input className={`${inputClass} w-56`} placeholder="filter the rows…" value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="filter the rows" />
+            <Button kind="mini" onClick={() => setShowFilter(!showFilter)}>By field…</Button>
+          </ToolGroup>
+          <ToolGroup label="Arrange">
+            {groupings.length > 1 && <label className="flex items-center gap-1 text-xs text-slate-400">Group by<select className={inputClass} value={grouping} onChange={(e) => { setGrouping(e.target.value); setOpen(new Set()); store(store_('grouping'), e.target.value) }}>
+              {groupings.map((x) => <option key={x.key} value={x.key}>{x.label}</option>)}</select></label>}
+            <Button kind="mini" onClick={() => setShowColumns(!showColumns)}>Columns…</Button>
+          </ToolGroup>
+          <ToolGroup label="Output" className="ml-auto">
+            <Button kind="mini" onClick={csv}>Export CSV</Button>
+            {p.report && <Button kind="mini" onClick={report}>Location report</Button>}
+            <Button kind="mini" onClick={reload} title="read the records again">Refresh</Button>
+          </ToolGroup>
         </div>
         {showFilter && <AddFilter keys={lead.concat(context, chosen)} labelOf={(k) => labelOf(col(k))} onAdd={(f) => { setFilters([...filters, f]); setShowFilter(false) }} />}
         {filters.length > 0 && (
@@ -159,8 +170,6 @@ export default function SettingsBookScreen({ screen, params: p }: { screen: Scre
         )}
         {showColumns && <ColumnChooser all={allColumns} labels={p.labels ?? {}} chosen={chosen} onChange={setChosen} defaults={p.defaultColumns} />}
         {raise && <RaiseRequest o={raise} onClose={() => setRaise(null)} />}
-        {/* the owner, 2026-09-23: the location chosen, named above its settings */}
-        {!scopeDevice && !scopeRequest && station && station !== '*' && stationName ? <h2 className="text-center text-lg font-semibold text-slate-100">{String(stationName)}</h2> : null}
         {status}
         <DataGrid rows={visible} columns={columns} rowKey={(r) => s(r[rowKey])} groupBy={groupBy} openGroups={open} onToggleGroup={toggleGroup}
           expandedKey={expanded} onRowClick={(r) => setExpanded(expanded === s(r[rowKey]) ? null : s(r[rowKey]))}
@@ -198,6 +207,16 @@ function Card({ r, card, can, ctx, rowKey }: { r: Row; card: NonNullable<Setting
           {textQ.isPending ? 'loading the settings text…' : textQ.isError ? 'The settings text could not be read: ' + (textQ.error as Error).message : textQ.data ? textQ.data.text : 'No settings file is filed for this revision.'}
         </pre>
       )}
+    </div>
+  )
+}
+
+/** A labelled cluster of the book's tools (2026-09-23): what the controls in it are for, in one word above them. */
+function ToolGroup({ label, className = '', children }: { label: string; className?: string; children: ReactNode }) {
+  return (
+    <div className={`flex flex-col gap-1 ${className}`}>
+      <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">{label}</span>
+      <div className="flex flex-wrap items-center gap-2">{children}</div>
     </div>
   )
 }
