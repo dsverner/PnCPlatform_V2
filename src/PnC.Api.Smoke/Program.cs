@@ -1993,6 +1993,7 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
             var k235_27 = (k235_settings?["27VLO"] as JsonArray)?.FirstOrDefault(x => x?["page"]?.ToString() == "5-11");
             Must(k235_ds == HttpStatusCode.OK && k235_def is not null && k235_doc?["settingsTemplate"]?.ToString() == "SETTINGS_TEXT_SEL_221F"
                  && new[] { "PSVC", "27VLO", "59VHI", "25DV", "SYNCP", "25T", "VCT" }.All(c => (k235_settings?[c] as JsonArray)?.Count > 0) && k235_whole
+                 && k235_settings?.Count == 46 && ((k235_settings?["Z2DP"] as JsonArray)?.Any(x => x?["page"]?.ToString() == "5-17" && x?["pdfPage"]?.GetValue<int>() == 141) ?? false)   // #236: every setting of the SEL-221F
                  && k235_27?["pdfPage"]?.GetValue<int>() == 135 && (k235_27?["quote"]?.ToString() ?? "").Contains("27VLO = 0.20 x 132.8 kV = 26.6 kV"),
                 $"#235: the SEL-221F manual guide is Effective for the settings template — {k235_settings?.Count} settings, {k235_quotes.Count} quotes, each with its page and PDF page; 27VLO at 5-11 opens PDF page {k235_27?["pdfPage"]}");
             // the editor's write: MTU on the #187 relay's outstanding draft, in the filed shape; the rendered file carries it byte for byte

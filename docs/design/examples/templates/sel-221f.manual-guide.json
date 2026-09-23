@@ -1,0 +1,1009 @@
+{
+ "key": "MANUAL_GUIDE_SEL_221F",
+ "name": "SEL-221F manual guide",
+ "model": "SEL-221F",
+ "settingsTemplate": "SETTINGS_TEXT_SEL_221F",
+ "source": "SEL-221F-2/-3/-4, SEL-121F-2/-3 Instruction Manual, date code 981207",
+ "sourceFile": "Z:\\Archive-WorkingData-Cloud\\Work\\DATA\\Manuals\\SEL\\221F-2-3-4_IM_19981207.pdf",
+ "pageOffsets": "printed 5-n = PDF page 124+n (Section 5); 2-51 = PDF page 71; see sel-221f.manual-pages.json",
+ "settings": {
+  "ID": [
+   {
+    "page": "5-4",
+    "pdfPage": 128,
+    "quote": "The relay tags each event report with a label in the identifier string. This allows you to distinguish the event report as one generated for a specific breaker and substation. Typical identifiers include an abbreviation of the substation name and line terminal. The date of the last functional test may also be included for maintenance purposes.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-5",
+    "pdfPage": 129,
+    "quote": "For the relay at Breaker 3:\nID = Example 230 kV Line",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-5",
+    "pdfPage": 129,
+    "quote": "- Setting Limit Check\nThe identifier string is limited to 39 characters. Characters entered after the 39th character are ignored.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   }
+  ],
+  "R1": [
+   {
+    "page": "5-5",
+    "pdfPage": 129,
+    "quote": "For optimal performance, the relay requires accurate values of positive- and zero-sequence impedances for the protected transmission line. The relay uses positive-sequence impedance settings to establish phase distance element reaches and calculate fault locations. Similarly, the relay uses zero-sequence impedances with positive-sequence impedances to establish ground distance element reaches and to calculate line-ground fault locations.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-5",
+    "pdfPage": 129,
+    "quote": "You can obtain values for the positive- and zero-sequence line impedances from transmission line modeling programs, existing fault studies, or hand calculations. Only the positive- and zero-sequence impedances for the protected transmission line are entered as relay settings R1, X1, R0, and X0. Values entered for R1 and X1 are the positive-sequence resistance and reactance for the protected transmission line section. The R0 value is transmission line zero-sequence resistance; the X0 value is transmission line zero-sequence reactance. Enter all impedances in primary ohms.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-5",
+    "pdfPage": 129,
+    "quote": "R1 =  13.90",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-6",
+    "pdfPage": 130,
+    "quote": "The relay allows impedance settings In the range 0 - 9999 ohms and line length settings between 0.1 and 999 miles.\n\nWhile there are no secondary setting limits for the impedance or line length settings, the magnitude and angle of the residual current compensation factor is range limited.\n\nWhere K = (Z0 - Z1)/(3 x Z1)\n0.0833 < |K| < 2.0\nand\n47° < MTA + ∠K < 113°",
+    "checked": "transcribed from the page image, 2026-09-23"
+   }
+  ],
+  "X1": [
+   {
+    "page": "5-5",
+    "pdfPage": 129,
+    "quote": "For optimal performance, the relay requires accurate values of positive- and zero-sequence impedances for the protected transmission line. The relay uses positive-sequence impedance settings to establish phase distance element reaches and calculate fault locations. Similarly, the relay uses zero-sequence impedances with positive-sequence impedances to establish ground distance element reaches and to calculate line-ground fault locations.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-5",
+    "pdfPage": 129,
+    "quote": "You can obtain values for the positive- and zero-sequence line impedances from transmission line modeling programs, existing fault studies, or hand calculations. Only the positive- and zero-sequence impedances for the protected transmission line are entered as relay settings R1, X1, R0, and X0. Values entered for R1 and X1 are the positive-sequence resistance and reactance for the protected transmission line section. The R0 value is transmission line zero-sequence resistance; the X0 value is transmission line zero-sequence reactance. Enter all impedances in primary ohms.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-5",
+    "pdfPage": 129,
+    "quote": "X1 =  79.96",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-6",
+    "pdfPage": 130,
+    "quote": "The relay allows impedance settings In the range 0 - 9999 ohms and line length settings between 0.1 and 999 miles.\n\nWhile there are no secondary setting limits for the impedance or line length settings, the magnitude and angle of the residual current compensation factor is range limited.\n\nWhere K = (Z0 - Z1)/(3 x Z1)\n0.0833 < |K| < 2.0\nand\n47° < MTA + ∠K < 113°",
+    "checked": "transcribed from the page image, 2026-09-23"
+   }
+  ],
+  "R0": [
+   {
+    "page": "5-5",
+    "pdfPage": 129,
+    "quote": "You can obtain values for the positive- and zero-sequence line impedances from transmission line modeling programs, existing fault studies, or hand calculations. Only the positive- and zero-sequence impedances for the protected transmission line are entered as relay settings R1, X1, R0, and X0. Values entered for R1 and X1 are the positive-sequence resistance and reactance for the protected transmission line section. The R0 value is transmission line zero-sequence resistance; the X0 value is transmission line zero-sequence reactance. Enter all impedances in primary ohms.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-5",
+    "pdfPage": 129,
+    "quote": "R0 =  41.50",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-6",
+    "pdfPage": 130,
+    "quote": "The relay allows impedance settings In the range 0 - 9999 ohms and line length settings between 0.1 and 999 miles.\n\nWhile there are no secondary setting limits for the impedance or line length settings, the magnitude and angle of the residual current compensation factor is range limited.\n\nWhere K = (Z0 - Z1)/(3 x Z1)\n0.0833 < |K| < 2.0\nand\n47° < MTA + ∠K < 113°",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-6",
+    "pdfPage": 130,
+    "quote": "Given the impedance settings selected,\nK = 0.702 ∠0.57°\nYou should perform a cursory check to be sure the minimum Zone 1, Zone 2, or Zone 3 secondary reaches at MTA are not below the minimum distance element reach setting of 0.125 Ω secondary or above the maximum setting limit of 64 Ω secondary.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   }
+  ],
+  "X0": [
+   {
+    "page": "5-5",
+    "pdfPage": 129,
+    "quote": "You can obtain values for the positive- and zero-sequence line impedances from transmission line modeling programs, existing fault studies, or hand calculations. Only the positive- and zero-sequence impedances for the protected transmission line are entered as relay settings R1, X1, R0, and X0. Values entered for R1 and X1 are the positive-sequence resistance and reactance for the protected transmission line section. The R0 value is transmission line zero-sequence resistance; the X0 value is transmission line zero-sequence reactance. Enter all impedances in primary ohms.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-5",
+    "pdfPage": 129,
+    "quote": "X0 = 248.57",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-6",
+    "pdfPage": 130,
+    "quote": "The relay allows impedance settings In the range 0 - 9999 ohms and line length settings between 0.1 and 999 miles.\n\nWhile there are no secondary setting limits for the impedance or line length settings, the magnitude and angle of the residual current compensation factor is range limited.\n\nWhere K = (Z0 - Z1)/(3 x Z1)\n0.0833 < |K| < 2.0\nand\n47° < MTA + ∠K < 113°",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-6",
+    "pdfPage": 130,
+    "quote": "Given the impedance settings selected,\nK = 0.702 ∠0.57°\nYou should perform a cursory check to be sure the minimum Zone 1, Zone 2, or Zone 3 secondary reaches at MTA are not below the minimum distance element reach setting of 0.125 Ω secondary or above the maximum setting limit of 64 Ω secondary.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   }
+  ],
+  "LL": [
+   {
+    "page": "5-5",
+    "pdfPage": 129,
+    "quote": "The relay fault locator uses the line length setting to scale the calculated fault location in terms of miles or kilometers. Set the LL setting equal to the transmission line length which corresponds to the value of positive-sequence impedance entered for R1 and X1. Typically, this is the length of the protected transmission line section.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-5",
+    "pdfPage": 129,
+    "quote": "LL = 100.00",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-6",
+    "pdfPage": 130,
+    "quote": "The relay allows impedance settings In the range 0 - 9999 ohms and line length settings between 0.1 and 999 miles.\n\nWhile there are no secondary setting limits for the impedance or line length settings, the magnitude and angle of the residual current compensation factor is range limited.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   }
+  ],
+  "CTR": [
+   {
+    "page": "5-6",
+    "pdfPage": 130,
+    "quote": "Current transformer ratio (CTR) selection for line protection is often based on the transmission line current carrying capability. CTR selections also determine the magnitude of secondary fault current presented to the relay.\n\nSelect a current transformer ratio which reduces the likelihood of CT saturation and allows the current transformer to deliver a reliable secondary representation of the primary current during a fault condition.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-6",
+    "pdfPage": 130,
+    "quote": "The current transformer ratio selected for this example is 1000/5 or 200:1. This ratio allows 1000 A of load to flow without exceeding five amperes of secondary current, while limiting the secondary current to well below 50 A for the maximum available fault duty.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-7",
+    "pdfPage": 131,
+    "quote": "CTR = 200.00",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-7",
+    "pdfPage": 131,
+    "quote": "The primary limit check for the CTR and PTR settings allows you to enter values from\n1 - 5000 and 1 - 10,000 respectively.\n\nThere is no secondary setting range check for the CTR setting. The ratio of PTR:SPTR must be between 0.5 and 1.99.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   }
+  ],
+  "PTR": [
+   {
+    "page": "5-6",
+    "pdfPage": 130,
+    "quote": "The potential transformer ratio (PTR) setting should be selected to match the primary voltage ratio (l-n) to approximately 67 V l-n.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-7",
+    "pdfPage": 131,
+    "quote": "The system voltage is 230 kV line-line or 132.8 kV line-neutral. The relay requires a nominal phase voltage of approximately 66.4 V l-n or 115 V l-l. The PTR selected for this example is 2000:1. The synch-check potential transformer uses the same ratio.\nPTR = (230 kV) / (115 V) = 2000:1",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-7",
+    "pdfPage": 131,
+    "quote": "PTR  = 2000.00",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-7",
+    "pdfPage": 131,
+    "quote": "The primary limit check for the CTR and PTR settings allows you to enter values from\n1 - 5000 and 1 - 10,000 respectively.\n\nThere is no secondary setting range check for the CTR setting. The ratio of PTR:SPTR must be between 0.5 and 1.99.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   }
+  ],
+  "SPTR": [
+   {
+    "page": "5-6",
+    "pdfPage": 130,
+    "quote": "The synch-check potential transformer ratio (SPTR) setting should be selected to allow the synch-check voltage input to range between 67 V l-n and 120 V l-n.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-7",
+    "pdfPage": 131,
+    "quote": "The PTR selected for this example is 2000:1. The synch-check potential transformer uses the same ratio.\nSPTR = (132.8 kV) / (66.4 V) = 2000:1",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-7",
+    "pdfPage": 131,
+    "quote": "SPTR = 2000.00",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-7",
+    "pdfPage": 131,
+    "quote": "There is no secondary setting range check for the CTR setting. The ratio of PTR:SPTR must be between 0.5 and 1.99.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   }
+  ],
+  "MTA": [
+   {
+    "page": "5-7",
+    "pdfPage": 131,
+    "quote": "The maximum torque angle (selected in the setting procedure) is common for all protective elements. A typical maximum torque angle setting is at or less than the positive-sequence transmission line impedance angle. A lower MTA setting extends the amount of resistive coverage provided by the mho elements. MTA selected for this example is 80.1°. Note that this value matches the positive-sequence line impedance angle of 80.1°.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-7",
+    "pdfPage": 131,
+    "quote": "MTA = 80.1",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-8",
+    "pdfPage": 132,
+    "quote": "The primary setting range check allows MTA settings from 47° - 90°. The secondary check for this setting checks the sum of the MTA setting and the angle of the residual compensation factor, K. The sum must fall within the range:\n47° < MTA° + ∠K° < 113°",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-8",
+    "pdfPage": 132,
+    "quote": "- Other Settings Affected\nZone 1, Zone 2, and Zone 3 distance element reach at MTA degrees if MTA does not equal the positive-sequence transmission line impedance angle.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   }
+  ],
+  "79OI": [
+   {
+    "page": "5-8",
+    "pdfPage": 132,
+    "quote": "An open interval timer controls the reclosing shot. The recloser must coordinate with remote reclosing schemes.\n\nFor this example, the first reclose attempt at Breaker 3 is 40 cycles after the TRIP condition is gone.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-8",
+    "pdfPage": 132,
+    "quote": "79OI =  40",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-8",
+    "pdfPage": 132,
+    "quote": "79OI timer has a primary limit check of 0 to 8,000 cycles. The 79RS timer has a primary limit check of 60 to 8,000 cycles. There is no secondary limit check for 79OI or 79RS. For this example, each open interval and 79RS reset timer setting lies within the relay setting limits.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-8",
+    "pdfPage": 132,
+    "quote": "Please note that the 52BT timer should be set less than the open interval timer if you need the switch-onto-fault logic enabled for the line test shot (see 52BT Setting for details).",
+    "checked": "transcribed from the page image, 2026-09-23"
+   }
+  ],
+  "79RS": [
+   {
+    "page": "5-8",
+    "pdfPage": 132,
+    "quote": "Because 79RS limits the duration of CLOSE output operation, the reset time (79RS) must be at least as long as it takes the breaker to completely close. The 79RS timer also serves to block automatic reclosing for 79RS time period after an operator (or SCADA) closes the line breaker. This feature allows the local operator to retain control of the line breaker. For this example, the 79RS timer is set for 240 cycles or four seconds.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-8",
+    "pdfPage": 132,
+    "quote": "79RS = 240",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-8",
+    "pdfPage": 132,
+    "quote": "79OI timer has a primary limit check of 0 to 8,000 cycles. The 79RS timer has a primary limit check of 60 to 8,000 cycles. There is no secondary limit check for 79OI or 79RS. For this example, each open interval and 79RS reset timer setting lies within the relay setting limits.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   }
+  ],
+  "PSVC": [
+   {
+    "page": "5-9",
+    "pdfPage": 133,
+    "quote": "Enable the voltage checking function by selecting a PSVC setting of S, P, or E. Voltage checking is disabled when you select PSVC = N. When PSVC = S, the relay asserts Relay Word bit VSC when VS > 59VHI and VP1 < 27VLO (live sync/dead polarizing) for VCT time. When PSVC = P, the relay asserts Relay Word bit VSC when VP1 > 59VHI and VS < 27VLO (live polarizing/dead sync) for VCT time. When PSVC = E, the relay asserts Relay Word bit VSC when either voltage condition is true for VCT time.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-12",
+    "pdfPage": 136,
+    "quote": "The relay allows PSVC settings of S (for live-sync/dead-pol checking), P (for live-pol/dead-sync checking), E (closing is acceptable if either condition is valid), or N (voltage checking disabled).",
+    "checked": "transcribed from the page image, 2026-09-23"
+   }
+  ],
+  "27VLO": [
+   {
+    "page": "5-9",
+    "pdfPage": 133,
+    "quote": "Select 59VHI and 27VLO settings based upon your utility standards. Select standard voltage levels where the line is considered live and dead for reclosing purposes.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-11",
+    "pdfPage": 135,
+    "quote": "For the 27VLO setting, we assume that the line is dead for reclosing purposes if line voltage is below 20% of nominal voltage.\n27VLO = 0.20 x 132.8 kV = 26.6 kV",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-12",
+    "pdfPage": 136,
+    "quote": "The primary setting range check allows 27VLO, 59VHI, and 25DV voltage settings from 0 - 2,000 kV primary. The 27VLO and 59VHI secondary setting range is from 0 - 80.0 V l-n secondary on the polarizing inputs and 0 - 125 V l-n secondary on the synchronism checking input.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   }
+  ],
+  "59VHI": [
+   {
+    "page": "5-9",
+    "pdfPage": 133,
+    "quote": "Select 59VHI and 27VLO settings based upon your utility standards. Select standard voltage levels where the line is considered live and dead for reclosing purposes.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-10",
+    "pdfPage": 134,
+    "quote": "The relay checks the magnitudes of V1 and VS to ensure that both voltages are above the 59VHI setting. The relay only performs the sync check if both the bus and line are live.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-12",
+    "pdfPage": 136,
+    "quote": "For the 59VHI setting, we assume that the line is live for reclosing purposes if line voltage is above 80% of nominal voltage.\n59VHI = 0.80 x 132.8 kV = 106.2 kV",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-12",
+    "pdfPage": 136,
+    "quote": "The primary setting range check allows 27VLO, 59VHI, and 25DV voltage settings from 0 - 2,000 kV primary. The 27VLO and 59VHI secondary setting range is from 0 - 80.0 V l-n secondary on the polarizing inputs and 0 - 125 V l-n secondary on the synchronism checking input.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   }
+  ],
+  "25DV": [
+   {
+    "page": "5-10",
+    "pdfPage": 134,
+    "quote": "Referring to Figure 5.2, note that 25DV is determined from the known angle, ∅. The 25DV setting is approximated with the equation:\n25DV = sin(∅) x 59VHI\nThe value of ∅ should be the maximum angle across the breaker to allow closing.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-11",
+    "pdfPage": 135,
+    "quote": "For our example, for a maximum angle of 30° and 59VHI equal to 80% of nominal phase-neutral voltage on a 230 kV system:\n25DV = sin(30) x (0.8 x 132.8 kv) = 53.12 kv",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-12",
+    "pdfPage": 136,
+    "quote": "The primary setting range check allows 27VLO, 59VHI, and 25DV voltage settings from 0 - 2,000 kV primary. … The 25DV element setting range is 0 - 150 V secondary.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   }
+  ],
+  "SYNCP": [
+   {
+    "page": "5-9",
+    "pdfPage": 133,
+    "quote": "The voltage VS is taken from a bus-side PT attached to A-phase; SYNCP = A.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-12",
+    "pdfPage": 136,
+    "quote": "The VS input is taken from a bus-side PT connected to A-phase.\nSYNCP = A",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-13",
+    "pdfPage": 137,
+    "quote": "The relay allows SYNCP settings of A, B, or C to indicate the phase which the VS input is attached to. If VS is not connected in your application, you may use A, B, or C for a SYNCP setting.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   }
+  ],
+  "25T": [
+   {
+    "page": "5-10",
+    "pdfPage": 134,
+    "quote": "If the 25T time is relatively short, the breaker close time may become a factor. For example, if 25T is set for 60 cycles and the breaker close time is 10 cycles, it actually takes 70 cycles to parallel the line. If this time is critical, the breaker close time should be taken into account when the 25T time is set so that, in this case, a 25T setting of 50 cycles might be more appropriate.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-10",
+    "pdfPage": 134,
+    "quote": "To set the relay, you must know the maximum angle (∅) between VPOL and VS that is allowed for the breaker to close. The slip frequency should be estimated to set the 25T time delay and the breaker close time should also be known.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-11",
+    "pdfPage": 135,
+    "quote": "The slip frequency is the maximum allowed frequency difference between VP and VS. The formula for slip is as follows:\nΔF = (2 x ∅) / (360 x 25T)\nWhere 25T is the sync-check time delay from the SEL-221F-2, -3, -4 relay setting.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-12",
+    "pdfPage": 136,
+    "quote": "The 25T setting is selected to allow closing under the synchronism conditions outlined above.\n25T = 5 sec = 300 cycles",
+    "checked": "transcribed from the page image, 2026-09-23"
+   }
+  ],
+  "VCT": [
+   {
+    "page": "5-9",
+    "pdfPage": 133,
+    "quote": "We only want to close if the voltage conditions have been valid for at least 30 cycles; VCT = 30 cycles.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   }
+  ],
+  "A1TP": [
+   {
+    "page": "5-13",
+    "pdfPage": 137,
+    "quote": "Pickup and dropout of the A1 programmable output contact can be time delayed using the A1TP and A1TD settings. This example does not require that these time delays be used.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-13",
+    "pdfPage": 137,
+    "quote": "A1TP = 0.0\nA1TD = 0.0",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-13",
+    "pdfPage": 137,
+    "quote": "The primary setting range check allows A1TP and A1TD settings of 0 - 8,000 cycles.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   }
+  ],
+  "A1TD": [
+   {
+    "page": "5-13",
+    "pdfPage": 137,
+    "quote": "Pickup and dropout of the A1 programmable output contact can be time delayed using the A1TP and A1TD settings. This example does not require that these time delays be used.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-13",
+    "pdfPage": 137,
+    "quote": "A1TP = 0.0\nA1TD = 0.0",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-13",
+    "pdfPage": 137,
+    "quote": "The primary setting range check allows A1TP and A1TD settings of 0 - 8,000 cycles.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   }
+  ],
+  "BFIN1": [
+   {
+    "page": "2-51",
+    "pdfPage": 71,
+    "quote": "Breaker Failure Logic Settings\nBFIN1    Y or N\nSetting to Y permits the IN1 input to activate the breaker failure logic. Wire the trip output from any backup protective relay to this input. This setting does not influence the function of the IN1 bit in the Relay Word.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "2-51",
+    "pdfPage": 71,
+    "quote": "Note: In the SEL-221F-3/121F-3 and SEL-221F-4 relays, BFIN1 and BFTD replace AITP and A1TD.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   }
+  ],
+  "BFTD": [
+   {
+    "page": "2-51",
+    "pdfPage": 71,
+    "quote": "Both conditions listed above must be true for the BFTD timer to start and continue timing. Once the BFTD timer expires, the BFT bit in the Relay Word asserts. Set the BFT bit in one of the four programmable output contact logic masks. This output contact should then be wired to the appropriate lockout relay.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "2-51",
+    "pdfPage": 71,
+    "quote": "Breaker Failure Logic Settings\nBFTD    5 to 8000\nSet this timer for the breaker failure time delay.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "2-51",
+    "pdfPage": 71,
+    "quote": "Note: In the SEL-221F-3/121F-3 and SEL-221F-4 relays, BFIN1 and BFTD replace AITP and A1TD.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   }
+  ],
+  "Z1%": [
+   {
+    "page": "5-13",
+    "pdfPage": 137,
+    "quote": "The Zone 1 reach is typically set short of the forward remote terminal. Thus, the Zone 1 elements provide instantaneous protection for phase-phase, three-phase, and phase-ground faults in the first 75-80% of the transmission line. The remainder of the line is protected by the overreaching Zone 2 elements. While the percent error of the impedance element reach is less than 5%, errors in the CT and PT ratios, modeled transmission line data, and fault study data do not permit Zone 1 element settings of 100%.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-14",
+    "pdfPage": 138,
+    "quote": "Z1 Reach = 0.80 x 81.16 Ω primary @ 80.1° = 64.93 Ω primary @ 80.1°\nThe reach settings for the phase distance elements are a percentage of the positive-sequence line impedance settings along the line angle. When the MTA setting differs from the positive-sequence line angle, the relay calculates the mho circle diameter with the following equation:\nDiameter = Set Reach / cos(Angle of Z1 - MTA)",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-14",
+    "pdfPage": 138,
+    "quote": "For the relay at Breaker 3:\nZ1% = 80.0",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-14",
+    "pdfPage": 138,
+    "quote": "The primary limit check allows Zone 1 percent reach settings of 0 - 2000%. The secondary setting check allows secondary reach settings of 0.125 - 64 ohms secondary along the MTA. … The Z1% setting of 80 for this example lies within primary and secondary setting limits of the relay. … Zone 1 must be less than Zone 2 and Zone 3. The Z1P and Z1G bits in the Relay Word depend on the Z1% setting.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   }
+  ],
+  "Z2%": [
+   {
+    "page": "5-14",
+    "pdfPage": 138,
+    "quote": "The Zone 2 phase and ground distance elements provide coverage for end-of-section faults. The time delay allows coordination between the Zone 2 element of this relay and the Zone 1 element of the next relay in the forward direction.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-15",
+    "pdfPage": 139,
+    "quote": "Zone 2 elements should never extend past the Zone 1 reach of the next line terminal. This prevents race conditions between Zone 2 time delayed elements of the two line terminals. Typical settings for the Zone 2 distance elements are 120 - 130% of the protected line.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-15",
+    "pdfPage": 139,
+    "quote": "Zone 2 element settings with a reach of 120% of protected line impedance account for the effects of infeed. This point must be verified using a fault study to calculate the apparent ohms at the local terminal for a fault at the remote end of the transmission line. … Assuming Breaker 5 Zone 1 reach is set for 80% of the line impedance of Line 3, verify that a Zone 2 reach of 120% for Breaker 3 does not overreach the Zone 1 elements at Breaker 5.\nLine 2 Impedance + [0.8 x Line 3 Impedance] = 81.6 Ω + [0.8 x 40.58 Ω]\n= 113.62 Ω primary\nWhen Zone 2 at Breaker 3 has a set reach of 120%, the effective reach is:\nZone 2 @ Bkr. 3 = 1.20 x 81.16 Ω = 97.39 Ω along the line angle\nSince 97.39 Ω < 113.62 Ω, the Zone 2 setting of 120% at Breaker 3 does not overreach the Zone 1 protection of Line 3. Any effect of infeed tends to increase the apparent ohms seen at Breaker 3 for faults on Line 3.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-16",
+    "pdfPage": 140,
+    "quote": "The primary limit check allows Zone 2 percent reach settings of 0 - 3200% with the requirement that the Zone 2 reach be equal to or greater than the Zone 1 reach. The secondary check allows secondary reach settings of 0.125 - 64 ohms secondary along the MTA. … The Z2% setting of 120 for this example lies within the secondary setting limits of the relay. … Zone 2 must be less than Zone 3. The Z2PT and Z2GT bits in the Relay Word depend on the Z2% setting.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   }
+  ],
+  "Z3%": [
+   {
+    "page": "5-16",
+    "pdfPage": 140,
+    "quote": "The Zone 3 elements time delayed outputs can serve as remote backup for faults beyond the far bus.\nFor the relay at Breaker 3:\nZ3% = 150.00",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-16",
+    "pdfPage": 140,
+    "quote": "The primary limit check allows Zone 3 percent reach settings of 0 - 3200%, with the requirement that Zone 3 reach exceed Zone 2 reach. The secondary check allows secondary reach settings of 0.125 - 64 ohms secondary along the MTA.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-16",
+    "pdfPage": 140,
+    "quote": "Secondary Ohms = 121.74 Ω primary / 10 = 12.174 Ω secondary along the MTA\nThe Z3% setting of 150 for this example is within primary and secondary setting limits of the relay. … The Z3, and Z3T bits in the Relay Word depend on the Z3% setting.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   }
+  ],
+  "Z2DP": [
+   {
+    "page": "5-17",
+    "pdfPage": 141,
+    "quote": "The time delay of the Zone 2 phase and ground distance elements is selected by the settings. The Zone 2 elements must coordinate with downstream Zone 1 elements, plus downstream breaker operating time, plus a small safety margin.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-17",
+    "pdfPage": 141,
+    "quote": "Z2DP = 30.00\nZ2DG = 30.00",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-17",
+    "pdfPage": 141,
+    "quote": "The limit check allows Zone 2 time delays of 3 - 2000 cycles. A Z2DP and Z2DG of 30 cycles each lies within the relay setting limits. There is no secondary limit check for this setting.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   }
+  ],
+  "Z2DG": [
+   {
+    "page": "5-17",
+    "pdfPage": 141,
+    "quote": "The time delay of the Zone 2 phase and ground distance elements is selected by the settings. The Zone 2 elements must coordinate with downstream Zone 1 elements, plus downstream breaker operating time, plus a small safety margin.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-17",
+    "pdfPage": 141,
+    "quote": "Z2DP = 30.00\nZ2DG = 30.00",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-17",
+    "pdfPage": 141,
+    "quote": "The limit check allows Zone 2 time delays of 3 - 2000 cycles. A Z2DP and Z2DG of 30 cycles each lies within the relay setting limits. There is no secondary limit check for this setting.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   }
+  ],
+  "Z3D": [
+   {
+    "page": "5-17",
+    "pdfPage": 141,
+    "quote": "The Z3D timer adds a settable delay to the instantaneous outputs of the Zone 3 phase and ground distance elements. The time delayed output of the Zone 3 distance elements is represented by the Z3T bit in the Relay Word. Time delayed Zone 3 elements provide time-step protection. The Zone 3 phase time delay should coordinate with the Zone 2 operating time of the relay and breaker at the remote bus. This allows the remote Zone 1 and Zone 2 elements to pick up and clear the fault.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-17",
+    "pdfPage": 141,
+    "quote": "A typical Zone 3 phase distance time delay setting is 40 cycles.\nIn the example at Breaker 3, the time selection should coordinate with the Breaker 2 Zone 2 protection to provide time-step backup protection for Line 3. The Zone 3 phase delay selected in this example is 40 cycles.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-17",
+    "pdfPage": 141,
+    "quote": "Z3D = 40.00",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-17",
+    "pdfPage": 141,
+    "quote": "The limit check allows Zone 3 time delays of 3 - 2000 cycles. A Z3D of 40 cycles lies within the relay setting limits. There is no secondary limit check for this setting.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   }
+  ],
+  "TDUR": [
+   {
+    "page": "5-18",
+    "pdfPage": 142,
+    "quote": "The trip duration timer setting determines the minimum length of time the TRIP output contacts close when the relay trips. The TRIP output contacts close for the greater of the TDUR time or the duration of the trip condition. A typical setting for this timer is 150 msec or nine cycles.\nTDUR = 9.00",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-18",
+    "pdfPage": 142,
+    "quote": "The primary limit check allows TDUR time delay settings of 0 - 2000 cycles. The TDUR setting of 9.00 cycles lies within the relay setting limits. There is no secondary limit check for this setting.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   }
+  ],
+  "50NG": [
+   {
+    "page": "5-18",
+    "pdfPage": 142,
+    "quote": "The 50NG setting selects pickup thresholds for the 50N and 50G ground distance element fault detector overcurrent elements. Before any ground distance element can pickup, the relay must detect phase and residual current greater than the 50NG setting. Calculate the phase and residual current for the most remote ground fault that the Zone 3 ground distance element must detect. Select a 50NG setting to ensure that both the 50N and 50G overcurrent elements pick up for this fault.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-18",
+    "pdfPage": 142,
+    "quote": "The 50N and 50G elements are also used in the trip unlatch logic (see Section 2: SPECIFICATIONS). Before the TRIP output can open, the trip condition must vanish and the phase and residual current must drop below the 50NG element setting. This assures that the TRIP output contact does not open until current has stopped flowing in the breaker.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-18",
+    "pdfPage": 142,
+    "quote": "For the relay at Breaker 3 in the system shown in Figure 5.1, the governing fault condition is a phase-ground fault at Bus D. The fault study revealed that for this fault, IA = 435 A primary and IR = 410 A primary. To ensure that the 50N and 50G elements pick up for the calculated fault current, select some current value below the calculated 410 ampere residual current value for the 50NG setting. This setting accounts for arc resistance and errors in fault study calculations. This value for the 50NG setting may be below load. In this example, the value selected for the 50NG setting is 250 A (approximately 60% of the minimum fault current).",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-19",
+    "pdfPage": 143,
+    "quote": "50NG = 250.00\n- Setting Limit Check\nThe primary limit check allows for 50NG settings of 0.25 - 50,000 A. The secondary check allows for a secondary amp setting of 0.5 - 25 times 51NP, but less than 40 A.\nCalculations:     CTR = 200:1\n50NG secondary amps = 250 A primary / 200 = 1.25 A secondary\nThe 50NG setting of 250 A for this example lies within the relay setting limits.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   }
+  ],
+  "50P": [
+   {
+    "page": "5-19",
+    "pdfPage": 143,
+    "quote": "The 50P element provides fault detector supervision of the phase distance elements and must pick up for all fault conditions where a phase distance element is expected to operate. The ideal setting for the 50P element is above load but below minimum fault duty for the most remote Zone 3 phase fault that the relay must detect.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-19",
+    "pdfPage": 143,
+    "quote": "Although it is not ideal, you can set 50P below load to permit distance element operation for end-of-line faults with magnitudes below load. When 50P is below load current and all three potential fuses operate, the relay three-phase LOP function cannot operate. Refer to the description of LOP logic for more details.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-19",
+    "pdfPage": 143,
+    "quote": "For the relay at Breaker 3, the governing fault condition is a phase-phase fault at Bus D. The fault study revealed that the lowest phase fault current equals 620 A primary for this fault. To ensure that the 50P element picks up for the calculated fault current, select some current value below the calculated 620 ampere value for the 50P setting. This setting accounts for arc resistance and errors in fault study calculations. In this example, the value selected for the 50P setting is 370 A (approximately 60% of the minimum fault current).\n50P = 370.00",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-20",
+    "pdfPage": 144,
+    "quote": "The primary limit check allows for 50P settings of 0.25 - 50,000 A. The secondary check allows for a secondary amp setting of 0.5 - 40 A.\nCalculations:     CTR = 200:1\n50P secondary amps = 370 A primary / 200 = 1.85 A secondary\nThe 50P setting of 370 A for this example lies within the relay setting limits.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   }
+  ],
+  "50H": [
+   {
+    "page": "5-20",
+    "pdfPage": 144,
+    "quote": "The 50H element is intended for use as a high set non-directional phase overcurrent detector in the switch-onto-fault logic. If a line breaker is closed into a close-in three-phase bolted fault where line-side potential transformers are used, polarizing voltage for the three-phase distance elements is never established. In this situation, the distance elements do not operate. The 50H element is provided to help prevent a failure to trip the line breaker in this instance.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-20",
+    "pdfPage": 144,
+    "quote": "The 50H element measures current magnitude in each phase with no dependence on polarizing voltages. This element is non-directional and should be used only in the switch-onto-fault logic mask (MTO) when the line breaker is closed to test the line on a radial basis. If fault duty in front of the line terminal is much greater than behind it, the 50H element can also be used in the unconditional trip logic mask (MTU) to provide rapid clearance of close-in faults.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-20",
+    "pdfPage": 144,
+    "quote": "Typical 50H settings are 50% - 70% of three-phase fault duty at the local bus.\nThe three-phase fault duty for a fault at Bus B is 2180 A. To assure rapid clearance of this fault, a 50H setting of 1500 A is selected for this example.\n50H = 1500.00",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-20",
+    "pdfPage": 144,
+    "quote": "The primary limit check allows 50H settings of 0.25 - 50,000 A. The secondary check allows a secondary amp setting of 0.5 - 80 A.\nCalculations:     CTR = 200:1\n50H secondary amps = 1500 A primary / 200 = 7.50 A secondary",
+    "checked": "transcribed from the page image, 2026-09-23"
+   }
+  ],
+  "51NP": [
+   {
+    "page": "5-21",
+    "pdfPage": 145,
+    "quote": "Consult a fault study to select the residual time-overcurrent element pickup setting. The residual time-overcurrent element provides current dependent, time delayed clearance of faults along the protected line and provides backup protection for remote terminals. Because the measure of residual current varies with system switching configuration, fault location, and fault resistance, a complete fault study is necessary to determine the minimum pickup setting, appropriate time dial, and curve characteristic.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-21",
+    "pdfPage": 145,
+    "quote": "For the relay at Breaker 3, a single line to ground fault at Bus C dictates the sensitivity required for the residual time-overcurrent pickup. The residual current magnitude for this fault is 540 A primary. To allow for ground fault resistance, a value of 50% of 540 A is selected as the residual time-overcurrent element pickup. The pickup (51NP), time dial (51NTD), and family of curves (51NC) selections are assumed to coordinate with the remaining residual time-overcurrent elements of the example system.\n51NP = 270.00",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-21",
+    "pdfPage": 145,
+    "quote": "The primary limit check for the residual time-overcurrent element allows 51NP settings of 0.25 - 50,000 A. The secondary check allows for secondary amp settings of 0.5 - 8.0 A.\nCalculations:     CTR = 200:1\n51NP secondary amps = 270 A primary / 200 = 1.35 A secondary",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-22",
+    "pdfPage": 146,
+    "quote": "The 51NP setting affects the 50NG and 67N pickup setting ranges. Relay Word bits 51NT and 51NP depend on the 51NP, 51NTD, 51NC and 51NTC settings.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   }
+  ],
+  "51NTD": [
+   {
+    "page": "5-21",
+    "pdfPage": 145,
+    "quote": "Because the measure of residual current varies with system switching configuration, fault location, and fault resistance, a complete fault study is necessary to determine the minimum pickup setting, appropriate time dial, and curve characteristic.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-21",
+    "pdfPage": 145,
+    "quote": "The pickup (51NP), time dial (51NTD), and family of curves (51NC) selections are assumed to coordinate with the remaining residual time-overcurrent elements of the example system.\n51NTD= 3.00",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-21",
+    "pdfPage": 145,
+    "quote": "The 51NTD setting check allows settings from 0.5 to 15 in increments of 0.01.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   }
+  ],
+  "51NC": [
+   {
+    "page": "5-21",
+    "pdfPage": 145,
+    "quote": "Because the measure of residual current varies with system switching configuration, fault location, and fault resistance, a complete fault study is necessary to determine the minimum pickup setting, appropriate time dial, and curve characteristic.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-21",
+    "pdfPage": 145,
+    "quote": "The pickup (51NP), time dial (51NTD), and family of curves (51NC) selections are assumed to coordinate with the remaining residual time-overcurrent elements of the example system.\n51NC = 2",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-21",
+    "pdfPage": 145,
+    "quote": "The 51NC setting check allows settings of 1, 2, 3, or 4 for the family of curves.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   }
+  ],
+  "51NTC": [
+   {
+    "page": "5-21",
+    "pdfPage": 145,
+    "quote": "When you enable the element forward-reaching by setting 51NTC=Y, consider only faults in front of the line terminal for coordinating purposes.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-21",
+    "pdfPage": 145,
+    "quote": "51NTC= Y",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-21",
+    "pdfPage": 145,
+    "quote": "The 51NTC setting allows the residual time-overcurrent element to be torque controlled (Y for forward reaching directional) or non-torque controlled (N for nondirectional).",
+    "checked": "transcribed from the page image, 2026-09-23"
+   }
+  ],
+  "67NP": [
+   {
+    "page": "5-22",
+    "pdfPage": 146,
+    "quote": "The relay provides an instantaneous residual overcurrent element, 67N. You can make the overcurrent element forward-looking by setting 67NTC = Y. The relay uses a negative-sequence directional element to torque control the 67N element when 67NTC = Y.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-22",
+    "pdfPage": 146,
+    "quote": "The pickup setting for this element should always be greater than the maximum end-of-line (EOL) ground fault current level. A typical setting for the 67NP element is 120% of this maximum EOL single-line-to-ground (SLG) fault duty. This prevents the instantaneous element from overreaching the forward bus.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-22",
+    "pdfPage": 146,
+    "quote": "The maximum residual current measured at Breaker 3 for a fault at Bus C equals 545 A. To ensure that the instantaneous element does not overreach Bus C, the 67NP setting should be 120% of 545 A. This 120% factor accounts for differences between the modeled and actual system, CT ratio errors, etc. The element should be forward-looking.\n67NP  = 650.00",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-22",
+    "pdfPage": 146,
+    "quote": "The primary limit check allows 67NP settings of 0.25 - 50,000 A. The secondary check allows a secondary amp setting of 0.5 A to 50 times the 51NP setting.\nCalculations:     CTR = 200:1\n67NP secondary amps = 650 A primary / 200 = 3.25 A secondary\nThe 67NP setting of 650 A for this example is greater than 0.5 A secondary and less than 50 times the 51NP setting.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   }
+  ],
+  "67NTC": [
+   {
+    "page": "5-22",
+    "pdfPage": 146,
+    "quote": "The relay provides an instantaneous residual overcurrent element, 67N. You can make the overcurrent element forward-looking by setting 67NTC = Y. The relay uses a negative-sequence directional element to torque control the 67N element when 67NTC = Y.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-22",
+    "pdfPage": 146,
+    "quote": "The element should be forward-looking.\n67NTC = Y",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-22",
+    "pdfPage": 146,
+    "quote": "The relay allows 67NTC settings of Y or N.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   }
+  ],
+  "52BT": [
+   {
+    "page": "5-23",
+    "pdfPage": 147,
+    "quote": "Switch-onto-fault protection is provided through elements selected in the MTO logic mask, typically non-time delay overreaching elements. The 52BT time delay setting dictates the interval during which these elements are enabled for tripping.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-23",
+    "pdfPage": 147,
+    "quote": "The 52BT element is an inverted time delayed follower of the 52A input. When the 52A input changes from the asserted (breaker closed) to deasserted state (breaker open), the 52BT element remains low for 52BT time. After the 52BT timer expires, the 52BT element changes from logic state \"0\" to \"1.\" When the breaker is closed (from an open state), 52BT remains high for 52BT time, then deasserts. While the 52BT element is high, elements selected in the MTO logic mask are enabled to trip.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-24",
+    "pdfPage": 148,
+    "quote": "This emphasizes the need to limit the time during which MTO mask elements can trip the breaker. Remember: the 52BT time setting must be long enough for the sensitive elements in the MTO logic mask to assert, yet shorter than the time allowed for Breaker 2 to parallel.\n\nIf you require switch-onto-fault protection for the reclose shot, set the 52BT time interval shorter than the recloser open interval. If you want to cancel switch-onto-fault logic for the reclose shot, set the 52BT timer longer than the open interval timer by the maximum expected breaker opening time. If the 52BT timer does not expire before the breaker recloses, switch-onto-fault protection is not enabled for that reclose. If high speed reclosing is not required, typical 52BT settings are 15 - 20 cycles.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-24",
+    "pdfPage": 148,
+    "quote": "In this example, the first reclose occurs at 40 cycles. A 52BT time of 30 cycles ensures that the 52BT element is asserted before the line breaker recloses.\n52BT = 30.00\n- Setting Limit Check\nThe limit check allows 52BT time delay settings of 0.5 - 10,000 cycles. The 52BT setting of 30.00 cycles lies within the relay setting limits. There is no secondary limit check for this setting.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   }
+  ],
+  "REJOE": [
+   {
+    "page": "5-25",
+    "pdfPage": 149,
+    "quote": "Remote-End-Just-Opened (REJO) Enable Setting (REJOE)\n\nWhen this feature is used, the SEL-221F-2, -3, -4 relay can deliver accelerated trips for Zone 2 faults without the use of a communications channel.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-27",
+    "pdfPage": 151,
+    "quote": "4.  When REJOE = G, the REJO element is defined by the following logic equation:\n\nREJO = NOT(3G50) * 3G50D * 50G * (½ cyc pu/inst do)\n\nThree-phase load is no longer present, but was at least 2 cycles ago, current is still flowing in at least one phase, and these conditions are maintained for at least ½ cycle.\n\n5.  When REJOE = P, the REJO element is defined by the logic equation:\n\nREJO = NOT(3P50) * 3P50D * 50G * (½ cyc pu/inst do)\n\nBy using the 3P50 instead of the 3G50, you may be able to set the relay to reject low-level tapped three-phase load between the relay and the remote breaker.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-27",
+    "pdfPage": 151,
+    "quote": "If the REJO function is enabled (REJOE = P or G in the relay settings), then the REJO condition is used as a qualifier for permissive tripping. … Used in this way, the REJO condition permits tripping for the relay elements set in the logic mask for Permissive Tripping (MPT) in the same manner as asserting the Permissive Trip input of the relay. You may set the MPT mask as if the relay were being used in a permissive tripping scheme, including instantaneous Zone 3 phase and ground distance (Z3) elements.\n\nThe REJO bit does not need to be set in any of the tripping logic masks to enable this function.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-27",
+    "pdfPage": 151,
+    "quote": "In the example, for the relay at Breaker 3, we select REJOE = N.\n\nREJOE = N\n\n- Setting Limit Check\n\nThe primary limit check allows REJOE settings of P (enabled, use 3P50), G (enabled, use 3G50), or N (not enabled).",
+    "checked": "transcribed from the page image, 2026-09-23"
+   }
+  ],
+  "LOPE": [
+   {
+    "page": "5-28",
+    "pdfPage": 152,
+    "quote": "Because occasional loss-of-potential to the relay is unavoidable, detection of this condition is desirable. Once a true loss-of-potential condition is detected, you may elect to block distance element operation and issue an alarm.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-29",
+    "pdfPage": 153,
+    "quote": "The following table summarizes the available LOPE settings and their results.\n\nLOPE      Block 21     52A supervises LOP     Close ALARM contact\nsetting   on LOP       Relay Word bit         on LOP bit assertion\n\nN         No           No                     No\nY         Yes          No                     No\n1         Yes          Yes                    No\n2         Yes          No                     Yes\n3         Yes          Yes                    Yes\n4         No           No                     Yes",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-29",
+    "pdfPage": 153,
+    "quote": "LOPE selections 1 and 3 are useful when line-side polarizing potentials are applied to the relay. A loss-of-potential condition may be detected while the breaker is open and the line and PTs are deenergized. Supervision of the Relay Word LOP bit prevents a continuous LOP alarm indication while the breaker is open.\n\nLOPE selections 2, 3, and 4 cause the relay to close the ALARM contact while loss-of-potential is detected. This is useful when all four of the relay programmable output contacts are dedicated to other functions.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-30",
+    "pdfPage": 154,
+    "quote": "For the relay at Breaker 3:\n\nLOPE = Y\n\n- Setting Limit Check\n\nThe primary limit check allows LOPE settings of N, Y, 1, 2, 3, or 4.\n\n- Relay Word Bits and Other Settings Affected\n\nIf LOPE=N or 4, the mho distance elements are not blocked from operating during an LOP condition.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   }
+  ],
+  "TIME1": [
+   {
+    "page": "5-30",
+    "pdfPage": 154,
+    "quote": "The TIME1 and TIME2 settings allow their respective ports to time out after the relay detects a period of inactivity for that port. After timing out, access for the port returns to Level 0 and no automatic messages are transmitted to it. In this example, a modem is connected to PORT 1. This requires a definite time setting for the port to prevent accumulation of toll charges if an operator does not hang up. PORT 2 is to be connected to an SEL-DTA and should never time out. This allows the SEL-DTA to receive any automatic message transmitted by the relay.\n\nTIME1= 5   TIME2 = 0",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-30",
+    "pdfPage": 154,
+    "quote": "- Setting Limit Check\n\nThe TIME1 and TIME2 limit check allows settings of 0 - 30 minutes. A zero setting signifies that the port never times out. There is no secondary limit check for this setting.\n\n- Other Settings Affected\n\nNone.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   }
+  ],
+  "TIME2": [
+   {
+    "page": "5-30",
+    "pdfPage": 154,
+    "quote": "The TIME1 and TIME2 settings allow their respective ports to time out after the relay detects a period of inactivity for that port. After timing out, access for the port returns to Level 0 and no automatic messages are transmitted to it. In this example, a modem is connected to PORT 1. This requires a definite time setting for the port to prevent accumulation of toll charges if an operator does not hang up. PORT 2 is to be connected to an SEL-DTA and should never time out. This allows the SEL-DTA to receive any automatic message transmitted by the relay.\n\nTIME1= 5   TIME2 = 0",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-30",
+    "pdfPage": 154,
+    "quote": "- Setting Limit Check\n\nThe TIME1 and TIME2 limit check allows settings of 0 - 30 minutes. A zero setting signifies that the port never times out. There is no secondary limit check for this setting.\n\n- Other Settings Affected\n\nNone.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   }
+  ],
+  "AUTO": [
+   {
+    "page": "5-30",
+    "pdfPage": 154,
+    "quote": "The AUTO setting specifies the port to which the relay directs automatically generated messages. The example has a modem connected to PORT 1 and an SEL-DTA connected to PORT 2. Since only the SEL-DTA is required to receive automatic messages, the AUTO setting is 2.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-31",
+    "pdfPage": 155,
+    "quote": "AUTO = 2\n\n- Setting Limit Check\n\nThe limit check allows messages to be sent to PORT 1 only, (AUTO = 1), PORT 2 only (AUTO = 2), or both ports (AUTO = 3).\n\n- Other Settings Affected\n\nNone.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   }
+  ],
+  "RINGS": [
+   {
+    "page": "5-31",
+    "pdfPage": 155,
+    "quote": "The RINGS setting specifies the number of rings a modem connected to PORT 1 waits to answer. This permits use of a single substation telephone line by both substation personnel and the relay. In this example, personnel have seven rings to answer the phone before the modem answers.\n\nRINGS = 7",
+    "checked": "transcribed from the page image, 2026-09-23"
+   },
+   {
+    "page": "5-31",
+    "pdfPage": 155,
+    "quote": "- Setting Limit Check\n\nThe limit check allows for the modem to answer between 1 and 30 rings.\n\n- Other Settings Affected\n\nNone.",
+    "checked": "transcribed from the page image, 2026-09-23"
+   }
+  ]
+ }
+}

@@ -425,7 +425,8 @@ function ManualQuotes({ name, code, quotes, source, manualFileRowId }: { name: s
       <div className="text-sm font-semibold text-slate-100">{name} <span className="text-xs text-slate-500">{code}</span></div>
       {quotes.map((x, i) => (
         <figure key={i} className="border-l-2 border-sky-700 pl-2">
-          <blockquote className="whitespace-pre-line text-sm text-slate-200">{x.quote}</blockquote>
+          {/* a table in the manual (columns kept by spacing, e.g. the LOPE choices) keeps its columns in a fixed-width font */}
+          <blockquote className={/\S {3,}\S/.test(x.quote) ? 'overflow-x-auto whitespace-pre font-mono text-xs text-slate-200' : 'whitespace-pre-line text-sm text-slate-200'}>{x.quote}</blockquote>
           <figcaption className="mt-1 text-xs text-slate-400">
             {manualFileRowId
               ? <button type="button" className="text-sky-300 underline" onClick={() => void openFileInTab(manualFileRowId, x.pdfPage).catch((e) => setErr(String(e)))}>Manual, page {x.page} ↗</button>
