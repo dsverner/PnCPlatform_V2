@@ -128,7 +128,8 @@ the text format, and the seed for the templates. → #61.
   the edit (7 outstanding on DEV). **Raised by it, a ruling for the owner:** under the four-step procedure the settings can
   still change after they are applied to the relay (a #192 re-base at completion, after INSTALL); the record and its file then
   say something the relay does not hold. Recommendation: refuse edits once the package is Applied, and give a drift found
-  after install a route back through re-applying.
+  after install a route back through re-applying. **Ruled 2026-09-23 ("a, refuse edits once applied") and built as #231** —
+  instead of a route back, a change is not loaded while its basis is outstanding or has changed, so nothing drifts after loading.
 - **A Block-mode segregation override is approved by being named** (found in #228): `security.CheckSegregation` lifts a
   Block rule when the caller names a different person as `OverrideApprovedByActorId`; nothing shows that person approved.
   Every seeded rule is WarnAndLog, so it is latent. Recommendation: the approval becomes the approver's own act (recorded in

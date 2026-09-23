@@ -11,7 +11,7 @@
 -- file a later change is copied from always carry the settings the record shows. Those rewrites pass @Reparse = 0: the rows
 -- are the source and are not read back (a re-read closes and re-adds every row); the settings step, when it writes, keeps
 -- the re-read. The writer's round trip is proved by the smoke (#168) and docs/schema/migration/roundtrip_settings.py. The file is written only from a complete reading: a file whose text holds settings the template does not
--- read (ParseStatus Partial) or was never read (NotParsed) would lose them in the rewrite, so it is refused (50186) and a
+-- read (ParseStatus Partial) or was never read (NotParsed) would lose them in the rewrite, so it is refused (50188) and a
 -- corrected file is attached instead. An empty file (a new relay's settings being entered) is written from what is entered.
 CREATE PROCEDURE [process].[IssueRenderedSettings]
     @ConfigurationFileRevisionRowId UNIQUEIDENTIFIER,
@@ -37,7 +37,7 @@ BEGIN
         DECLARE @m6 NVARCHAR(800) = CASE WHEN @parse = N'Partial'
             THEN CONCAT(N'process.IssueRenderedSettings: the settings file holds settings this relay''s template does not read (', LEFT(ISNULL(@parseError, N'?'), 300), N'). Writing the file from the settings would drop them. Attach a corrected settings file instead.')
             ELSE N'process.IssueRenderedSettings: the settings file has not been read against this relay''s template, so the file cannot be written from its settings. Attach a corrected settings file instead.' END;
-        THROW 50186, @m6, 1;
+        THROW 50188, @m6, 1;
     END
     -- the settings step issues a file and needs settings to issue; a rewrite after edits (@Reparse = 0) writes what there is
     IF ISNULL(@Reparse, 1) = 1 AND NOT EXISTS (SELECT 1 FROM [document].[ParsedSetting] WHERE [ConfigurationFileRevisionRowId] = @ConfigurationFileRevisionRowId AND [IsDeleted] = 0 AND [ValidTo] IS NULL)

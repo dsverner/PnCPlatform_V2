@@ -12,7 +12,7 @@ Written 2026-09-23, at the end of the session that built #217–#228. Read this 
 | Remote | `origin` = `Z:\Repos\PnCPlatform_V2.git` (pushed 2026-09-23); no GitHub remote (the owner's call) |
 | DEV database | `PnCPlatform_V2_DEV` on VM01 `10.10.70.25`, deployed with everything to #228 |
 | DEV API | `http://127.0.0.1:5210`, React app at `/app/` (run recipe in memory `project-dev-api-run-recipe`) |
-| Last results | API smoke 411 PASS / 0 FAIL (#230, PC02, 2026-09-23); schema smoke on PC02 after #230: 268 + the clock-skew FAIL; schema smoke 269 PASS on the laptop, 268 + 1 clock-skew FAIL on PC02 (below); wording check 0 |
+| Last results | API smoke 412 PASS / 0 FAIL (#231, PC02, 2026-09-23); schema smoke on PC02 after #231: 268 + the clock-skew FAIL; schema smoke 269 PASS on the laptop, 268 + 1 clock-skew FAIL on PC02 (below); wording check 0 |
 
 ## What this session built (one line each; the log row has the rest)
 
@@ -78,10 +78,8 @@ Written 2026-09-23, at the end of the session that built #217–#228. Read this 
 
 ## Raised, not built — the next candidates, most important first
 
-1. **Settings can still change after they are applied to the relay** (four-step procedure: a #192 re-base at completion,
-   after INSTALL) — found building #230, which made the file follow every change. The record and its file then say what the
-   relay does not hold. **A ruling for the owner, not yet asked.** Recommendation: refuse edits once the package is Applied;
-   a drift found after install goes back through re-applying.
+1. ~~Settings can still change after they are applied to the relay~~ — **ruled ("a, refuse edits once applied") and built as
+   #231** (2026-09-23): locked once loaded; a change is not loaded while its basis is outstanding or has changed.
 2. **Block-mode segregation overrides are approved by being named** (`security.CheckSegregation`); latent while every rule
    is WarnAndLog. Make the approval the approver's own act before any rule is switched to Block.
 3. Carried from earlier (see `docs/OPEN-QUESTIONS.md`): the settings book's chosen columns and the menu's open groups stay

@@ -210,6 +210,9 @@ public static class RationaleEngine
     {
         if (st.Template is null) throw new ApiException(404, "no_template", "This model has no rationale template.");
         if (S(st.Record["RevisionStatus"]) != "Draft") throw new ApiException(409, "not_outstanding", "A rationale is applied to an outstanding (Draft) revision only; this revision is issued and its rationale is frozen.");
+        // #231: the settings are on the relay (the package's lifecycle state locks them, process.fSettingsLocked via the view) — refused before a rationale revision is made
+        if (st.Record["SettingsLocked"] is JsonNode lockedNode && (lockedNode.ToString() is "true" or "True" or "1"))
+            throw new ApiException(409, "settings_locked", "These settings have been loaded on the relay, so the rationale is no longer applied to them in this request. Finish the request, or raise a new change to alter them.");
         var settingsRevision = G(st.Record["RevisionRowId"])!.Value; var device = G(st.Record["DeviceEntityId"])!.Value;
         // #230: the settings file follows the settings, written once after the whole apply — and a file that cannot be written from
         // its settings (settings the template does not read) is refused here, before anything is written

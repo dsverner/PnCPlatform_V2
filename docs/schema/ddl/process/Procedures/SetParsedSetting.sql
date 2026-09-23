@@ -33,6 +33,10 @@ BEGIN
     IF @device <> @DeviceEntityId THROW 50180, N'process.SetParsedSetting: the revision does not belong to that device.', 1;
     IF @status <> N'Draft' OR @inService IS NOT NULL THROW 50183, N'process.SetParsedSetting: only an outstanding (draft) revision is edited; an in-service or archived revision is the record.', 1;
     IF @kind <> N'SettingsText' THROW 50183, N'process.SetParsedSetting: the revision holds a native vendor file and no reader/writer exists for that format yet; its settings are not edited here.', 1;
+    -- #231 (the owner, 2026-09-23: "refuse edits once applied"): once the package's settings are on the relay, the record and
+    -- its file stay what was loaded — the lifecycle state says so through its locksContent flag (process.fStateLocksContent)
+    IF (SELECT [Locked] FROM [process].[fSettingsLocked](@ConfigurationFileRevisionRowId)) = 1
+        THROW 50187, N'process.SetParsedSetting: these settings have been loaded on the relay, so they are no longer changed in this request. Finish the request, or raise a new change to alter them.', 1;
 
     -- the template, as ParseSettingsText resolves it: the revision's firmware, else the model's row that names one
     DECLARE @tdef UNIQUEIDENTIFIER, @tver UNIQUEIDENTIFIER;

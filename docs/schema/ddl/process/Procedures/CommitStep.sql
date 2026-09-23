@@ -185,16 +185,53 @@ BEGIN
     -- #192 (2026-09-18): a draft based on another request's draft is BLOCKED at the check, the approval, the issue and the
     -- baseline while its basis has changed since the draft was taken (process.fBasisDrift) — the owner: flagged, and not
     -- allowed through until re-based. The refusal names the settings so the engineer knows what to look at.
-    IF @pkg IS NOT NULL AND ((@recordKind = N'EngineeringCheck' AND @Outcome = N'Pass') OR (@recordKind = N'Approval' AND @Outcome = N'Approved') OR @recordKind IN (N'SettingsIssue', N'Baseline'))
+    -- #231 (the owner, 2026-09-23: once applied, the settings are not edited): the step that LOADS the settings on the relay — the
+    -- one whose advances transition brings the package into a state its lifecycle flags locksContent (process.fStateLocksContent;
+    -- no step or state is named here) — is held to both rules as well, for its own device when it runs per relay: (a) what the
+    -- draft is based on must be in service, so relays are loaded in order and a later load of the first change cannot overwrite
+    -- the second's; (b) the basis must not have changed since (re-base first). Once the basis is in service it cannot change, so
+    -- nothing drifts after the load, and the settings stay what the relay holds.
+    DECLARE @loads BIT = 0;
+    IF @pkg IS NOT NULL AND @AdvancesWorkflowKey IS NOT NULL AND ISNULL(JSON_VALUE(@node, '$.advances.onOutcome'), @Outcome) = @Outcome
     BEGIN
-        DECLARE @dRev UNIQUEIDENTIFIER, @dDev UNIQUEIDENTIFIER, @dN INT, @dCodes NVARCHAR(400), @dTitle NVARCHAR(200), @dName NVARCHAR(200), @dMsg NVARCHAR(800);
+        DECLARE @lcState NVARCHAR(40), @lcVer UNIQUEIDENTIFIER, @lcTo NVARCHAR(40);
+        SELECT TOP (1) @lcState = lc.[CurrentState], @lcVer = lc.[WorkflowDefinitionVersionRowId]
+        FROM [process].[WorkflowInstance] lc JOIN [config].[DefinitionVersion] ldv ON ldv.[RowId] = lc.[WorkflowDefinitionVersionRowId]
+        JOIN [config].[Definition] ld ON ld.[EntityId] = ldv.[DefinitionEntityId]
+        WHERE lc.[IsDeleted] = 0 AND lc.[SubjectKind] = N'SettingsIssuePackage' AND lc.[SubjectEntityId] = @pkg AND ld.[DefinitionKey] = @AdvancesWorkflowKey
+        ORDER BY lc.[RowSeq] DESC;
+        -- the state the transition leads to: from where the package stands; else (a repeat that is a no-op, #117) the state it already reached
+        SELECT TOP (1) @lcTo = JSON_VALUE(tr.[value], '$.to') FROM [config].[DefinitionVersion] ldv CROSS APPLY OPENJSON(ldv.[PayloadText], '$.transitions') tr
+        WHERE ldv.[RowId] = @lcVer AND JSON_VALUE(tr.[value], '$.name') = @AdvancesTransition
+          AND (JSON_VALUE(tr.[value], '$.from') = @lcState OR JSON_VALUE(tr.[value], '$.to') = @lcState)
+        ORDER BY CASE WHEN JSON_VALUE(tr.[value], '$.from') = @lcState THEN 0 ELSE 1 END;
+        SELECT @loads = [Locked] FROM [process].[fStateLocksContent](@lcVer, @lcTo);
+    END
+
+    IF @pkg IS NOT NULL AND (@loads = 1 OR (@recordKind = N'EngineeringCheck' AND @Outcome = N'Pass') OR (@recordKind = N'Approval' AND @Outcome = N'Approved') OR @recordKind IN (N'SettingsIssue', N'Baseline'))
+    BEGIN
+        DECLARE @dRev UNIQUEIDENTIFIER, @dDev UNIQUEIDENTIFIER, @dN INT, @dCodes NVARCHAR(400), @dTitle NVARCHAR(200), @dName NVARCHAR(200), @dMsg NVARCHAR(800), @lBasis UNIQUEIDENTIFIER;
         DECLARE dcx CURSOR LOCAL FAST_FORWARD FOR
             SELECT cf.[RevisionRowId], cf.[DeviceEntityId] FROM [document].[SettingsIssuePackageItem] it JOIN [document].[ConfigurationFile] cf ON cf.[RevisionRowId] = it.[ConfigurationFileRevisionRowId] AND cf.[IsDeleted] = 0
             WHERE it.[PackageRevisionRowId] = @pkg AND it.[IsDeleted] = 0 AND it.[ValidTo] IS NULL AND cf.[CaptureKind] = N'Designed'
-              AND EXISTS (SELECT 1 FROM [document].[RevisionLink] l WHERE l.[RevisionRowId] = cf.[RevisionRowId] AND l.[LinkKind] = N'BasedOn' AND l.[ValidTo] IS NULL AND l.[IsDeleted] = 0);
+              AND EXISTS (SELECT 1 FROM [document].[RevisionLink] l WHERE l.[RevisionRowId] = cf.[RevisionRowId] AND l.[LinkKind] = N'BasedOn' AND l.[ValidTo] IS NULL AND l.[IsDeleted] = 0)
+              AND (@loads = 0 OR ISNULL(@memberKind, N'') <> N'Device' OR cf.[DeviceEntityId] = @member);   -- #231: a per-relay load answers for its own relay
         OPEN dcx; FETCH NEXT FROM dcx INTO @dRev, @dDev;
         WHILE @@FETCH_STATUS = 0
         BEGIN
+            IF @loads = 1
+            BEGIN
+                SET @lBasis = [process].[fBasisRevision](@dRev);
+                IF @lBasis IS NOT NULL AND EXISTS (SELECT 1 FROM [document].[ConfigurationFile] bcf WHERE bcf.[RevisionRowId] = @lBasis AND bcf.[IsDeleted] = 0 AND bcf.[InServiceFrom] IS NULL)
+                BEGIN
+                    SELECT TOP (1) @dTitle = sr.[WorkRequestTitle] FROM [document].[vSettingsRecord] sr WHERE sr.[RevisionRowId] = @lBasis;
+                    SELECT @dName = [Name] FROM [asset].[vAsset] WHERE [EntityId] = @dDev;
+                    SET @dMsg = CONCAT(N'process.CommitStep: ', ISNULL(@dName, N'the device'), N' is based on the settings of "', ISNULL(@dTitle, N'another request'),
+                                       N'", which are not yet in service. Load these settings after that request is completed, so the relay gets both changes in order.');
+                    CLOSE dcx; DEALLOCATE dcx;
+                    THROW 50254, @dMsg, 1;
+                END
+            END
             SELECT @dN = COUNT(*), @dCodes = STRING_AGG([SettingCode], N', ') WITHIN GROUP (ORDER BY [SettingCode]) FROM [process].[fBasisDrift](@dRev) WHERE [Outcome] IN (N'take', N'agree', N'conflict');
             IF @dN > 0
             BEGIN

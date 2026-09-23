@@ -31,6 +31,7 @@ SELECT r.[RowSeq],
            ELSE N'Outstanding' END,
        lc.[CurrentState]            AS [LifecycleState],
        lc.[EntityId]                AS [LifecycleWorkflowInstanceEntityId],
+       ISNULL(lk.[Locked], CAST(0 AS BIT)) AS [SettingsLocked],   -- #231: the package is in a state that fixes its settings (on the relay)
        r.[RevisionLabel],
        r.[Status]                   AS [RevisionStatus],
        r.[DocumentEntityId],
@@ -94,8 +95,9 @@ SELECT r.[RowSeq],
 FROM [document].[vConfigurationFile] cf
 JOIN [document].[vRevision] r ON r.[RowId] = cf.[RevisionRowId]
 LEFT JOIN [document].[vSettingsIssuePackageItem] it ON it.[ConfigurationFileRevisionRowId] = cf.[RevisionRowId]
-OUTER APPLY (SELECT TOP (1) lc.[EntityId], lc.[CurrentState] FROM [process].[WorkflowInstance] lc
+OUTER APPLY (SELECT TOP (1) lc.[EntityId], lc.[CurrentState], lc.[WorkflowDefinitionVersionRowId] FROM [process].[WorkflowInstance] lc
              WHERE lc.[IsDeleted] = 0 AND lc.[SubjectKind] = N'SettingsIssuePackage' AND lc.[SubjectEntityId] = it.[PackageRevisionRowId] ORDER BY lc.[RowSeq] DESC) lc
+OUTER APPLY [process].[fStateLocksContent](lc.[WorkflowDefinitionVersionRowId], lc.[CurrentState]) lk   -- #231: the settings are on the relay (fSettingsLocked's rule, on the lifecycle row already in hand)
 OUTER APPLY (SELECT TOP (1) x.[WorkRequestEntityId] FROM [record].[Record] x
              WHERE x.[ValidTo] IS NULL AND x.[IsDeleted] = 0 AND x.[SecondSubjectKind] = N'ConfigurationFileRevision' AND x.[SecondSubjectEntityId] = cf.[RevisionRowId]
              ORDER BY x.[OccurredAt]) rec

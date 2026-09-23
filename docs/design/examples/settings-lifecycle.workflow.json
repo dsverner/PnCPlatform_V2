@@ -10,8 +10,8 @@
     { "code": "Checked", "name": "Checked", "roles": ["PCEngineer", "PCApprover"] },
     { "code": "Approved", "name": "Approved", "roles": ["PCEngineer"] },
     { "code": "Issued", "name": "Issued", "roles": ["PCEngineer", "PCTechnician"] },
-    { "code": "Applied", "name": "Applied", "roles": ["PCEngineer", "PCTechnician"] },
-    { "code": "Verified", "name": "Verified", "roles": ["PCEngineer"] },
+    { "code": "Applied", "name": "Applied", "locksContent": true, "roles": ["PCEngineer", "PCTechnician"] },
+    { "code": "Verified", "name": "Verified", "locksContent": true, "roles": ["PCEngineer"] },
     { "code": "InService", "name": "In service", "terminal": true, "roles": [] },
     { "code": "Superseded", "name": "Superseded", "terminal": true, "roles": [] },
     { "code": "Withdrawn", "name": "Withdrawn", "terminal": true, "cancellation": true, "roles": [] }

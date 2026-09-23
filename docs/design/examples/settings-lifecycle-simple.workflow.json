@@ -7,7 +7,7 @@
   "subjectKind": "SettingsIssuePackage",
   "states": [
     { "code": "Calculated", "name": "Calculated", "initial": true },
-    { "code": "Applied", "name": "Applied to the relay" },
+    { "code": "Applied", "name": "Applied to the relay", "locksContent": true },
     { "code": "InService", "name": "In service", "terminal": true },
     { "code": "Superseded", "name": "Superseded", "terminal": true },
     { "code": "Withdrawn", "name": "Withdrawn", "terminal": true, "cancellation": true }

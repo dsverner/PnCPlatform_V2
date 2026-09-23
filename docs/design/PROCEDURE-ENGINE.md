@@ -256,7 +256,9 @@ gets no copy. (2) A value of an outstanding revision is edited through `process.
 range, closed list; the prior row closed in valid time; audited) — and, since #230, the revision's file is rewritten from its rows in
 the same act (`IssueRenderedSettings` with no read-back; a re-base or a rationale apply writes it once at the end), so an outstanding
 record's file always says what its settings say, and a record whose file holds settings the template does not read refuses the edit
-rather than drop them. (3) `ConfigurationFileRevision` **with no file attached** and a draft
+rather than drop them. Since #231 a lifecycle state may carry `locksContent: true` (the settings lifecycles flag Applied, and
+Verified): while the package stands there its revisions' settings are not edited (50187), and the step whose `advances` brings it
+there waits until each draft's basis is in service (50254) and unchanged (50251). (3) `ConfigurationFileRevision` **with no file attached** and a draft
 in the package for the member device: `process.IssueRenderedSettings` renders the draft's rows as the model's settings text
 (`process.RenderSettingsText`, the template's SET order) and files it as the revision's Native file through `process.RefileRevision`,
 which parses the platform's own file back through the same reader — the round trip proven in place; `evidence.required` on such a step

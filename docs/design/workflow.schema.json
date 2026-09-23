@@ -26,6 +26,7 @@
           "initial": { "type": "boolean", "default": false, "description": "Exactly one state is initial." },
           "terminal": { "type": "boolean", "default": false },
           "cancellation": { "type": "boolean", "default": false, "description": "A terminal state reached by abandoning the subject rather than completing it." },
+          "locksContent": { "type": "boolean", "default": false, "description": "While the subject is in this state its content cannot change — a settings package whose settings are on the relay: its settings are not edited, and a step that brings the package here waits for what it was based on." },
           "roles": { "type": "array", "items": { "type": "string" }, "description": "security.Role codes permitted to act on the subject while in this state. Empty: read-only." },
           "onEnter": {
             "type": "array",

@@ -33,6 +33,7 @@ export default function RecordScreen({ params: p, id }: { screen: Screen; params
   const rowQ = useViewAll(schema, vw, { [p.key]: id ?? '' }, undefined, !!id)
   const r = rowQ.data?.[0]
   const revision = s(r?.RevisionRowId || id)
+  const settingsLocked = ['true', '1'].includes(s(r?.SettingsLocked).toLowerCase())   // #231: document.vSettingsRecord.SettingsLocked
   const parsedQ = useViewAll('document', 'vParsedSettingNamed', { ConfigurationFileRevisionRowId: revision }, 'SettingCode', !!r)
   const textQ = useQuery({ queryKey: ['settingsText', revision], queryFn: () => settingsText(revision), enabled: !!r, staleTime: 5 * 60_000 })
   const revisionsQ = useViewAll(schema, vw, { DeviceEntityId: s(r?.DeviceEntityId) }, '-CalculatedAt', !!r?.DeviceEntityId)
@@ -76,8 +77,10 @@ export default function RecordScreen({ params: p, id }: { screen: Screen; params
         /* #168: the template's view of the device — functions, inputs, settings by function — when the model has one */
         ? <>
             {/* #192: a draft based on another request's draft — its drift and re-base sit first, being what the engineer must act on */}
-            {r.GridState === 'Outstanding' && !!r.BasedOnRevisionRowId && <BasisPanel r={r} revision={revision} editable={can('ConfigurationFile.Modify')} />}
-            <DeviceSettings r={r} revision={revision} filedText={textQ.data?.text ?? null} editable={r.GridState === 'Outstanding' && can('ConfigurationFile.Modify')} />
+            {/* #231 (the owner, 2026-09-23): once the settings are loaded on the relay they are not edited — the package's state says so */}
+            {r.GridState === 'Outstanding' && settingsLocked && <Status>These settings have been loaded on the relay. They are not changed in this request; finish it, or raise a new change to alter them.</Status>}
+            {r.GridState === 'Outstanding' && !!r.BasedOnRevisionRowId && <BasisPanel r={r} revision={revision} editable={!settingsLocked && can('ConfigurationFile.Modify')} />}
+            <DeviceSettings r={r} revision={revision} filedText={textQ.data?.text ?? null} editable={r.GridState === 'Outstanding' && !settingsLocked && can('ConfigurationFile.Modify')} />
           </>
         : <Panel title={parsed.length ? `Settings · ${parsed.length} parsed from the ${s(r.FileKind)} file` : r.FileKind === 'NativeSettings' ? 'Settings · the native (vendor) file is stored as is; no reader exists for it yet (#113)' : 'Settings · no parsed settings; the text as filed is the record'}>
             {parsed.length > 0 ? <DataGrid rows={parsed} columns={PARSED_COLS} rowKey={(x) => s(x.SettingCode) + '|' + s(x.GroupNumber)} /> : <Status>No settings template for this model yet; the text as filed is the record.</Status>}
@@ -140,7 +143,7 @@ export default function RecordScreen({ params: p, id }: { screen: Screen; params
           <FilesPanel r={r} revision={revision} />
         </>)}
       {section === 'manual' && <ManualPanel templateDefinitionEntityId={s(r.TemplateDefinitionEntityId) || null} modelName={s(r.ModelName)} />}   {/* #216 */}
-      {section === 'rationale' && hasRationaleTab && <RationalePanel revision={id} editable={s(r.GridState) === 'Outstanding'} />}   {/* #219, #222 */}
+      {section === 'rationale' && hasRationaleTab && <RationalePanel revision={id} editable={s(r.GridState) === 'Outstanding' && !settingsLocked} />}   {/* #219, #222 */}
     </div>
   )
 }

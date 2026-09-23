@@ -24,6 +24,9 @@ BEGIN
     WHERE cf.[RevisionRowId] = @RevisionRowId AND cf.[IsDeleted] = 0 AND r.[IsDeleted] = 0;
     IF @device IS NULL THROW 50253, N'process.RebaseDraft: no live device configuration revision with that id.', 1;
     IF @inService IS NOT NULL OR @status IN (N'Superseded', N'Withdrawn') THROW 50253, N'process.RebaseDraft: only an outstanding draft is re-based; this revision is not one.', 1;
+    -- #231: once loaded on the relay the settings stay as loaded — said here before any drift is weighed
+    IF (SELECT [Locked] FROM [process].[fSettingsLocked](@RevisionRowId)) = 1
+        THROW 50187, N'process.RebaseDraft: these settings have been loaded on the relay, so they are no longer re-based in this request. Finish the request, or raise a new change to alter them.', 1;
     DECLARE @linked UNIQUEIDENTIFIER = (SELECT TOP (1) l.[SubjectEntityId] FROM [document].[RevisionLink] l WHERE l.[RevisionRowId] = @RevisionRowId AND l.[LinkKind] = N'BasedOn' AND l.[ValidTo] IS NULL AND l.[IsDeleted] = 0 ORDER BY l.[RowSeq] DESC);
     IF @linked IS NULL THROW 50253, N'process.RebaseDraft: this draft is not based on another request; there is nothing to re-base.', 1;
     DECLARE @basis UNIQUEIDENTIFIER = [process].[fBasisRevision](@RevisionRowId);

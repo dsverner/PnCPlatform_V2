@@ -2424,22 +2424,24 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
                     Must(a1s == HttpStatusCode.OK && ea == HttpStatusCode.OK && b1s == HttpStatusCode.OK && outRows.Count == 2 && draftB is not null && draftB != draftA
                          && parsedB.GetValueOrDefault("SLOPE") == "35 %" && string.Equals(rowB?["BasedOnWorkRequestEntityId"]?.ToString(), wrA?.ToString(), StringComparison.OrdinalIgnoreCase) && rowB?["BasedOnGridState"]?.ToString() == "Outstanding",
                         $"#191: B's draft starts from A's current settings (SLOPE {parsedB.GetValueOrDefault("SLOPE")}, not the in-service 30 %), two outstanding records, B based on A ({rowB?["BasedOnWorkRequestTitle"]}, {rowB?["BasedOnGridState"]})");
-                    // B runs ahead to its completion — refused while A is a draft
+                    // B's rationale and settings are done — but B is not loaded on the relay while A, its basis, is not in service (#231, the
+                    // owner 2026-09-23: once applied, settings are not edited — so nothing may be loaded that could still have to change)
                     await RunStep(admin, "WRITE_RATIONALE", new { outcome = "Done", evidence = new[] { File("rationale.txt", "text/plain", "#191 B", "Rationale") } });
                     await RunStep(admin, "RECORD_SETTINGS", new { outcome = "Done" }, devBdd);
                     await Post(admin, $"api/v1/process/procedure-instances/{instB}/evaluate", new { }); await Post(admin, $"api/v1/process/procedure-instances/{instB}/evaluate", new { });
-                    await RunStep(tech, "INSTALL", new { outcome = "Done", capture = new { installedAt = DateTime.UtcNow.ToString("o"), commissioningNote = "#191 B" } }, devBdd);
-                    var stepB = await ReadyStep("COMPLETE", null, 2);
-                    var (cbs, _) = await Post(admin, $"api/v1/process/step-instances/{stepB}/claim", new { });
-                    // ======== #192 (2026-09-18): A changes after B was taken from it — B is flagged, blocked, and re-based
+                    async Task<string?> PackageState(Guid? rev) { var (_, b) = await Get(admin, $"api/v1/document/vSettingsRecord?RevisionRowId={rev}&take=1"); return (b?["rows"] as JsonArray)?.FirstOrDefault()?["LifecycleState"]?.ToString(); }
+                    var k231_stepB = await ReadyStep("INSTALL", devBdd, 2);
+                    var (k231_clB, _) = await Post(tech, $"api/v1/process/step-instances/{k231_stepB}/claim", new { });
+                    var (k231_i1s, k231_i1b) = await Post(tech, $"api/v1/process/step-instances/{k231_stepB}/commit", new { outcome = "Done", capture = new { installedAt = DateTime.UtcNow.ToString("o"), commissioningNote = "#191 B" } });
+                    var k231_i1 = k231_i1b?["detail"]?.ToString() ?? "";
+                    Must(k231_stepB is not null && k231_clB == HttpStatusCode.OK && k231_i1s != HttpStatusCode.OK && k231_i1.Contains("not yet in service") && k231_i1.Contains("in order") && await PackageState(draftB) == "Calculated",
+                        $"#231: B is not loaded on the relay while A, which it is based on, is still outstanding — refused, B's package still Calculated [{(int)k231_i1s}: {k231_i1}]");
+                    // ======== #192 (2026-09-18): A changes after B was taken from it — B is flagged and re-based (before it is loaded)
                     async Task<(JsonArray rows, JsonNode? head)> Drift(Guid? rev) { var (_, b) = await Post(admin, "api/v1/process/BasisDrift", new { RevisionRowId = rev, DeviceEntityId = devBdd }); var rs = b?["results"] as JsonArray; var attention = new JsonArray(); foreach (var x in (rs?[0] as JsonArray) ?? new JsonArray()) if (x?["Outcome"]?.ToString() is "take" or "agree" or "conflict") attention.Add(x?.DeepClone()); return (attention, (rs?[1] as JsonArray)?.FirstOrDefault()); }   // only the rows that need attention: a row where only mine moved is not drift
                     var (ea2, _) = await Post(admin, "api/v1/process/SetParsedSetting", new { ConfigurationFileRevisionRowId = draftA, DeviceEntityId = devBdd, SettingCode = "SLOPE", RawValue = "38 %" });
                     var (dr1, dh1) = await Drift(draftB); var d1 = dr1.FirstOrDefault();
                     Must(ea2 == HttpStatusCode.OK && dr1.Count == 1 && d1?["SettingCode"]?.ToString() == "SLOPE" && d1?["ThenValue"]?.ToString() == "35 %" && d1?["NowValue"]?.ToString() == "38 %" && d1?["MineValue"]?.ToString() == "35 %" && d1?["Outcome"]?.ToString() == "take" && dh1?["HasFrozenBasis"]?.ToString() == "1",
                         $"#192: A moved SLOPE to 38 % after B was taken — B's drift is one row: then {d1?["ThenValue"]}, theirs {d1?["NowValue"]}, mine {d1?["MineValue"]}, outcome {d1?["Outcome"]}; a frozen basis exists ({dh1?["HasFrozenBasis"]})");
-                    var (bl1s, bl1b) = await Post(admin, $"api/v1/process/step-instances/{stepB}/commit", new { outcome = "Done" });
-                    Must(bl1s != HttpStatusCode.OK && (bl1b?["detail"]?.ToString() ?? "").Contains("changed since") && (bl1b?["detail"]?.ToString() ?? "").Contains("SLOPE"),
-                        $"#192: B's baseline is refused while its basis has changed ({(int)bl1s} {Code(bl1b)}: {bl1b?["detail"]})");
                     var (rb1s, rb1b) = await Post(admin, "api/v1/process/RebaseDraft", new { RevisionRowId = draftB, DeviceEntityId = devBdd });
                     var afterRb1 = await Parsed(draftB); var (dr2, _) = await Drift(draftB);
                     Must(rb1s == HttpStatusCode.OK && rb1b?["Applied"]?.ToString() == "1" && afterRb1.GetValueOrDefault("SLOPE") == "38 %" && dr2.Count == 0,
@@ -2459,11 +2461,7 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
                     var k230_fB = await Filed(draftB); var k230_rB = await Rendered(draftB);
                     Must(k230_fB.count == 1 && k230_fB.text == k230_rB && k230_fB.text.Contains("SLOPE=39 %"),
                         $"#230: after the re-bases B's file is its settings, SLOPE=39 % (it was written at 35 % by the settings step) — {k230_fB.name}");
-                    // and now the #191 ordering rule is what stands between B and service
-                    var (rbs, rbb) = await Post(admin, $"api/v1/process/step-instances/{stepB}/commit", new { outcome = "Done" });
-                    Must(cbs == HttpStatusCode.OK && rbs != HttpStatusCode.OK && (rbb?["detail"]?.ToString() ?? "").Contains("not yet in service"),
-                        $"#191: B cannot go in service before A — refused ({(int)rbs} {Code(rbb)}: {rbb?["detail"]})");
-                    // A completes; then B can
+                    // A is loaded and completed first; then B, loaded after it, is what the relay holds
                     inst = instA;
                     await RunStep(admin, "WRITE_RATIONALE", new { outcome = "Done", evidence = new[] { File("rationale.txt", "text/plain", "#191 A", "Rationale") } });
                     await RunStep(admin, "RECORD_SETTINGS", new { outcome = "Done" }, devBdd);
@@ -2471,12 +2469,25 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
                     await RunStep(tech, "INSTALL", new { outcome = "Done", capture = new { installedAt = DateTime.UtcNow.ToString("o"), commissioningNote = "#191 A" } }, devBdd);
                     var (kas, _) = await RunStep(admin, "COMPLETE", new { outcome = "Done" });
                     var activeAfterA = Id(await Record(devBdd, "Active"), "RevisionRowId");
-                    var (rbs2, rbb2) = await Post(admin, $"api/v1/process/step-instances/{stepB}/commit", new { outcome = "Done" });
+                    inst = instB;
+                    var (k231_i2s, k231_i2b) = await Post(tech, $"api/v1/process/step-instances/{k231_stepB}/commit", new { outcome = "Done", capture = new { installedAt = DateTime.UtcNow.ToString("o"), commissioningNote = "#191 B" } });
+                    Must(kas == HttpStatusCode.OK && activeAfterA == draftA && k231_i2s == HttpStatusCode.OK && await PackageState(draftB) == "Applied",
+                        $"#231: with A in service ({(int)kas}), B is loaded on the relay ({(int)k231_i2s} {Code(k231_i2b)} {k231_i2b?["detail"]}) — B's package Applied");
+                    // B's settings are on the relay: the record and its file stay what was loaded
+                    var (k231_e1s, k231_e1b) = await Post(admin, "api/v1/process/SetParsedSetting", new { ConfigurationFileRevisionRowId = draftB, DeviceEntityId = devBdd, SettingCode = "SLOPE", RawValue = "37 %" });
+                    var (k231_r1s, k231_r1b) = await Post(admin, "api/v1/process/RebaseDraft", new { RevisionRowId = draftB, DeviceEntityId = devBdd });
+                    var (_, k231_srb) = await Get(admin, $"api/v1/document/vSettingsRecord?RevisionRowId={draftB}&take=1");
+                    var k231_locked = (k231_srb?["rows"] as JsonArray)?.FirstOrDefault()?["SettingsLocked"]?.ToString();
+                    var k231_after = (await Parsed(draftB)).GetValueOrDefault("SLOPE"); var k231_fAfter = await Filed(draftB);
+                    Must(k231_e1s == HttpStatusCode.Conflict && (k231_e1b?["detail"]?.ToString() ?? "").Contains("loaded on the relay") && k231_r1s == HttpStatusCode.Conflict && (k231_r1b?["detail"]?.ToString() ?? "").Contains("loaded on the relay")
+                         && k231_after == "39 %" && k231_fAfter.text.Contains("SLOPE=39 %") && (k231_locked is "true" or "True" or "1"),
+                        $"#231: once B is loaded an edit and a re-base are refused, and B still reads SLOPE {k231_after} in its settings and its file; the record says its settings are locked ({k231_locked}) [{(int)k231_e1s}: {k231_e1b?["detail"]}; {(int)k231_r1s}: {k231_r1b?["detail"]}]");
+                    var (rbs2, rbb2) = await RunStep(admin, "COMPLETE", new { outcome = "Done" });
                     var activeAfterB = Id(await Record(devBdd, "Active"), "RevisionRowId");
                     var (_, archB) = await Get(admin, $"api/v1/document/vSettingsRecord?DeviceEntityId={devBdd}&GridState=Archived");
                     var aArchived = (archB?["rows"] as JsonArray)?.Any(r => Id(r, "RevisionRowId") == draftA) == true;
-                    Must(kas == HttpStatusCode.OK && activeAfterA == draftA && rbs2 == HttpStatusCode.OK && activeAfterB == draftB && aArchived,
-                        $"#191: A in service first ({(int)kas}), then B ({(int)rbs2} {Code(rbb2)} {rbb2?["detail"]}) — B is the Active record, A archived");
+                    Must(rbs2 == HttpStatusCode.OK && activeAfterB == draftB && aArchived,
+                        $"#191: A in service first, then B ({(int)rbs2} {Code(rbb2)} {rbb2?["detail"]}) — B is the Active record, A archived");
                     await Post(admin, $"api/v1/process/workflow-instances/{wfA}/transitions", new { name = "Close" }); await Post(admin, $"api/v1/process/workflow-instances/{wfB}/transitions", new { name = "Close" });
 
                     // ======== #228 (2026-09-22): cancelling a request stops its work and sets its draft aside. Until now a cancel moved
@@ -2514,7 +2525,22 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
                     await RunStep(admin, "WRITE_RATIONALE", new { outcome = "Done", evidence = new[] { File("rationale.txt", "text/plain", "#228 D", "Rationale") } });
                     await RunStep(admin, "RECORD_SETTINGS", new { outcome = "Done" }, devBdd);
                     await Post(admin, $"api/v1/process/procedure-instances/{k228_instD}/evaluate", new { }); await Post(admin, $"api/v1/process/procedure-instances/{k228_instD}/evaluate", new { });
-                    await RunStep(tech, "INSTALL", new { outcome = "Done", capture = new { installedAt = DateTime.UtcNow.ToString("o"), commissioningNote = "#228 D" } }, devBdd);
+                    // with C cancelled, D is measured against what is in service: C's order no longer stands between them (#228); any
+                    // difference from the in-service settings is re-based as #192 does it — before D is loaded, since loaded settings
+                    // are not re-based (#231)
+                    var k228_stepI = await ReadyStep("INSTALL", devBdd, 2);
+                    await Post(tech, $"api/v1/process/step-instances/{k228_stepI}/claim", new { });
+                    var (k228_k1s, k228_k1b) = await Post(tech, $"api/v1/process/step-instances/{k228_stepI}/commit", new { outcome = "Done", capture = new { installedAt = DateTime.UtcNow.ToString("o"), commissioningNote = "#228 D" } });
+                    var k228_k1 = k228_k1b?["detail"]?.ToString() ?? "";
+                    Must(!k228_k1.Contains("not yet in service") && !k228_k1.Contains("completes first"), $"#228: the cancelled C does not hold D back by order [{(int)k228_k1s}: {k228_k1}]");
+                    if (k228_k1s != HttpStatusCode.OK)
+                    {
+                        var k228_draftD = Id(k228_dRow, "RevisionRowId");
+                        var (k228_rbs, k228_rbb) = await Post(admin, "api/v1/process/RebaseDraft", new { RevisionRowId = k228_draftD, DeviceEntityId = devBdd });
+                        var (k228_k2s, k228_k2b) = await Post(tech, $"api/v1/process/step-instances/{k228_stepI}/commit", new { outcome = "Done", capture = new { installedAt = DateTime.UtcNow.ToString("o"), commissioningNote = "#228 D" } });
+                        Must(k228_k1.Contains("re-base it first") && k228_rbs == HttpStatusCode.OK && k228_k2s == HttpStatusCode.OK,
+                            $"#228/#231: D's load waits for a re-base onto what is in service, then D is loaded [{(int)k228_rbs} {Code(k228_rbb)} {k228_rbb?["detail"]}; {(int)k228_k2s} {Code(k228_k2b)} {k228_k2b?["detail"]}]");
+                    }
                     // #229 (owner, 2026-09-23, "yes remove it"): SETTINGS_LIFECYCLE_SIMPLE has no Withdraw from Applied any more, so
                     // with D's settings on the relay its request is refused a cancel, as the full lifecycle's is in the main run
                     var (k229_ca, k229_cab) = await Post(admin, $"api/v1/process/workflow-instances/{k228_wfD}/transitions", new { name = "Cancel", reason = "smoke #229: too late" });
@@ -2524,21 +2550,7 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
                     Must(k229_ca == HttpStatusCode.Conflict && (k229_cab?["detail"]?.ToString() ?? "").Contains("cannot be cancelled now")
                          && (k229_rib?["rows"] as JsonArray)?.FirstOrDefault()?["State"]?.ToString() == "Running" && k229_pRow?["LifecycleState"]?.ToString() == "Applied",
                         $"#229: under the four-step procedure, with its settings applied on the relay the request cannot be cancelled, and the refusal changes nothing [{(int)k229_ca}: {k229_cab?["detail"]}; package {k229_pRow?["LifecycleState"]}]");
-                    // with C cancelled, D is measured against what is in service: the ordering rule ("that request completes first")
-                    // no longer stands between them; any difference from the in-service settings is re-based as #192 does it
-                    var k228_stepD = await ReadyStep("COMPLETE", null, 2);
-                    await Post(admin, $"api/v1/process/step-instances/{k228_stepD}/claim", new { });
-                    var (k228_k1s, k228_k1b) = await Post(admin, $"api/v1/process/step-instances/{k228_stepD}/commit", new { outcome = "Done" });
-                    var k228_k1 = k228_k1b?["detail"]?.ToString() ?? "";
-                    Must(!k228_k1.Contains("that request completes first"), $"#228: the cancelled C does not hold D back by order [{(int)k228_k1s}: {k228_k1}]");
-                    if (k228_k1s != HttpStatusCode.OK)
-                    {
-                        var k228_draftD = Id(k228_dRow, "RevisionRowId");
-                        var (k228_rbs, k228_rbb) = await Post(admin, "api/v1/process/RebaseDraft", new { RevisionRowId = k228_draftD, DeviceEntityId = devBdd });
-                        var (k228_k2s, k228_k2b) = await Post(admin, $"api/v1/process/step-instances/{k228_stepD}/commit", new { outcome = "Done" });
-                        Must(k228_rbs == HttpStatusCode.OK && k228_k2s == HttpStatusCode.OK,
-                            $"#228: re-based onto what is in service, D goes in [{(int)k228_rbs} {Code(k228_rbb)} {k228_rbb?["detail"]}; {(int)k228_k2s} {Code(k228_k2b)} {k228_k2b?["detail"]}]");
-                    }
+                    var (k228_cps, k228_cpb) = await RunStep(admin, "COMPLETE", new { outcome = "Done" });
                     Must(Id(await Record(devBdd, "Active"), "RevisionRowId") != k228_activeBefore, "#228: D is the settings in service now");
                     await Post(admin, $"api/v1/process/workflow-instances/{k228_wfD}/transitions", new { name = "Close" });
 
