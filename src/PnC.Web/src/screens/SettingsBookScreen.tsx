@@ -2,7 +2,7 @@
 // with counts), a row that unfolds to its card and filed text, the state toggle, the column chooser, filters by field,
 // the right-click commands, Export CSV, the location report. Which view, columns, states, groupings and commands: the
 // definition's. No legacy field name or record number on screen (owner, 2026-09-14); the text filter still matches them.
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useSearchParams } from 'react-router'
 import { getJson, s, type Row } from '@/lib/api'
@@ -60,6 +60,12 @@ export default function SettingsBookScreen({ screen, params: p }: { screen: Scre
   // #188: the owner, 2026-09-18: the Locations list "should typically always be displayed and have a collapse button"
   const [locationsHidden, setLocationsHidden] = useState(() => stored(store_('locations.hidden'), 'false') === 'true')
   const toggleLocations = () => { setLocationsHidden(!locationsHidden); store(store_('locations.hidden'), String(!locationsHidden)) }
+  // the owner, 2026-09-23: the chosen location stays highlighted and is brought to the middle of the list — it was off the bottom
+  const listRef = useRef<HTMLUListElement>(null)
+  useEffect(() => {
+    const list = listRef.current; const el = list?.querySelector<HTMLElement>('li[data-selected]')
+    if (list && el) list.scrollTop = el.offsetTop - list.offsetTop - list.clientHeight / 2 + el.clientHeight / 2
+  }, [station, stationRows.length, locationsHidden])
 
   // ---- the read: one state, one location; a state with badgeFrom also reads that state for the badges (round 5 B5)
   const scoped = !!(scopeDevice || scopeRequest)
@@ -126,9 +132,9 @@ export default function SettingsBookScreen({ screen, params: p }: { screen: Scre
         <aside className="no-print w-60 shrink-0 self-start sticky top-4">
           <Panel title="Locations" actions={<Button kind="mini" onClick={toggleLocations} title="hide the locations">‹</Button>}>
             <input className={`${inputClass} mb-2 w-full`} placeholder="filter locations…" value={stationFilter} onChange={(e) => setStationFilter(e.target.value)} />
-            <ul className="max-h-[calc(100vh-12rem)] overflow-y-auto text-sm">
+            <ul ref={listRef} className="max-h-[calc(100vh-12rem)] overflow-y-auto text-sm">
               {stationRows.map((x) => { const id = String(x.EntityId); const sel = id.toLowerCase() === station.toLowerCase()
-                return <li key={id}><button type="button" onClick={() => choose(id)} className={`block w-full truncate rounded px-2 py-1 text-left ${sel ? 'bg-slate-800 text-sky-300' : 'text-slate-300 hover:bg-slate-800/60'}`}>{String(x.Name)}</button></li> })}
+                return <li key={id} data-selected={sel || undefined}><button type="button" onClick={() => choose(id)} aria-current={sel || undefined} className={`block w-full truncate rounded px-2 py-1 text-left ${sel ? 'border-l-4 border-sky-400 bg-slate-800 font-semibold text-sky-300' : 'text-slate-300 hover:bg-slate-800/60'}`}>{String(x.Name)}</button></li> })}
               <li className="mt-2 border-t border-slate-800 pt-2"><button type="button" onClick={() => choose('*')} className={`block w-full rounded px-2 py-1 text-left ${station === '*' ? 'bg-slate-800 text-sky-300' : 'text-slate-400 hover:bg-slate-800/60'}`}>Whole estate (every location)</button></li>
             </ul>
             <Status>{stationsQ.isPending ? 'Loading…' : `${stationRows.length} of ${stations.length} location(s)`}</Status>
@@ -153,6 +159,8 @@ export default function SettingsBookScreen({ screen, params: p }: { screen: Scre
         )}
         {showColumns && <ColumnChooser all={allColumns} labels={p.labels ?? {}} chosen={chosen} onChange={setChosen} defaults={p.defaultColumns} />}
         {raise && <RaiseRequest o={raise} onClose={() => setRaise(null)} />}
+        {/* the owner, 2026-09-23: the location chosen, named above its settings */}
+        {!scopeDevice && !scopeRequest && station && station !== '*' && stationName ? <h2 className="text-center text-lg font-semibold text-slate-100">{String(stationName)}</h2> : null}
         {status}
         <DataGrid rows={visible} columns={columns} rowKey={(r) => s(r[rowKey])} groupBy={groupBy} openGroups={open} onToggleGroup={toggleGroup}
           expandedKey={expanded} onRowClick={(r) => setExpanded(expanded === s(r[rowKey]) ? null : s(r[rowKey]))}
