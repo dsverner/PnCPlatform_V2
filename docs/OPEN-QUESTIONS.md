@@ -145,6 +145,15 @@ the text format, and the seed for the templates. → #61.
   transition and the cancel is refused. A ruling for the owner: keep it (the technician puts the old settings back, unrecorded)
   or remove it from the definition (recommended), so the change must be finished or reversed by a new one.
   **Resolved 2026-09-23** — the owner: "yes remove it". Removed from the definition → `DECISION-LOG.md` #229.
+- **The platform's "panel" is the old program's EQUIPMENT group, not the physical panel** (raised 2026-09-23, testing the
+  settings book). Grouping by Scheme and by Equipment give the same groups: of 5,545 active records on DEV (smoke fixtures
+  excluded), scheme name = panel name on 5,530, neither on 15, different on 0 — both were built from the legacy EQUIPMENT value
+  (#158). The owner: a panel "should have values such as PNL12A, PNL34 etc."; the platform's panel nodes carry "2101 A-PROT"
+  and the like. So a relay's physical place is known only down to the equipment group; the real panels — what cabling, DC feeds
+  and panel drawings hang off in later phases — are not held. The owner's ruling: leave the book's two groupings as they are
+  (removing Equipment would need remembering to restore it). Open: where the real panel identifiers come from (not found in the
+  legacy database — unverified whether drawings or site records hold them); when they are loaded, the Equipment grouping shows
+  them with no screen change.
 - **The engine stamps "now" from the machine it runs on, not from the database** (measured 2026-09-23 on VGS-PC02). The
   first schema smoke on PC02 was 268 PASS / 1 FAIL: "the engine moves the open exception to the new rule version and
   recomputes its clock (#23: 1, [])" (`docs/schema/ddl/tools/smoke.py:686`) — one exception moved, none visible. It is clock
