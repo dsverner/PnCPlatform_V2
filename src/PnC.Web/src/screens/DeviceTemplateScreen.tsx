@@ -61,7 +61,7 @@ export default function DeviceTemplateScreen({ params: p, id }: { screen: Screen
       <Panel title="Settings — by the manual's own groups, none hidden">
         {tmpl.isPending && <Status>…</Status>}
         {!tmpl.isPending && !tmpl.data && <Status>No settings list is loaded for this model yet. An administrator builds it from the manufacturer's manual.</Status>}
-        {tmpl.data && <SettingsByFunction template={tmpl.data} parsed={[]} parseStatus="template" parseError="" revision="" filedText={null} />}
+        {tmpl.data && <SettingsByFunction template={tmpl.data} parsed={[]} parseStatus="template" parseError="" revision="" filedText={null} manualTemplateDefinitionEntityId={factsQ.data ? s(factsQ.data.def.DefinitionEntityId) : null} />}
       </Panel>
 
       {/* #216: the manual, kept with the template — in the page, or its own tab */}

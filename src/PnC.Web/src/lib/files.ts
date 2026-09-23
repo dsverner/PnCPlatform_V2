@@ -11,11 +11,11 @@ export async function fetchFileBlob(fileRowId: string): Promise<Blob> {
   return r.blob()
 }
 
-/** The file in its own browser tab (the browser's own viewer for a PDF). */
-export async function openFileInTab(fileRowId: string): Promise<void> {
+/** The file in its own browser tab (the browser's own viewer for a PDF); a PDF opens at `page` (1-based, physical) when given (#235). */
+export async function openFileInTab(fileRowId: string, page?: number): Promise<void> {
   const blob = await fetchFileBlob(fileRowId)
   const url = URL.createObjectURL(blob)
-  window.open(url, '_blank', 'noopener')
+  window.open(page ? `${url}#page=${page}` : url, '_blank', 'noopener')
   setTimeout(() => URL.revokeObjectURL(url), 60_000)
 }
 

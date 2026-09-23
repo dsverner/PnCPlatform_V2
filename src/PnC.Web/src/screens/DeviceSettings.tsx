@@ -15,6 +15,10 @@ import { Panel, Pill, Tabs, Status, Button, inputClass } from '@/components/ui/u
 import { DataGrid, type Column } from '@/components/ui/data-grid'
 import { useRelayWord, parseMask, formatMask, isMaskText, ownerOf, supervisionLine, type RelayWord, type RelayElement } from '@/lib/relayWord'
 import type { ReactNode } from 'react'
+import { useManualGuide, useManualHelp, ManualHelpContext, type ManualQuote } from '@/lib/manualGuide'
+import { useModelManual } from '@/components/ManualPanel'
+import { Popover } from '@/components/ui/popover'
+import { openFileInTab } from '@/lib/files'
 
 export interface Template { definitionEntityId: string; versionRowId: string; key: string; name: string; rows: Row[]; ansi: Map<string, string> }
 
@@ -282,8 +286,18 @@ function SettingsGrid({ rows: given, values, revision, editable = false, deviceI
       qc.invalidateQueries({ queryKey: ['view', 'document', 'vParsedSettingNamed'] }); qc.invalidateQueries({ queryKey: ['rendered', revision] }); qc.invalidateQueries({ queryKey: ['settingsText', revision] })
     } catch (err) { setMsg({ text: err instanceof ApiError ? plainRefusal(err.message) : String(err), bad: true }) }
   }
+  // #235 (the owner, 2026-09-23): what the manual says on how a setting is set, in its own words with the page, as a floatover on
+  // the setting — instead of the generic comment; a setting the guide does not cover yet keeps its comment for now
+  const help = useManualHelp()
+  const quotesOf = (r: Row) => help.guide?.settings[s(r.SettingCode).toUpperCase()] ?? help.guide?.settings[s(r.SettingCode)] ?? []
+  const commentOf = (r: Row) => isMask(r) && relayWord!.masks[s(r.SettingCode)] ? relayWord!.masks[s(r.SettingCode)].purpose
+    : quotesOf(r).length ? '' : s(r.Description).replace(/^§ /, '')
+  const anyComment = rows.some((r) => commentOf(r) !== '')
   const cols: Column<Row & { _v?: Row }>[] = [
-    { key: 'Name', label: 'Setting', render: (r) => <span>{s(r.Name)} <span className="text-xs text-slate-500">{s(r.SettingCode)}</span></span> },
+    { key: 'Name', label: 'Setting', render: (r) => <span>{s(r.Name)} <span className="text-xs text-slate-500">{s(r.SettingCode)}</span>
+        {quotesOf(r).length > 0 && <Popover trigger="ⓘ" label={`What the manual says on ${s(r.SettingCode)}`}>
+          <ManualQuotes name={s(r.Name)} code={s(r.SettingCode)} quotes={quotesOf(r)} source={help.guide!.source} manualFileRowId={help.manualFileRowId} />
+        </Popover>}</span> },
     { key: '_value', label: 'Value', render: (r) => {
         const was = r._v ? s(r._v.RawValue ?? r._v.DisplayValue) : ''; const code = s(r.SettingCode)
         if (isMask(r)) return r._v && was ? <span className="font-mono text-slate-100">{was}</span> : <span className="text-slate-500">not set</span>
@@ -296,7 +310,7 @@ function SettingsGrid({ rows: given, values, revision, editable = false, deviceI
     { key: '_flag', label: '', render: (r) => (r._v?.RangeCheck === 'OutOfRange' ? <Pill tone="bad" title={s(r._v.RangeCheckNote)}>out of range</Pill> : null), csv: (r) => s(r._v?.RangeCheck) },
     // #215 follow-up (the owner, 2026-09-21): a mask row says what THAT mask is for (its purpose from the Relay Word definition, one sentence
     // per mask), not the template's one sentence repeated ten times
-    { key: 'Description', label: 'Comments', render: (r) => <span className="text-xs text-slate-400">{isMask(r) && relayWord!.masks[s(r.SettingCode)] ? relayWord!.masks[s(r.SettingCode)].purpose : s(r.Description).replace(/^§ /, '')}</span> },
+    ...(anyComment ? [{ key: 'Description', label: 'Comments', render: (r: Row & { _v?: Row }) => <span className="text-xs text-slate-400">{commentOf(r)}</span> }] : []),
   ]
   return (
     <>
@@ -403,13 +417,38 @@ function ElementGroups({ rows, values, revision, editable, deviceId, relayWord }
   )
 }
 
+/** #235: the manual's own words on a setting, each quote with its printed page; the page opens the manual there in its own tab. */
+function ManualQuotes({ name, code, quotes, source, manualFileRowId }: { name: string; code: string; quotes: ManualQuote[]; source: string; manualFileRowId: string | null }) {
+  const [err, setErr] = useState<string | null>(null)
+  return (
+    <div className="space-y-2">
+      <div className="text-sm font-semibold text-slate-100">{name} <span className="text-xs text-slate-500">{code}</span></div>
+      {quotes.map((x, i) => (
+        <figure key={i} className="border-l-2 border-sky-700 pl-2">
+          <blockquote className="whitespace-pre-line text-sm text-slate-200">{x.quote}</blockquote>
+          <figcaption className="mt-1 text-xs text-slate-400">
+            {manualFileRowId
+              ? <button type="button" className="text-sky-300 underline" onClick={() => void openFileInTab(manualFileRowId, x.pdfPage).catch((e) => setErr(String(e)))}>Manual, page {x.page} ↗</button>
+              : <>Manual, page {x.page}</>}
+          </figcaption>
+        </figure>
+      ))}
+      {err && <Status bad>The manual could not be opened: {err}</Status>}
+      <div className="text-[11px] text-slate-500">{source}</div>
+    </div>
+  )
+}
+
 /** A tab beside the template's categories that is not a settings category (#216 follow-up: the relay's Hardware). */
 export interface ExtraTab { key: string; label: string; render: () => ReactNode }
 
-export function SettingsByFunction({ template, parsed, parseStatus, parseError, revision, filedText, editable = false, deviceId = '', extraTabs = [], showListing = true }: { template: Template; parsed: Row[]; parseStatus: string; parseError: string; revision: string; filedText: string | null; editable?: boolean; deviceId?: string; extraTabs?: ExtraTab[]; showListing?: boolean }) {
+export function SettingsByFunction({ template, parsed, parseStatus, parseError, revision, filedText, editable = false, deviceId = '', extraTabs = [], showListing = true, manualTemplateDefinitionEntityId = null }: { template: Template; parsed: Row[]; parseStatus: string; parseError: string; revision: string; filedText: string | null; editable?: boolean; deviceId?: string; extraTabs?: ExtraTab[]; showListing?: boolean; manualTemplateDefinitionEntityId?: string | null }) {
   const values = useMemo(() => new Map(parsed.map((p) => [s(p.SettingCode), p])), [parsed])
   const bookRows = template.rows
   const rwQ = useRelayWord(template.key)   // #215: the relay's Relay Word, when a definition names this template
+  const guideQ = useManualGuide(template.key)   // #235: the manual's words on each setting, when a guide names this template
+  const manualQ = useModelManual(manualTemplateDefinitionEntityId)   // #216: the manual's PDF, for the floatover's link to the page
+  const help = useMemo(() => ({ guide: guideQ.data ?? null, manualFileRowId: manualQ.data?.fileRowId ?? null }), [guideQ.data, manualQ.data])
   const categories = useMemo(() => { const seen: string[] = []; for (const r of bookRows) { const c = s(r.Category) || 'Settings'; if (!seen.includes(c)) seen.push(c) } return seen }, [bookRows])
   const [tab, setTab] = useState(categories[0] ?? '')
   const current = tab || categories[0] || ''
@@ -422,7 +461,7 @@ export function SettingsByFunction({ template, parsed, parseStatus, parseError, 
       <Tabs tabs={[...categories.map((c) => ({ key: c, label: c.length > 42 ? c.slice(0, 40) + '…' : c })), ...extraTabs.map((x) => ({ key: x.key, label: x.label }))]} value={current} onChange={setTab} />
       {extraTabs.find((x) => x.key === current)
         ? extraTabs.find((x) => x.key === current)!.render()   // the owner, 2026-09-21: "hardware should really be another tab in the settings section"
-        : <ElementGroups rows={rows} values={values} revision={revision} editable={editable} deviceId={deviceId} relayWord={rwQ.data ?? null} />}
+        : <ManualHelpContext.Provider value={help}><ElementGroups rows={rows} values={values} revision={revision} editable={editable} deviceId={deviceId} relayWord={rwQ.data ?? null} /></ManualHelpContext.Provider>}
       {showListing && <RelayListingAndFile template={template} parsed={parsed} revision={revision} filedText={filedText} />}
     </Panel>
   )
@@ -468,7 +507,7 @@ export default function DeviceSettings({ r, revision, filedText, editable = fals
   if (!tq.data) return null
   return (
     <>
-      <SettingsByFunction template={tq.data} parsed={parsed} parseStatus={s(r.ParseStatus)} parseError={s(r.ParseError)} revision={revision} filedText={filedText} editable={editable} deviceId={s(r.DeviceEntityId)} showListing={false} />
+      <SettingsByFunction template={tq.data} parsed={parsed} parseStatus={s(r.ParseStatus)} parseError={s(r.ParseError)} revision={revision} filedText={filedText} editable={editable} deviceId={s(r.DeviceEntityId)} showListing={false} manualTemplateDefinitionEntityId={s(r.TemplateDefinitionEntityId) || null} />
     </>
   )
 }

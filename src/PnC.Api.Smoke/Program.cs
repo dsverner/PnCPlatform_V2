@@ -1981,6 +1981,20 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
                  && Bit(1, 1) == "Z1P" && Bit(2, 6) == "50H" && Bit(3, 2) == "TRIP" && k215_variant?["code"]?.ToString() == "BFT"
                  && k215_doc?["settingsTemplate"]?.ToString() == "SETTINGS_TEXT_SEL_221F" && (k215_mtu?["never"] as JsonArray)?.FirstOrDefault()?.ToString() == "TRIP",
                 $"#215: the SEL-221F Relay Word is an Effective definition from the manual — {k215_bits} bits, row 1 bit 1 {Bit(1, 1)}, row 2 bit 6 {Bit(2, 6)}, row 3 bit 2 {Bit(3, 2)} ({k215_variant?["code"]} on the {k215_variant?["models"]}); MTU never masks {(k215_mtu?["never"] as JsonArray)?.FirstOrDefault()}");
+            // #235: the manual guide — the manual's own words on how each setting is set, with the printed page and the PDF page,
+            // bound to the same settings template; the Settings tab shows it as a floatover with a link to the page
+            var (k235_ds, k235_db) = await Get(admin, "api/v1/config/vDefinition?DefinitionKind=Program.ManualGuide&DefinitionKey=MANUAL_GUIDE_SEL_221F&take=1");
+            var k235_def = (k235_db?["rows"] as JsonArray)?.FirstOrDefault();
+            var (_, k235_vb) = await Get(admin, $"api/v1/config/vDefinitionVersion?DefinitionEntityId={k235_def?["EntityId"]}&Status=Effective&take=1");
+            var k235_doc = JsonNode.Parse((k235_vb?["rows"] as JsonArray)?.FirstOrDefault()?["PayloadText"]?.ToString() ?? "{}");
+            var k235_settings = k235_doc?["settings"] as JsonObject;
+            var k235_quotes = k235_settings?.SelectMany(kv => (kv.Value as JsonArray) ?? new JsonArray()).ToList() ?? new();
+            var k235_whole = k235_quotes.All(x => !string.IsNullOrWhiteSpace(x?["quote"]?.ToString()) && !string.IsNullOrWhiteSpace(x?["page"]?.ToString()) && (x?["pdfPage"]?.GetValue<int>() ?? 0) > 0);
+            var k235_27 = (k235_settings?["27VLO"] as JsonArray)?.FirstOrDefault(x => x?["page"]?.ToString() == "5-11");
+            Must(k235_ds == HttpStatusCode.OK && k235_def is not null && k235_doc?["settingsTemplate"]?.ToString() == "SETTINGS_TEXT_SEL_221F"
+                 && new[] { "PSVC", "27VLO", "59VHI", "25DV", "SYNCP", "25T", "VCT" }.All(c => (k235_settings?[c] as JsonArray)?.Count > 0) && k235_whole
+                 && k235_27?["pdfPage"]?.GetValue<int>() == 135 && (k235_27?["quote"]?.ToString() ?? "").Contains("27VLO = 0.20 x 132.8 kV = 26.6 kV"),
+                $"#235: the SEL-221F manual guide is Effective for the settings template — {k235_settings?.Count} settings, {k235_quotes.Count} quotes, each with its page and PDF page; 27VLO at 5-11 opens PDF page {k235_27?["pdfPage"]}");
             // the editor's write: MTU on the #187 relay's outstanding draft, in the filed shape; the rendered file carries it byte for byte
             var k215_rev = k187_rec?["RevisionRowId"]?.ToString();
             var (k215_s1s, k215_s1b) = await Post(admin, "api/v1/process/SetParsedSetting", new { ConfigurationFileRevisionRowId = k215_rev, DeviceEntityId = k187_relay, SettingCode = "MTU", RawValue = "F0 A4 00" });
