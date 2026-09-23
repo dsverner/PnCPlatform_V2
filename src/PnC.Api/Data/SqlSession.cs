@@ -132,10 +132,10 @@ public sealed class SqlSession : IAsyncDisposable
         string source;
         if (view.IsAsOfFunction)
         {
-            var at = asOf ?? DateTimeOffset.Now;
-            cmd.Parameters.Add("@asOf", SqlDbType.DateTimeOffset).Value = at;
-            cmd.Parameters.Add("@believed", SqlDbType.DateTime2).Value = DateTime.UtcNow;
-            source = $"{Q(view.Schema)}.{Q(view.Name)}(@asOf, @believed)";
+            // "now" is the database's (2026-09-23): the API's machine can run ahead of or behind SQL Server — on VGS-PC02 ~209 ms —
+            // and a read at this machine's now misses what the database stamped a moment ago in its own time
+            cmd.Parameters.Add("@asOf", SqlDbType.DateTimeOffset).Value = asOf is { } at ? at : DBNull.Value;
+            source = $"{Q(view.Schema)}.{Q(view.Name)}(ISNULL(@asOf, SYSDATETIMEOFFSET()), SYSUTCDATETIME())";
         }
         else
         {

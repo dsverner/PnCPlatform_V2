@@ -40,6 +40,7 @@
     const c = state.current;
     $("btn-save").disabled = !can("Definition.Modify") || !$("doc").value.trim();
     $("btn-approve").disabled = !can("Definition.Approve") || !c || !c.versionRowId || c.status !== "Draft";
+    $("btn-exception").disabled = !can("Definition.Approve") || !c || !c.versionRowId || c.status !== "Draft";
     $("btn-check").disabled = !$("doc").value.trim();
   }
 
@@ -271,6 +272,24 @@
     } catch (e) { setStatus("Not approved: " + (e.status ? e.status + " " : "") + e.message, true); }
   }
 
+  // ---- #232 (the owner, 2026-09-23): where the rule does not let the author approve their own version, another person who could
+  // approve it lets the author do so, once, within 24 hours — from their own sign-in; the author never names who approved
+  async function approveException() {
+    const c = state.current;
+    if (!c || !c.versionRowId) return;
+    const row = state.versions.find((x) => x.RowId.toLowerCase() === String(c.versionRowId).toLowerCase());
+    try {
+      const a = row && row.CreatedBy ? await getJson("/api/v1/personnel/vActor?ActorId=" + row.CreatedBy + "&take=1") : { rows: [] };
+      const person = a.rows[0] && a.rows[0].PersonEntityId;
+      if (!person) { setStatus("The author of this version is not a person, so there is no one to let approve it.", true); return; }
+      const reason = window.prompt("Why may the author approve " + c.key + " v" + c.versionNumber + " themselves?");
+      if (!reason || !reason.trim()) return;
+      setStatus("Recording the exception…");
+      const r = await postJson("/api/v1/process/override-approvals", { subjectKind: "DefinitionVersion", subjectEntityId: c.versionRowId, action: "Approve", forPersonEntityId: person, reason: reason.trim() });
+      setStatus("Exception recorded: the author can approve " + c.key + " v" + c.versionNumber + " once, until " + new Date(r.expiresAt).toLocaleString() + ".");
+    } catch (e) { setStatus("Exception not recorded: " + String(e.message).replace(/^[a-z]+\.[A-Za-z]+: /, ""), true); }
+  }
+
   // ---- the expression bench
   async function bench(ev) {
     ev.preventDefault();
@@ -317,6 +336,7 @@
   $("btn-check").addEventListener("click", () => { clearTimeout(state.checkTimer); check(); });
   $("btn-save").addEventListener("click", save);
   $("btn-approve").addEventListener("click", approve);
+  $("btn-exception").addEventListener("click", approveException);
   $("doc").addEventListener("input", () => { setButtons(); scheduleCheck(); });
   $("doc").addEventListener("keyup", showCaret);
   $("doc").addEventListener("click", showCaret);

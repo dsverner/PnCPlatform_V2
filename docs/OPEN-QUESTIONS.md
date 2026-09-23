@@ -136,9 +136,9 @@ the text format, and the seed for the templates. → #61.
   their own session) before any rule is switched to Block. Not built.
   **Built 2026-09-23 as #232** (the owner: the approver must be "someone who could do the action themselves", option A): the
   approver records the approval from their own session (`security.ApproveOverride`, `POST /api/v1/process/override-approvals`),
-  single use, 24 h, withdrawable; a name in a request is refused. **Raised, not built:** the approve control exists on the step
-  screen only; approving an override for a definition approval, a record acceptance or a work assignment is API-only until
-  those screens get it.
+  single use, 24 h, withdrawable; a name in a request is refused. The approve control is on the step screen and (#233) on the
+  definitions page ("Exception for the author…"). Record acceptance and work assignment have no screen at all yet, so their
+  override approval is through the API until those screens are built.
 - **The simple settings lifecycle lets an applied package be withdrawn** (#228): `SETTINGS_LIFECYCLE_SIMPLE` has
   `Withdraw` from Applied ("applied to the relay"), so a request under the four-step procedure can be cancelled after its
   settings are on the relay, and the record then says the old settings are in service. The full lifecycle has no such
@@ -157,4 +157,7 @@ the text format, and the seed for the templates. → #61.
   domain controllers) may be the one adrift — UNVERIFIED, VM01's offset against an outside source not measured.
   Recommendation: the engine and the API take "now" from the database (`SYSDATETIMEOFFSET()`) for anything they write or
   read as-of, so one clock orders the record whatever machine the code runs on; separately, measure VM01's and the domain
-  controllers' offset. Not built.
+  controllers' offset. Not built. **Built 2026-09-23 as #233** (the owner: "perform all fixes"): V2's as-of reads and the
+  rationale apply take the database's time; the predecessor engine CLI the schema smoke runs defaults every verb to the
+  database's time (branch `v2/engine-db-now` in `C:\Projects\PnCPlatform`, not merged there). Still open: VM01's and the domain
+  controllers' offset against an outside source, unmeasured.

@@ -12,7 +12,7 @@ Written 2026-09-23, at the end of the session that built #217–#228. Read this 
 | Remote | `origin` = `Z:\Repos\PnCPlatform_V2.git` (pushed 2026-09-23); no GitHub remote (the owner's call) |
 | DEV database | `PnCPlatform_V2_DEV` on VM01 `10.10.70.25`, deployed with everything to #228 |
 | DEV API | `http://127.0.0.1:5210`, React app at `/app/` (run recipe in memory `project-dev-api-run-recipe`) |
-| Last results | API smoke 418 PASS / 0 FAIL (#232, PC02, 2026-09-23); schema smoke on PC02 after #232: 268 + the clock-skew FAIL; schema smoke 269 PASS on the laptop, 268 + 1 clock-skew FAIL on PC02 (below); wording check 0 |
+| Last results | API smoke 418 PASS / 0 FAIL (#232, PC02, 2026-09-23); schema smoke on PC02 after #233: 269 PASS / 0 FAIL (the clock fixed); schema smoke 269 PASS on the laptop, 268 + 1 clock-skew FAIL on PC02 (below); wording check 0 |
 
 ## What this session built (one line each; the log row has the rest)
 
@@ -82,8 +82,11 @@ Written 2026-09-23, at the end of the session that built #217–#228. Read this 
    #231** (2026-09-23): locked once loaded; a change is not loaded while its basis is outstanding or has changed.
 2. ~~Block-mode segregation overrides are approved by being named~~ — **built as #232** (2026-09-23; owner ruling A: the
    approver is someone who could do the act): the approval is the approver's own act from their own session, single use,
-   24 h. Left: the approve control on the definition, record-acceptance and assignment screens (API-only today).
-3. Carried from earlier (see `docs/OPEN-QUESTIONS.md`): the settings book's chosen columns and the menu's open groups stay
+   24 h. The definitions page got its control in #233; record acceptance and assignment have no screen yet (API only).
+3. ~~The engine stamps "now" from its own machine~~ — **built as #233**: database time in V2's as-of reads, the rationale apply
+   and the predecessor engine CLI (branch `v2/engine-db-now` in `C:\Projects\PnCPlatform` — the smoke's `PNC_ENGINE_DIR`
+   build is from it; merge or keep is the owner's call).
+4. Carried from earlier (see `docs/OPEN-QUESTIONS.md`): the settings book's chosen columns and the menu's open groups stay
    per browser (#226, by decision); the client's complete legacy documents share (Z: holds stations E–W only); six station
    folders with no legacy location; compare the relay's online settings with the in-service record (later phase); the
    requirement page (later phase); one device per legacy number in the migration model; per-port configuration; phase units

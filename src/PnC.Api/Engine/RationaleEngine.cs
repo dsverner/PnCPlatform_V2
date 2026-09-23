@@ -253,7 +253,7 @@ public static class RationaleEngine
                 _ => raw,
             };
         }
-        var reader = new DictReader(facts); var now = DateTimeOffset.UtcNow;
+        var reader = new DictReader(facts); var now = await s.NowAsync(ct);   // the database's time, as everything it records (2026-09-23)
         var sections = new JsonArray(); var written = new List<(string code, string raw)>(); var unknowns = new List<string>();
         var elements = (st.Map?["elements"] as JsonArray ?? new JsonArray()).Select(e => (JsonObject)e!).ToDictionary(e => S(e["key"]), e => e, StringComparer.OrdinalIgnoreCase);
         foreach (var secNode in st.Template["sections"] as JsonArray ?? new JsonArray())
