@@ -1,18 +1,19 @@
 # Session handoff — where the work stands
 
-Written 2026-09-23, at the end of the session that built #217–#228. Read this first in the next session, then
-`docs/decisions/DECISION-LOG.md` (rows #217–#228 carry every reason, measurement and owner quote) and
+Written 2026-09-23. The session on the laptop built #217–#228; the session on VGS-PC02 (same day) built #229–#236 and the
+settings-book changes below. Read this first in the next session, then `docs/decisions/DECISION-LOG.md` (rows #217–#236 carry
+every reason, measurement and owner quote) and
 `docs/OPEN-QUESTIONS.md`. Replace this file at the end of each session; git keeps the earlier ones.
 
 ## Where things are
 
 | | |
 |---|---|
-| Branch | `foundation/documentary-record`, clean, last commit `46a8421` (#228) |
-| Remote | `origin` = `Z:\Repos\PnCPlatform_V2.git` (pushed 2026-09-23); no GitHub remote (the owner's call) |
-| DEV database | `PnCPlatform_V2_DEV` on VM01 `10.10.70.25`, deployed with everything to #228 |
+| Branch | `foundation/documentary-record`, clean, pushed to `origin` (see `git log -1`) |
+| Remote | `origin` = `\\10.10.40.10\vernersys-share\Repos\PnCPlatform_V2.git` (= Z:); no GitHub remote (the owner's call). The predecessor repo's branch `v2/engine-db-now` is on its `origin` and `github` |
+| DEV database | `PnCPlatform_V2_DEV` on VM01 `10.10.70.25`, deployed with everything to #236 |
 | DEV API | `http://127.0.0.1:5210`, React app at `/app/` (run recipe in memory `project-dev-api-run-recipe`) |
-| Last results | API smoke 418 PASS / 0 FAIL (#232, PC02, 2026-09-23); schema smoke on PC02 after #233: 269 PASS / 0 FAIL (the clock fixed); schema smoke 269 PASS on the laptop, 268 + 1 clock-skew FAIL on PC02 (below); wording check 0 |
+| Last results | API smoke 419 PASS / 0 FAIL (#236, PC02, 2026-09-23); schema smoke on PC02 after #233: 269 PASS / 0 FAIL (the clock fixed); schema smoke 269 PASS on the laptop, 268 + 1 clock-skew FAIL on PC02 (below); wording check 0 |
 
 ## What this session built (one line each; the log row has the rest)
 
@@ -35,6 +36,27 @@ Written 2026-09-23, at the end of the session that built #217–#228. Read this 
   their place), Withdraw with a reason. 23,680 tracks filled by a replayable import rule.
 - **#228** Cancelling a request cancels its work and withdraws its settings package (generic, read from the definitions'
   `cancellation` flag); refused once the settings are on the relay under the full lifecycle; older stuck runs repaired.
+
+## What the PC02 session built (2026-09-23; one line each, the log row has the rest)
+
+- **#229** No Withdraw from Applied in the four-step settings lifecycle (owner: "yes remove it").
+- **#230** An outstanding record's settings file is rewritten from its settings after every change; a partly-read file refuses the edit.
+- **#231** Settings loaded on the relay are locked (state flag `locksContent`); a change is not loaded while its basis is outstanding or changed.
+- **#232** A segregation override is approved by the approver, from their own session, by someone who could do the act (owner ruling A).
+- **#233** "Now" is the database's (V2 reads, rationale apply, the predecessor engine CLI on branch `v2/engine-db-now`) — the PC02 schema smoke is clean, 269/0; the definitions page approves an exception for a version's author.
+- **#234** The settings book keeps one relay's revisions together, newest first (multi-key sort, `RevisionNumber`).
+- Settings book, owner's testing: the chosen location highlighted and centred in the list and named as a heading; the state tabs on their own row; the tools in Find / Arrange / Output, folding away closed by default; the count line removed.
+- Open question resolved: a panel's **name** is the protection panel (L2103 A-PROT), its **code** the physical panel (PNL34A), blank until known.
+- **#235, #236** The manual's own words on how each setting is set, as a floatover (ⓘ) with a link to the page — all 46 SEL-221F settings, 151 quotes, verbatim from the page images. Procedure for the next model: `docs/runbook/MANUAL-GUIDE.md`, `tools/manual_guide.py`.
+
+## Lessons from the PC02 session
+
+- **Screens on PC02**: the Chrome extension reaches the owner's laptop browser, not PC02. Check PC02 screens with headless Chrome
+  (`puppeteer-core` in the scratchpad) — memory `project-ui-check-on-pc02`. Nothing UI goes out as "not seen" when this works.
+- **One background job per long run**: a watcher that seems dead may still be running — check the processes
+  (`Get-CimInstance Win32_Process`) before starting a second API or smoke.
+- **The manual's PDF**: its text layer is OCR with errors; pages render with PyMuPDF (JBIG2), not pypdf or the Read tool.
+- **Wording**: `plainRefusal` (lib/api) strips the procedure name from a refusal on every screen that shows one.
 
 ## Security fixes made this session (all measured on DEV before the fix)
 
