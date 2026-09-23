@@ -46,12 +46,31 @@ Written 2026-09-23, at the end of the session that built #217–#228. Read this 
   role by naming an unrelated step; a step commit took `ValidationOk`/`CompetencyOk`/`CapturedByActorId` as given. Now
   refused there; the dedicated endpoints keep their codes under `"endpoints"` in `api-permissions.json` (#228).
 
-## Waiting on the owner (rulings)
+## Owner rulings of 2026-09-23 — to act on first, on PC02
 
-1. **The simple lifecycle lets an applied package be withdrawn.** `SETTINGS_LIFECYCLE_SIMPLE` has `Withdraw` from
-   Applied, so under the four-step procedure a request can be cancelled after its settings are on the relay, and the record
-   then says the old settings are in service. Recommendation: remove that transition from the definition.
-2. (Answered, recorded) Finishing a request from the old program stays with P&C engineers (the workflow's Close role).
+1. **Remove `Withdraw` from Applied in `SETTINGS_LIFECYCLE_SIMPLE`** ("yes remove it"). Not yet done. The definition is
+   `docs/design/examples/settings-lifecycle-simple.workflow.json`; it reaches DEV through the API smoke's
+   `LoadApprove("settings-lifecycle-simple.workflow.json", "SETTINGS_LIFECYCLE_SIMPLE")` (`src/PnC.Api.Smoke/Program.cs:2300`) —
+   check how LoadApprove versions and approves before relying on it. Runs already started keep their pinned version. After
+   the change, a request under the four-step procedure is refused a cancel once its package is Applied (50178), as the full
+   lifecycle already is. Log it as #229 with the ruling.
+2. **Build the fix for the out-of-date settings file next** ("Agreed") — item 1 below, planned first (plan mode). Research
+   was started and stopped for the move; redo it: every place the file is written (`IssueRenderedSettings`, `RefileRevision`,
+   `WriteConfigurationRevision`, the rationale engine), every place rows change on an outstanding record
+   (`SetParsedSetting`, `RebaseDraft`, the rationale apply), how `CopyRevisionAsDraft` copies the in-service revision (file
+   bytes) versus an outstanding basis (rendered rows), and whether one primitive already renders rows to the file.
+3. (Answered earlier, recorded) Finishing a request from the old program stays with P&C engineers.
+
+## State at the move to PC02 (2026-09-23, morning)
+
+- The laptop's DEV API is **stopped**; start it on PC02 (memory `project-dev-api-run-recipe`).
+- A **schema smoke was running on PC02** at the move, log `C:\pc02-setup\schema-smoke.log` — read it first; if it passed
+  (`SMOKE PASS`, ~269 PASS) PC02 is fully verified. An earlier try failed only because the predecessor engine had not been
+  built Release; it now is.
+- PC02 was on Wi-Fi by the owner's choice. It is an ASUS ROG Flow X13 laptop: its battery bridges short cuts; whether its
+  firmware can power on after an outage is unconfirmed (F2 at start, Advanced Mode).
+- **Z: credentials on PC02** were not confirmed saved: if `git push` from PC02 fails, open the Z: share once in the desktop
+  session and save them.
 
 ## Raised, not built — the next candidates, most important first
 
@@ -99,11 +118,11 @@ develop on a machine next to the database and use the laptop only as a Remote De
 | Installed | Git 2.55, .NET SDK 10.0.401 + sqlpackage, Node 24.19, Python 3.14.7 (`pyodbc`, `pycdlib`), ODBC Driver 17, Chrome, Tailscale 1.102.4, Claude Code 2.1.280 |
 | Repositories | `C:\Projects\PnCPlatform_V2` (this one; `origin` = `\\10.10.40.10\vernersys-share\Repos\PnCPlatform_V2.git`) and `C:\Projects\PnCPlatform` (the predecessor: its engine and `dev.local`), with their ignored settings and credential files copied |
 | Claude Code | global `CLAUDE.md`, `settings.json` (standing permissions, hooks), status line, skills, `C:\ss\stage-clip.ps1`, and this project's 29 memory files copied |
-| Verified | the API, the smoke tool, the engine, the web app and the database project build (70 s) |
+| Verified | the API, the smoke tool, the engine, the web app and the database project build (70 s); the predecessor engine also built **Release** (the schema smoke runs it with `-c Release --no-build`); after `tag:business` was applied in Tailscale, SQL round trip median 2.92 ms (laptop 3.09 ms); API smoke 407 PASS on PC02 against its own API |
 | Spare | **VGS-DEV01**, Proxmox VM 102 on the Business VLAN, Windows 11 Pro 25H2, no tools; stopped and off at boot; admin in the predecessor's `dev.local` (`DEV01_ADMIN_*`) |
 
 **Still needed from the owner, before leaving:**
-1. **Tailscale sign-in on PC02** with the same route to `10.10.0.0/16` the laptop uses — PC02 cannot reach SQL Server without it (the
+1. ~~Tailscale sign-in on PC02~~ **done 2026-09-23**, tagged `tag:business` (without the tag it saw no route to `10.10.0.0/16`) — PC02 cannot reach SQL Server without it (the
    `Business -> OT (MSSQL)` rule names `vgs-ct05` only; measured: `10.10.70.25:1433` does not answer from PC02).
 2. **Claude Code sign-in** on PC02 and the **Claude extension** in Chrome there.
 3. **The Z: credentials** saved once in an interactive session on PC02, so `git push` to `origin` works.
