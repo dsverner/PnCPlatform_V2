@@ -2481,13 +2481,21 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
                     var k228_dRow = (k228_drB?["rows"] as JsonArray)?.FirstOrDefault(r => string.Equals(r?["WorkRequestEntityId"]?.ToString(), k228_wrD?.ToString(), StringComparison.OrdinalIgnoreCase));
                     Must(k228_dRow?["BasedOnGridState"]?.ToString() == "Withdrawn", $"#228: D reads its basis as withdrawn, not outstanding ({k228_dRow?["BasedOnGridState"]})");
 
-                    // D runs to service; the cancelled C, its basis, no longer holds it back. (The simple lifecycle lets an applied
-                    // package be withdrawn, so the refusal is checked on the full lifecycle in the main run, not here.)
+                    // D runs to service; the cancelled C, its basis, no longer holds it back.
                     inst = k228_instD;
                     await RunStep(admin, "WRITE_RATIONALE", new { outcome = "Done", evidence = new[] { File("rationale.txt", "text/plain", "#228 D", "Rationale") } });
                     await RunStep(admin, "RECORD_SETTINGS", new { outcome = "Done" }, devBdd);
                     await Post(admin, $"api/v1/process/procedure-instances/{k228_instD}/evaluate", new { }); await Post(admin, $"api/v1/process/procedure-instances/{k228_instD}/evaluate", new { });
                     await RunStep(tech, "INSTALL", new { outcome = "Done", capture = new { installedAt = DateTime.UtcNow.ToString("o"), commissioningNote = "#228 D" } }, devBdd);
+                    // #229 (owner, 2026-09-23, "yes remove it"): SETTINGS_LIFECYCLE_SIMPLE has no Withdraw from Applied any more, so
+                    // with D's settings on the relay its request is refused a cancel, as the full lifecycle's is in the main run
+                    var (k229_ca, k229_cab) = await Post(admin, $"api/v1/process/workflow-instances/{k228_wfD}/transitions", new { name = "Cancel", reason = "smoke #229: too late" });
+                    var (_, k229_rib) = await Get(admin, $"api/v1/process/vProcedureInstance?EntityId={k228_instD}");
+                    var (_, k229_prB) = await Get(admin, $"api/v1/document/vSettingsRecord?DeviceEntityId={devBdd}&GridState=Outstanding");
+                    var k229_pRow = (k229_prB?["rows"] as JsonArray)?.FirstOrDefault(r => string.Equals(r?["WorkRequestEntityId"]?.ToString(), k228_wrD?.ToString(), StringComparison.OrdinalIgnoreCase));
+                    Must(k229_ca == HttpStatusCode.Conflict && (k229_cab?["detail"]?.ToString() ?? "").Contains("cannot be cancelled now")
+                         && (k229_rib?["rows"] as JsonArray)?.FirstOrDefault()?["State"]?.ToString() == "Running" && k229_pRow?["LifecycleState"]?.ToString() == "Applied",
+                        $"#229: under the four-step procedure, with its settings applied on the relay the request cannot be cancelled, and the refusal changes nothing [{(int)k229_ca}: {k229_cab?["detail"]}; package {k229_pRow?["LifecycleState"]}]");
                     // with C cancelled, D is measured against what is in service: the ordering rule ("that request completes first")
                     // no longer stands between them; any difference from the in-service settings is re-based as #192 does it
                     var k228_stepD = await ReadyStep("COMPLETE", null, 2);

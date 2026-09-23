@@ -16,7 +16,6 @@
     { "from": "Calculated", "to": "Applied", "name": "Apply" },
     { "from": "Applied", "to": "InService", "name": "Baseline" },
     { "from": "InService", "to": "Superseded", "name": "Supersede", "roles": ["PCEngineer"] },
-    { "from": "Calculated", "to": "Withdrawn", "name": "Withdraw", "requiresReason": true },
-    { "from": "Applied", "to": "Withdrawn", "name": "Withdraw", "requiresReason": true }
+    { "from": "Calculated", "to": "Withdrawn", "name": "Withdraw", "requiresReason": true }
   ]
 }

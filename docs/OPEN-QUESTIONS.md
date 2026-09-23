@@ -131,3 +131,17 @@ the text format, and the seed for the templates. → #61.
   settings are on the relay, and the record then says the old settings are in service. The full lifecycle has no such
   transition and the cancel is refused. A ruling for the owner: keep it (the technician puts the old settings back, unrecorded)
   or remove it from the definition (recommended), so the change must be finished or reversed by a new one.
+  **Resolved 2026-09-23** — the owner: "yes remove it". Removed from the definition → `DECISION-LOG.md` #229.
+- **The engine stamps "now" from the machine it runs on, not from the database** (measured 2026-09-23 on VGS-PC02). The
+  first schema smoke on PC02 was 268 PASS / 1 FAIL: "the engine moves the open exception to the new rule version and
+  recomputes its clock (#23: 1, [])" (`docs/schema/ddl/tools/smoke.py:686`) — one exception moved, none visible. It is clock
+  skew, not a logic fault: `ExceptionClocks.RederiveAsync` takes `at = asAt ?? DateTimeOffset.Now` and writes it as the
+  revised row's `ValidFrom` (predecessor engine, `C:\Projects\PnCPlatform\src\PnC.Api\Services\ExceptionClocks.cs:30,82`);
+  PC02 ran ~209 ms ahead of SQL Server on VM01, so the moved row became valid ~89 ms in the server's future and the check's
+  read, at the server's now, did not see it. The same pattern is in V2's own reads: an as-of view is read at the API's
+  `DateTimeOffset.Now` (`src/PnC.Api/Data/SqlSession.cs:131`), so a client behind the server can miss a row just written.
+  PC02's time service is now automatic (time.windows.com) and it is still ~209 ms ahead of VM01, so VM01 (time from the OT
+  domain controllers) may be the one adrift — UNVERIFIED, VM01's offset against an outside source not measured.
+  Recommendation: the engine and the API take "now" from the database (`SYSDATETIMEOFFSET()`) for anything they write or
+  read as-of, so one clock orders the record whatever machine the code runs on; separately, measure VM01's and the domain
+  controllers' offset. Not built.

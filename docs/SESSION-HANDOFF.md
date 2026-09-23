@@ -12,7 +12,7 @@ Written 2026-09-23, at the end of the session that built #217–#228. Read this 
 | Remote | `origin` = `Z:\Repos\PnCPlatform_V2.git` (pushed 2026-09-23); no GitHub remote (the owner's call) |
 | DEV database | `PnCPlatform_V2_DEV` on VM01 `10.10.70.25`, deployed with everything to #228 |
 | DEV API | `http://127.0.0.1:5210`, React app at `/app/` (run recipe in memory `project-dev-api-run-recipe`) |
-| Last results | API smoke 407 PASS / 0 FAIL; schema smoke 269 PASS; wording check 0 |
+| Last results | API smoke 408 PASS / 0 FAIL (#229, PC02, 2026-09-23); schema smoke 269 PASS on the laptop, 268 + 1 clock-skew FAIL on PC02 (below); wording check 0 |
 
 ## What this session built (one line each; the log row has the rest)
 
@@ -48,7 +48,7 @@ Written 2026-09-23, at the end of the session that built #217–#228. Read this 
 
 ## Owner rulings of 2026-09-23 — to act on first, on PC02
 
-1. **Remove `Withdraw` from Applied in `SETTINGS_LIFECYCLE_SIMPLE`** ("yes remove it"). Not yet done. The definition is
+1. **Remove `Withdraw` from Applied in `SETTINGS_LIFECYCLE_SIMPLE`** ("yes remove it"). **Done as #229** (2026-09-23, PC02). The definition is
    `docs/design/examples/settings-lifecycle-simple.workflow.json`; it reaches DEV through the API smoke's
    `LoadApprove("settings-lifecycle-simple.workflow.json", "SETTINGS_LIFECYCLE_SIMPLE")` (`src/PnC.Api.Smoke/Program.cs:2300`) —
    check how LoadApprove versions and approves before relying on it. Runs already started keep their pinned version. After
@@ -64,9 +64,12 @@ Written 2026-09-23, at the end of the session that built #217–#228. Read this 
 ## State at the move to PC02 (2026-09-23, morning)
 
 - The laptop's DEV API is **stopped**; start it on PC02 (memory `project-dev-api-run-recipe`).
-- A **schema smoke was running on PC02** at the move, log `C:\pc02-setup\schema-smoke.log` — read it first; if it passed
-  (`SMOKE PASS`, ~269 PASS) PC02 is fully verified. An earlier try failed only because the predecessor engine had not been
-  built Release; it now is.
+- The **schema smoke on PC02** (log `C:\pc02-setup\schema-smoke.log`) ended `SMOKE FAIL (1)`, 268 PASS: the one failure
+  is "the engine moves the open exception … (#23: 1, [])", and it is **clock skew, not a logic fault** — the engine stamps
+  the moved exception's `ValidFrom` with its own machine's clock (`ExceptionClocks.cs:30,82` in the predecessor), PC02 ran
+  ~209 ms ahead of SQL Server, so the row was valid ~89 ms in the server's future when the check read it. Recorded with the
+  recommendation (take "now" from the database, `SYSDATETIMEOFFSET()`) in `docs/OPEN-QUESTIONS.md`. Until that is built, a
+  failure of that one check on PC02 is this; any other failure is not. The API smoke on PC02: 407 PASS.
 - PC02 was on Wi-Fi by the owner's choice. It is an ASUS ROG Flow X13 laptop: its battery bridges short cuts; whether its
   firmware can power on after an outage is unconfirmed (F2 at start, Advanced Mode).
 - **Z: credentials on PC02** were not confirmed saved: if `git push` from PC02 fails, open the Z: share once in the desktop
