@@ -49,7 +49,9 @@ public sealed class SqlSession : IAsyncDisposable
 
     // ------------------------------------------------------------------ procedures
 
-    private static readonly HashSet<string> NeverBound = new(StringComparer.OrdinalIgnoreCase) { "ActorId", "MigrationRunId" };
+    // DeferFileWrite (#230): process.SetParsedSetting's switch for callers that write the settings file once after many edits;
+    // taken from a body it would let a caller leave an outstanding record's file behind its settings
+    private static readonly HashSet<string> NeverBound = new(StringComparer.OrdinalIgnoreCase) { "ActorId", "MigrationRunId", "DeferFileWrite" };
     /// <summary>Views materialised whole before ordering and paging (W7; Api:MaterialiseBeforePaging).</summary>
     public static HashSet<string> MaterialiseBeforePaging { get; } = new(StringComparer.OrdinalIgnoreCase);
 

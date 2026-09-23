@@ -6,7 +6,7 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router'
-import { fmtWhen, s, view as readView, type Row } from '@/lib/api'
+import { fmtWhen, s, view as readView, plainRefusal, type Row } from '@/lib/api'
 import { useCan, useViewAll } from '@/lib/hooks'
 import { type WorkItemParams, type Screen, type Command, splitView, cellText, labelOf, runCommand, commandEnabled, screenPath } from '@/lib/screens'
 import { procedureInstance, evaluate, releaseHold, workflowDocumentOf, transition, type BlockNode, type ProcedureInstance } from '@/lib/process'
@@ -21,8 +21,8 @@ import { LegacyRequest } from '@/components/LegacyRequest'
 const REQUEST_WORDS: Record<string, string> = { Raised: 'raised', InProgress: 'in progress', Closed: 'finished', Cancelled: 'withdrawn' }
 const WORK_WORDS: Record<string, string> = { Running: 'under way', Held: 'on hold', Completed: 'done', Cancelled: 'stopped', Pending: 'not started' }
 // #227: a request from the old program has none of these — no package, no outage window, no raised date
-// #228: a refusal from the database starts with the procedure's name — ours, not the reader's
-const plain = (m: string) => m.replace(/^[a-z]+\.[A-Za-z]+: /, '')
+// #228: a refusal from the database starts with the procedure's name — ours, not the reader's (lib/api plainRefusal, #230)
+const plain = plainRefusal
 const NOT_IN_THE_OLD_PROGRAM = new Set(['PriorityCode', 'OutageWindowStartAt', 'OutageWindowEndAt', 'ReturnToServiceAt', 'LifecycleState', 'DeviceCount', 'RequestStartedAt'])
 
 export default function WorkItemScreen({ screen, params: p, id }: { screen: Screen; params: WorkItemParams; id?: string }) {

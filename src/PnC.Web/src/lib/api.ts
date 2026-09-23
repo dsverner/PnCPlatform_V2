@@ -15,6 +15,9 @@ export class ApiError extends Error {
   }
 }
 
+/** A database refusal without the procedure's name in front ("process.SetParsedSetting: …"): screen text never names our procedures. */
+export const plainRefusal = (m: string) => m.replace(/^[a-z]+\.[A-Za-z]+: /, '')
+
 export function devUser(): string | null { try { return localStorage.getItem('pnc.devUser') } catch { return null } }
 export function setDevUser(v: string | null) { try { if (v) localStorage.setItem('pnc.devUser', v); else localStorage.removeItem('pnc.devUser') } catch { /* no storage */ } }
 

@@ -2161,6 +2161,13 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
                 var (k219_f2s, k219_f2b) = await Get(admin, $"api/v1/document/vFile?RevisionRowId={k219_rr}&take=10");
                 Must(k219_bs == HttpStatusCode.OK && (k219_p2b?["rows"] as JsonArray)?.FirstOrDefault()?["RawValue"]?.ToString() == "80" && ((k219_f2b?["rows"] as JsonArray)?.Count ?? 0) == 2,
                     $"#219: a second apply with zone 1 at 80 % updates Z1% ({(k219_p2b?["rows"] as JsonArray)?.FirstOrDefault()?["RawValue"]}) and refiles the two files ({(k219_f2b?["rows"] as JsonArray)?.Count} on the rationale revision)");
+                // #230: the apply wrote the settings file once, from the settings it wrote
+                var (_, k230_nb) = await Get(admin, $"api/v1/document/vFile?RevisionRowId={k215_rev}&FileRole=Native");
+                var k230_nf = (k230_nb?["rows"] as JsonArray) ?? new JsonArray();
+                var k230_ft = k230_nf.Count == 1 ? System.Text.Encoding.UTF8.GetString(await (await admin.GetAsync($"api/v1/files/{k230_nf[0]?["RowId"]}")).Content.ReadAsByteArrayAsync()) : "";
+                var k230_rr = await admin.GetAsync($"api/v1/settings/{k215_rev}/rendered"); var k230_rt = k230_rr.IsSuccessStatusCode ? await k230_rr.Content.ReadAsStringAsync() : "";
+                Must(k230_nf.Count == 1 && k230_ft == k230_rt && k230_ft.Contains("Z1%=80"),
+                    $"#230: after the apply the draft's settings file is its settings — one file ({k230_nf.FirstOrDefault()?["FileName"]}), Z1%=80 in it ({k230_ft.Length} chars)");
                 var (k219_rs, k219_rb) = await Post(readOnly!, $"api/v1/rationale/{k215_rev}/apply", new { inputs = new { Zone1Pct = "70" } });
                 Must(k219_rs == HttpStatusCode.Forbidden, $"#219: ReadOnly may not apply a rationale ({(int)k219_rs} {Code(k219_rb)})");
             }
@@ -2302,6 +2309,15 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
             var okW = await LoadApprove("settings-change-simple.workflow.json", "SETTINGS_CHANGE_REQUEST_SIMPLE");
             var simpleType = await Definition("Program.WorkType", $"{tag}_SETTINGS_CHANGE_SIMPLE", "Settings change, four steps (#168 smoke)", new { g = 1, workflow = "SETTINGS_CHANGE_REQUEST_SIMPLE", requiredRecordKinds = Array.Empty<string>() });
             async Task<string> Rendered(Guid? rev) { var r = await admin.GetAsync($"api/v1/settings/{rev}/rendered"); return r.StatusCode == HttpStatusCode.OK ? await r.Content.ReadAsStringAsync() : $"<{(int)r.StatusCode}>"; }
+            // #230: the revision's one live Native file, as filed — what is loaded to the relay and what a later change is copied from
+            async Task<(string text, string name, int count)> Filed(Guid? rev)
+            {
+                var (_, fb) = await Get(admin, $"api/v1/document/vFile?RevisionRowId={rev}&FileRole=Native");
+                var fs = (fb?["rows"] as JsonArray) ?? new JsonArray();
+                if (fs.Count != 1) return ("", "", fs.Count);
+                var dl = await admin.GetAsync($"api/v1/files/{fs[0]?["RowId"]}");
+                return (System.Text.Encoding.UTF8.GetString(await dl.Content.ReadAsByteArrayAsync()), fs[0]?["FileName"]?.ToString() ?? "", 1);
+            }
             async Task<JsonNode?> Record(Guid? dev, string state) { var (_, b) = await Get(admin, $"api/v1/document/vSettingsRecord?DeviceEntityId={dev}&GridState={state}"); return (b?["rows"] as JsonArray)?.OrderByDescending(r => r?["RowSeq"]?.GetValue<long>()).FirstOrDefault(); }
             async Task<Dictionary<string, string>> Parsed(Guid? rev) { var (_, b) = await Get(admin, $"api/v1/document/vParsedSettingNamed?ConfigurationFileRevisionRowId={rev}"); return (b?["rows"] as JsonArray)?.ToDictionary(r => r?["SettingCode"]?.ToString() ?? "", r => r?["RawValue"]?.ToString() ?? "") ?? new(); }
             var aRow = await Record(devBdd, "Active"); var aRev = Id(aRow, "RevisionRowId");
@@ -2349,6 +2365,11 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
                     var (al9s, al9b) = await Get(admin, $"api/v1/audit/vActionLog?SubjectRowId={mRev}&take=50");
                     var edits9 = (al9b?["rows"] as JsonArray)?.Count(r => (r?["Detail"]?.ToString() ?? "").Contains("setting-edited")) ?? 0;
                     Must(afterEdit.GetValueOrDefault("SLOPE") == "30 %" && edits9 >= 3, $"#168 edit: the row reads 30 % as typed; {edits9} edits in the audit log with code, from and to");
+                    // #230: the file followed the edits before any step wrote it — and a refused edit wrote nothing
+                    var k230_f1 = await Filed(mRev); var k230_r1 = await Rendered(mRev);
+                    var k230_writes = (al9b?["rows"] as JsonArray)?.Count(r => (r?["Detail"]?.ToString() ?? "").Contains("settings-file-written")) ?? 0;
+                    Must(k230_f1.count == 1 && k230_f1.text == k230_r1 && k230_f1.text.Contains("SLOPE=30 %") && !k230_f1.name.Contains(") (") && k230_writes >= 2,
+                        $"#230: after the edits the outstanding record's file is its settings — one file ({k230_f1.name}), the same text as written from the settings, SLOPE=30 %; {k230_writes} rewrites in the audit log");
                     // [2] rationale and settings side by side: the settings step commits with NO file — the platform writes it
                     await RunStep(admin, "WRITE_RATIONALE", new { outcome = "Done", evidence = new[] { File("rationale.txt", "text/plain", "#168 smoke: slope raised to 30 % after the CT saturation study", "Rationale") } });
                     var (c9s, c9b) = await RunStep(admin, "RECORD_SETTINGS", new { outcome = "Done" }, devBdd);
@@ -2434,6 +2455,10 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
                     Must(d3?["Outcome"]?.ToString() == "conflict" && rb2s != HttpStatusCode.OK && (rb2b?["detail"]?.ToString() ?? "").Contains("SLOPE") && rb3s == HttpStatusCode.Forbidden
                          && rb4s == HttpStatusCode.OK && rb4b?["Kept"]?.ToString() == "1" && afterRb4.GetValueOrDefault("SLOPE") == "39 %" && dr4.Count == 0,
                         $"#192: A 40 % vs B 39 % is a conflict ({d3?["Outcome"]}); a re-base without a decision is refused ({(int)rb2s}: {rb2b?["detail"]}); ReadOnly refused ({(int)rb3s}); decided \"mine\" → kept ({rb4b?["Kept"]}), B reads {afterRb4.GetValueOrDefault("SLOPE")}, no drift ({dr4.Count})");
+                    // #230: B's settings step wrote its file at 35 %; the re-bases and the edit since moved SLOPE to 39 % — the file moved with it
+                    var k230_fB = await Filed(draftB); var k230_rB = await Rendered(draftB);
+                    Must(k230_fB.count == 1 && k230_fB.text == k230_rB && k230_fB.text.Contains("SLOPE=39 %"),
+                        $"#230: after the re-bases B's file is its settings, SLOPE=39 % (it was written at 35 % by the settings step) — {k230_fB.name}");
                     // and now the #191 ordering rule is what stands between B and service
                     var (rbs, rbb) = await Post(admin, $"api/v1/process/step-instances/{stepB}/commit", new { outcome = "Done" });
                     Must(cbs == HttpStatusCode.OK && rbs != HttpStatusCode.OK && (rbb?["detail"]?.ToString() ?? "").Contains("not yet in service"),
@@ -2468,6 +2493,9 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
                     var (k228_d1s, _) = await RunStep(admin, "REQUEST", new { outcome = "Done", capture = new { reason = "#228 D", devices = new[] { devBdd } } });
                     var k228_activeBefore = Id(await Record(devBdd, "Active"), "RevisionRowId");
                     Must(k228_c1s == HttpStatusCode.OK && k228_d1s == HttpStatusCode.OK && k228_draftC is not null, $"#228: C and D raised on the relay, D based on C (draft C {k228_draftC})");
+                    // #230: C was copied from B in service — from B's file, which now says what B's settings say
+                    var k230_slopeC = (await Parsed(k228_draftC)).GetValueOrDefault("SLOPE");
+                    Must(k230_slopeC == "39 %", $"#230: the next change on the relay starts from the settings in service, SLOPE {k230_slopeC} (B's 39 %, not the 35 % its file said before)");
 
                     var (k228_x1s, k228_x1b) = await Post(admin, $"api/v1/process/workflow-instances/{k228_wfC}/transitions", new { name = "Cancel", reason = "smoke #228: raised in error" });
                     var (_, k228_ciB) = await Get(admin, $"api/v1/process/vProcedureInstance?EntityId={k228_instC}");

@@ -7,7 +7,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router'
-import { getJson, postJson, s, viewAll, type Row } from '@/lib/api'
+import { getJson, postJson, s, viewAll, plainRefusal, type Row } from '@/lib/api'
 import { screenPath } from '@/lib/screens'
 import { Panel, Button, Status, inputClass } from '@/components/ui/ui'
 import { openFile, downloadFile } from '@/lib/files'
@@ -71,8 +71,8 @@ export function RationalePanel({ revision, editable }: { revision: string; edita
       if (line) body.lineAssetEntityId = line
       const r = await postJson<Result>(`/api/v1/rationale/${revision}/apply`, body)
       setMsg({ text: `Applied: ${r.settingsWritten.length} setting(s) written${r.unknown.length ? `; ${r.unknown.length} could not be worked out` : ''}${Object.keys(r.rangeChecks).length ? `; range: ${Object.entries(r.rangeChecks).map(([k, v]) => `${k} ${v}`).join(', ')}` : ''}.` })
-      qc.invalidateQueries({ queryKey: ['rationale', revision] }); qc.invalidateQueries({ queryKey: ['view', 'document'] }); qc.invalidateQueries({ queryKey: ['rendered', revision] })
-    } catch (e) { setMsg({ text: e instanceof Error ? e.message : String(e), bad: true }) } finally { setBusy(false) }
+      qc.invalidateQueries({ queryKey: ['rationale', revision] }); qc.invalidateQueries({ queryKey: ['view', 'document'] }); qc.invalidateQueries({ queryKey: ['rendered', revision] }); qc.invalidateQueries({ queryKey: ['settingsText', revision] })
+    } catch (e) { setMsg({ text: e instanceof Error ? plainRefusal(e.message) : String(e), bad: true }) } finally { setBusy(false) }
   }
   const docx = [...d.files].reverse().find((f) => /^rationale.*\.docx$/i.test(s(f.FileName)))   // the newest: the names are stamped
   // the file's own id and name are ours; the buttons say what the engineer gets

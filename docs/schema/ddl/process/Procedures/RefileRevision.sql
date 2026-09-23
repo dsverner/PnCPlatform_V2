@@ -5,12 +5,15 @@
 -- platform's own file, written from the edited settings) and process.CommitStep (a vendor file attached at the settings
 -- step over the copy the change started from — one outstanding revision per device per package, never two).
 -- A name the revision's store already holds (the copy's file, say) gets " (2)", " (3)"… before its extension.
+-- #230: @Reparse = 0 files the text without reading it back — for the platform's own file written from rows that are already
+-- the settings (IssueRenderedSettings after an edit), where a re-read would only close and re-add every row.
 CREATE PROCEDURE [process].[RefileRevision]
     @ConfigurationFileRevisionRowId UNIQUEIDENTIFIER,
     @FileName NVARCHAR(255),
     @MimeType NVARCHAR(100),
     @Content VARBINARY(MAX),
     @TextContent NVARCHAR(MAX) = NULL,
+    @Reparse BIT = 1,
     @ActorId UNIQUEIDENTIFIER = NULL,
     @FiledName NVARCHAR(255) = NULL OUTPUT,
     @FileStreamId UNIQUEIDENTIFIER = NULL OUTPUT
@@ -54,7 +57,7 @@ BEGIN
     DECLARE @fe UNIQUEIDENTIFIER, @fr UNIQUEIDENTIFIER;
     EXEC [document].[File_Write] @RevisionRowId = @ConfigurationFileRevisionRowId, @FileName = @FiledName, @MimeType = @MimeType, @Content = @Content, @FileRole = N'Native',
          @ActorId = @ActorId, @FileStreamId = @FileStreamId OUTPUT, @EntityId = @fe OUTPUT, @RowId = @fr OUTPUT;
-    IF @kind = N'SettingsText' AND @TextContent IS NOT NULL
+    IF @kind = N'SettingsText' AND @TextContent IS NOT NULL AND ISNULL(@Reparse, 1) = 1
     BEGIN
         DECLARE @pm INT, @pu INT;
         EXEC [process].[ParseSettingsText] @ConfigurationFileRevisionRowId = @ConfigurationFileRevisionRowId, @Text = @TextContent, @ActorId = @ActorId, @Matched = @pm OUTPUT, @Unmatched = @pu OUTPUT;

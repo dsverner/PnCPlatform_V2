@@ -2,14 +2,20 @@
 -- at implementation the platform writes the manufacturer's settings file — no retyping. One value of an outstanding (Draft)
 -- revision changes: the current parsed row is closed in valid time and a new row written with the value read as the parser
 -- reads it (the template's type, the primary range check, RawValue as typed, a closed list checked); an empty value unsets
--- the setting. The file as filed is not touched here — process.IssueRenderedSettings writes the file from the rows when the
--- settings step commits. Audited (audit.LogAction on the device: code, from, to, range check). Over HTTP:
--- ConfigurationFile.Modify on the device — @DeviceEntityId names the scope and must be the revision's device.
+-- the setting. #230 (2026-09-23): the file follows — process.IssueRenderedSettings rewrites the revision's file from its rows
+-- in the same transaction, so a record never goes in service, and a change is never copied, from a file that no longer says
+-- what its settings say (before, only the settings step wrote it and a later edit or re-base was lost from the file). A file
+-- that cannot be rewritten faithfully (settings the template does not read) refuses the edit. @DeferFileWrite = 1 is for
+-- the callers that change many settings in one act (RebaseDraft, the rationale apply) and write the file once at the end;
+-- it is never taken from a request body (SqlSession.NeverBound). Audited (audit.LogAction on the device: code, from, to,
+-- range check). Over HTTP: ConfigurationFile.Modify on the device — @DeviceEntityId names the scope and must be the
+-- revision's device.
 CREATE PROCEDURE [process].[SetParsedSetting]
     @ConfigurationFileRevisionRowId UNIQUEIDENTIFIER,
     @DeviceEntityId UNIQUEIDENTIFIER,
     @SettingCode NVARCHAR(40),
     @RawValue NVARCHAR(400) = NULL,
+    @DeferFileWrite BIT = 0,
     @ActorId UNIQUEIDENTIFIER = NULL,
     @RangeCheck NVARCHAR(20) = NULL OUTPUT,
     @RangeCheckNote NVARCHAR(400) = NULL OUTPUT
@@ -88,6 +94,11 @@ BEGIN
                                            N',"to":', CASE WHEN @raw = N'' THEN N'null' ELSE N'"' + STRING_ESCAPE(@raw, 'json') + N'"' END, N',"rangeCheck":"', @RangeCheck, N'"}');
     EXEC [audit].[LogAction] @ActionKindCode = N'Administrative', @SubjectSchema = N'document', @SubjectTable = N'ConfigurationFile', @SubjectEntityId = @device, @SubjectRowId = @ConfigurationFileRevisionRowId,
          @ActorId = @ActorId, @Detail = @detail, @OccurredAt = @now;
+    IF ISNULL(@DeferFileWrite, 0) = 0
+    BEGIN
+        DECLARE @fn NVARCHAR(255), @wr BIT;
+        EXEC [process].[IssueRenderedSettings] @ConfigurationFileRevisionRowId = @ConfigurationFileRevisionRowId, @ActorId = @ActorId, @Reparse = 0, @FileName = @fn OUTPUT, @Written = @wr OUTPUT;
+    END
     COMMIT TRANSACTION;
 END;
 GO

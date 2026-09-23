@@ -350,9 +350,12 @@ The setting display (§9) links every file name to it; the record's Files and re
   outstanding revision, through the dispatcher (`ConfigurationFile.Modify` on `DeviceEntityId`, which must be the revision's device).
   Refused with the procedure's message when the revision is not a draft (50183), the template does not know the code (50182), or the
   value is not a number / whole number / on the closed list (50184). An empty `RawValue` unsets the setting. Returns
-  `RangeCheck` / `RangeCheckNote` as the procedure's outputs.
-- The file the platform writes is filed by the engine at the settings step (`process.IssueRenderedSettings`, PROCEDURE-ENGINE §5.1
-  #168 note); `IssueRenderedSettings`, `RefileRevision` and `CopyRevisionAsDraft` are engine procedures, not callable over HTTP.
+  `RangeCheck` / `RangeCheckNote` as the procedure's outputs. Since #230 the same call rewrites the revision's settings file from its
+  settings; a file holding settings the template does not read is refused (50186) — attach a corrected file instead.
+  `DeferFileWrite` is never taken from a body.
+- The file the platform writes is filed by the engine at the settings step and after every change to an outstanding revision's
+  settings (`process.IssueRenderedSettings`, PROCEDURE-ENGINE §5.1 #168/#230 note); `IssueRenderedSettings`, `RefileRevision` and
+  `CopyRevisionAsDraft` are engine procedures, not callable over HTTP.
 
 ## 8f. Primary assets and applicability classifications — W8 (2026-09-16, decision #170)
 

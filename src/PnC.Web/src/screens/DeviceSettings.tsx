@@ -6,7 +6,7 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { getText, proc, view, viewAll, s, ApiError, type Row } from '@/lib/api'
+import { getText, proc, view, viewAll, s, ApiError, plainRefusal, type Row } from '@/lib/api'
 import { useViewAll } from '@/lib/hooks'
 import { screenPath } from '@/lib/screens'
 import { useTemplateDefs, saveAssetCharacteristic, addFirstWinding } from '@/components/CharacteristicsPanel'
@@ -262,8 +262,8 @@ function AddSourceForm({ schemeEntityId, schemeName, inputs, sources, capability
 
 /** The settings grid: the template rows given, each with the revision's value or "not set"; a value edits in place when the
  * revision is outstanding (#168 increment 2: process.SetParsedSetting reads it as the parser would — type, range, closed
- * list — closes the prior row in valid time and audits the change; the platform writes the settings file from these rows
- * at the settings step). */
+ * list — closes the prior row in valid time and audits the change; since #230 it also rewrites the settings file from these
+ * rows, so the file always says what the settings say). */
 function SettingsGrid({ rows: given, values, revision, editable = false, deviceId = '', relayWord = null, quiet = false }: { rows: Row[]; values: Map<string, Row>; revision: string; editable?: boolean; deviceId?: string; relayWord?: RelayWord | null; quiet?: boolean }) {
   const rows: (Row & { _v?: Row })[] = given.map((r) => ({ ...r, _v: values.get(s(r.SettingCode)) }))
   const qc = useQueryClient()
@@ -279,8 +279,8 @@ function SettingsGrid({ rows: given, values, revision, editable = false, deviceI
       await proc('process', 'SetParsedSetting', { ConfigurationFileRevisionRowId: revision, DeviceEntityId: deviceId, SettingCode: code, RawValue: v })
       setMsg({ text: `${code} saved${v === '' ? ' (unset)' : ''}.` })
       setEdits((e) => { const n = { ...e }; delete n[code]; return n })
-      qc.invalidateQueries({ queryKey: ['view', 'document', 'vParsedSettingNamed'] }); qc.invalidateQueries({ queryKey: ['rendered', revision] })
-    } catch (err) { setMsg({ text: err instanceof ApiError ? err.message : String(err), bad: true }) }
+      qc.invalidateQueries({ queryKey: ['view', 'document', 'vParsedSettingNamed'] }); qc.invalidateQueries({ queryKey: ['rendered', revision] }); qc.invalidateQueries({ queryKey: ['settingsText', revision] })
+    } catch (err) { setMsg({ text: err instanceof ApiError ? plainRefusal(err.message) : String(err), bad: true }) }
   }
   const cols: Column<Row & { _v?: Row }>[] = [
     { key: 'Name', label: 'Setting', render: (r) => <span>{s(r.Name)} <span className="text-xs text-slate-500">{s(r.SettingCode)}</span></span> },
@@ -301,14 +301,14 @@ function SettingsGrid({ rows: given, values, revision, editable = false, deviceI
   return (
     <>
       {msg && <Status bad={msg.bad}>{msg.text}</Status>}
-      {editable && !quiet && <Status>This record is outstanding. A value saves when you leave the field. The settings file is written from these values when the settings step of the change commits.</Status>}
+      {editable && !quiet && <Status>This record is outstanding. A value saves when you leave the field. The settings file is rewritten from these values each time one changes.</Status>}
       <div className="mt-2"><DataGrid rows={rows} columns={cols} rowKey={(r) => s(r.SettingCode)} emptyText="No settings in this group."
         expandedKey={open} canExpand={isMask} onRowClick={(r) => { if (isMask(r)) setOpen(open === s(r.SettingCode) ? null : s(r.SettingCode)) }}
         detail={(r) => (open && s(r.SettingCode) === open && relayWord
           ? <MaskBits relayWord={relayWord} code={open} value={r._v ? s(r._v.RawValue ?? r._v.DisplayValue) : ''} editing={editable}
               onSave={async (v) => { await proc('process', 'SetParsedSetting', { ConfigurationFileRevisionRowId: revision, DeviceEntityId: deviceId, SettingCode: open, RawValue: v })
                 setMsg({ text: `${open} saved as ${v}.` }); setOpen(null)
-                qc.invalidateQueries({ queryKey: ['view', 'document', 'vParsedSettingNamed'] }); qc.invalidateQueries({ queryKey: ['rendered', revision] }) }}
+                qc.invalidateQueries({ queryKey: ['view', 'document', 'vParsedSettingNamed'] }); qc.invalidateQueries({ queryKey: ['rendered', revision] }); qc.invalidateQueries({ queryKey: ['settingsText', revision] }) }}
               onClose={() => setOpen(null)} />
           : null)} /></div>
     </>
@@ -335,7 +335,7 @@ function MaskBits({ relayWord, code, value, editing, onSave, onClose }: { relayW
   const save = async () => {
     if (!isMaskText(hex, nRows)) { setErr(`Enter ${nRows} hex bytes (as ${relayWord.masks[code]?.example ?? '00 00 00'}).`); return }
     setBusy(true); setErr(null)
-    try { await onSave(formatMask(parseMask(hex, nRows, nBits), nRows, nBits)) } catch (e) { setErr(e instanceof ApiError ? e.message : String(e)) } finally { setBusy(false) }
+    try { await onSave(formatMask(parseMask(hex, nRows, nBits), nRows, nBits)) } catch (e) { setErr(e instanceof ApiError ? plainRefusal(e.message) : String(e)) } finally { setBusy(false) }
   }
   return (
     <div className="space-y-2 p-2 text-sm">
@@ -436,7 +436,7 @@ export function RelayListingAndFile({ template, parsed, revision, filedText, bar
   const body = (
       <div className="mt-2 grid gap-3 lg:grid-cols-2">
         <div><h4 className="text-xs text-slate-500">Listing — the template's order, as the relay lists it</h4><pre className="mt-1 overflow-auto rounded border border-slate-800 bg-slate-950 p-2 text-xs">{listing(template.rows, values)}</pre></div>
-        <div><h4 className="text-xs text-slate-500">The settings file from these values{renderedQ.data != null && filedText != null ? (renderedQ.data === filedText ? ' — the same as the file as filed' : ' — different from the file as filed: the order or the spelling differs, the values are the ones read from it') : ''}</h4>
+        <div><h4 className="text-xs text-slate-500">The settings file from these values{renderedQ.data != null && filedText != null ? (renderedQ.data === filedText ? ' — the same as the file as filed' : ' — not the same text as the file as filed') : ''}</h4>
           <pre className="mt-1 max-h-64 overflow-auto rounded border border-slate-800 bg-slate-950 p-2 text-xs whitespace-pre-wrap">{!revision || !parsed.length ? 'no settings yet' : renderedQ.isPending ? '…' : renderedQ.isError ? 'not available' : renderedQ.data}</pre></div>
       </div>)
   if (bare) return body
@@ -498,8 +498,8 @@ export function BasisPanel({ r, revision, editable }: { r: Row; revision: string
     try {
       const out = await proc<Row>('process', 'RebaseDraft', { RevisionRowId: revision, DeviceEntityId: s(r.DeviceEntityId), Decisions: JSON.stringify(decisions) })
       setMsg({ text: `Re-based: ${s(out.Applied)} value(s) taken from ${title}, ${s(out.Kept)} kept as this draft's.` }); setDecisions({})
-      qc.invalidateQueries({ queryKey: ['basisDrift', revision] }); qc.invalidateQueries({ queryKey: ['view', 'document'] }); qc.invalidateQueries({ queryKey: ['settingsText', revision] })
-    } catch (e) { setMsg({ text: e instanceof ApiError ? e.message : String(e), bad: true }) } finally { setBusy(false) }
+      qc.invalidateQueries({ queryKey: ['basisDrift', revision] }); qc.invalidateQueries({ queryKey: ['view', 'document'] }); qc.invalidateQueries({ queryKey: ['settingsText', revision] }); qc.invalidateQueries({ queryKey: ['rendered', revision] })
+    } catch (e) { setMsg({ text: e instanceof ApiError ? plainRefusal(e.message) : String(e), bad: true }) } finally { setBusy(false) }
   }
   return (
     <Panel title={`${title} has changed since this draft was taken · ${drift.length} setting${drift.length === 1 ? '' : 's'}`} className="border-amber-700/60">

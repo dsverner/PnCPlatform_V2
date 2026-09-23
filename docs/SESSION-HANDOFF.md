@@ -12,7 +12,7 @@ Written 2026-09-23, at the end of the session that built #217–#228. Read this 
 | Remote | `origin` = `Z:\Repos\PnCPlatform_V2.git` (pushed 2026-09-23); no GitHub remote (the owner's call) |
 | DEV database | `PnCPlatform_V2_DEV` on VM01 `10.10.70.25`, deployed with everything to #228 |
 | DEV API | `http://127.0.0.1:5210`, React app at `/app/` (run recipe in memory `project-dev-api-run-recipe`) |
-| Last results | API smoke 408 PASS / 0 FAIL (#229, PC02, 2026-09-23); schema smoke 269 PASS on the laptop, 268 + 1 clock-skew FAIL on PC02 (below); wording check 0 |
+| Last results | API smoke 411 PASS / 0 FAIL (#230, PC02, 2026-09-23); schema smoke on PC02 after #230: 268 + the clock-skew FAIL; schema smoke 269 PASS on the laptop, 268 + 1 clock-skew FAIL on PC02 (below); wording check 0 |
 
 ## What this session built (one line each; the log row has the rest)
 
@@ -54,7 +54,8 @@ Written 2026-09-23, at the end of the session that built #217–#228. Read this 
    check how LoadApprove versions and approves before relying on it. Runs already started keep their pinned version. After
    the change, a request under the four-step procedure is refused a cancel once its package is Applied (50178), as the full
    lifecycle already is. Log it as #229 with the ruling.
-2. **Build the fix for the out-of-date settings file next** ("Agreed") — item 1 below, planned first (plan mode). Research
+2. **Build the fix for the out-of-date settings file next** ("Agreed") — **done as #230** (2026-09-23, PC02); it raised a new
+   ruling (below, "Raised, not built" item 1). Original note: Research
    was started and stopped for the move; redo it: every place the file is written (`IssueRenderedSettings`, `RefileRevision`,
    `WriteConfigurationRevision`, the rationale engine), every place rows change on an outstanding record
    (`SetParsedSetting`, `RebaseDraft`, the rationale apply), how `CopyRevisionAsDraft` copies the in-service revision (file
@@ -77,11 +78,10 @@ Written 2026-09-23, at the end of the session that built #217–#228. Read this 
 
 ## Raised, not built — the next candidates, most important first
 
-1. **A settings record can go in service with a file that no longer matches its settings.** Edits after the settings step
-   wrote the file (a direct edit or a #192 re-base) are not written to the file. Measured: the smoke's record B reads
-   SLOPE 39 % while its filed `settings.txt` says 35 %, and the next change, copied from the file, started from 35 %. The
-   file is what is loaded to the relay. Recommendation: rewrite the file whenever the settings change after that step, and
-   copy the in-service settings (not the file) into a new change. **Recommended as the next increment.**
+1. **Settings can still change after they are applied to the relay** (four-step procedure: a #192 re-base at completion,
+   after INSTALL) — found building #230, which made the file follow every change. The record and its file then say what the
+   relay does not hold. **A ruling for the owner, not yet asked.** Recommendation: refuse edits once the package is Applied;
+   a drift found after install goes back through re-applying.
 2. **Block-mode segregation overrides are approved by being named** (`security.CheckSegregation`); latent while every rule
    is WarnAndLog. Make the approval the approver's own act before any rule is switched to Block.
 3. Carried from earlier (see `docs/OPEN-QUESTIONS.md`): the settings book's chosen columns and the menu's open groups stay

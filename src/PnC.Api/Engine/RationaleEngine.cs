@@ -211,6 +211,13 @@ public static class RationaleEngine
         if (st.Template is null) throw new ApiException(404, "no_template", "This model has no rationale template.");
         if (S(st.Record["RevisionStatus"]) != "Draft") throw new ApiException(409, "not_outstanding", "A rationale is applied to an outstanding (Draft) revision only; this revision is issued and its rationale is frozen.");
         var settingsRevision = G(st.Record["RevisionRowId"])!.Value; var device = G(st.Record["DeviceEntityId"])!.Value;
+        // #230: the settings file follows the settings, written once after the whole apply — and a file that cannot be written from
+        // its settings (settings the template does not read) is refused here, before anything is written
+        const string WriteFile = """
+            SET NOCOUNT ON; DECLARE @fn NVARCHAR(255), @wr BIT;
+            EXEC process.IssueRenderedSettings @ConfigurationFileRevisionRowId = @rev, @ActorId = @a, @Reparse = 0, @FileName = @fn OUTPUT, @Written = @wr OUTPUT;
+            """;
+        await s.ExecAsync(WriteFile, new Dictionary<string, object?> { ["@rev"] = settingsRevision, ["@a"] = actorId }, ct);
         // the inputs: defaults, then what stands, then what was posted
         var inputs = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase); var tables = new Dictionary<string, JsonNode?>(StringComparer.OrdinalIgnoreCase);
         var inputDefs = (st.Template["inputs"] as JsonArray ?? new JsonArray()).Select(i => (JsonObject)i!).ToList();
@@ -300,11 +307,12 @@ public static class RationaleEngine
         {
             var rc = await s.RowsAsync("""
                 SET NOCOUNT ON; DECLARE @rc NVARCHAR(20), @rn NVARCHAR(400);
-                EXEC process.SetParsedSetting @ConfigurationFileRevisionRowId = @rev, @DeviceEntityId = @d, @SettingCode = @c, @RawValue = @v, @ActorId = @a, @RangeCheck = @rc OUTPUT, @RangeCheckNote = @rn OUTPUT;
+                EXEC process.SetParsedSetting @ConfigurationFileRevisionRowId = @rev, @DeviceEntityId = @d, @SettingCode = @c, @RawValue = @v, @DeferFileWrite = 1, @ActorId = @a, @RangeCheck = @rc OUTPUT, @RangeCheckNote = @rn OUTPUT;
                 SELECT @rc AS RangeCheck, @rn AS Note
                 """, new Dictionary<string, object?> { ["@rev"] = settingsRevision, ["@d"] = device, ["@c"] = code, ["@v"] = raw, ["@a"] = actorId }, ct);
             var r0 = rc.FirstOrDefault(); if (S(r0?["RangeCheck"]) == "OutOfRange") rangeNotes[code] = "OutOfRange" + (S(r0?["Note"]) == "" ? "" : ": " + S(r0?["Note"]));
         }
+        if (written.Count > 0) await s.ExecAsync(WriteFile, new Dictionary<string, object?> { ["@rev"] = settingsRevision, ["@a"] = actorId }, ct);
         foreach (var i in inputDefs)
         {
             var key = S(i["key"]); if (S(i["dataType"]) == "Table" || !st.Defs.ContainsKey(key)) continue;

@@ -122,6 +122,13 @@ the text format, and the seed for the templates. → #61.
   what is loaded to the relay (feedback-native-settings-round-trip), so this is the one that matters. Recommendation: the file
   is rewritten from the settings whenever they change after the settings step (or the edit reopens that step), and a new
   change copies the in-service settings rather than the file, as it already does for an outstanding basis. Not built.
+  **Built 2026-09-23 as #230** (the owner: "Agreed"): every change to an outstanding record's settings rewrites its file, so a
+  new change copied from the in-service file starts from the settings in service; the copy itself was left as it is (a
+  legacy in-service record keeps its vendor bytes). A record whose file holds settings the template does not read is refused
+  the edit (7 outstanding on DEV). **Raised by it, a ruling for the owner:** under the four-step procedure the settings can
+  still change after they are applied to the relay (a #192 re-base at completion, after INSTALL); the record and its file then
+  say something the relay does not hold. Recommendation: refuse edits once the package is Applied, and give a drift found
+  after install a route back through re-applying.
 - **A Block-mode segregation override is approved by being named** (found in #228): `security.CheckSegregation` lifts a
   Block rule when the caller names a different person as `OverrideApprovedByActorId`; nothing shows that person approved.
   Every seeded rule is WarnAndLog, so it is latent. Recommendation: the approval becomes the approver's own act (recorded in

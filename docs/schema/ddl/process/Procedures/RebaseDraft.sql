@@ -48,11 +48,17 @@ BEGIN
     OPEN ac; FETCH NEXT FROM ac INTO @code, @value;
     WHILE @@FETCH_STATUS = 0
     BEGIN
-        EXEC [process].[SetParsedSetting] @ConfigurationFileRevisionRowId = @RevisionRowId, @DeviceEntityId = @device, @SettingCode = @code, @RawValue = @value, @ActorId = @ActorId, @RangeCheck = @rc OUTPUT, @RangeCheckNote = @rn OUTPUT;
+        EXEC [process].[SetParsedSetting] @ConfigurationFileRevisionRowId = @RevisionRowId, @DeviceEntityId = @device, @SettingCode = @code, @RawValue = @value, @DeferFileWrite = 1, @ActorId = @ActorId, @RangeCheck = @rc OUTPUT, @RangeCheckNote = @rn OUTPUT;
         SET @Applied += 1;
         FETCH NEXT FROM ac INTO @code, @value;
     END
     CLOSE ac; DEALLOCATE ac;
+    -- #230: the file follows the settings — written once for the whole re-base, not once per setting
+    IF @Applied > 0
+    BEGIN
+        DECLARE @fn NVARCHAR(255), @wr BIT;
+        EXEC [process].[IssueRenderedSettings] @ConfigurationFileRevisionRowId = @RevisionRowId, @ActorId = @ActorId, @Reparse = 0, @FileName = @fn OUTPUT, @Written = @wr OUTPUT;
+    END
     SELECT @Kept = COUNT(*) FROM @drift WHERE [Outcome] = N'conflict' AND [Decision] = N'mine';
     IF @basis <> @linked
         EXEC [document].[RevisionLink_Add] @RevisionRowId = @RevisionRowId, @LinkKind = N'BasedOn', @SubjectKind = N'DocumentRevision', @SubjectEntityId = @basis, @ActorId = @ActorId;
