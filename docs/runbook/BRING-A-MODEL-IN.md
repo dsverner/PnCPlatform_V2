@@ -41,7 +41,7 @@ Each step: what is produced, the tool and command, where it registers, the decis
 | 15b | The manual guide: the manual's own words on how each setting is set — the Settings tab's floatover, with a link that opens the manual at the page | `docs/design/examples/templates/<model>.manual-guide.json` → `Seed_config_ManualGuide_<MODEL>.sql` (`Program.ManualGuide` naming the settings template); `<model>.manual-pages.json` | `python tools/manual_pages.py <pdf> <json>`; pages viewed with PyMuPDF; `python tools/manual_guide.py <model>.manual-guide.json` — **the whole procedure and the transcription rules: `docs/runbook/MANUAL-GUIDE.md`** | `PostDeploy.sql` after the Relay Word | #235, #236. Every quote verbatim from the page IMAGE, never the OCR text; each with its printed page and PDF page; nothing summarised; a setting the manual does not address gets no entry |
 | 16 | Rationale: the legacy documents by rule; the ELEMENT MAP on the Relay Word (each element's capability, outputs, owned settings, supervision from the manual's logic equations — the sheet's sub-groups); the RATIONALE TEMPLATE (`Program.Rationale`: inputs, sections per element, formulas, statements; defaults labelled by source); the line's impedance on the line (`LINE_Template`) | legacy: `legacy_import.py rationale_stage` (`--docs`); generated: `Seed_config_Rationale_<MODEL>_<FUNCTION>.sql` + `docs/design/examples/templates/<model>.rationale.md` (`CharacteristicSchema.RationaleDevice`) | `python tools/rationale_sel221f.py` — copy it; the line's impedances on the line asset (`LINE_Template`, `tools/template_line.py`) | `PostDeploy.sql` | #217 (by number AND station; a number is reused after retirement), #218 (opens in Word through a signed link), #219 |
 | 16b | The words on every screen the model touches | — | `python tools/check_wording.py` (zero before the commit) | — | #221: the wording rule, `docs/design/UI-WORDING.md` — no decision number, owner quote, view or permission name on a screen; the manual's own words stay |
-| 17 | Publish, seed, re-parse, verify | — | `python docs/schema/ddl/tools/generate.py` → `deploy.py --database PnCPlatform_V2_DEV` → `reparse_settings.py` → `roundtrip_settings.py` → `docs/schema/ddl/tools/smoke.py` (~30 min) → `src/PnC.Api.Smoke` → Chrome on DEV, screen by screen → DECISION-LOG row → this runbook | — | every increment |
+| 17 | Publish, seed, re-parse, verify | — | `python docs/schema/ddl/tools/generate.py` → `deploy.py --database PnCPlatform_V2_DEV` → `reparse_settings.py` → `roundtrip_settings.py` → `docs/schema/ddl/tools/smoke.py` (~30 min) → `src/PnC.Api.Smoke` → Chrome on DEV, screen by screen (on PC02: headless Chrome from the session, then the owner) → DECISION-LOG row → this runbook | — | every increment |
 
 ## Settled — do not ask again
 
@@ -68,6 +68,11 @@ Each step: what is produced, the tool and command, where it registers, the decis
 | A settings editor for logic masks? | Yes, from the relay's Relay Word, opened by the row's arrow; no manual recommendations, no tick line; the last column is "Comments" (each mask's purpose) | #215 |
 | Where does the rationale's line impedance live? | On the line asset (`LINE_Template`), never only in the relay's settings | #219 |
 | Is the legacy Word rationale ever updated? | No — frozen at its revision; from the next change the platform generates the rationale | #217 |
+| What does the Settings tab say beside a setting? | The manual's own words on how it is set, as a floatover on an ⓘ by the setting's name, each quote with its page and a link opening the manual there — not an authored comment. *"custom floatovers which are excerpts from the manual on the various settings on how they should be set"* | #235, `MANUAL-GUIDE.md` |
+| May the floatover quote the PDF's text? | Never the text layer (OCR, with errors); only what is read off the page image, verbatim — layout may change (fractions with "/", joined hyphens, equations on their own line), words may not | #235, #236 |
+| Where does the Comments column go? | A setting the guide covers drops its comment; the column disappears from a grid where nothing is left in it; a mask keeps its Relay Word purpose | #235 |
+| May agents transcribe the manual? | Yes, by page range, from rendered page images under the MANUAL-GUIDE rules; the session re-reads a sample of pages against their quotes; the owner spot-checks the first section | #236 |
+| Should the ⓘ be made more prominent? | No — *"it is just a matter of getting used to it"* | 2026-09-23 |
 
 ## Traps recorded
 
@@ -85,6 +90,14 @@ Each step: what is produced, the tool and command, where it registers, the decis
   a model's texts.
 - The generator (`tools/generate.py`) owns every `v<Table>`; a hand-written view must not be named that way (#213).
 - A legacy record number is reused after retirement: match legacy things by number AND station, never number alone (#217).
+- The manual's PDF text layer is an OCR with errors (the 221F: "SlNP" for S1NP) — fine for finding pages, never for a quote (#235).
+- A scanned manual's pages are JBIG2 images: pypdf cannot decode them ("jbig2dec binary is not available") and the Read tool
+  cannot render PDFs on PC02 (no poppler) — render with PyMuPDF (`pip install --user pymupdf`) and view the PNG (#235).
+- The manual's printed page labels are not PDF page numbers; `tools/manual_pages.py` maps them but misses labels on some pages
+  (221F: 97 of 260) — record each quote's PDF page as read off the image (#235).
+- An agent's JSON may HTML-escape "<" as `&lt;`; restore it before merging (#236).
+- The Chrome extension in a PC02 session drives the owner's laptop browser, whose 127.0.0.1 is not PC02 — check PC02's screens
+  with headless Chrome instead (memory `project-ui-check-on-pc02`).
 
 ## The checklist for the next model
 
@@ -102,6 +115,10 @@ Copy into the model's plan and tick off:
    enumerations; bound to every model code.
 8. If the relay has logic masks: `tools/relay_word_<model>.py`.
 9. `tools/load_manual.py` on each environment; the LOAD-MANUALS table.
+9b. The manual guide — `docs/runbook/MANUAL-GUIDE.md` start to finish: `tools/manual_pages.py`, render the setting pages with
+    PyMuPDF, transcribe verbatim from the images into `docs/design/examples/templates/<model>.manual-guide.json` (agents by page
+    range if large), re-read a sample, `python tools/manual_guide.py <json>`, register `Seed_config_ManualGuide_<MODEL>.sql`,
+    extend the API smoke's guide check with a quote of the model; the owner spot-checks the first section.
 10. Screens: nothing per model unless a new kind of thing appears; if a screen is added, `seed_screens.py`, a `menu`, `PAGES`.
     A screen with tabs also declares them in `tools/view_items.py` (#226), so a person can turn off the ones they do not
     use; a tab left undeclared is simply always shown.
@@ -113,12 +130,15 @@ Copy into the model's plan and tick off:
 
 ## Still by hand (no tool yet)
 
-- Reading the manual into rows (page cites, ranges, lists, aliases) — a person transcribes; no extraction tool.
+- Reading the manual into rows (page cites, ranges, lists, aliases) — a person transcribes; no extraction tool. The manual
+  guide's quotes likewise (page images rendered by PyMuPDF; the OCR text is not trusted) — `MANUAL-GUIDE.md`.
 - The four generators are copy-and-edit per model (`template_`, `capability_`, `template_bundle_`, `relay_word_`); no
   shared scaffold or `--model` parameter yet.
 - `Seed_ref_AnsiFunction_Core.sql`, `PostDeploy.sql` registration, the screen JSON's `menu` and the `PAGES` order.
 - A second vendor format's parser and writer (only the SEL name=value form exists).
 - Model variants (-2/-3/-4) are not on the model row; breaker failure is recorded against both codes (#215/#216).
-- The manual's page cites are printed labels; the viewer takes physical pages (a page map per manual would let a cite open
-  its page, #216).
-- Verification's last mile is a person in Chrome; the API smoke covers the data, not the layout.
+- ~~The manual's page cites are printed labels; the viewer takes physical pages~~ — #235: `tools/manual_pages.py` builds the
+  map, and every manual-guide quote carries its PDF page, so a floatover's link opens the page. The template rows' own
+  `Description` cites are still printed labels only.
+- Verification's last mile is a person in Chrome; the API smoke covers the data, not the layout. On PC02 the session can
+  look at a screen itself with headless Chrome (memory `project-ui-check-on-pc02`) before asking the owner.
