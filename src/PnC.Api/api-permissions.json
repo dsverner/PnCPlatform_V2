@@ -50,6 +50,8 @@
 
   "_226": "What a person shows or hides on a screen (#226). The catalogue and the role defaults are read by everyone and written only through the two guarded procedures: SetViewItem writes the caller's own row and nothing else, so every role holds ViewItem.Modify; SetRoleViewItem changes what a role starts people with, which is an Administrator's act. The generated writers are not callable over HTTP.",
 
+  "_227": "A change request brought over from the old program (#227): its two tracks are set by hand and it is finished or withdrawn as the old program did. The three procedures take WorkRequest.Modify on the request named in the body, so a scoped grant covers only its own requests; the workflow's Close and Cancel role rules still apply inside them. document.SetOutOfService is called only by work.CompleteLegacyRequest.",
+
   "_subjectKeys": "W2 (IDENTITY.md §5; API-W1-SECURITY.md #11): a body key that names the subject of a write and the ref.SubjectKind it implies. '*' = the object's class; '$SubjectKind' / '$MemberKind' = the body's own kind field. Order is preference.",
   "subjectKeys": [
     { "key": "EntityId",            "kind": "*" },
@@ -92,6 +94,13 @@
     "compliance.SubjectEvaluation_Deactivate": null,
     "compliance.SubjectVerdict_Deactivate": null,
     "compliance.EvaluationRequest_Append": null,
+    "work.SetRequestTrack":                "WorkRequest.Modify",
+    "work.CompleteLegacyRequest":          "WorkRequest.Modify",
+    "work.WithdrawLegacyRequest":          "WorkRequest.Modify",
+    "work.RequestTrack_Add":               null,
+    "work.RequestTrack_Revise":            null,
+    "work.RequestTrack_SoftDelete":        null,
+    "document.SetOutOfService":            null,
     "config.SetViewItem":                  "ViewItem.Modify",
     "config.SetRoleViewItem":              "ViewItem.Administer",
     "config.ViewItem_Upsert":              null,

@@ -43,24 +43,27 @@ record is `LEGACY-FIELDS.md`. A rehearsal (`run_rehearsal.py`) proves the import
 | legacy classification columns (CLASS, USE, RESPONSIBILITY, Bulk_Power_Element, Protection_Group, ELEMENT, LINE_TYPE, NUMBER OF RELAYS): dropped — untrusted (#194) | `revisions_stage` | 676 |
 | "A": "A row → the current revision, in service now", "P": "P row → a superseded revision with its in-service period", "M": "M row → a Draft revision (the open change)" | `revisions_stage` | 684 |
 | overflow columns (SETTINGS2, DESC, REMARKS, CT/PT) → the record's summary text | `revisions_stage` | 686 |
-| chain where an archived CR exceeds the active CR → a finding (#59) | `findings_stage` | 752 |
-| chain where an archived CR exceeds the active CR → a finding (#59) | `findings_stage` | 759 |
-| a Word lock file or recovery copy → skipped | `folder_location` | 819 |
-| a Word file not named by the rotation → not loaded | `folder_location` | 822 |
-| a relay setting file beside the documents → skipped (not a document) | `folder_location` | 823 |
-| a document in a folder that names no legacy location → not loaded | `folder_location` | 827 |
-| a document whose number has no legacy row → not loaded | `folder_location` | 829 |
-| a document whose change request belongs to a dropped D record → not loaded (R-06) | `folder_location` | 834 |
-| a document whose number and change request match no revision → not loaded | `folder_location` | 835 |
-| a change-request document whose folder is not its revision's station → loaded onto that revision, flagged | `folder_location` | 845 |
-| a rotation-named document → the rationale of the revision with its number and change request | `folder_location` | 847 |
-| an A document → the in-service revision of its number at the folder's station | `folder_location` | 853 |
-| an A document whose number now serves elsewhere → the last superseded revision of the number at the folder's station (the retired device's record) | `folder_location` | 860 |
-| an A document whose folder holds only a dropped record of its number → not loaded (R-06) | `folder_location` | 862 |
-| an A document whose folder holds no row of its number → not loaded, flagged | `folder_location` | 865 |
-| the same document filed twice for one revision → loaded once | `folder_location` | 874 |
-| D row: dropped, counted (#31) | `dropped_counts` | 939 |
-| {tbl} row of a dropped or unknown chain: counted, not written | `dropped_counts` | 947 |
+| a further relay of a multi-relay request: its tracks stay in the legacy rows (#227) | `request_tracks_stage` | 758 |
+| legacy documentation track row → work.RequestTrack (#227) | `request_tracks_stage` | 762 |
+| legacy database track row → work.RequestTrack (#227) | `request_tracks_stage` | 763 |
+| chain where an archived CR exceeds the active CR → a finding (#59) | `findings_stage` | 800 |
+| chain where an archived CR exceeds the active CR → a finding (#59) | `findings_stage` | 807 |
+| a Word lock file or recovery copy → skipped | `folder_location` | 867 |
+| a Word file not named by the rotation → not loaded | `folder_location` | 870 |
+| a relay setting file beside the documents → skipped (not a document) | `folder_location` | 871 |
+| a document in a folder that names no legacy location → not loaded | `folder_location` | 875 |
+| a document whose number has no legacy row → not loaded | `folder_location` | 877 |
+| a document whose change request belongs to a dropped D record → not loaded (R-06) | `folder_location` | 882 |
+| a document whose number and change request match no revision → not loaded | `folder_location` | 883 |
+| a change-request document whose folder is not its revision's station → loaded onto that revision, flagged | `folder_location` | 893 |
+| a rotation-named document → the rationale of the revision with its number and change request | `folder_location` | 895 |
+| an A document → the in-service revision of its number at the folder's station | `folder_location` | 901 |
+| an A document whose number now serves elsewhere → the last superseded revision of the number at the folder's station (the retired device's record) | `folder_location` | 908 |
+| an A document whose folder holds only a dropped record of its number → not loaded (R-06) | `folder_location` | 910 |
+| an A document whose folder holds no row of its number → not loaded, flagged | `folder_location` | 913 |
+| the same document filed twice for one revision → loaded once | `folder_location` | 922 |
+| D row: dropped, counted (#31) | `dropped_counts` | 987 |
+| {tbl} row of a dropped or unknown chain: counted, not written | `dropped_counts` | 995 |
 
 ## 2. Rules a PostDeploy seed applies to migrated data (replayed on every deploy)
 
@@ -84,3 +87,7 @@ record is `LEGACY-FIELDS.md`. A rehearsal (`run_rehearsal.py`) proves the import
 | 2026-09-19 | #195: 75 CIP impact ratings on API-smoke fixture stations and buildings (W4_...) withdrawn (empty value through asset.RecordClassification, audited) | fixture cleanup; the smoke now withdraws its own and a station is refused | no |
 | 2026-09-20 | #209: smoke debris retired on DEV — the voltage class r_a45729 (69 kV), seven asset types smoke_w2_/w3r_/w4r_*, the model smoke_w4r_a45729-M and the manufacturer r_a45729, all left active by schema-smoke runs that failed before their cleanup; deactivated (soft) as the system actor | the owner met r_a45729 in a transformer's voltage-class list; not migrated data — test fixtures. The schema smoke now sweeps such leftovers at the start of every run, so this is not needed again | no |
 | 2026-09-21 | #217: the 6,858 rationale documents placed by the first form of the rule (by number alone; provenance key RationaleFile:<name>) withdrawn — RevisionLink, File, Revision and Document soft-deleted through the generated procedures, attributed to the migration actor — before the corrected rule (by number AND station; key RationaleFile:<station>/<name>) replayed onto the copy | the owner, 2026-09-21: the folder is the terminal station and numbers are reused after retirement; the first placement put retired devices' documents on current records. The replay is the rule; the withdrawal is not — on the real cutover the corrected rule runs once | no |
+| 2026-09-22 | #219's rationale demonstration was applied to the wrong record — revision 3 of the SEL-221F [0798], 1111 A-PROT at Grand Falls, whose change request CR 9617635 is a Delete Order, using the line L2103 (Bathurst to Eel River HVDC), which is not its line. The 26 settings whose values it changed were restored to what the migration filed (each from its own audit row), and the rationale revision it made was withdrawn with its files, through the platform's procedures. The record's own legacy rationale, M0798_9617635.doc, is untouched. | a demonstration written onto a migrated record; the owner asked for it to be put back. The correction is not a rule: the real cutover never writes it in the first place | no |
+| 2026-09-22 | #226: ReadOnly's ViewItem.Modify deactivated on DEV (security.RolePermission_Deactivate). The first #226 deploy seeded it; the corrected seed never grants it, so a fresh database does not need this | decision 237: ReadOnly only reads; the schema smoke's role-permission check failed on it | no |
+| 2026-09-22 | #226 proof rows on DEV: a handful of config.UserViewItem choices made and withdrawn by the technician and Hydro smoke users, and one PCTechnician role default ticked on and put back, all through the platform's own procedures and audited | browser and API proofs of the increment, including the measured row-hijack before its fix | no |
+| 2026-09-22 | #227 browser proof: one fixture relay (W4_20260922234302 227 browser proof) and a change request landed on it the way the importer lands one (migration run 'smoke-227'), then its two tracks set and the request finished in Chrome as the engineer smoke user; its new settings are in service and the old archived. No real legacy request was changed | the Save and Finish buttons proven at the user's layer without touching a real legacy request | no |

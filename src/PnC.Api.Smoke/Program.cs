@@ -2159,6 +2159,121 @@ if (admin is not null && approver is not null && hydro is not null && tech is no
             }
         }
 
+        // ======== #227 (2026-09-22): a change request brought over from the old program is finished the old program's way.
+        // The owner: a legacy request "still showing all of the procedure states … none of the procedure is going to be
+        // followed". Three fixture requests are built the way the importer builds one (a migration run, the in-service and
+        // outstanding revisions, the record linking the draft, the landing, the two tracks), then driven through the API.
+        if (cs is not null && windows is null)   // DEV mode: the engineer and technician identities exist
+        {
+            var eng227 = engineer!; var tech227 = tech!;
+            await using var con227 = new SqlConnection(cs);
+            await con227.OpenAsync();
+            async Task<object?> Sql(string text, params (string name, object? value)[] ps)
+            {
+                await using var cmd = con227.CreateCommand(); cmd.CommandText = text;
+                foreach (var (n, v) in ps) cmd.Parameters.AddWithValue(n, v ?? DBNull.Value);
+                return await cmd.ExecuteScalarAsync();
+            }
+            var (k227_ms, k227_mb) = await Get(admin, "api/v1/ref/vModel?ModelCode=SEL-221F&take=1");
+            var k227_model = Id((k227_mb?["rows"] as JsonArray)?.FirstOrDefault(), "ModelId");
+            var k227_run = (Guid)(await Sql("""
+                SET NOCOUNT ON; DECLARE @r UNIQUEIDENTIFIER, @now DATETIMEOFFSET(7) = SYSDATETIMEOFFSET();
+                EXEC migration.Run_Append @SourceSystem = N'smoke-227', @SourceCaptureAt = @now, @StartedAt = @now, @RunByActorId = @a,
+                     @Notes = N'#227 API smoke: requests landed the way the importer lands one', @RunId = @r OUTPUT; SELECT @r
+                """, ("@a", systemActor)))!;
+            async Task<(Guid relay, Guid wr, Guid revA, Guid revM)> Landed(string label, string typeKey)
+            {
+                var (_, ab) = await Post(admin, "api/v1/asset/Asset_Add", new { AssetTypeCode = "ProtectiveRelay", Name = $"{tag} 227 {label}", ModelId = k227_model, Status = "InService" });
+                var relay = Id(ab)!.Value;
+                await Post(admin, "api/v1/device/Device_Add", new { EntityId = relay, PartNumber = "SEL-221F" });
+                var revA = (Guid)(await Sql("""
+                    SET NOCOUNT ON; DECLARE @rev UNIQUEIDENTIFIER, @k NVARCHAR(20), @at DATETIMEOFFSET(7) = DATEADD(day, -2, SYSDATETIMEOFFSET());
+                    EXEC process.WriteConfigurationRevision @DeviceEntityId = @d, @CaptureKind = N'Designed', @FileName = N'A_smoke.txt', @MimeType = N'text/plain; charset=utf-8',
+                         @Content = 0x, @At = @at, @ActorId = @a, @MigrationRunId = @run, @FileKindOverride = N'SettingsText', @Status = N'Issued', @RevisionRowId = @rev OUTPUT, @FileKind = @k OUTPUT;
+                    EXEC document.SetInService @RevisionRowId = @rev, @InServiceFrom = @at, @ActorId = @a; SELECT @rev
+                    """, ("@d", relay), ("@a", systemActor), ("@run", k227_run)))!;
+                var wr = (Guid)(await Sql("""
+                    SET NOCOUNT ON; DECLARE @e UNIQUEIDENTIFIER, @r UNIQUEIDENTIFIER;
+                    DECLARE @v UNIQUEIDENTIFIER = (SELECT TOP (1) v.RowId FROM config.DefinitionVersion v JOIN config.Definition d ON d.EntityId = v.DefinitionEntityId
+                                                   WHERE d.DefinitionKey = @k AND d.IsDeleted = 0 AND v.IsDeleted = 0 AND v.Status = N'Effective' ORDER BY v.VersionNumber DESC);
+                    EXEC work.WorkRequest_Add @WorkTypeDefinitionVersionRowId = @v, @Title = @t, @Description = N'Requested by Smoke Requester', @ScopeKind = N'Asset', @ScopeEntityId = @d,
+                         @ValidFrom = @now, @ActorId = @a, @MigrationRunId = @run, @EntityId = @e OUTPUT, @RowId = @r OUTPUT; SELECT @e
+                    """, ("@k", typeKey), ("@t", $"CR {tag} 227 {label}"), ("@d", relay), ("@now", DateTimeOffset.Now), ("@a", systemActor), ("@run", k227_run)))!;
+                var revM = (Guid)(await Sql("""
+                    SET NOCOUNT ON; DECLARE @rev UNIQUEIDENTIFIER, @k NVARCHAR(20), @e UNIQUEIDENTIFIER, @rr UNIQUEIDENTIFIER, @at DATETIMEOFFSET(7) = DATEADD(day, -1, SYSDATETIMEOFFSET());
+                    EXEC process.WriteConfigurationRevision @DeviceEntityId = @d, @CaptureKind = N'Designed', @FileName = N'M_smoke.txt', @MimeType = N'text/plain; charset=utf-8',
+                         @Content = 0x, @At = @at, @ActorId = @a, @MigrationRunId = @run, @FileKindOverride = N'SettingsText', @Status = N'Draft', @RevisionRowId = @rev OUTPUT, @FileKind = @k OUTPUT;
+                    EXEC record.Record_Add @RecordKindCode = N'ConfigurationFileRevision', @SubjectKind = N'Device', @SubjectEntityId = @d, @SecondSubjectKind = N'ConfigurationFileRevision',
+                         @SecondSubjectEntityId = @rev, @WorkRequestEntityId = @wr, @OccurredAt = @at, @TimeSourceQuality = 3, @PerformedByActorId = @a, @Summary = N'#227 smoke outstanding',
+                         @ValidFrom = @at, @ValidFromQuality = 0, @ActorId = @a, @MigrationRunId = @run, @EntityId = @e OUTPUT, @RowId = @rr OUTPUT;
+                    DECLARE @wf UNIQUEIDENTIFIER, @pi UNIQUEIDENTIFIER;
+                    EXEC process.LandMigratedInstance @WorkRequestEntityId = @wr, @DocumentationStatus = N'Change In Progress', @DatabaseStatus = N'Change In Progress',
+                         @ActorId = @a, @MigrationRunId = @run, @WorkflowInstanceEntityId = @wf OUTPUT, @ProcedureInstanceEntityId = @pi OUTPUT;
+                    DECLARE @t1 UNIQUEIDENTIFIER, @t2 UNIQUEIDENTIFIER, @x1 UNIQUEIDENTIFIER, @x2 UNIQUEIDENTIFIER;
+                    EXEC work.RequestTrack_Add @WorkRequestEntityId = @wr, @TrackCode = N'Documentation', @Status = N'InProgress', @ActorId = @a, @MigrationRunId = @run, @EntityId = @t1 OUTPUT, @RowId = @x1 OUTPUT;
+                    EXEC work.RequestTrack_Add @WorkRequestEntityId = @wr, @TrackCode = N'Database', @Status = N'InProgress', @ActorId = @a, @MigrationRunId = @run, @EntityId = @t2 OUTPUT, @RowId = @x2 OUTPUT;
+                    SELECT @rev
+                    """, ("@d", relay), ("@wr", wr), ("@a", systemActor), ("@run", k227_run)))!;
+                return (relay, wr, revA, revM);
+            }
+            async Task<string> GridState(Guid rev) { var (_, b) = await Get(admin, $"api/v1/document/vSettingsRecord?RevisionRowId={rev}&take=1"); return (b?["rows"] as JsonArray)?.FirstOrDefault()?["GridState"]?.ToString() ?? "(none)"; }
+            async Task<JsonNode?> Head(Guid wr) { var (_, b) = await Get(admin, $"api/v1/work/vChangeRequestStatus?WorkRequestEntityId={wr}&take=1"); return (b?["rows"] as JsonArray)?.FirstOrDefault(); }
+            async Task<HttpStatusCode> SetTrack(HttpClient who, Guid wr, string code, string status) => (await Post(who, "api/v1/work/SetRequestTrack", new { WorkRequestEntityId = wr, TrackCode = code, Status = status, Note = "smoke" })).status;
+
+            var k227_chg = await Landed("change", "SETTINGS_CHANGE");
+            var k227_del = await Landed("delete", "SETTINGS_DELETE");
+            var k227_wdr = await Landed("withdraw", "SETTINGS_CHANGE");
+            await Sql("EXEC migration.CompleteRun @RunId = @r, @Notes = N'#227 API smoke fixture'", ("@r", k227_run));
+
+            // the header reads as the old program had it
+            var k227_h0 = await Head(k227_chg.wr);
+            Must(k227_model is not null && k227_h0?["FromOldProgram"]?.GetValue<bool>() == true && k227_h0?["RequestedByDisplayName"]?.ToString() == "Smoke Requester"
+                 && k227_h0?["RequestedAt"] is null && k227_h0?["DatabaseStatus"]?.ToString() == "In Progress" && k227_h0?["DeviceCount"]?.ToString() == "1",
+                $"#227: a request from the old program reads its requester's name, no invented date, one relay and its tracks as kept ({k227_h0?["RequestedByDisplayName"]}, {k227_h0?["RequestedAt"]}, {k227_h0?["DatabaseStatus"]}, {k227_h0?["DeviceCount"]})");
+            Must(await GridState(k227_chg.revA) == "Active" && await GridState(k227_chg.revM) == "Outstanding", "#227: before finishing, the relay's settings are in service and the change is outstanding");
+
+            // finishing is refused while a track is in progress, as the old program refused it
+            var (k227_c1, k227_c1b) = await Post(eng227, "api/v1/work/CompleteLegacyRequest", new { WorkRequestEntityId = k227_chg.wr });
+            Must(k227_c1 == HttpStatusCode.Conflict && Code(k227_c1b) == "rule", $"#227: finishing is refused while a track is still in progress [{(int)k227_c1} {Code(k227_c1b)}]");
+            Must(await SetTrack(tech227, k227_chg.wr, "Documentation", "Complete") == HttpStatusCode.OK && await SetTrack(tech227, k227_chg.wr, "Database", "Complete") == HttpStatusCode.OK,
+                "#227: a technician sets the two tracks by hand");
+            // the workflow's own rule for closing a request still applies inside the finish, and a refusal leaves nothing half done
+            var (k227_c2, k227_c2b) = await Post(tech227, "api/v1/work/CompleteLegacyRequest", new { WorkRequestEntityId = k227_chg.wr });
+            Must(k227_c2 != HttpStatusCode.OK && await GridState(k227_chg.revM) == "Outstanding" && await GridState(k227_chg.revA) == "Active",
+                $"#227: a technician may not close the request, and the refused finish changes nothing [{(int)k227_c2} {Code(k227_c2b)}]");
+            var (k227_c3, k227_c3b) = await Post(eng227, "api/v1/work/CompleteLegacyRequest", new { WorkRequestEntityId = k227_chg.wr });
+            var k227_h3 = await Head(k227_chg.wr);
+            Must(k227_c3 == HttpStatusCode.OK && await GridState(k227_chg.revM) == "Active" && await GridState(k227_chg.revA) == "Archived" && k227_h3?["RequestState"]?.ToString() == "Closed"
+                 && k227_h3?["ProcedureState"]?.ToString() == "Completed",
+                $"#227: a change finished — the new settings in service, the old archived, the request closed, its landed run completed [{(int)k227_c3} {Code(k227_c3b)} {k227_c3b?["message"]}]");
+            Must(await SetTrack(tech227, k227_chg.wr, "Documentation", "InProgress") == HttpStatusCode.Conflict, "#227: a finished request's tracks are no longer set");
+
+            // a Delete Order: the settings in service are archived and nothing replaces them
+            await SetTrack(eng227, k227_del.wr, "Documentation", "NotNeeded"); await SetTrack(eng227, k227_del.wr, "Database", "NotNeeded");
+            var (k227_d1, k227_d1b) = await Post(eng227, "api/v1/work/CompleteLegacyRequest", new { WorkRequestEntityId = k227_del.wr });
+            var (k227_d2s, k227_d2b) = await Get(admin, $"api/v1/document/vSettingsRecord?DeviceEntityId={k227_del.relay}&GridState=Active&take=5");
+            Must(k227_d1 == HttpStatusCode.OK && await GridState(k227_del.revA) == "Archived" && await GridState(k227_del.revM) == "Withdrawn" && ((k227_d2b?["rows"] as JsonArray)?.Count ?? -1) == 0,
+                $"#227: a Delete Order finished — the in-service settings archived, the draft in no list, nothing in service [{(int)k227_d1} {Code(k227_d1b)} {k227_d1b?["message"]}]");
+
+            // withdrawn: needs a reason; the draft is set aside, the settings in service untouched
+            var (k227_w1, _) = await Post(eng227, "api/v1/work/WithdrawLegacyRequest", new { WorkRequestEntityId = k227_wdr.wr, Reason = " " });
+            var (k227_w2, k227_w2b) = await Post(eng227, "api/v1/work/WithdrawLegacyRequest", new { WorkRequestEntityId = k227_wdr.wr, Reason = "smoke: raised in error" });
+            var k227_hw = await Head(k227_wdr.wr);
+            Must(k227_w1 == HttpStatusCode.Conflict && k227_w2 == HttpStatusCode.OK && await GridState(k227_wdr.revM) == "Withdrawn" && await GridState(k227_wdr.revA) == "Active"
+                 && k227_hw?["RequestState"]?.ToString() == "Cancelled" && k227_hw?["ProcedureState"]?.ToString() == "Cancelled",
+                $"#227: withdrawn with a reason — the draft set aside, the in-service settings untouched, the request and its run cancelled [{(int)k227_w1}, {(int)k227_w2} {Code(k227_w2b)} {k227_w2b?["message"]}]");
+
+            // none of this reaches a request raised in the platform, and the table's own writers are not callable
+            var k227_ours = await Sql("SELECT TOP (1) EntityId FROM work.WorkRequest WHERE MigrationRunId IS NULL AND ValidTo IS NULL AND IsDeleted = 0 ORDER BY RowSeq DESC");
+            var (k227_p1, k227_p1b) = await Post(eng227, "api/v1/work/SetRequestTrack", new { WorkRequestEntityId = k227_ours, TrackCode = "Database", Status = "Complete" });
+            var (k227_p2, k227_p2b) = await Post(admin, "api/v1/work/RequestTrack_Add", new { WorkRequestEntityId = k227_chg.wr, TrackCode = "Database", Status = "Complete" });
+            Must(k227_p1 == HttpStatusCode.Conflict && k227_p2 == HttpStatusCode.NotFound,
+                $"#227: a platform request keeps its tracks as steps [{(int)k227_p1} {Code(k227_p1b)}]; the track table is written only through the guarded save [{(int)k227_p2} {Code(k227_p2b)}]");
+            var (k227_p3, _) = await Post(readOnly!, "api/v1/work/SetRequestTrack", new { WorkRequestEntityId = k227_wdr.wr, TrackCode = "Database", Status = "Complete" });
+            Must(k227_p3 == HttpStatusCode.Forbidden, $"#227: a read-only account sets no track [{(int)k227_p3}]");
+        }
+        else Skip("#227 requests from the old program (needs the DEV identities and a connection string)");
+
         // ======== #168 increment 2 (2026-09-16): the settings edited in the platform, the file written by it — the owner's four-step
         // procedure on the BDD15B that the run above left in service. REQUEST copies the in-service revision as the change's outstanding
         // revision (the legacy M from the A); a value is edited through SetParsedSetting; the settings step commits with no file and

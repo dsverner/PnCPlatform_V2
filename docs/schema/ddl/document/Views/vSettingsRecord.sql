@@ -19,6 +19,9 @@ SELECT r.[RowSeq],
        cf.[RevisionRowId],
        cf.[DeviceEntityId],
        [GridState] = CASE
+           -- #227: withdrawn settings that never went in service (a change request withdrawn, or the draft of a finished Delete
+           -- Order) are in no list — they were never the device's settings; the device's History still shows them
+           WHEN r.[Status] = N'Withdrawn' AND cf.[InServiceFrom] IS NULL THEN N'Withdrawn'
            WHEN r.[Status] IN (N'Superseded', N'Withdrawn') OR lc.[CurrentState] IN (N'Superseded', N'Withdrawn') THEN N'Archived'   -- the letters first (W7: a retired device's last revision keeps an open period)
            WHEN cf.[InServiceFrom] IS NOT NULL AND cf.[InServiceTo] IS NULL THEN N'Active'
            WHEN cf.[InServiceTo] IS NOT NULL THEN N'Archived'

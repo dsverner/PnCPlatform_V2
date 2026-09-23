@@ -19,8 +19,13 @@ SELECT w.[RowSeq],
        w.[ParentWorkRequestEntityId],
        wt.[DefinitionKey]           AS [WorkTypeKey],
        wt.[Name]                    AS [WorkTypeName],
-       rp.[DisplayName]             AS [RequestedByDisplayName],
-       w.[CreatedAt]                AS [RequestedAt],
+       -- #227: a request brought over from the old program is read as the old program had it. Its requester is the
+       -- typed name the importer wrote into the description (the old program kept a name, not an account); it has no
+       -- raised or started date (0 of 8,409 legacy headers carry one), so none is shown rather than the import's.
+       [FromOldProgram]             = CONVERT(BIT, CASE WHEN w.[MigrationRunId] IS NOT NULL THEN 1 ELSE 0 END),
+       [RequestedByDisplayName]     = COALESCE(rp.[DisplayName], CASE WHEN w.[MigrationRunId] IS NOT NULL AND w.[Description] LIKE N'Requested by %'
+                                                                     THEN LTRIM(SUBSTRING(w.[Description], 14, 200)) END),
+       [RequestedAt]                = CASE WHEN w.[MigrationRunId] IS NULL THEN w.[CreatedAt] END,
        w.[ScopeKind], w.[ScopeEntityId],
        [ScopeName]                  = COALESCE(sn.[Name], sa.[Name]),
        [ScopeNodeEntityId]          = COALESCE(sn.[EntityId], spl.[NodeEntityId]),
@@ -30,7 +35,7 @@ SELECT w.[RowSeq],
        rw.[EntityId]                AS [RequestWorkflowInstanceEntityId],
        rwk.[DefinitionKey]          AS [WorkflowKey],
        rw.[CurrentState]            AS [RequestState],
-       rw.[StartedAt]               AS [RequestStartedAt],
+       [RequestStartedAt]           = CASE WHEN w.[MigrationRunId] IS NULL THEN rw.[StartedAt] END,
        rw.[CompletedAt]             AS [RequestCompletedAt],
        rw.[IsCancelled],
        pi.[EntityId]                AS [ProcedureInstanceEntityId],
@@ -40,8 +45,10 @@ SELECT w.[RowSeq],
        pi.[CompletedAt]             AS [ProcedureCompletedAt],
        pi.[PackageRevisionRowId],
        lc.[CurrentState]            AS [LifecycleState],
-       [DeviceCount]                = (SELECT COUNT(*) FROM [document].[vSettingsIssuePackageItem] i WHERE i.[PackageRevisionRowId] = pi.[PackageRevisionRowId]),
-       [DocumentationStatus]        = CASE WHEN doc.[State] = N'Completed' THEN N'Complete'
+       [DeviceCount]                = CASE WHEN w.[MigrationRunId] IS NOT NULL AND w.[ScopeKind] = N'Asset' THEN 1   -- #227: the old program's request is one relay
+                                           ELSE (SELECT COUNT(*) FROM [document].[vSettingsIssuePackageItem] i WHERE i.[PackageRevisionRowId] = pi.[PackageRevisionRowId]) END,
+       [DocumentationStatus]        = CASE WHEN w.[MigrationRunId] IS NOT NULL THEN CASE rtd.[Status] WHEN N'Complete' THEN N'Complete' WHEN N'NotNeeded' THEN N'NA' WHEN N'InProgress' THEN N'In Progress' ELSE N'Not Started' END
+                                           WHEN doc.[State] = N'Completed' THEN N'Complete'
                                            WHEN doc.[State] = N'Skipped' AND doc.[Outcome] = N'NotApplicable' THEN N'NA'
                                            WHEN doc.[State] IN (N'Running', N'Held') THEN N'In Progress'
                                            WHEN doc.[State] = N'Cancelled' THEN N'Cancelled'
@@ -55,7 +62,8 @@ SELECT w.[RowSeq],
        JSON_VALUE(rr.[Draft], '$.note')          AS [DocumentationNote],
        rr.[CommittedRecordEntityId] AS [DocumentationRecordEntityId],
        idn.[Outcome]                AS [DrawingsOutcome],
-       [DatabaseStatus]             = CASE WHEN db.[State] = N'Completed' THEN N'Complete'
+       [DatabaseStatus]             = CASE WHEN w.[MigrationRunId] IS NOT NULL THEN CASE rtb.[Status] WHEN N'Complete' THEN N'Complete' WHEN N'NotNeeded' THEN N'NA' WHEN N'InProgress' THEN N'In Progress' ELSE N'Not Started' END
+                                           WHEN db.[State] = N'Completed' THEN N'Complete'
                                            WHEN db.[State] = N'Skipped' AND db.[Outcome] = N'NotApplicable' THEN N'NA'
                                            WHEN db.[State] IN (N'Running', N'Held') THEN N'In Progress'
                                            WHEN db.[State] = N'Cancelled' THEN N'Cancelled'
@@ -68,7 +76,14 @@ SELECT w.[RowSeq],
        bl.[State]                   AS [BaselineStepState],
        rts.[StepInstanceEntityId]   AS [RtsStepInstanceEntityId],
        rts.[State]                  AS [RtsStepState],
-       rts.[CommittedAt]            AS [ReturnToServiceAt]
+       rts.[CommittedAt]            AS [ReturnToServiceAt],
+       -- #227: the hand-kept tracks of a request from the old program, as set (status code, date, note)
+       rtd.[Status]                 AS [DocumentationTrackStatus],
+       rtd.[TrackDate]              AS [DocumentationTrackDate],
+       rtd.[Note]                   AS [DocumentationTrackNote],
+       rtb.[Status]                 AS [DatabaseTrackStatus],
+       rtb.[TrackDate]              AS [DatabaseTrackDate],
+       rtb.[Note]                   AS [DatabaseTrackNote]
 FROM [work].[vWorkRequest] w
 LEFT JOIN [config].[vDefinitionVersion] wtv ON wtv.[RowId] = w.[WorkTypeDefinitionVersionRowId]
 LEFT JOIN [config].[vDefinition] wt ON wt.[EntityId] = wtv.[DefinitionEntityId]
@@ -114,7 +129,11 @@ OUTER APPLY (SELECT TOP (1) s.[EntityId] AS [StepInstanceEntityId], s.[State], s
              WHERE b.[IsDeleted] = 0 AND s.[IsDeleted] = 0 AND b.[ProcedureInstanceEntityId] = pi.[EntityId] AND s.[StepId] = N'BASELINE' ORDER BY s.[CommittedAt] DESC, s.[RowSeq] DESC) bl
 OUTER APPLY (SELECT TOP (1) s.[EntityId] AS [StepInstanceEntityId], s.[State], s.[CommittedAt]
              FROM [process].[BlockInstance] b JOIN [process].[StepInstance] s ON s.[BlockInstanceEntityId] = b.[EntityId]
-             WHERE b.[IsDeleted] = 0 AND s.[IsDeleted] = 0 AND b.[ProcedureInstanceEntityId] = pi.[EntityId] AND s.[StepId] = N'RETURN_TO_SERVICE' ORDER BY s.[CommittedAt] DESC, s.[RowSeq] DESC) rts;
+             WHERE b.[IsDeleted] = 0 AND s.[IsDeleted] = 0 AND b.[ProcedureInstanceEntityId] = pi.[EntityId] AND s.[StepId] = N'RETURN_TO_SERVICE' ORDER BY s.[CommittedAt] DESC, s.[RowSeq] DESC) rts
+OUTER APPLY (SELECT TOP (1) t.[Status], t.[TrackDate], t.[Note] FROM [work].[RequestTrack] t
+             WHERE t.[ValidTo] IS NULL AND t.[IsDeleted] = 0 AND t.[WorkRequestEntityId] = w.[EntityId] AND t.[TrackCode] = N'Documentation' ORDER BY t.[RowSeq] DESC) rtd
+OUTER APPLY (SELECT TOP (1) t.[Status], t.[TrackDate], t.[Note] FROM [work].[RequestTrack] t
+             WHERE t.[ValidTo] IS NULL AND t.[IsDeleted] = 0 AND t.[WorkRequestEntityId] = w.[EntityId] AND t.[TrackCode] = N'Database' ORDER BY t.[RowSeq] DESC) rtb;
 GO
 GRANT SELECT ON [work].[vChangeRequestStatus] TO [app_execute];
 GO

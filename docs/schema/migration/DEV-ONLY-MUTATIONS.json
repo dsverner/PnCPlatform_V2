@@ -54,6 +54,12 @@
       "what": "#226 proof rows on DEV: a handful of config.UserViewItem choices made and withdrawn by the technician and Hydro smoke users, and one PCTechnician role default ticked on and put back, all through the platform's own procedures and audited",
       "why": "browser and API proofs of the increment, including the measured row-hijack before its fix",
       "rule": false
+    },
+    {
+      "date": "2026-09-22",
+      "what": "#227 browser proof: one fixture relay (W4_20260922234302 227 browser proof) and a change request landed on it the way the importer lands one (migration run 'smoke-227'), then its two tracks set and the request finished in Chrome as the engineer smoke user; its new settings are in service and the old archived. No real legacy request was changed",
+      "why": "the Save and Finish buttons proven at the user's layer without touching a real legacy request",
+      "rule": false
     }
   ]
 }

@@ -15,6 +15,13 @@ import { DataGrid, type Column } from '@/components/ui/data-grid'
 import { RaiseRequest, type RaiseOpts } from '@/components/actions/RaiseRequest'
 import { raiseOptsFor } from './ListScreen'
 import { legacyFree } from '@/lib/legacy'
+import { LegacyRequest } from '@/components/LegacyRequest'
+
+// #227: the request's state as a P&C person says it, not the workflow's codes
+const REQUEST_WORDS: Record<string, string> = { Raised: 'raised', InProgress: 'in progress', Closed: 'finished', Cancelled: 'withdrawn' }
+const WORK_WORDS: Record<string, string> = { Running: 'under way', Held: 'on hold', Completed: 'done', Cancelled: 'stopped', Pending: 'not started' }
+// #227: a request from the old program has none of these — no package, no outage window, no raised date
+const NOT_IN_THE_OLD_PROGRAM = new Set(['PriorityCode', 'OutageWindowStartAt', 'OutageWindowEndAt', 'ReturnToServiceAt', 'LifecycleState', 'DeviceCount', 'RequestStartedAt'])
 
 export default function WorkItemScreen({ screen, params: p, id }: { screen: Screen; params: WorkItemParams; id?: string }) {
   const [schema, view] = splitView(p.headerView); const qc = useQueryClient(); const can = useCan(); const navigate = useNavigate()
@@ -42,8 +49,9 @@ export default function WorkItemScreen({ screen, params: p, id }: { screen: Scre
   if (!head) return <Status bad>You may not read that change request, or it does not exist.</Status>
 
   const current = s(head.RequestState) || null
+  const legacy = head.FromOldProgram === true || head.FromOldProgram === 1
   const doc = wfQ.data?.document
-  const transitions = doc ? doc.transitions.filter((t) => t.from === current).filter((t, i, a) => a.findIndex((x) => x.name === t.name) === i) : []
+  const transitions = doc && !legacy ? doc.transitions.filter((t) => t.from === current).filter((t, i, a) => a.findIndex((x) => x.name === t.name) === i) : []
   const fire = async (name: string, why?: string) => {
     if (!wfId) { setMsg({ text: 'This change request has no stages, so it cannot be moved on.', bad: true }); return }
     try { const x = await transition(wfId, name, why); setMsg({ text: `${name} → ${x.toState}.` }); setReasonFor(null); setReason(''); reload() }
@@ -68,14 +76,19 @@ export default function WorkItemScreen({ screen, params: p, id }: { screen: Scre
           <Button type="submit" kind="primary">{reasonFor}</Button><Button onClick={() => setReasonFor(null)}>Never mind</Button>
         </form>
       )}
-      <Status bad={msg?.bad}>{msg?.text ?? `The request is ${current ?? 'not started'}.${head.ProcedureState ? ` The work is ${head.ProcedureState}${head.ProcedureOutcome ? ` — ${head.ProcedureOutcome}` : ''}.` : ''}${head.LifecycleState ? ` The settings package is ${head.LifecycleState}.` : ''}`}</Status>
+      <Status bad={msg?.bad}>{msg?.text ?? (legacy
+        ? `Raised in the old program; the request is ${REQUEST_WORDS[current ?? ''] ?? 'open'}.`
+        : `The request is ${REQUEST_WORDS[current ?? ''] ?? 'not started'}.${head.ProcedureState ? ` The work is ${WORK_WORDS[s(head.ProcedureState)] ?? s(head.ProcedureState).toLowerCase()}.` : ''}${head.LifecycleState ? ` The settings package is ${s(head.LifecycleState).toLowerCase()}.` : ''}`)}</Status>
       {doc ? <StageBar stages={doc.states} current={current} /> : wfQ.isError ? <Status>You may not see the stages of this request.</Status> : null}
       {raise && <RaiseRequest o={raise} onClose={() => setRaise(null)} />}
       <div className="grid gap-3 lg:grid-cols-[2fr_1fr]">
-        <Panel title="Request"><Facts cols={2} pairs={p.headerFacts.map((c) => [labelOf(c), cellText(c, head)])} /></Panel>
-        {p.notes && <Panel title="Notes"><Facts cols={1} pairs={p.notes.map((c) => [labelOf(c), cellText(c, head)])} /></Panel>}
+        <Panel title="Request"><Facts cols={2} pairs={p.headerFacts.filter((c) => !legacy || !NOT_IN_THE_OLD_PROGRAM.has(c.key)).map((c) => [labelOf(c),
+          legacy && c.key === 'RequestedAt' && !head.RequestedAt ? 'not recorded in the old program' : cellText(c, head)])} /></Panel>
+        {/* #227: the old program kept the requester as a name, which the request's header now shows; the same words are not repeated here */}
+        {p.notes && <Panel title="Notes"><Facts cols={1} pairs={p.notes.filter((c) => !(legacy && c.key === 'Description' && /^Requested by /.test(s(head.Description)))).map((c) => [labelOf(c), cellText(c, head)])} /></Panel>}
       </div>
-      {instId ? (instQ.isPending ? <Status>Loading the procedure…</Status> : instQ.isError ? <Status bad>The procedure could not be read: {(instQ.error as Error).message}</Status>
+      {legacy ? <LegacyRequest head={head} can={can} onChanged={reload} />
+        : instId ? (instQ.isPending ? <Status>Loading the procedure…</Status> : instQ.isError ? <Status bad>The procedure could not be read: {(instQ.error as Error).message}</Status>
         : <Tracks inst={instQ.data} p={p} memberNames={memberNames} can={can} onChanged={reload} navigate={navigate} />)
         : <Status>No procedure has been started for this request{current === 'Raised' ? ' — use Start, above' : ''}.</Status>}
       {p.produced && instQ.data && Object.keys(instQ.data.produced).length > 0 && (

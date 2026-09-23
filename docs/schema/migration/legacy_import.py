@@ -740,6 +740,54 @@ class Importer:
                 self.rule(rule_name, oldno)
 
     # ------------------------------------------------------------------ 9 findings (#142)
+    # ------------------------------------------------------------------ 8b the two tracks, kept by hand (#227)
+    TRACK_STATUS = {"Complete": "Complete", "NA": "NotNeeded", "Change In Progress": "InProgress"}
+
+    def request_tracks_stage(self):
+        """#227 (2026-09-22): a request brought over from the old program keeps its documentation and settings-database tracks
+        as the old program kept them — a status, a date and notes, set by hand (prog_frmRelaySettingChangeStatus.dfm), not as
+        the platform procedure's branches. One work.RequestTrack per request and track, from the track row of the request's
+        first relay (a request is scoped to its first relay, RequestSpansDevices). The software track is not written (#58)."""
+        seen = set()
+        for base, b in self.bases.items():
+            for r in b["rows"]:
+                oldno, cr = r[0], r[1]
+                wr = self.requests.get(cr)
+                if wr is None or cr in seen:
+                    if wr is not None:
+                        self.rule("a further relay of a multi-relay request: its tracks stay in the legacy rows (#227)", f"{cr}/{oldno}")
+                    continue
+                seen.add(cr)
+                for name, code in (("doc", "Documentation"), ("db", "Database")):
+                    counted = lambda k: (self.rule("legacy documentation track row → work.RequestTrack (#227)", k) if code == "Documentation"
+                                         else self.rule("legacy database track row → work.RequestTrack (#227)", k))
+                    flags = []
+                    trk = self.track_for(name, cr, oldno, flags)
+                    if trk is None:
+                        # #164: an A or P row with no track row anywhere landed complete with both tracks NA; an M with none is flagged
+                        status, note, date = ("NotNeeded" if oldno[0] != "M" else "InProgress"), None, None
+                        flags.append(self.run.flag("TrackRowMissing" if oldno[0] == "M" else "NoTrackRows",
+                                                   f"{oldno}/{cr}: no legacy {code.lower()} track row; {status}", oldno))
+                    else:
+                        raw, note, date = trk
+                        status = self.TRACK_STATUS.get(raw or "")
+                        if status is None:
+                            status = "InProgress"
+                            flags.append(self.run.flag("TrackStatusUnknown", f"{oldno}/{cr}: {code.lower()} track status {raw!r}; InProgress (set it by hand)", oldno))
+                    at, _q, _f = dto(date)
+                    key = f"RequestTrack:{cr}/{code}"
+                    h = row_hash("RequestTrack", cr, code, status, at, note)
+                    if self.run.already_loaded("work", "RequestTrack", key, h):
+                        counted(f"{cr}/{code}"); continue
+                    fields = dict(WorkRequestEntityId=wr, TrackCode=code, Status=status, TrackDate=at, Note=note or None, ValidFrom=capture_at(), ValidFromQuality=2)
+                    ent = self.run.existing_entity("work", "RequestTrack", key)
+                    if ent is None:
+                        (ent, rr) = self.run.exec("work.RequestTrack_Add", outputs=[("EntityId", "UNIQUEIDENTIFIER"), ("RowId", "UNIQUEIDENTIFIER")], **fields)
+                    else:
+                        (rr,) = self.run.exec("work.RequestTrack_Revise", outputs=[("RowId", "UNIQUEIDENTIFIER")], EntityId=ent, **fields)
+                    self.run.provenance("work", "RequestTrack", key, h, entity_id=ent, row_id=rr, notes=self.run.join_flags(*flags))
+                    counted(f"{cr}/{code}")
+
     def findings_stage(self):
         rows = self.src_rows("""SELECT a.b, a.cr, p.maxcr FROM (SELECT SUBSTRING(OLD_NO,2,4) b, [Change Request ID] cr FROM dbo.SETTINGS WHERE LEFT(OLD_NO,1)='A') a
                                 JOIN (SELECT SUBSTRING(OLD_NO,2,4) b, MAX([Change Request ID]) maxcr FROM dbo.SETTINGS WHERE LEFT(OLD_NO,1)='P' GROUP BY SUBSTRING(OLD_NO,2,4)) p ON p.b = a.b
@@ -969,7 +1017,7 @@ def load(database, limit=None, report=None, source_db=None, docs=None):
         sys.exit("refusing: the target must be a PnCPlatform_V2_* database (#99)")
     with Run(SOURCE, CAPTURE_AT, notes=f"W7 legacy import (CUTOVER-STRATEGY §5); limit {limit}", target_db=database) as run:
         imp = Importer(run, limit, source_db, docs)
-        for stage in ("prepare", "persons_stage", "manufacturers_stage", "models_stage", "locations_stage", "devices_stage", "schemes_stage", "requests_stage", "revisions_stage", "rationale_stage", "landings_stage", "findings_stage", "provenance_stage", "dropped_counts"):
+        for stage in ("prepare", "persons_stage", "manufacturers_stage", "models_stage", "locations_stage", "devices_stage", "schemes_stage", "requests_stage", "revisions_stage", "rationale_stage", "landings_stage", "request_tracks_stage", "findings_stage", "provenance_stage", "dropped_counts"):
             imp.log(stage); getattr(imp, stage)()
         path = report or os.path.join(HERE, f"RECONCILIATION-{datetime.date.today().isoformat()}.md")
         totals = imp.report(path)
