@@ -10,7 +10,7 @@ every reason, measurement and owner quote) and
 | | |
 |---|---|
 | Branch | `foundation/documentary-record`, clean, pushed to `origin` (see `git log -1`) |
-| Remote | `origin` = `\\10.10.40.10\vernersys-share\Repos\PnCPlatform_V2.git` (= Z:); no GitHub remote (the owner's call). The predecessor repo's branch `v2/engine-db-now` is on its `origin` and `github` |
+| Remote | `origin` = `\\10.10.40.10\vernersys-share\Repos\PnCPlatform_V2.git` (= Z:) and `github` = `https://github.com/dsverner/PnCPlatform_V2.git` (added 2026-09-25 at the owner's request; push both). The predecessor repo's branch `v2/engine-db-now` is on its `origin` and `github` |
 | DEV database | `PnCPlatform_V2_DEV` on VM01 `10.10.70.25`, deployed with everything to #236 |
 | DEV API | `http://127.0.0.1:5210`, React app at `/app/` (run recipe in memory `project-dev-api-run-recipe`) |
 | Last results | API smoke 419 PASS / 0 FAIL (#236, PC02, 2026-09-23); schema smoke on PC02 after #233: 269 PASS / 0 FAIL (the clock fixed); schema smoke 269 PASS on the laptop, 268 + 1 clock-skew FAIL on PC02 (below); wording check 0 |
