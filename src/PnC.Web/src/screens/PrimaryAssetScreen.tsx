@@ -15,6 +15,7 @@ import { useCan, useViewAll } from '@/lib/hooks'
 import { type RecordParams, type Screen, screenPath } from '@/lib/screens'
 import { Panel, Pill, Button, Facts, Status, inputClass } from '@/components/ui/ui'
 import { AssetCharacteristics } from '@/components/CharacteristicsPanel'
+import { statusWords } from '@/lib/labels'
 
 /** The kinds and the values in the standards' own words. The **values** are still the client's; **which kinds apply** is
  * reference data (#173, the owner 2026-09-17: "a bus is not PRC-023 applicable and has no rating") —
@@ -254,7 +255,7 @@ function AssetForm({ r }: { r: Row }) {
         <label className="text-slate-400">Name</label><input className={`${inputClass} w-64`} value={f.Name} onChange={set('Name')} placeholder="e.g. L0012" />
         <label className="text-slate-400">Type</label><select className={`${inputClass} w-64`} value={f.AssetTypeCode} onChange={set('AssetTypeCode')}>{(typesQ.data ?? []).map((t) => <option key={s(t.AssetTypeCode)} value={s(t.AssetTypeCode)}>{s(t.Name)}</option>)}</select>
         <label className="text-slate-400">Terminals</label><Terminals r={r} />
-        <label className="text-slate-400">Status</label><span><select className={`${inputClass} w-64`} value={f.Status} onChange={set('Status')}>{STATUSES.map((x) => <option key={x}>{x}</option>)}</select><span className="ml-2 text-xs text-slate-500">the asset as a whole, not a terminal</span></span>
+        <label className="text-slate-400">Status</label><span><select className={`${inputClass} w-64`} value={f.Status} onChange={set('Status')}>{STATUSES.map((x) => <option key={x} value={x}>{statusWords(x)}</option>)}</select><span className="ml-2 text-xs text-slate-500">the asset as a whole, not a terminal</span></span>
         <label className="text-slate-400">Notes</label><textarea className={`${inputClass} w-full`} rows={2} value={f.Notes} onChange={set('Notes')} />
       </div>
       <Button kind="primary" disabled={!dirty || busy} onClick={() => void save()}>Save</Button>
@@ -395,7 +396,7 @@ export default function PrimaryAssetScreen({ params: p, id }: { screen: Screen; 
   return (
     <div className="space-y-3">
       <header className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2"><h1 className="text-lg font-semibold text-slate-100">{s(r.Name)}</h1><Pill tone="accent">{s(r.AssetTypeName)}</Pill><Pill tone={r.Status === 'InService' ? 'good' : 'neutral'}>{s(r.Status)}</Pill></div>
+        <div className="flex items-center gap-2"><h1 className="text-lg font-semibold text-slate-100">{s(r.Name)}</h1><Pill tone="accent">{s(r.AssetTypeName)}</Pill><Pill tone={r.Status === 'InService' ? 'good' : 'neutral'}>{statusWords(r.Status)}</Pill></div>
         <div className="flex gap-2"><Button onClick={() => navigate(-1)}>Close</Button></div>
       </header>
       <div className="grid gap-3 lg:grid-cols-2">

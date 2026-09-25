@@ -18,6 +18,7 @@ import { Panel, Pill, Button, Facts, Status, Field, inputClass } from '@/compone
 import { DataGrid } from '@/components/ui/data-grid'
 import { AssetPicker } from '@/components/pickers'
 import { classificationPairs } from './PrimaryAssetScreen'
+import { memberKindWords, statusWords, useMemberRoleName } from '@/lib/labels'
 
 const ZONES = ['Primary', 'Backup', 'BreakerFailure']   // the owner, 2026-09-16: Primary, Backup, Breaker Failure
 
@@ -77,11 +78,11 @@ export default function SchemeScreen({ params: p, id }: { screen: Screen; params
   return (
     <div className="space-y-3">
       <header className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2"><h1 className="text-lg font-semibold text-slate-100">{s(r.Name)}</h1><Pill tone={r.Status === 'InService' ? 'good' : 'neutral'}>{s(r.Status)}</Pill></div>
+        <div className="flex items-center gap-2"><h1 className="text-lg font-semibold text-slate-100">{s(r.Name)}</h1><Pill tone={r.Status === 'InService' ? 'good' : 'neutral'}>{statusWords(r.Status)}</Pill></div>
         <div className="flex gap-2">{!!station?.StationNodeEntityId && <Button onClick={() => navigate(screenPath('SETTINGS_BOOK') + `?StationNodeEntityId=${station.StationNodeEntityId}`)}>Settings book</Button>}<Button onClick={() => navigate(-1)}>Close</Button></div>
       </header>
       <div className="grid gap-3 lg:grid-cols-2">
-        <Panel title="Scheme"><Facts cols={1} pairs={[['Name', s(r.Name)], ['System designation', s(r.SystemDesignation) || '—'], ['Station', station ? s(station.StationName) : (stationQ.isPending || schemeStationQ.isPending) ? '…' : 'not known yet — no member of this scheme is placed anywhere'], ['Status', s(r.Status)], ['Notes', s(r.Notes) || '—']]} /></Panel>
+        <Panel title="Scheme"><Facts cols={1} pairs={[['Name', s(r.Name)], ['System designation', s(r.SystemDesignation) || '—'], ['Station', station ? s(station.StationName) : (stationQ.isPending || schemeStationQ.isPending) ? '…' : 'not known yet — no member of this scheme is placed anywhere'], ['Status', statusWords(r.Status)], ['Notes', s(r.Notes) || '—']]} /></Panel>
         <MembersPanel schemeId={id} stationNodeEntityId={s(station?.StationNodeEntityId)} stationName={s(station?.StationName)} />
       </div>
       <Panel title={`Protects · ${protectsQ.isPending ? '…' : (protectsQ.data ?? []).length} primary asset(s)`}>
@@ -141,7 +142,7 @@ export default function SchemeScreen({ params: p, id }: { screen: Screen; params
  * <Class>.Archive, and the scheme schema's class is Scheme). Decision 71 again: it closes the belief, ValidTo untouched.
  */
 function MembersPanel({ schemeId, stationNodeEntityId, stationName }: { schemeId: string; stationNodeEntityId: string; stationName: string }) {
-  const qc = useQueryClient()
+  const qc = useQueryClient(); const roleName = useMemberRoleName()
   const can = useCan()
   const canAdd = can('Scheme.Modify'); const canRemove = can('Scheme.Archive')
   const membersQ = useQuery({ queryKey: ['schemeMembers', schemeId], enabled: !!schemeId, queryFn: async () => {
@@ -169,7 +170,7 @@ function MembersPanel({ schemeId, stationNodeEntityId, stationName }: { schemeId
   return (
     <Panel title={`Members · ${membersQ.isPending ? '…' : rows.length}`}>
       <DataGrid rows={rows} rowKey={(x) => s(x.EntityId)} emptyText="No member yet. Add the protection function this scheme runs on, below." columns={[
-        { key: 'MemberName', label: 'Member' }, { key: 'MemberKind', label: 'Kind' }, { key: 'MemberRoleCode', label: 'Role' },
+        { key: 'MemberName', label: 'Member' }, { key: 'MemberKind', label: 'Kind', render: (x) => memberKindWords(x.MemberKind) }, { key: 'MemberRoleCode', label: 'Role', render: (x) => roleName(x.MemberRoleCode) },   // #238: names, not codes
         { key: 'IsInService', label: 'In service', render: (x) => (x.IsInService ? 'yes' : 'no') },
         ...(canRemove ? [{ key: '_x', label: '', render: (x: Row) => (confirmId === s(x.EntityId)
           ? <span className="flex items-center gap-1 text-xs text-amber-300">remove?

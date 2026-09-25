@@ -6,14 +6,14 @@
 // (compliance.vDeviceVerdict, vDeviceEvaluation), when and why, and has no button. A change that a rule reads leaves an
 // evaluation request; the worker answers within seconds; the hourly pass is the catch-all (Compliance › Evaluation).
 import { Fragment, useState } from 'react'
-import { useNodeTypeName } from '@/lib/labels'
+import { statusWords, useNodeTypeName } from '@/lib/labels'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router'
 import { fmtDate, fmtWhen, s, view, viewAll, type Row } from '@/lib/api'
 import { useCan, useViewAll } from '@/lib/hooks'
 import { screenPath } from '@/lib/screens'
 import { Panel, Pill, Button, Status, type Tone } from '@/components/ui/ui'
-import { ClassificationPanel, DEVICE_KINDS, NodeLink, kindApplies, useClassificationKindRef, useClassifications, type DerivedNote } from './PrimaryAssetScreen'
+import { CLASSIFICATION_KINDS, ClassificationPanel, DEVICE_KINDS, NodeLink, kindApplies, useClassificationKindRef, useClassifications, type DerivedNote } from './PrimaryAssetScreen'
 
 /** One fact read, as the evaluator records it on a verdict (compliance.SubjectVerdict.ReadsJson) and on an obligation. */
 export interface FactRead { name: string; params: string | null; value: string }
@@ -30,6 +30,54 @@ const PRC023_READS: [string, string][] = [
   ['asset.formula.prc023_load_current', 'lowest load-responsive trip current'],
   ['asset.formula.prc023_criterion', 'criterion'],
 ]
+
+/** #238 (the owner, 2026-09-25): what the evaluator read, named as a P&C person names it. The stored reason and reads stay
+ * exactly as the evaluator wrote them (the audit trail); only the screen puts them in words. The names are the facts seen
+ * in verdicts and obligations on DEV (33, listed from compliance.SubjectVerdict and ObligationInstanceFact); a fact not
+ * named here shows its own name, so a gap is visible rather than guessed. */
+const KIND_LABEL: Record<string, string> = Object.fromEntries(CLASSIFICATION_KINDS.map((k) => [k.code, k.label]))
+const kindLabel = (code: string) => KIND_LABEL[code] ?? code
+const RATING_WORDS: Record<string, string> = { FifteenMinute: '15-minute rating', FourHour: '4-hour rating', PracticalLimitation: 'practical limitation' }
+const FACT_WORDS: Record<string, string> = {
+  'device.technology': 'Technology', 'asset.voltage_class': 'Voltage class', 'device.protects.name': 'Protected element',
+  'device.protects.terminal.voltage': 'Voltage at the protected terminal', 'device.functions.note': 'Why each element is or is not load-responsive',
+  'cadence.anchor': 'Period start', 'cadence.due': 'Due', 'record.occurred_at': 'Record date', 'record.last': 'Last record',
+  'person.employer': 'Employer', 'person.authorisations': 'Authorisations',
+}
+export function factLabel(name: string, params?: string | null): string {
+  const inline = /^(.*?)(\[.*\])$/.exec(name)                    // an obligation fact carries its parameters in its name
+  if (inline && !params) return factLabel(inline[1], inline[2])
+  const p = s(params).replace(/^\[|\]$/g, '')
+  if (name === 'device.functions') return /load_responsive/.test(p) ? 'Load-responsive elements in service' : 'Elements in service'
+  if (name === 'device.protects.rating') { const k = /kind='?([A-Za-z]+)/.exec(p)?.[1] ?? ''; return `Protected element's ${RATING_WORDS[k] ?? (k || 'rating')}` }
+  if (FACT_WORDS[name]) return FACT_WORDS[name]
+  const prc = PRC023_READS.find(([n]) => n === name); if (prc) return prc[1][0].toUpperCase() + prc[1].slice(1)
+  let m: RegExpExecArray | null
+  if ((m = /^device\.classification\.(\w+)$/.exec(name))) return `${kindLabel(m[1])} (this relay)`
+  if ((m = /^device\.protects\.bus\.classification\.(\w+)$/.exec(name))) return `${kindLabel(m[1])} of the bus at the protected end`
+  if ((m = /^device\.protects\.classification\.(\w+)$/.exec(name))) return `${kindLabel(m[1])} of the protected element`
+  if ((m = /^device\.location\.classification\.(\w+)$/.exec(name))) return `${kindLabel(m[1])} of the building`
+  if ((m = /^device\.station\.classification\.(\w+)$/.exec(name))) return `${kindLabel(m[1])} of the station`
+  if ((m = /^device\.settings\.(.+)$/.exec(name))) return `Setting ${m[1]}`
+  return name
+}
+/** A value as read: "unknown" is what the evaluator writes for a fact nobody has recorded; "{}" is an empty set. */
+export const factValue = (v: unknown) => { const x = s(v); return x === 'unknown' ? 'not recorded' : x === '{}' ? 'none' : x.replace(/@Primary\b/g, ' primary').replace(/@Secondary\b/g, ' secondary') }
+const readLine = (x: FactRead) => `${factLabel(x.name, x.params)}: ${factValue(x.value)}`
+
+/** A standing verdict's reason in words (ComplianceEvaluator.Reasons writes "undetermined — not known: <facts>" and "it
+ * read <fact> = <value>; …"; those are rebuilt from the fact names and reads; a reason already in words is shown as is). */
+function reasonWords(v: Row): string {
+  const r = s(v.Reason)
+  const unknown = /^undetermined(?: — not known)?:\s*(.*)$/.exec(r)
+  if (unknown) return 'Not known yet: ' + unknown[1].split(',').map((n) => n.trim()).filter(Boolean).map((n) => factLabel(n)).join('; ')
+  if (r.startsWith('it read ')) {
+    const reads = readsOf(v).filter((x) => x.name !== 'device.functions.note').slice(0, 3)
+    return reads.length ? 'Read ' + reads.map(readLine).join('; ') : r
+  }
+  if (r === 'no case matched') { const reads = readsOf(v); return reads.length ? 'worked out from ' + reads.map(readLine).join('; ') : 'none of its cases applies' }
+  return r
+}
 
 const statusTone = (v: unknown): Tone => {
   const x = s(v)
@@ -136,8 +184,9 @@ export function useLocationCip(positionNodeEntityId: string, deviceEntityId: str
  * itself. #214: the derivation's standing verdict (compliance.vDeviceVerdict, VerdictKind Derivation) carries its reason. */
 function besCyberAssetNote(r: Row, protectedAssets: Row[] | undefined, current: Row | undefined, derived: Row | undefined): DerivedNote {
   if (derived?.Error) return { label: `could not be worked out: ${s(derived.Error)}`, reason: s(derived.Error) }
-  if (current) return { reason: derived ? s(derived.Reason) : undefined }   // a derived row stands; its reason is the pass's
-  if (derived && !derived.Result) return { label: `not decided — ${s(derived.Reason)}` }
+  // a derived row stands; its reason is what the pass read (#238: the facts in words, not the case's formula text)
+  if (current) return { reason: derived ? (readsOf(derived).map(readLine).join('; ') || reasonWords(derived)) : undefined }
+  if (derived && !derived.Result) return { label: `not decided — ${reasonWords(derived)}` }
   return { label: <>not decided yet. This is checked within seconds of a change, and every hour. What is known so far:
     <ul className="mt-0.5 list-disc pl-5">{besCyberAssetInputs(r, protectedAssets).map((p) => <li key={p}>{p}</li>)}</ul></> }
 }
@@ -287,11 +336,11 @@ function Standards({ r, verdicts, pending }: { r: Row; verdicts: Row[]; pending:
                   <td className="py-1 pr-2 text-slate-200">{s(v.StandardCode)}<div className="text-xs text-slate-500">{s(v.StandardVersion)}</div></td>
                   <td className="py-1 pr-2 text-slate-200">{s(v.RequirementNumber)}<div className="text-xs text-slate-500">{s(v.RequirementTitle)}</div></td>
                   <td className="py-1 pr-2 text-slate-200">{s(v.RuleName)}
-                    {result === 'unknown' && <div className="text-xs text-amber-300">{s(v.Reason)}</div>}
+                    {result === 'unknown' && <div className="text-xs text-amber-300">{reasonWords(v)}</div>}
                     {result === 'error' && <div className="text-xs text-red-300">{s(v.Reason)}</div>}
-                    {!!v.EvidenceNote && <div className="text-xs text-slate-500">evidence: {s(v.EvidenceNote)}</div>}</td>
+                    {!!v.EvidenceNote && <div className="text-xs text-slate-500">Evidence: {s(v.EvidenceNote)}</div>}</td>
                   <td className="py-1 pr-2">
-                    {o ? <Pill tone={statusTone(o.Status)}>{s(o.Status)}</Pill>
+                    {o ? <Pill tone={statusTone(o.Status)}>{statusWords(o.Status)}</Pill>
                       : result === 'true' ? <Pill tone="warn" title="This requirement applies to the relay. It joins the list at the next check.">applies</Pill>
                       : <Pill tone={resultTone(result)}>{result === 'unknown' ? 'not decided' : 'error'}</Pill>}
                     <div className="text-xs text-slate-600">since {fmtWhen(v.SinceAt)}</div>
@@ -309,7 +358,7 @@ function Standards({ r, verdicts, pending }: { r: Row; verdicts: Row[]; pending:
                   <td className="py-1 pr-2 text-slate-200">{s(o.StandardCode)}<div className="text-xs text-slate-500">{s(o.StandardVersion)}</div></td>
                   <td className="py-1 pr-2 text-slate-200">{s(o.RequirementNumber)}{o.SubRequirement ? '.' + s(o.SubRequirement) : ''}<div className="text-xs text-slate-500">{s(o.RequirementTitle)}</div></td>
                   <td className="py-1 pr-2 text-slate-200">{s(o.RuleName)}</td>
-                  <td className="py-1 pr-2"><Pill tone={statusTone(o.Status)}>{s(o.Status)}</Pill></td>
+                  <td className="py-1 pr-2"><Pill tone={statusTone(o.Status)}>{statusWords(o.Status)}</Pill></td>
                   <td className="py-1 pr-2 text-xs text-slate-400">{fmtDate(o.PeriodStartAt)}{o.PeriodEndAt ? ' – ' + fmtDate(o.PeriodEndAt) : ' – open'}</td>
                   <td className="py-1"><Button kind="mini" onClick={() => setOpen(open === id ? null : id)}>{open === id ? 'hide' : 'show'}</Button>{open === id && <ObligationFacts instanceRowId={id} />}</td>
                 </tr>) })}
@@ -321,7 +370,7 @@ function Standards({ r, verdicts, pending }: { r: Row; verdicts: Row[]; pending:
           <Button kind="mini" className="ml-2" onClick={() => setShowWhy(!showWhy)}>{showWhy ? 'hide why' : 'show why'}</Button>
           {showWhy && (
             <ul className="mt-1 space-y-0.5">
-              {notBinding.map((v) => <li key={'why' + s(v.RuleKey)}><span className="text-slate-300">{ruleTitle(v)}</span> <span className="text-slate-400">— {s(v.Reason)}</span> <span className="text-slate-600">since {fmtWhen(v.SinceAt)}</span></li>)}
+              {notBinding.map((v) => <li key={'why' + s(v.RuleKey)}><span className="text-slate-300">{ruleTitle(v)}</span> <span className="text-slate-400">— {reasonWords(v)}</span> <span className="text-slate-600">since {fmtWhen(v.SinceAt)}</span></li>)}
             </ul>)}
         </div>)}
     </Panel>
@@ -336,7 +385,7 @@ function VerdictReads({ v }: { v: Row }) {
   if (!reads.length) return <div className="mt-1 text-xs text-slate-500">Nothing was read for this rule.</div>
   return (
     <ul className="mt-1 space-y-0.5 text-xs">
-      {reads.map((x, i) => <li key={x.name + i}><span className="text-slate-400">{x.name}{x.params ? ` [${x.params}]` : ''}</span> <span className="text-slate-100">{x.value}</span></li>)}
+      {reads.map((x, i) => <li key={x.name + i}><span className="text-slate-400">{factLabel(x.name, x.params)}:</span> <span className="text-slate-100">{factValue(x.value)}</span></li>)}
     </ul>
   )
 }
@@ -350,7 +399,7 @@ function Working({ v }: { v: Row }) {
     <div className="mt-1">
       <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">The loadability working</div>
       <ul className="mt-0.5 space-y-0.5 text-xs">
-        {working.map(([name, label]) => <li key={name}><span className="text-slate-400">{label}</span> <span className="text-slate-100">{byName.get(name)!.value}</span></li>)}
+        {working.map(([name, label]) => <li key={name}><span className="text-slate-400">{label}:</span> <span className="text-slate-100">{factValue(byName.get(name)!.value)}</span></li>)}
       </ul>
       <div className="mt-0.5 text-xs text-slate-600">The steady-state self-polarised circle. The memory-polarised expansion is not modelled. 50H is taken as a tripping element; its MTU/MTO mask is not decoded.</div>{/* #171 */}
     </div>
@@ -365,7 +414,7 @@ function ObligationFacts({ instanceRowId }: { instanceRowId: string }) {
   if (!rows.length) return <div className="mt-1 text-xs text-slate-500">Nothing was recorded against this requirement.</div>
   return (
     <ul className="mt-1 space-y-0.5 text-xs">
-      {rows.map((f) => <li key={s(f.ObligationInstanceFactId)}><span className="text-slate-400">{s(f.FactName)}</span> <span className="text-slate-200">{s(f.ValueAsRead)}</span></li>)}
+      {rows.map((f) => <li key={s(f.ObligationInstanceFactId)}><span className="text-slate-400">{factLabel(s(f.FactName))}:</span> <span className="text-slate-200">{factValue(f.ValueAsRead)}</span></li>)}
     </ul>
   )
 }

@@ -60,6 +60,17 @@ BEGIN
             THROW 50235, @m4, 1;
         END
     END
+    -- #238 (owner, 2026-09-25, withdrawing L2103's line-level rating): the same rule for an Asset subject. A kind whose
+    -- SubjectKinds names neither Asset nor Device (CipImpactRating: ["Building"]) is not recorded on a primary asset or a
+    -- device; before this only a Node subject was checked, so a line still took a CIP rating (#171 made it the building's).
+    IF @value IS NOT NULL AND @SubjectKind = N'Asset' AND @subjectKinds IS NOT NULL
+       AND NOT EXISTS (SELECT 1 FROM OPENJSON(@subjectKinds) WHERE [value] IN (N'Asset', N'Device'))
+    BEGIN
+        DECLARE @m5 NVARCHAR(400) = N'asset.RecordClassification: ' + @ClassificationKindCode + N' is recorded on a '
+            + ISNULL((SELECT STRING_AGG(LOWER(j.[value]), N' or ') FROM OPENJSON(@subjectKinds) j), N'location')
+            + N', not on a primary asset or a relay.';
+        THROW 50237, @m5, 1;
+    END
     IF @value IS NOT NULL AND @appliesTo IS NOT NULL AND @SubjectKind = N'Asset'
     BEGIN
         SELECT @assetType = a.[AssetTypeCode] FROM [asset].[vAsset] a WHERE a.[EntityId] = @SubjectEntityId;

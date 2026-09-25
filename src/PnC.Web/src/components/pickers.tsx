@@ -14,6 +14,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { s, view, type Row } from '@/lib/api'
 import { useViewAll } from '@/lib/hooks'
+import { statusWords } from '@/lib/labels'
 import { Status, inputClass } from './ui/ui'
 
 /** A value that settles: `ms` after the last keystroke. */
@@ -94,7 +95,7 @@ export function AssetPicker({ value, onChange, label = 'Device', placeholder = '
                 className="w-full rounded px-1 py-0.5 text-left text-sm text-slate-200 hover:bg-slate-800">
                 {s(a.Name)}
                 <span className="ml-2 text-xs text-slate-500">{modelLabel(byId.get(s(a.ModelId).toLowerCase())) || s(a.AssetTypeCode)}</span>
-                <span className="ml-2 text-xs text-slate-600">{s(a.Status)}</span>
+                <span className="ml-2 text-xs text-slate-600">{statusWords(a.Status)}</span>
               </button>
             </li>))}
         </ul>)}

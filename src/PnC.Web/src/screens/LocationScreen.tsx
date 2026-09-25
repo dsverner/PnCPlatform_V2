@@ -33,7 +33,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router'
 import { ApiError, fmtDate, proc, s, sqlNumber, view, type Row } from '@/lib/api'
 import { useCan, useViewAll } from '@/lib/hooks'
-import { useNodeTypeName } from '@/lib/labels'
+import { statusWords, useNodeTypeName } from '@/lib/labels'
 import { type RecordParams, type Screen, screenPath } from '@/lib/screens'
 import { Panel, Pill, Button, Facts, Status, inputClass } from '@/components/ui/ui'
 import { AssetPicker, modelLabel, useModels } from '@/components/pickers'
@@ -479,7 +479,7 @@ function SchemesHere({ stationId }: { stationId: string }) {
         {rows.map((x) => (
           <li key={s(x.SchemeEntityId)}>
             <a className="text-sky-300 underline" href={screenPath('SCHEME', s(x.SchemeEntityId))} onClick={(e) => { e.preventDefault(); navigate(screenPath('SCHEME', s(x.SchemeEntityId))) }}>{s(x.SchemeName)}</a>
-            <span className="ml-2 text-xs text-slate-500">{s(x.SchemeStatus)}</span>
+            <span className="ml-2 text-xs text-slate-500">{statusWords(x.SchemeStatus)}</span>
           </li>))}
       </ul>
     </Panel>
@@ -629,7 +629,7 @@ function PlacedRow({ x, model, nodeName, canPlace, canRetract, onDone }: {
         <span className="text-slate-200">{s(x.AssetName)}</span>
         <span className="text-xs text-slate-500">{modelLabel(model) || s(x.AssetTypeCode)}</span>
         <Pill tone={x.PlacementKind === 'Installed' ? 'good' : 'neutral'}>{s(x.PlacementKind)}</Pill>
-        {x.AssetStatus ? <span className="text-xs text-slate-500">{s(x.AssetStatus)}</span> : null}
+        {x.AssetStatus ? <span className="text-xs text-slate-500">{statusWords(x.AssetStatus)}</span> : null}
         {x.PlacedFrom ? <span className="text-xs text-slate-500">since {fmtDate(x.PlacedFrom)}</span> : null}
         {(canPlace || canRetract) && <Button kind="mini" disabled={busy} onClick={() => { setMsg(null); setOpen(!open) }}>{open ? 'done' : 'change…'}</Button>}
       </div>

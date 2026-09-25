@@ -182,7 +182,7 @@ public sealed class ComplianceEvaluator(SqlSession s, Catalog catalog, ILogger l
                                     if (mode == "Effective") { instanceRowId = await OpenAsync(rule, kind, id, now, runId, reads, ct); }
                                     c.opened++; opened++;
                                 }
-                                else if (open.VersionRowId != rule.VersionRowId)
+                                else if (open.VersionRowId != rule.VersionRowId && !await SameObligationAsync(rule, open.VersionRowId, ct))
                                 {
                                     // #197: the obligation stands, but under an earlier version of the rule — that row is Superseded and
                                     // one opens under the version in force, with the reads this version made
@@ -332,6 +332,32 @@ public sealed class ComplianceEvaluator(SqlSession s, Catalog catalog, ILogger l
             }, ct);
         return rowId;
     }
+
+    /// <summary>#238 (owner, 2026-09-25): a rule version that changes only its words — the evidence note, the name — is the same
+    /// obligation, so the open row stands under the version it was opened under and keeps its period. Only a changed scope or
+    /// cadence supersedes it (#197); the requirement is already the same (OpenInstanceAsync finds the row by it). Without this,
+    /// rewording the notes would have superseded and reopened every open obligation with a new period start.</summary>
+    async Task<bool> SameObligationAsync(Rule rule, Guid openedUnder, CancellationToken ct)
+    {
+        if (_sameAs.TryGetValue((rule.VersionRowId, openedUnder), out var known)) return known;
+        var text = await s.ScalarAsync<string>("SELECT PayloadText FROM config.vDefinitionVersion WHERE RowId = @v",
+            new Dictionary<string, object?> { ["@v"] = openedUnder }, ct);
+        var same = false;
+        if (text is not null)
+        {
+            try
+            {
+                var p = (JsonObject)JsonNode.Parse(text)!;
+                var scope = p["scope"] as JsonObject ?? (p["scopeText"]?.GetValue<string>() is { } st ? Parser.Parse(st) : null);
+                same = scope is not null && Canonical.ToCanonical(scope) == rule.ScopeKey
+                       && string.Equals((p["cadenceText"]?.GetValue<string>() ?? "once").Trim(), rule.Cadence.Trim(), StringComparison.OrdinalIgnoreCase);
+            }
+            catch (Exception e) when (e is not OperationCanceledException) { same = false; }   // unreadable: treat as changed, as before
+        }
+        _sameAs[(rule.VersionRowId, openedUnder)] = same;
+        return same;
+    }
+    readonly Dictionary<(Guid, Guid), bool> _sameAs = new();
 
     async Task SupersedeAsync(Rule rule, OpenRow open, string kind, Guid subject, Guid runId, CancellationToken ct)
     {

@@ -16,7 +16,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router'
 import { ApiError, fmtDate, fmtWhen, proc, s, view, viewAll, type Row } from '@/lib/api'
 import { useCan, useViewAll } from '@/lib/hooks'
-import { useNodeTypeName } from '@/lib/labels'
+import { splitWords, statusWords, useNodeTypeName } from '@/lib/labels'
 import { workTypes, raiseAndStart } from '@/lib/actions'
 import { type RecordParams, type Screen, screenPath } from '@/lib/screens'
 import { Panel, Pill, Button, Facts, Status, inputClass } from '@/components/ui/ui'
@@ -48,7 +48,7 @@ export default function InstrumentTransformerScreen({ params: p, id }: { screen:
   return (
     <div className="space-y-3">
       <header className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2"><h1 className="text-lg font-semibold text-slate-100">{s(r.Name)}</h1><Pill tone="accent">{s(r.AssetTypeName)}</Pill><Pill tone={r.Status === 'InService' ? 'good' : r.Status === 'Retired' ? 'bad' : 'neutral'}>{s(r.Status)}</Pill>
+        <div className="flex items-center gap-2"><h1 className="text-lg font-semibold text-slate-100">{s(r.Name)}</h1><Pill tone="accent">{s(r.AssetTypeName)}</Pill><Pill tone={r.Status === 'InService' ? 'good' : r.Status === 'Retired' ? 'bad' : 'neutral'}>{statusWords(r.Status)}</Pill>
           {r.IsPlaced === false && <Pill tone="warn" title="nothing says where this transformer stands yet">not placed</Pill>}</div>
         <div className="flex gap-2">{editable && <Button onClick={() => setEdit(!edit)}>{edit ? 'Cancel edit' : 'Edit'}</Button>}<Button onClick={() => navigate(-1)}>Close</Button></div>
       </header>
@@ -255,7 +255,7 @@ function Windings({ r, editable, canRemove, onChanged }: { r: Row; editable: boo
   const editFrom = (w: Row) => ({ Code: w.Code, Purpose: w.Purpose ?? 'Protection', RatioTaps: w.RatioTaps ?? '', RatioInUse: w.RatioInUse ?? '', AccuracyClass: w.AccuracyClass ?? '', RatedBurden: w.RatedBurden ?? '', KneePointVoltageV: w.KneePointVoltageV ?? '', RatedSecondary: w.RatedSecondary ?? '', Connection: w.Connection ?? '', Notes: w.Notes ?? '' })
   const field = (_key: string, val: string, set: (v: string) => void, w = 'w-24', ph = '') => <input className={`${inputClass} ${w}`} value={val} disabled={busy} placeholder={ph} onChange={(e) => set(e.target.value)} />
   const purposeSel = (val: string, set: (v: string) => void) => <select className={`${inputClass} w-28`} value={val} disabled={busy} onChange={(e) => set(e.target.value)}>{['Protection', 'Metering', 'Sync', 'Spare', 'Other'].map((x) => <option key={x} value={x}>{x}</option>)}</select>
-  const connSel = (val: string, set: (v: string) => void) => <select className={`${inputClass} w-28`} value={val} disabled={busy} onChange={(e) => set(e.target.value)}><option value="">—</option>{['Wye', 'Delta', 'OpenDelta', 'BrokenDelta', 'Single'].map((x) => <option key={x} value={x}>{x}</option>)}</select>
+  const connSel = (val: string, set: (v: string) => void) => <select className={`${inputClass} w-28`} value={val} disabled={busy} onChange={(e) => set(e.target.value)}><option value="">—</option>{['Wye', 'Delta', 'OpenDelta', 'BrokenDelta', 'Single'].map((x) => <option key={x} value={x}>{splitWords(x)}</option>)}</select>
   return (
     <Panel title={`Secondary windings · ${q.isPending ? '…' : rows.length}`} actions={editable ? <Button kind={editing ? 'primary' : 'default'} onClick={() => { setEditing(!editing); setAdding(false) }}>{editing ? 'Done' : 'Edit windings'}</Button> : undefined}>
       {!q.isPending && !rows.length && <Status>No secondary winding is recorded for this transformer.{editable ? ' Edit windings to add the ones on the nameplate.' : ''}</Status>}
@@ -278,7 +278,7 @@ function Windings({ r, editable, canRemove, onChanged }: { r: Row; editable: boo
                   <td className="py-1 pr-2 text-slate-300">{f ? field('RatedBurden', g('RatedBurden'), setF('RatedBurden'), 'w-20') : (s(w.RatedBurden) || '—')}</td>
                   {isCurrent && <td className="py-1 pr-2 text-slate-300">{f ? field('KneePointVoltageV', g('KneePointVoltageV'), setF('KneePointVoltageV'), 'w-16') : (w.KneePointVoltageV != null ? `${Number(w.KneePointVoltageV)} V` : '—')}</td>}
                   <td className="py-1 pr-2 text-slate-300">{f ? field('RatedSecondary', g('RatedSecondary'), setF('RatedSecondary'), 'w-16', '5 A') : (s(w.RatedSecondary) || '—')}</td>
-                  <td className="py-1 pr-2 text-slate-300">{f ? connSel(g('Connection'), setF('Connection')) : (s(w.Connection) || '—')}</td>
+                  <td className="py-1 pr-2 text-slate-300">{f ? connSel(g('Connection'), setF('Connection')) : (splitWords(s(w.Connection)) || '—')}</td>
                   <td className="py-1 pr-2 text-xs text-slate-300">{w.UsedBy ? s(w.UsedBy) : <span className="text-slate-500">free</span>}</td>
                   {editing && <td className="py-1"><span className="flex flex-wrap gap-1 text-xs">
                     {!f && <Button kind="mini" disabled={busy} onClick={() => setEdit({ ...edit, [id]: editFrom(w) })}>Edit</Button>}

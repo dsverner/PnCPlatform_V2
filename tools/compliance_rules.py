@@ -29,16 +29,18 @@ VERSIONS = {   # the NB appendix labels in force on 2026-09-16 (nbeub.ca): the l
 CIP_SCOPE = "device.classification.BesCyberAsset = 'BCA' and device.location.classification.CipImpactRating in {'High', 'Medium'}"
 CIP_ERC_SCOPE = CIP_SCOPE + " and device.classification.ExternalRoutableConnectivity = 'ERC'"
 NPCC_NOTE = ("NPCC Directory 4 is a design criterion, not a settings criterion: the evidence is the protection system design and "
-             "its TFSP submittal and acceptance (R6.1 - R6.3), kept outside the platform. Attaches when the A-10 study declares the "
-             "protected bus BPS (the owner, 2026-09-18: a documentation awareness case).")
-CIP_NOTE = ("The platform holds no record kind for this requirement in this phase; the evidence is kept outside the platform. "
-            "The obligation is listed so the device's sheet shows what applies to it (owner, 2026-09-16).")
+             "its TFSP submittal and acceptance (R6.1 - R6.3), kept outside this application. Attaches when the A-10 study declares "
+             "the protected bus BPS.")   # #238: the owner's quote (2026-09-18, a documentation awareness case) is kept here, not in the note
+# #238 (owner, 2026-09-25): a note is read by the P&C person on the relay's Compliance tab - no owner quotes or dates, no
+# sentence about how the application is built. The reason stands here instead: no record kind holds this evidence in this
+# phase, and the obligation is listed so the relay's sheet shows what applies to it (owner, 2026-09-16).
+CIP_NOTE = "The evidence for this requirement is kept outside this application."
 
 # (key, standard, number, scope text, cadence, note)
 CIP_RULES = [
     ("cip004_r2", "CIP-004", "R2", CIP_SCOPE, "once", CIP_NOTE),
     ("cip004_r4", "CIP-004", "R4", CIP_SCOPE, "once", CIP_NOTE),
-    ("cip005_r1", "CIP-005", "R1", CIP_ERC_SCOPE, "once", CIP_NOTE + " Applies with external routable connectivity (the owner's list)."),
+    ("cip005_r1", "CIP-005", "R1", CIP_ERC_SCOPE, "once", CIP_NOTE + " Listed for a relay with external routable connectivity."),
     ("cip006_r1", "CIP-006", "R1", CIP_SCOPE, "once", CIP_NOTE),
     ("cip007_r1", "CIP-007", "R1", CIP_SCOPE, "once", CIP_NOTE),
     ("cip007_r2", "CIP-007", "R2", CIP_SCOPE, "once", CIP_NOTE),
@@ -70,10 +72,10 @@ PRC_EXPLAIN = ["device.functions", "device.functions.note"]
 PRC_RULES = [
     ("prc023_r1", "PRC-023", "R1", PRC_R1_SCOPE, "once",
      "PRC-023-6 R1: any one of criteria 1-13 for the circuit terminal; loadability at 0.85 pu and 30 degrees. The group applies "
-     "criterion 1, then 2, then 13, then 12 (owner, 2026-09-16); the formula prc023_criterion records which one the in-service "
-     "settings satisfy. Applicability from PRC-023-6 4.2.1.1 (200 kV and above) or the Planning Authority's R6 list (recorded as "
-     "the Prc023 classification of the protected asset), and only where an element in service at the device's position is one "
-     "Attachment A includes (4.1; ground fault detection excluded by A 2.2). NB appendix PRC-023-6-NB-0: no modification."),
+     "criterion 1, then 2, then 13, then 12; the loadability working shows which one the in-service settings satisfy. "
+     "Applicability from PRC-023-6 4.2.1.1 (200 kV and above) or the Planning Authority's R6 list (recorded as "
+     "its PRC-023 listing), and only where an element in service at the relay's position is one "
+     "Attachment A includes (4.1; ground fault detection excluded by A 2.2). NB appendix PRC-023-6-NB-0: no modification."),   # #238: the order of criteria is the owner's, 2026-09-16
     # #184: NPCC Directory 4 attaches to every relay protecting a bus the A-10 study declares BPS. One rule, pointing at the
     # Directory's general criterion R5.1; the Compliance tab lists the whole Directory as reading material beneath it.
     ("npcc_d4", "NPCC-D4", "R5.1", "device.protects.classification.NpccBulkPowerSystem = 'BPS'", "once", NPCC_NOTE),   # #196: the element's declaration, else its bus's
