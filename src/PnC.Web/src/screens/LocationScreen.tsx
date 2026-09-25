@@ -33,6 +33,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router'
 import { ApiError, fmtDate, proc, s, sqlNumber, view, type Row } from '@/lib/api'
 import { useCan, useViewAll } from '@/lib/hooks'
+import { useNodeTypeName } from '@/lib/labels'
 import { type RecordParams, type Screen, screenPath } from '@/lib/screens'
 import { Panel, Pill, Button, Facts, Status, inputClass } from '@/components/ui/ui'
 import { AssetPicker, modelLabel, useModels } from '@/components/pickers'
@@ -71,7 +72,7 @@ function useAncestors(path: unknown) {
 }
 
 export default function LocationScreen({ params: p, id }: { screen: Screen; params: RecordParams; id?: string }) {
-  const navigate = useNavigate(); const can = useCan()
+  const navigate = useNavigate(); const can = useCan(); const nodeTypeName = useNodeTypeName()
   const rowQ = useViewAll('location', 'vNode', { [p.key]: id ?? '' }, undefined, !!id)
   const r = rowQ.data?.[0]
   const ancestorsQ = useAncestors(r?.Path)
@@ -94,16 +95,16 @@ export default function LocationScreen({ params: p, id }: { screen: Screen; para
   return (
     <div className="space-y-3">
       <header className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap items-center gap-2"><h1 className="text-lg font-semibold text-slate-100">{s(r.Name)}</h1>{s(r.FlocCode) ? <FlocTag floc={s(r.FlocCode)} /> : null}<Pill tone="accent">{s(r.NodeTypeCode)}</Pill>{r.SubtypeCode ? <Pill>{s(r.SubtypeCode)}</Pill> : null}</div>
+        <div className="flex flex-wrap items-center gap-2"><h1 className="text-lg font-semibold text-slate-100">{s(r.Name)}</h1>{s(r.FlocCode) ? <FlocTag floc={s(r.FlocCode)} /> : null}<Pill tone="accent">{nodeTypeName(r.NodeTypeCode)}</Pill>{r.SubtypeCode ? <Pill>{s(r.SubtypeCode)}</Pill> : null}</div>
         <div className="flex gap-2"><Button onClick={() => navigate(-1)}>Close</Button></div>
       </header>
       <div className="grid gap-3 lg:grid-cols-2">
         <Panel title="Location">
           <div className="space-y-3">
             <Facts cols={1} pairs={[
-              ['Type', s(r.NodeTypeCode)],
+              ['Type', nodeTypeName(r.NodeTypeCode)],
               ['Where it sits', ancestorsQ.isPending ? '…' : ancestors.length
-                ? <span>{ancestors.map((a, i) => <span key={s(a.EntityId)}>{i > 0 ? ' › ' : ''}<NodeLink id={s(a.EntityId)} name={s(a.Name)} /><span className="ml-1 text-xs text-slate-500">{s(a.NodeTypeCode)}</span></span>)}</span>
+                ? <span>{ancestors.map((a, i) => <span key={s(a.EntityId)}>{i > 0 ? ' › ' : ''}<NodeLink id={s(a.EntityId)} name={s(a.Name)} /><span className="ml-1 text-xs text-slate-500">({nodeTypeName(a.NodeTypeCode).toLowerCase()})</span></span>)}</span>
                 : 'the top of the tree']]} />
             {note && <Status>{note}</Status>}
             {canEdit
@@ -121,7 +122,7 @@ export default function LocationScreen({ params: p, id }: { screen: Screen; para
               return (
                 <Panel title="Applicability classifications">
                   {s(r.NodeTypeCode) !== 'Station' && <Facts cols={1} pairs={[['CIP impact rating', rated
-                    ? <span>{s(rated.c!.ClassificationValue)} <span className="text-slate-500">— inherited from <NodeLink id={s(rated.a.EntityId)} name={s(rated.a.Name)} /> ({s(rated.a.NodeTypeCode)})</span></span>
+                    ? <span>{s(rated.c!.ClassificationValue)} <span className="text-slate-500">— inherited from <NodeLink id={s(rated.a.EntityId)} name={s(rated.a.Name)} /> ({nodeTypeName(rated.a.NodeTypeCode).toLowerCase()})</span></span>
                     : <span className="text-slate-500">none — no building above this carries a rating yet</span>],
                     ...(POSITION_TYPES.includes(s(r.NodeTypeCode)) ? [['Device here', (() => {
                       const x = placedQ.data?.[0]; if (!x) return <span className="text-slate-500">nothing placed</span>
@@ -290,7 +291,7 @@ function refreshTree(qc: ReturnType<typeof useQueryClient>) {
  * a building, its panels. The estate's 250 buildings are one per station and all named "Building (unknown — legacy has
  * no buildings)"; the link is how they are reached at all (#173). #174: a child is added and withdrawn here. */
 function Inside({ node, canEdit, canArchive }: { node: Row; canEdit: boolean; canArchive: boolean }) {
-  const qc = useQueryClient()
+  const qc = useQueryClient(); const nodeTypeName = useNodeTypeName()
   const q = useViewAll('location', 'vNode', { ParentEntityId: s(node.EntityId) }, 'Name', !!node.EntityId)
   const rows = [...(q.data ?? [])].sort(byCodeThenName)
   // #195: a station's buildings carry the CIP impact rating; shown here, read-only, so the station still tells you
@@ -314,7 +315,7 @@ function Inside({ node, canEdit, canArchive }: { node: Row; canEdit: boolean; ca
         {rows.map((n) => (
           <li key={s(n.EntityId)} className="flex flex-wrap items-center gap-2">
             <CodeName id={s(n.EntityId)} code={s(n.Code)} name={s(n.Name)} />
-            <span className="text-xs text-slate-500">{s(n.NodeTypeCode)}{n.SubtypeCode ? ' · ' + s(n.SubtypeCode) : ''}</span>
+            <span className="text-xs text-slate-500">{nodeTypeName(n.NodeTypeCode)}{n.SubtypeCode ? <>, <span className="text-slate-600">type</span> {s(n.SubtypeCode)}</> : null}</span>
             {s(node.NodeTypeCode) === 'Station' && s(n.NodeTypeCode) === 'Building' && (cipOf(s(n.EntityId))
               ? <span className="text-xs text-sky-300">CIP {s(cipOf(s(n.EntityId)))}</span>
               : <span className="text-xs text-slate-500">— no CIP rating yet; open the building to enter it</span>)}

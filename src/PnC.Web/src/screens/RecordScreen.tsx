@@ -22,7 +22,8 @@ const SETTINGS_ACTIONS = ['SETTINGS_CHANGE', 'SETTINGS_ADD', 'SETTINGS_DELETE', 
 import { RationalePanel } from '@/screens/RationalePanel'
 import { DataGrid, type Column } from '@/components/ui/data-grid'
 import DeviceSettings, { useTemplate, AnalogInputs, BasisPanel, RelayListingAndFile } from './DeviceSettings'
-import ComplianceTab, { useProtectedAssets } from './ComplianceTab'
+import ComplianceTab, { ProtectedAssetList } from './ComplianceTab'
+import { useNodeTypeName } from '@/lib/labels'
 import { NodeLink } from './PrimaryAssetScreen'
 import { ManualPanel } from '@/components/ManualPanel'
 import { AssetCharacteristics } from '@/components/CharacteristicsPanel'
@@ -69,7 +70,12 @@ export default function RecordScreen({ params: p, id }: { screen: Screen; params
         </div>
       </header>
       {raise && <RaiseRequest o={raise} onClose={() => setRaise(null)} />}
-      <Status>{legacyFree(r.DeviceName)} · rev {s(r.RevisionLabel) || '?'} · Revision {s(r.RevisionStatus)} · lifecycle {s(r.LifecycleState) || '—'} · {s(r.FileKind)} {s(r.ParseStatus)}</Status>
+      {/* #237 (the owner, 2026-09-25): facts set out as label and value, not one run of " · " */}
+      <dl className="flex flex-wrap gap-x-6 gap-y-1 rounded border border-slate-800 bg-slate-900/60 px-3 py-1.5 text-sm">
+        {([['Relay', legacyFree(r.DeviceName)], ['Revision', `${s(r.RevisionLabel) || '?'} (${s(r.RevisionStatus).toLowerCase()})`], ['Lifecycle', s(r.LifecycleState) || '—'],
+          ['Settings file', [s(r.FileKind).replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase(), s(r.ParseStatus).toLowerCase()].filter(Boolean).join(', ') || 'none filed']] as [string, string][]).map(([k, v]) =>
+          <div key={k} className="flex gap-1.5"><dt className="text-slate-500">{k}:</dt><dd className="text-slate-200">{v}</dd></div>)}
+      </dl>
       {/* #226 (the owner, 2026-09-22): which of these a person keeps is theirs — defaulted by the work they do, changed
           by them, and never a way of blocking anything. The two conditional tabs keep their conditions on top of it. */}
       <PreferredTabs screenKey="SETTINGS_RECORD" value={section} onChange={setSection} tabs={[{ key: 'settings', label: 'Settings' }, ...(hasRationaleTab ? [{ key: 'rationale', label: 'Rationale' }] : []), { key: 'analog', label: 'Analog inputs' }, ...(r.TemplateDefinitionEntityId ? [{ key: 'jumpers', label: 'Jumper settings' }] : []), { key: 'record', label: 'Record' }, { key: 'history', label: 'History' }, { key: 'compliance', label: 'Compliance' }, { key: 'notes', label: 'Notes' }, { key: 'text', label: 'Settings file' }, { key: 'files', label: 'Files and records' }, { key: 'manual', label: 'Manual' }]} />
@@ -104,7 +110,7 @@ export default function RecordScreen({ params: p, id }: { screen: Screen; params
           ['Template', r.TemplateKey ? <span><a className="text-sky-300 underline" href={screenPath('DEVICE_TEMPLATE', s(r.ModelId))} onClick={(e) => { e.preventDefault(); navigate(screenPath('DEVICE_TEMPLATE', s(r.ModelId))) }}>{s(r.TemplateKey)} v{s(r.TemplateVersion)}</a> <span className="text-slate-500">through the model</span></span> : <span className="text-slate-500">no template for this model yet</span>]]} /></Panel>
         <Panel title="Placement and scheme"><Facts cols={1} pairs={[['Location', <NodeLink id={s(r.BuildingNodeEntityId)} name={s(r.BuildingName)} />],
           ['Scheme', r.SchemeEntityId ? <a className="text-sky-300 underline" href={screenPath('SCHEME', s(r.SchemeEntityId))} onClick={(e) => { e.preventDefault(); navigate(screenPath('SCHEME', s(r.SchemeEntityId))) }}>{s(r.SchemeName)}</a> : s(r.SchemeName)],
-          ['Protects', <Protects schemeEntityId={s(r.SchemeEntityId)} />], ['Equipment', s(r.PanelName)], ['Position', s(r.PositionName)],
+          ['Protects', r.SchemeEntityId ? <ProtectedAssetList schemeEntityId={s(r.SchemeEntityId)} /> : <span className="text-slate-500">—</span>], ['Equipment', s(r.PanelName)], ['Position', s(r.PositionName)],
           /* #187: placed and FLOC are two facts — a relay can be installed at a position that has no tag yet */
           ['Placed', r.PositionNodeEntityId
             ? <span>Installed at <NodeLink id={s(r.PositionNodeEntityId)} name={s(r.PositionName)} />{r.PanelName ? <>, {s(r.PanelName)}</> : null}{r.PlacedFrom ? ` since ${fmtDate(r.PlacedFrom)}` : ''}</span>
@@ -146,17 +152,6 @@ export default function RecordScreen({ params: p, id }: { screen: Screen; params
       {section === 'rationale' && hasRationaleTab && <RationalePanel revision={id} editable={s(r.GridState) === 'Outstanding' && !settingsLocked} />}   {/* #219, #222 */}
     </div>
   )
-}
-
-/** #170: what the device's scheme protects, with the primary assets' applicability classifications — the device inherits them (the owner, 2026-09-16). */
-function Protects({ schemeEntityId }: { schemeEntityId: string }) {
-  const navigate = useNavigate()
-  const q = useProtectedAssets(schemeEntityId)   // #171: one lookup, shared with the Compliance tab
-  if (!schemeEntityId) return <span className="text-slate-500">—</span>
-  if (q.isPending) return <span className="text-slate-500">…</span>
-  const rows = q.data ?? []
-  if (!rows.length) return <span className="text-slate-500">not recorded on the scheme yet</span>
-  return <span>{rows.map((a, i) => <span key={s(a.EntityId)}>{i > 0 ? '; ' : ''}<a className="text-sky-300 underline" href={screenPath('PRIMARY_ASSET', s(a.EntityId))} onClick={(e) => { e.preventDefault(); navigate(screenPath('PRIMARY_ASSET', s(a.EntityId))) }}>{s(a.Name)}</a> <span className="text-xs text-slate-500">{s(a.AssetTypeName).toLowerCase()}{a.ZoneRole !== 'Primary' ? ' · ' + s(a.ZoneRole).toLowerCase() : ''}{a.Classifications ? ' · ' + s(a.Classifications) : ' · no classification recorded'}{a.Npcc ? ` · NPCC ${s(a.Npcc)} (declared on the element)` : ''}{a.HasTerminal ? ` · from terminal ${s(a.TerminalNo)} ${s(a.TerminalStation)}: ` + (a.BusName ? `bus ${s(a.BusName)} NPCC ${s(a.BusNpcc) || 'not recorded'}` : 'no bus linked') : ''}</span></span>)}</span>
 }
 
 const PARSED_COLS: Column<Row>[] = [
@@ -281,6 +276,7 @@ function FilesPanel({ r, revision }: { r: Row; revision: string }) {
  */
 function FlocMissing({ r }: { r: Row }) {
   const posId = s(r.PositionNodeEntityId)
+  const nodeTypeName = useNodeTypeName()
   const q = useQuery({ queryKey: ['flocMissing', posId], enabled: !!posId, staleTime: 60_000, queryFn: async () => {
     const pos = (await view('location', 'vNode', { EntityId: posId }, { take: 1 })).rows[0]
     if (!pos) return [] as Row[]
@@ -298,6 +294,6 @@ function FlocMissing({ r }: { r: Row }) {
   const missing = q.data ?? []
   if (!missing.length) return <span className="text-slate-500">no tag yet</span>
   return (
-    <span className="text-slate-400">no tag yet — no code on {missing.map((n, i) => <span key={s(n.EntityId)}>{i > 0 ? (i === missing.length - 1 ? ' and ' : ', ') : ''}<NodeLink id={s(n.EntityId)} name={`${s(n.Name)} (${s(n.NodeTypeCode)})`} /></span>)}; open one to enter it</span>
+    <span className="text-slate-400">no tag yet — no code on {missing.map((n, i) => <span key={s(n.EntityId)}>{i > 0 ? (i === missing.length - 1 ? ' and ' : ', ') : ''}<NodeLink id={s(n.EntityId)} name={`${s(n.Name)} (${nodeTypeName(n.NodeTypeCode).toLowerCase()})`} /></span>)}; open one to enter it</span>
   )
 }

@@ -7,7 +7,7 @@
 // the terminal connects to. The NPCC A-10 test is a bus test (the owner): the BPS declaration is recorded on busses only and a
 // line or transformer inherits it at each end from its bus. The schemes protecting the asset are listed by terminal end on the
 // right, where a scheme at that station is assigned to the end it protects from.
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router'
 import { ApiError, fmtWhen, s, view, viewAll, proc, type Row } from '@/lib/api'
@@ -31,6 +31,15 @@ export const CLASSIFICATION_KINDS: { code: string; label: string; values: string
   // #171 (2026-09-17): ERC is recorded by hand until a network-analysis module can determine it
   { code: 'ExternalRoutableConnectivity', label: 'External routable connectivity', values: ['ERC', 'No ERC'], help: 'CIP-005: the device is reachable by a routable protocol from outside the electronic security perimeter. Recorded by hand', subject: 'device' },
 ]
+/** #237: a read model's summary string ("BesStatus=BES; Prc023=Listed") as labelled pairs, each kind by its name
+ * ("BES status", "PRC-023"); a kind not in the list above keeps its code. Never shown to a user as the raw string. */
+export function classificationPairs(summary: unknown): { code: string; label: string; value: string }[] {
+  return s(summary).split(';').map((x) => x.trim()).filter(Boolean).map((x) => {
+    const at = x.indexOf('='); const code = at < 0 ? x : x.slice(0, at).trim(); const value = at < 0 ? '' : x.slice(at + 1).trim()
+    return { code, label: CLASSIFICATION_KINDS.find((k) => k.code === code)?.label ?? code, value }
+  })
+}
+
 /** The kinds each screen records: the primary asset's, the location node's, the device's (#171). */
 export const PRIMARY_ASSET_KINDS = ['BesStatus', 'NpccBulkPowerSystem', 'Prc023']
 export const NODE_KINDS = ['CipImpactRating']
@@ -66,7 +75,7 @@ const useTerminals = (assetId: string) => useViewAll('asset', 'vAssetTerminalDet
  * because both are decided here. `reasons` lets a caller put the derivation's own words beside the value: `reason` sits
  * after the value, and `label` replaces the whole line while no derived value has been written — the panel never says why
  * a value is what it is, nor what it would be, on its own. */
-export interface DerivedNote { label?: string; reason?: string }
+export interface DerivedNote { label?: ReactNode; reason?: string }
 export function ClassificationPanel({ subjectKind, subjectEntityId, editable, assetTypeCode, kinds: kindCodes, title, note, reasons }: { subjectKind: string; subjectEntityId: string; editable: boolean; assetTypeCode?: string; kinds?: string[]; title?: string; note?: string; reasons?: Record<string, DerivedNote> }) {
   const qc = useQueryClient()
   const q = useClassifications(subjectKind, subjectEntityId)
@@ -287,7 +296,7 @@ function Terminals({ r, readOnly = false }: { r: Row; readOnly?: boolean }) {
           </select>
           <select className={`${inputClass} w-28`} value={s(x.VoltageClassCode)} disabled={busy} title="the voltage at this terminal" onChange={(e) => void revise(x, { VoltageClassCode: e.target.value || null }, `terminal ${s(x.TerminalNo)}: ${e.target.value || 'no voltage'}.`)}><option value="">— kV —</option>{!!x.VoltageClassCode && !(voltagesQ.data ?? []).some((v) => s(v.VoltageClassCode) === s(x.VoltageClassCode)) && <option value={s(x.VoltageClassCode)}>{s(x.VoltageClassCode)} (retired)</option>}{voltageOptions}</select>
           {r.AssetTypeCode !== 'Bus' && <select className={`${inputClass} w-56`} value={s(x.BusAssetEntityId).toLowerCase()} disabled={busy} title="the bus this terminal connects to (the NPCC A-10 declaration is the bus's)" onChange={(e) => void revise(x, { BusAssetEntityId: e.target.value || null }, `terminal ${s(x.TerminalNo)}: bus ${bussesAt(x.StationNodeEntityId).find((b) => s(b.EntityId).toLowerCase() === e.target.value)?.Name ?? 'none'}.`)}>
-            <option value="">— bus at {s(x.StationName)} —</option>{bussesAt(x.StationNodeEntityId).map((b) => <option key={s(b.EntityId)} value={s(b.EntityId).toLowerCase()}>{s(b.Name)}{b.Classifications ? ` (${s(b.Classifications).replace('NpccBulkPowerSystem=', 'NPCC ')})` : ''}</option>)}
+            <option value="">— bus at {s(x.StationName)} —</option>{bussesAt(x.StationNodeEntityId).map((b) => <option key={s(b.EntityId)} value={s(b.EntityId).toLowerCase()}>{s(b.Name)}{b.Classifications ? ` (${classificationPairs(b.Classifications).map((p) => `${p.label}: ${p.value}`).join(', ')})` : ''}</option>)}
           </select>}
           <NodeLink id={s(x.StationNodeEntityId)} name="the station" />
           <Button kind="mini" disabled={busy} onClick={() => void removeTerminal(x)}>remove</Button>
@@ -337,7 +346,9 @@ function ProtectedBy({ r, editable }: { r: Row; editable: boolean }) {
       <ul className="space-y-2 text-sm">
         {terminals.map((t) => (
           <li key={s(t.TerminalEntityId)}>
-            <div className="font-semibold text-slate-200">Terminal {s(t.TerminalNo)} · {s(t.StationName)}{t.VoltageClassCode ? ` · ${s(t.VoltageClassCode)}` : ''}{t.BusName ? <span className="ml-2 text-xs font-normal text-slate-400">bus {s(t.BusName)}{t.BusNpcc ? ` · NPCC ${s(t.BusNpcc)}` : ''}</span> : null}</div>
+            {/* #237: the end, then its bus on a line of its own — not one run of facts */}
+            <div className="font-semibold text-slate-200">Terminal {s(t.TerminalNo)} at {s(t.StationName)}{t.VoltageClassCode ? <span className="font-normal text-slate-400">, {s(t.VoltageClassCode)}</span> : ''}</div>
+            <div className="text-xs text-slate-400">Bus: {t.BusName ? <>{s(t.BusName)} <span className="text-slate-500">— NPCC:</span> {s(t.BusNpcc) || <span className="text-slate-500">not recorded</span>}</> : <span className="text-slate-500">none linked</span>}</div>
             <ul className="ml-4 mt-1 space-y-1">
               {linksAt(t).map((l) => <li key={s(l.EntityId)} className="flex items-center gap-2">└ {schemeLink(l)} <span className="text-xs text-slate-500">{s(l.ZoneRole) === 'BreakerFailure' ? 'breaker failure' : s(l.ZoneRole).toLowerCase()}{l.AssetTerminalEntityId ? '' : ' · by station'}</span>
                 {editable && !l.AssetTerminalEntityId && <Button kind="mini" disabled={busy} onClick={() => void tie(l, t)}>tie to this end</Button>}

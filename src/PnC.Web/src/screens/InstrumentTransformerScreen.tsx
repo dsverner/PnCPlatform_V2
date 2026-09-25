@@ -16,6 +16,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router'
 import { ApiError, fmtDate, fmtWhen, proc, s, view, viewAll, type Row } from '@/lib/api'
 import { useCan, useViewAll } from '@/lib/hooks'
+import { useNodeTypeName } from '@/lib/labels'
 import { workTypes, raiseAndStart } from '@/lib/actions'
 import { type RecordParams, type Screen, screenPath } from '@/lib/screens'
 import { Panel, Pill, Button, Facts, Status, inputClass } from '@/components/ui/ui'
@@ -108,7 +109,7 @@ function EditEquipment({ r, onDone }: { r: Row; onDone: () => void }) {
  * here when the station has none (no migrated station has one). asset.PlaceAsset applies #202: a CT/VT in a Yard, an
  * auxiliary at a Panel; and a node holds one installed asset (a second auxiliary on the same panel is refused by the database). */
 function WhereItStands({ r, canPlace, canMakeNode, onChanged }: { r: Row; canPlace: boolean; canMakeNode: boolean; onChanged: () => void }) {
-  const station = s(r.StationNodeEntityId); const at = standsAt(s(r.AssetTypeCode))
+  const station = s(r.StationNodeEntityId); const at = standsAt(s(r.AssetTypeCode)); const nodeTypeName = useNodeTypeName()
   const stationName = s(r.StationName); const placed = !!r.NodeEntityId; const migrated = !!r.MigrationSource
   const yardsQ = useViewAll('location', 'vNode', { ParentEntityId: station, NodeTypeCode: 'Yard' }, 'Name', !!station && at === 'Yard')
   const panelsQ = useQuery({ queryKey: ['stationPanels', station], enabled: !!station && at === 'Panel', staleTime: 60_000, queryFn: async () => {
@@ -137,7 +138,7 @@ function WhereItStands({ r, canPlace, canMakeNode, onChanged }: { r: Row; canPla
   return (
     <Panel title="Where it stands">
       {r.NodeEntityId
-        ? <Facts cols={1} pairs={[['Placed at', <span><NodeLink id={s(r.NodeEntityId)} name={s(r.NodeName)} /> <span className="text-xs text-slate-500">{s(r.NodeTypeCode)} · {s(r.PlacementKind)}</span></span>]]} />
+        ? <Facts cols={1} pairs={[['Placed at', <span><NodeLink id={s(r.NodeEntityId)} name={s(r.NodeName)} /> <span className="text-xs text-slate-500">({nodeTypeName(r.NodeTypeCode).toLowerCase()})</span></span>], ['Placement', s(r.PlacementKind) || '—']]} />
         : <Status>Not placed. {migrated ? 'The legacy record gave the scheme, not the yard: ' : ''}{station ? `choose the ${at === 'Yard' ? 'yard' : 'panel'} at ${stationName} below${at === 'Yard' ? ', or make the yard first' : ''}.` : 'Nothing says which station it is at. Name it as a scheme\'s source first, or place it from a yard\'s page.'}</Status>}
       {canPlace && station && (
         <div className="mt-2 space-y-2 border-t border-slate-800 pt-2 text-sm">
@@ -196,7 +197,9 @@ function Feeds({ r, editable, canRemove, onChanged }: { r: Row; editable: boolea
             {rows.map((x) => (
               <tr key={s(x.MemberEntityId)} className="border-t border-slate-800 align-top">
                 <td className="py-1 pr-2"><SchemeName id={s(x.SchemeEntityId)} onOpen={() => navigate(screenPath('SCHEME', s(x.SchemeEntityId)))} /></td>
-                <td className="py-1 pr-2 text-slate-300">{sourceRoleLabel(x.MemberRoleCode)}{x.InputCode ? ` · ${s(x.InputCode)}` : ''}{x.WindingCode ? <span className="text-slate-200"> · winding {s(x.WindingCode)}</span> : <span className="text-xs text-amber-300"> · winding not recorded</span>}{x.RatioInUse ? <span className="text-xs text-slate-500"> · {s(x.RatioInUse)}{x.Ratio != null ? ` = ${s(x.Ratio)}` : ''}</span> : null}</td>
+                <td className="py-1 pr-2 text-slate-300">{/* #237: role, input, winding and ratio each on a labelled line */}<div>{sourceRoleLabel(x.MemberRoleCode)}{x.InputCode ? <span className="text-slate-400">, input {s(x.InputCode)}</span> : null}</div>
+                  <div className="text-xs">{x.WindingCode ? <><span className="text-slate-500">Winding:</span> <span className="text-slate-200">{s(x.WindingCode)}</span></> : <span className="text-amber-300">Winding not recorded</span>}</div>
+                  {x.RatioInUse ? <div className="text-xs"><span className="text-slate-500">Ratio in use:</span> {s(x.RatioInUse)}{x.Ratio != null ? <span className="text-slate-500"> (= {s(x.Ratio)})</span> : null}</div> : null}</td>
                 <td className="py-1 pr-2"><span className="flex flex-wrap gap-1">{x.IsInService === false ? <Pill tone="warn">not in service</Pill> : <Pill tone="good">in service</Pill>}{Number(x.ParallelCount ?? 0) >= 2 && <InputPartners inputId={s(x.AnalogInputEntityId)} self={s(r.Name)} />}</span></td>
                 <td className="py-1 pr-2 text-xs text-slate-300">{s(x.Notes) || <span className="text-slate-600">—</span>}</td>
                 {editing && <td className="py-1"><SchemeSourceActions x={x} canModify={editable} canRemove={canRemove} onChanged={onChanged} /></td>}

@@ -5,7 +5,8 @@
 // function of what is presently known about the system?"): it is — this tab reads what the platform decided
 // (compliance.vDeviceVerdict, vDeviceEvaluation), when and why, and has no button. A change that a rule reads leaves an
 // evaluation request; the worker answers within seconds; the hourly pass is the catch-all (Compliance › Evaluation).
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
+import { useNodeTypeName } from '@/lib/labels'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router'
 import { fmtDate, fmtWhen, s, view, viewAll, type Row } from '@/lib/api'
@@ -61,6 +62,49 @@ export function useProtectedAssets(schemeEntityId: string) {
   } })
 }
 
+/** #237 (the owner, 2026-09-25: the Protects line had "all of the various information sections … stuck together"): what
+ * a scheme protects, one bullet per primary asset, each fact on its own labelled line. Shared by the record's Placement
+ * panel and the Compliance tab. #173: a classification that does not apply to the asset's type is not shown (a bus has
+ * no PRC-023 line); #196: the element's own NPCC declaration rules over the bus's. */
+export function ProtectedAssetList({ schemeEntityId }: { schemeEntityId: string }) {
+  const navigate = useNavigate()
+  const q = useProtectedAssets(schemeEntityId)
+  const kindRefQ = useClassificationKindRef()
+  const kindRef = (code: string) => (kindRefQ.data ?? []).find((k) => s(k.ClassificationKindCode) === code)
+  const link = (screen: string, id: string, label: string) => (
+    <a className="text-sky-300 underline" href={screenPath(screen, id)} onClick={(e) => { e.preventDefault(); navigate(screenPath(screen, id)) }}>{label}</a>)
+  if (!schemeEntityId) return <span className="text-slate-500">this relay is in no scheme, so what it protects is not known</span>
+  if (q.isPending) return <span className="text-slate-500">…</span>
+  const rows = q.data ?? []
+  if (!rows.length) return <span className="text-slate-500">the scheme has nothing recorded that it protects</span>
+  const notRecorded = <span className="text-slate-500">not recorded</span>
+  return (
+    <ul className="list-disc space-y-2 pl-5 marker:text-slate-600">{rows.map((a) => {
+      const type = s(a.AssetTypeName).toLowerCase() || 'element'
+      const kinds = ([['BesStatus', 'BES status', a.BesStatus], ['Prc023', 'PRC-023', a.Prc023]] as [string, string, unknown][])
+        .filter(([code]) => kindApplies(kindRef(code), s(a.AssetTypeCode)))
+      return (
+        <li key={s(a.EntityId)}>
+          <span className="font-medium">{link('PRIMARY_ASSET', s(a.EntityId), s(a.Name))}</span>
+          <span className="ml-2 text-xs text-slate-500">{s(a.AssetTypeName)}{a.ZoneRole !== 'Primary' ? ` (${s(a.ZoneRole).toLowerCase()} zone)` : ''}</span>
+          <dl className="mt-1 grid grid-cols-[9rem_1fr] gap-x-2 gap-y-0.5 text-xs">
+            {kinds.map(([code, label, value]) => <Fragment key={code}><dt className="text-slate-500">{label}</dt><dd className="text-slate-300">{value ? s(value) : notRecorded}</dd></Fragment>)}
+            {!kinds.length && <><dt className="text-slate-500">BES / PRC-023</dt><dd className="text-slate-500">does not apply to a {type}</dd></>}
+            {a.Npcc ? <><dt className="text-slate-500">NPCC (the {type}'s own)</dt><dd className="text-sky-300">{s(a.Npcc)}</dd></> : null}
+            <dt className="text-slate-500">Protected from</dt>
+            <dd className="text-slate-300">{a.HasTerminal
+              ? <>terminal {s(a.TerminalNo)} at {a.TerminalStationId ? link('LOCATION', s(a.TerminalStationId), s(a.TerminalStation)) : s(a.TerminalStation)}</>
+              : <span className="text-slate-500">no end is named, so no bus NPCC is taken</span>}</dd>
+            {a.HasTerminal ? <>
+              <dt className="text-slate-500">Bus at that end</dt>
+              <dd className="text-slate-300">{a.BusName ? s(a.BusName) : <span className="text-slate-500">no bus linked</span>}</dd>
+              {a.BusName ? <><dt className="text-slate-500">Bus NPCC</dt><dd className="text-slate-300">{s(a.BusNpcc) || notRecorded}{a.Npcc ? <span className="text-slate-500"> — the {type}'s own declaration rules</span> : null}</dd></> : null}
+            </> : null}
+          </dl>
+        </li>) })}
+    </ul>)
+}
+
 /** The CIP-002 impact rating the rules actually read: the nearest classified ancestor-or-self of the device's placement
  * node, not the station's (#173, the owner 2026-09-17 — "the classification … of building that the device is in"; the
  * engine walks ParentEntityId in location.fNearestClassified). location.vNode.Path is that same chain for a screen: the
@@ -94,18 +138,19 @@ function besCyberAssetNote(r: Row, protectedAssets: Row[] | undefined, current: 
   if (derived?.Error) return { label: `could not be worked out: ${s(derived.Error)}`, reason: s(derived.Error) }
   if (current) return { reason: derived ? s(derived.Reason) : undefined }   // a derived row stands; its reason is the pass's
   if (derived && !derived.Result) return { label: `not decided — ${s(derived.Reason)}` }
-  return { label: `not decided yet. This is checked within seconds of a change, and every hour. What is known so far: ${besCyberAssetInputs(r, protectedAssets)}.` }
+  return { label: <>not decided yet. This is checked within seconds of a change, and every hour. What is known so far:
+    <ul className="mt-0.5 list-disc pl-5">{besCyberAssetInputs(r, protectedAssets).map((p) => <li key={p}>{p}</li>)}</ul></> }
 }
 
 /** The facts the derivation reads, stated as facts and nothing more (the technology and each protected element's BES status). */
-function besCyberAssetInputs(r: Row, protectedAssets: Row[] | undefined): string {
+function besCyberAssetInputs(r: Row, protectedAssets: Row[] | undefined): string[] {
   const tech = s(r.Technology)                                    // document.vSettingsRecord carries the model's Technology
-  const parts = [tech ? `${tech.toLowerCase()}-based` : 'the technology is not recorded']
+  const parts = [tech ? `Technology: ${tech.toLowerCase()}` : 'the technology is not recorded']
   if (!r.SchemeEntityId) parts.push('this relay is in no scheme, so what it protects is not known')
   else if (!protectedAssets) parts.push('what it protects is still loading')
   else if (!protectedAssets.length) parts.push('the scheme has nothing recorded that it protects')
   else parts.push(...protectedAssets.map((a) => `${s(a.Name)} is ${a.BesStatus ? s(a.BesStatus) : 'of no recorded BES status'}`))
-  return parts.join('; ')
+  return parts
 }
 
 export default function ComplianceTab({ r }: { r: Row }) {
@@ -135,17 +180,9 @@ export default function ComplianceTab({ r }: { r: Row }) {
 /** What the device inherits: the location's CIP impact rating, and the protected primary asset's BES / PRC-023 and the bus's NPCC.
  * #173: a classification that does not apply to the protected asset's type is not shown at all — a bus has no PRC-023 line. */
 function Inherited({ r, bca }: { r: Row; bca: string }) {
-  const navigate = useNavigate()
   const cipQ = useLocationCip(s(r.PositionNodeEntityId), s(r.DeviceEntityId))
-  const protectsQ = useProtectedAssets(s(r.SchemeEntityId))
-  const kindRefQ = useClassificationKindRef()
-  const kindRef = (code: string) => (kindRefQ.data ?? []).find((k) => s(k.ClassificationKindCode) === code)
-  const inherited = (a: Row) => ([['BesStatus', 'BES status', a.BesStatus], ['Prc023', 'PRC-023', a.Prc023]] as [string, string, unknown][])
-    .filter(([code]) => kindApplies(kindRef(code), s(a.AssetTypeCode)))
+  const nodeTypeName = useNodeTypeName()
   const cip = cipQ.data
-  const link = (screen: string, id: string, label: string) => (
-    <a className="text-sky-300 underline" href={screenPath(screen, id)} onClick={(e) => { e.preventDefault(); navigate(screenPath(screen, id)) }}>{label}</a>)
-  const rows = protectsQ.data ?? []
   return (
     <Panel title="Inherited">
       <dl className="space-y-2 text-sm">
@@ -159,30 +196,15 @@ function Inherited({ r, bca }: { r: Row; bca: string }) {
               : !cip.value ? <span className="text-slate-500">no building above this position carries a rating</span>
               : bca === 'Not BCA' ? <span className="text-slate-300">Not applicable — not a cyber asset. <span className="text-slate-500">The building <NodeLink id={cip.nodeId} name={cip.nodeName} /> is rated {cip.value}; that applies to the cyber assets it houses, not to this relay.</span></span>
               : <><Pill tone={cip.value === 'High' ? 'bad' : cip.value === 'Medium' ? 'warn' : 'neutral'}>{cip.value}</Pill>
-                  <span className="ml-2">— {bca === 'BCA' ? 'a BES Cyber Asset in' : 'the rating of'} <NodeLink id={cip.nodeId} name={cip.nodeName} /> <span className="text-xs text-slate-500">{cip.nodeType}{cip.at ? ' · ' + fmtWhen(cip.at) : ''}{bca === 'BCA' ? '' : ' · cyber status not decided yet'}</span></span></>}
+                  <span className="ml-2">— {bca === 'BCA' ? 'a BES Cyber Asset in' : 'the rating of'} <NodeLink id={cip.nodeId} name={cip.nodeName} /> <span className="text-xs text-slate-500">({nodeTypeName(cip.nodeType).toLowerCase()}{cip.at ? ', rated ' + fmtWhen(cip.at) : ''})</span>
+                  {bca === 'BCA' ? null : <div className="text-xs text-slate-500">Whether this relay is a BES Cyber Asset is not decided yet.</div>}</span></>}
             <div className="text-xs text-slate-600">CIP-002: this is the building's rating. Every BES Cyber Asset in it takes that rating. Whether this relay is one is worked out above.</div>{/* #173, #195 */}
           </dd>
         </div>
         <div className="grid grid-cols-[13rem_1fr] items-start gap-2">
           <dt className="text-slate-400">Protected primary asset</dt>
           <dd className="min-w-0">
-            {!r.SchemeEntityId ? <span className="text-slate-500">this relay is in no scheme, so what it protects is not known</span>
-              : protectsQ.isPending ? <span className="text-slate-500">…</span>
-              : !rows.length ? <span className="text-slate-500">the scheme has nothing recorded that it protects</span>
-              : <ul className="space-y-1">{rows.map((a) => (
-                  <li key={s(a.EntityId)}>
-                    {link('PRIMARY_ASSET', s(a.EntityId), s(a.Name))} <span className="text-xs text-slate-500">{s(a.AssetTypeName).toLowerCase()}{a.ZoneRole !== 'Primary' ? ' · ' + s(a.ZoneRole).toLowerCase() : ''}</span>
-                    <div className="ml-3 text-xs text-slate-400">
-                      {inherited(a).map(([code, label, value], i) => <span key={code}>{i > 0 ? ' · ' : ''}{label}: {value ? s(value) : <span className="text-slate-500">not recorded</span>}</span>)}
-                      {!inherited(a).length && <span className="text-slate-500">no BES or PRC-023 declaration applies to a {s(a.AssetTypeName).toLowerCase()}</span>}
-                    </div>
-                    <div className="ml-3 text-xs text-slate-400">
-                      {/* #196: the element's own A-10 declaration rules over the bus's */}
-                      {a.Npcc ? <span className="text-sky-300">NPCC {s(a.Npcc)} — declared on the {s(a.AssetTypeName).toLowerCase() || 'element'} · </span> : null}
-                      {a.HasTerminal ? <>from terminal {s(a.TerminalNo)} · {a.TerminalStationId ? link('LOCATION', s(a.TerminalStationId), s(a.TerminalStation)) : s(a.TerminalStation)} · {a.BusName ? <>bus {s(a.BusName)} — NPCC {s(a.BusNpcc) || 'not recorded'}{a.Npcc ? ' (the element\'s own declaration rules)' : ''}</> : 'no bus linked at that end'}</>
-                        : <span className="text-slate-500">no end is named for what this scheme protects, so no bus NPCC is taken</span>}
-                    </div>
-                  </li>))}</ul>}
+            <ProtectedAssetList schemeEntityId={s(r.SchemeEntityId)} />
             <div className="text-xs text-slate-600">What applies comes from the primary asset and its bus. The relay takes it from what it protects.</div>
           </dd>
         </div>

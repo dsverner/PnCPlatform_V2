@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getText, proc, view, viewAll, s, ApiError, plainRefusal, type Row } from '@/lib/api'
 import { useViewAll } from '@/lib/hooks'
+import { useAssetTypeName } from '@/lib/labels'
 import { screenPath } from '@/lib/screens'
 import { useTemplateDefs, saveAssetCharacteristic, addFirstWinding } from '@/components/CharacteristicsPanel'
 import { SchemeSourceActions, sourceRoleLabel } from '@/components/SchemeSourceActions'
@@ -73,7 +74,7 @@ export function AnalogInputs({ r, revision, canEditAssets = false, canEditScheme
   const values = useMemo(() => new Map((parsedQ.data ?? []).map((p) => [s(p.SettingCode), p])), [parsedQ.data])
   const hasScheme = !!r.SchemeEntityId; const schemeId = s(r.SchemeEntityId); const schemeName = s(r.SchemeName) || 'the scheme'
   const deviceName = s(r.ModelName).replace(/\s*\(legacy label [^)]*\)\s*$/i, '').trim() || s(r.ModelCode) || 'this relay'   // the short model name (owner, 2026-09-20): the legacy label stays in the record's header
-  const sourcesQ = useViewAll('scheme', 'vSchemeSource', { SchemeEntityId: schemeId }, 'AssetName', hasScheme)
+  const sourcesQ = useViewAll('scheme', 'vSchemeSource', { SchemeEntityId: schemeId }, 'AssetName', hasScheme); const assetTypeName = useAssetTypeName()
   const inputsQ = useViewAll('scheme', 'vSchemeInput', { SchemeEntityId: schemeId }, 'InputCode', hasScheme)
   const sources = sourcesQ.data ?? []; const inputs = useMemo(() => sortInputs(inputsQ.data ?? []), [inputsQ.data])
   const capability = tq.data ? deviceInputs(tq.data.rows) : null
@@ -137,7 +138,9 @@ export function AnalogInputs({ r, revision, canEditAssets = false, canEditScheme
                         const ratio = src.Ratio == null ? NaN : Number(src.Ratio); const path = screenPath('INSTRUMENT_TRANSFORMER', s(src.AssetEntityId))
                         return (
                           <tr key={s(src.MemberEntityId)} className="border-t border-slate-800 align-top">
-                            <td className="py-1 pr-2"><a className="text-sky-300 underline" href={path} onClick={(e) => { e.preventDefault(); navigate(path) }}>{s(src.AssetName)}</a>{src.WindingCode ? <span className="text-slate-200"> · {s(src.WindingCode)}</span> : <span className="text-xs text-amber-300" title="which secondary winding feeds this input is not recorded"> · winding not recorded</span>} <span className="text-xs text-slate-500">{s(src.AssetTypeCode)}{src.Phases != null ? ` · ${s(src.Phases) === '1' ? 'single-phase' : `${s(src.Phases)}-phase`}` : ''}</span></td>
+                            <td className="py-1 pr-2"><a className="text-sky-300 underline" href={path} onClick={(e) => { e.preventDefault(); navigate(path) }}>{s(src.AssetName)}</a>{/* #237: the transformer, then its winding and kind on lines of their own */}
+                              <div className="text-xs text-slate-500">{assetTypeName(src.AssetTypeCode)}{src.Phases != null ? `, ${s(src.Phases) === '1' ? 'single-phase' : `${s(src.Phases)}-phase`}` : ''}</div>
+                              <div className="text-xs">{src.WindingCode ? <><span className="text-slate-500">Winding:</span> <span className="text-slate-200">{s(src.WindingCode)}</span></> : <span className="text-amber-300" title="which secondary winding feeds this input is not recorded">Winding not recorded</span>}</div></td>
                             <td className="py-1 pr-2 text-slate-300">{s(src.RatioInUse) ? `${s(src.RatioInUse)}${Number.isFinite(ratio) ? ` = ${ratio}` : ' (not readable)'}` : 'not recorded'}</td>
                             <td className="py-1 pr-2"><span className="flex flex-wrap gap-1">{src.IsPlaced === false && <Pill tone="neutral" title="nothing says where it stands yet — place it from its page">not placed</Pill>}{src.IsInService === false ? <Pill tone="warn">not in service</Pill> : <Pill tone="good">in service</Pill>}</span></td>
                             <td className="py-1 pr-2 text-xs text-slate-300">{s(src.Notes) || <span className="text-slate-600">—</span>}</td>

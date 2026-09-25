@@ -117,7 +117,11 @@ export function RationalePanel({ revision, editable }: { revision: string; edita
         const used = sec.kind !== 'element' || !ins.some((i) => i.key === 'Used_' + sec.key) || yes(inputs['Used_' + sec.key] ?? 'Y')
         return (
           <Panel key={sec.key} title={`${sec.kind === 'element' ? '' : sec.kind === 'shared' ? 'Shared · ' : ''}${sec.title}`}>
-            {el && <div className="text-xs text-slate-400">Capability {el.capability}{el.outputs.length ? ` · outputs ${el.outputs.join(', ')}` : ''} · sets {el.settings.join(', ') || 'no setting'}{d.commissioned.length ? (d.commissioned.includes(el.capability) ? ' · commissioned at this position' : ' · not commissioned at this position') : ''}</div>}
+            {/* #237: one labelled line per fact */}
+            {el && <dl className="grid grid-cols-[7rem_1fr] gap-x-2 text-xs text-slate-400">
+              <dt className="text-slate-500">Capability</dt><dd>{el.capability}{d.commissioned.length ? <span className="text-slate-500">{d.commissioned.includes(el.capability) ? ' — commissioned at this position' : ' — not commissioned at this position'}</span> : null}</dd>
+              {el.outputs.length ? <><dt className="text-slate-500">Outputs</dt><dd>{el.outputs.join(', ')}</dd></> : null}
+              <dt className="text-slate-500">Sets</dt><dd>{el.settings.join(', ') || 'no setting'}</dd></dl>}
             {el && supervisionLine(el) && <div className="text-xs text-slate-400">{supervisionLine(el)}</div>}
             <div className="mt-2 grid gap-2 md:grid-cols-3">
               {ins.map((i) => i.dataType === 'Table'

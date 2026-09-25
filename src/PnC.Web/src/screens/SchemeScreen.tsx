@@ -17,6 +17,7 @@ import { type RecordParams, type Screen, screenPath } from '@/lib/screens'
 import { Panel, Pill, Button, Facts, Status, Field, inputClass } from '@/components/ui/ui'
 import { DataGrid } from '@/components/ui/data-grid'
 import { AssetPicker } from '@/components/pickers'
+import { classificationPairs } from './PrimaryAssetScreen'
 
 const ZONES = ['Primary', 'Backup', 'BreakerFailure']   // the owner, 2026-09-16: Primary, Backup, Breaker Failure
 
@@ -88,7 +89,9 @@ export default function SchemeScreen({ params: p, id }: { screen: Screen; params
         <DataGrid rows={protectsQ.data ?? []} rowKey={(x) => s(x.LinkEntityId)} emptyText="Nothing recorded yet: which primary asset does this scheme protect?" columns={[
           { key: 'Name', label: 'Primary asset', render: (x) => <a className="text-sky-300 underline" href={screenPath('PRIMARY_ASSET', s(x.PrimaryAssetEntityId))} onClick={(e) => { e.preventDefault(); navigate(screenPath('PRIMARY_ASSET', s(x.PrimaryAssetEntityId))) }}>{s(x.Name) || s(x.PrimaryAssetEntityId).slice(0, 8)}</a> },
           { key: 'AssetTypeName', label: 'Type' }, { key: 'Stations', label: 'Terminals' }, { key: 'ProtectedFrom', label: 'Protected from' }, { key: 'ZoneRole', label: 'Zone' },
-          { key: 'Classifications', label: 'Classifications', render: (x) => <span className="text-xs text-slate-400">{s(x.Classifications) || 'none recorded'}</span> },
+          { key: 'Classifications', label: 'Classifications', render: (x) => x.Classifications   // #237: one labelled line per kind, never the "Kind=Value;" summary
+            ? <ul className="text-xs text-slate-400">{classificationPairs(x.Classifications).map((p) => <li key={p.code}><span className="text-slate-500">{p.label}:</span> {p.value}</li>)}</ul>
+            : <span className="text-xs text-slate-500">none recorded</span> },
           ...(editable ? [{ key: '_x', label: '', render: (x: Row) => <Button kind="mini" onClick={() => void unlink(x)}>remove</Button> }] : [])]} />
         {editable && (
           <div className="mt-3 grid gap-3 lg:grid-cols-2">
